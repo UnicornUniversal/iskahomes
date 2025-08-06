@@ -49,7 +49,7 @@ const SignInPage = () => {
       icon: Users,
       email: 'homeseeker@iskahomes.com',
       password: 'homeseeker123',
-      redirectLink: '/homeSeeker'
+      redirectLink: '/homeSeeker/67890/dashboard'
     }
   ]
 
@@ -114,26 +114,14 @@ const SignInPage = () => {
          // Redirect to the appropriate dashboard
          window.location.href = selectedType.redirectLink
        } else {
-         // Check if it's a different account type that's not developer
-         if (formData.accountType !== 'developer') {
-           toast.info('Account still being developed. We are almost there! 🚀', {
-             position: "top-center",
-             autoClose: 4000,
-             hideProgressBar: false,
-             closeOnClick: true,
-             pauseOnHover: true,
-             draggable: true,
-           })
-         } else {
-           toast.error('Invalid email or password for the selected account type', {
-             position: "top-center",
-             autoClose: 4000,
-             hideProgressBar: false,
-             closeOnClick: true,
-             pauseOnHover: true,
-             draggable: true,
-           })
-         }
+         toast.error('Invalid email or password for the selected account type', {
+           position: "top-center",
+           autoClose: 4000,
+           hideProgressBar: false,
+           closeOnClick: true,
+           pauseOnHover: true,
+           draggable: true,
+         })
        }
     } catch (error) {
       console.error('Sign in error:', error)
@@ -321,22 +309,69 @@ const SignInPage = () => {
           </form>
 
           <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h3 className="text-sm font-semibold text-blue-800 mb-3">🧪 Demo Account for Testing:</h3>
-            <div className="space-y-2 text-sm text-blue-700">
-              <div className="flex items-center space-x-2">
-                <span className="font-medium">Email:</span>
-                <span className="bg-white px-2 py-1 rounded border">trassacovalley@gmail.com</span>
+            <h3 className="text-sm font-semibold text-blue-800 mb-3">🧪 Demo Accounts for Testing:</h3>
+            <div className="space-y-4 text-sm text-blue-700">
+              {/* Developer Account */}
+              <div className="border-b border-blue-200 pb-3">
+                <h4 className="font-semibold text-blue-800 mb-2">👨‍💼 Developer Account:</h4>
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium">Email:</span>
+                    <span className="bg-white px-2 py-1 rounded border">trassacovalley@gmail.com</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium">Password:</span>
+                    <span className="bg-white px-2 py-1 rounded border">12345</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <span className="font-medium">Password:</span>
-                <span className="bg-white px-2 py-1 rounded border">12345</span>
+
+              {/* Agent Account */}
+              <div className="border-b border-blue-200 pb-3">
+                <h4 className="font-semibold text-blue-800 mb-2">👤 Agent Account:</h4>
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium">Email:</span>
+                    <span className="bg-white px-2 py-1 rounded border">agent@iskahomes.com</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium">Password:</span>
+                    <span className="bg-white px-2 py-1 rounded border">12345</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <span className="font-medium">Account Type:</span>
-                <span className="bg-white px-2 py-1 rounded border">Developer</span>
+
+              {/* Homeowner Account */}
+              <div className="border-b border-blue-200 pb-3">
+                <h4 className="font-semibold text-blue-800 mb-2">🏠 Homeowner Account:</h4>
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium">Email:</span>
+                    <span className="bg-white px-2 py-1 rounded border">homeowner@iskahomes.com</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium">Password:</span>
+                    <span className="bg-white px-2 py-1 rounded border">homeowner123</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* HomeSeeker Account */}
+              <div>
+                <h4 className="font-semibold text-blue-800 mb-2">👥 HomeSeeker Account:</h4>
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium">Email:</span>
+                    <span className="bg-white px-2 py-1 rounded border">homeseeker@iskahomes.com</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium">Password:</span>
+                    <span className="bg-white px-2 py-1 rounded border">homeseeker123</span>
+                  </div>
+                </div>
               </div>
             </div>
-            <p className="text-xs text-blue-600 mt-2 italic">Use these credentials to test the developer dashboard functionality</p>
+            <p className="text-xs text-blue-600 mt-3 italic">Select the appropriate account type and use these credentials to test different dashboard functionalities</p>
           </div>
 
           {/* Divider */}

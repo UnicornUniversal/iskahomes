@@ -49,7 +49,7 @@ const Conversation = ({ selectedChatId, onBack }) => {
 
   if (!selectedChat) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50 rounded-xl shadow-sm">
+      <div className="flex-1 flex items-center min-h-screen  h-full justify-center bg-gray-50 rounded-xl shadow-sm">
         <div className="text-center">
           <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">
             <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -64,7 +64,7 @@ const Conversation = ({ selectedChatId, onBack }) => {
   }
 
   return (
-    <div className="flex flex-col h-full w-full bg-white rounded-xl shadow-sm border border-gray-100">
+    <div className="flex flex-col min-h-[80vh] w-full bg-white rounded-xl shadow-sm border border-gray-100">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50 rounded-t-xl">
         <div className="flex items-center min-w-0">

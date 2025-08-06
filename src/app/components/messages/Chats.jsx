@@ -17,7 +17,7 @@ const Chats = ({ onChatSelect, selectedChatId }) => {
     <div className="w-80 border-r border-gray-200 bg-white flex flex-col h-full shadow-sm rounded-xl overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-gray-100 bg-gray-50">
-        <h2 className="text-xl font-semibold text-gray-900">Messages</h2>
+        <h2 className="text-xl font-semibold text-gray-900">Chats</h2>
         <p className="text-sm text-gray-500 mt-1">6 conversations</p>
       </div>
 

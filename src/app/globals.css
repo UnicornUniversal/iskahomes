@@ -49,7 +49,7 @@ body {
   }
 
   button{
-    @apply cursor-pointer text-[0.8em] md:text-[0.9em] text-white bg-secondary_color rounded-full p-4 px-6 duration-500;
+    @apply cursor-pointer text-[0.8em] md:text-[0.9em] text-white bg-secondary_color rounded-full p-4  duration-500;
   }
  
   p, h1, h2, h3, h4, h5, h6, pre , li{
