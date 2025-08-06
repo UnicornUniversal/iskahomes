@@ -5,11 +5,26 @@
   --foreground: #171717;
 }
 
+/* Line clamp utility for text truncation */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-poppins);
   --font-mono: var(--font-geist-mono);
+  --color-primary_color: #17637C;
+  --color-secondary_color: #F68B1F;
+  --color-primary_red: #9D2C2C;
+  --color-primary_green: #15D842;
+  --color-gray_bg: #D9D9D9;
+  --color-white_bg: #F5F5F5;
+  --color-text_color: rgb(255,255,255);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,5 +37,116 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-poppins);
+}
+
+@layer base {
+  .bg_blur{
+    @apply backdrop-blur-md  lg:shadow-none ;
+}
+  button{ 
+    @apply text-[0.8em]; 
+  }
+
+  button{
+    @apply cursor-pointer text-[0.8em] md:text-[0.9em] text-white bg-secondary_color rounded-full p-4 px-6 duration-500;
+  }
+ 
+  p, h1, h2, h3, h4, h5, h6, pre , li{
+    @apply cursor-pointer text-primary_color;
+  }
+  
+  p, label, input,li {
+    @apply text-[0.8em] md:text-[0.9em] duration-500;
+  }
+  
+  h1 {
+    @apply text-5xl leading-[1.2];
+  }
+  
+  h2 {
+    @apply text-4xl leading-[1.3];
+  }
+  
+  h3 {
+    @apply text-3xl leading-[1.3];
+  }
+  
+  h4 {
+    @apply text-2xl leading-[1.3];
+  }
+  
+  h5 {
+    @apply text-xl leading-[1.4];
+  }
+  
+  h6 {
+    @apply text-[1em] leading-[1.4];
+  }
+}
+
+/* MESSAGING APP STYLES - COMPLETELY SEPARATE FROM MAIN SITE */
+.messages-page {
+  /* Override button styles only for messaging app */
+  button {
+    @apply text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-md px-4 py-2 duration-200;
+  }
+  
+  /* Override text styles only for messaging app */
+  p, h1, h2, h3, h4, h5, h6, li {
+    @apply text-gray-900 cursor-default;
+  }
+  
+  /* Custom scrollbar for messaging app only */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+}
+
+
+.normal_div{
+  @apply flex flex-col gap-4 md:flex-row ;
+}
+
+/* Message bubble animations - only for messaging app */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-bubble {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Online indicator pulse - only for messaging app */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.online-indicator {
+  animation: pulse 2s infinite;
 }
