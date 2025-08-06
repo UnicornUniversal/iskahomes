@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react'
 import Layout1 from '../../../layout/Layout1'
-import HomeSeekerHeader from '../../../components/homeseeker/HomeSeekerHeader'
-import HomeSeekerNav from '../../../components/homeseeker/HomeSeekerNav'
-import SavedListingCard from '../../../components/homeseeker/SavedListingCard'
+import HomeSeekerHeader from '../../../components/homeSeeker/HomeSeekerHeader'
+import HomeSeekerNav from '../../../components/homeSeeker/HomeSeekerNav'
+import SavedListingCard from '../../../components/homeSeeker/SavedListingCard'
 import { FiFilter, FiGrid, FiList, FiSearch, FiHeart } from 'react-icons/fi'
 
 const HomeSeekerSavedListings = () => {

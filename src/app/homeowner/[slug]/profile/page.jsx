@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react'
 import Layout1 from '../../../layout/Layout1'
-import HomeOwnerHeader from '../../../components/homeowner/HomeOwnerHeader'
-import HomeOwnerNav from '../../../components/homeowner/HomeOwnerNav'
+import HomeOwnerHeader from '../../../components/homeOwner/HomeOwnerHeader'
+import HomeOwnerNav from '../../../components/homeOwner/HomeOwnerNav'
 import { FiUser, FiMail, FiPhone, FiMapPin, FiEdit, FiSave, FiX, FiCamera, FiShield, FiSettings } from 'react-icons/fi'
 
 const HomeOwnerProfile = () => {

@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react'
 import Layout1 from '@/app/layout/Layout1'
-import HomeOwnerHeader from '@/app/components/homeowner/HomeOwnerHeader'
-import HomeOwnerNav from '@/app/components/homeowner/HomeOwnerNav'
+import HomeOwnerHeader from '@/app/components/homeOwner/HomeOwnerHeader'
+import HomeOwnerNav from '@/app/components/homeOwner/HomeOwnerNav'
 import Chats from '@/app/components/messages/Chats'
 import Conversation from '@/app/components/messages/Conversation'
 

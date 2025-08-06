@@ -2,11 +2,11 @@
 
 import React from 'react'
 import Layout1 from '@/app/layout/Layout1'
-import HomeOwnerHeader from '@/app/components/homeowner/HomeOwnerHeader'
-import HomeOwnerNav from '@/app/components/homeowner/HomeOwnerNav'
-import PropertyCard from '@/app/components/homeowner/PropertyCard'
-import BookingSchedule from '@/app/components/homeowner/BookingSchedule'
-import LeadSummary from '@/app/components/homeowner/LeadSummary'
+import HomeOwnerHeader from '@/app/components/homeOwner/HomeOwnerHeader'
+import HomeOwnerNav from '@/app/components/homeOwner/HomeOwnerNav'
+import PropertyCard from '@/app/components/homeOwner/PropertyCard'
+import BookingSchedule from '@/app/components/homeOwner/BookingSchedule'
+import LeadSummary from '@/app/components/homeOwner/LeadSummary'
 import { FiMapPin, FiCalendar, FiMessageSquare, FiBell, FiDollarSign } from 'react-icons/fi'
 
 const HomeOwnerDashboard = () => {

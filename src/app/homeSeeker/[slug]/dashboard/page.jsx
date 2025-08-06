@@ -2,10 +2,10 @@
 
 import React from 'react'
 import Layout1 from '@/app/layout/Layout1'
-import HomeSeekerHeader from '@/app/components/homeseeker/HomeSeekerHeader'
-import HomeSeekerNav from '@/app/components/homeseeker/HomeSeekerNav'
-import SavedListingCard from '@/app/components/homeseeker/SavedListingCard'
-import BookingCard from '@/app/components/homeseeker/BookingCard'
+import HomeSeekerHeader from '@/app/components/homeSeeker/HomeSeekerHeader'
+import HomeSeekerNav from '@/app/components/homeSeeker/HomeSeekerNav'
+import SavedListingCard from '@/app/components/homeSeeker/SavedListingCard'
+import BookingCard from '@/app/components/homeSeeker/BookingCard'
 import { FiHeart, FiCalendar, FiMessageSquare, FiCheckCircle, FiMapPin } from 'react-icons/fi'
 
 const HomeSeekerDashboard = () => {

@@ -4,9 +4,9 @@ import React, { useState } from 'react'
 import Layout1 from '../../../layout/Layout1'
 
 
-import HomeOwnerHeader from '../../../components/homeowner/HomeOwnerHeader'
+import HomeOwnerHeader from '../../../components/homeOwner/HomeOwnerHeader'
 
-import HomeOwnerNav from '../../../components/homeowner/HomeOwnerNav'
+import HomeOwnerNav from '../../../components/homeOwner/HomeOwnerNav'
 
 import { FiCalendar, FiClock, FiMapPin, FiUser, FiPhone, FiMail, FiCheckCircle, FiXCircle, FiClock as FiPending } from 'react-icons/fi'
 

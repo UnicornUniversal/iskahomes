@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react'
 import Layout1 from '../../../layout/Layout1'
-import HomeSeekerHeader from '../../../components/homeseeker/HomeSeekerHeader'
-import HomeSeekerNav from '../../../components/homeseeker/HomeSeekerNav'
+import HomeSeekerHeader from '../../../components/homeSeeker/HomeSeekerHeader'
+import HomeSeekerNav from '../../../components/homeSeeker/HomeSeekerNav'
 import { FiUser, FiMail, FiPhone, FiMapPin, FiEdit, FiSave, FiX, FiCamera, FiShield, FiSettings, FiHeart, FiHome } from 'react-icons/fi'
 
 const HomeSeekerProfile = () => {

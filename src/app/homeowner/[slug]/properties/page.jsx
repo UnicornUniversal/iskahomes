@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react'
 import Layout1 from '@/app/layout/Layout1'
-import HomeOwnerHeader from '@/app/components/homeowner/HomeOwnerHeader'
-import HomeOwnerNav from '@/app/components/homeowner/HomeOwnerNav'
-import PropertyCard from '@/app/components/homeowner/PropertyCard'
+import HomeOwnerHeader from '@/app/components/homeOwner/HomeOwnerHeader'
+import HomeOwnerNav from '@/app/components/homeOwner/HomeOwnerNav'
+import PropertyCard from '@/app/components/homeOwner/PropertyCard'
 import { FiFilter, FiSearch, FiPlus } from 'react-icons/fi'
 
 const HomeOwnerProperties = () => {
