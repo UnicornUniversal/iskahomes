@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { FiSearch, FiFilter, FiBuilding, FiEye, FiEdit, FiTrash2, FiCheckCircle, FiXCircle } from 'react-icons/fi'
+import { FiSearch, FiFilter, FiHome, FiEye, FiEdit, FiTrash2, FiCheckCircle, FiXCircle } from 'react-icons/fi'
 
 const DevelopersPage = () => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -100,7 +100,7 @@ const DevelopersPage = () => {
               <p className="text-sm font-medium text-gray-600">Total Developers</p>
               <p className="text-2xl font-bold text-gray-900">{developers.length}</p>
             </div>
-            <FiBuilding className="w-8 h-8 text-blue-600" />
+            <FiHome className="w-8 h-8 text-blue-600" />
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -133,7 +133,7 @@ const DevelopersPage = () => {
                 {developers.reduce((acc, d) => acc + d.properties, 0)}
               </p>
             </div>
-            <FiBuilding className="w-8 h-8 text-purple-600" />
+            <FiHome className="w-8 h-8 text-purple-600" />
           </div>
         </div>
       </div>
@@ -160,7 +160,7 @@ const DevelopersPage = () => {
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10">
                         <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                          <FiBuilding className="w-5 h-5 text-blue-600" />
+                          <FiHome className="w-5 h-5 text-blue-600" />
                         </div>
                       </div>
                       <div className="ml-4">

@@ -13,7 +13,6 @@ import {
     FiMenu,
     FiX,
     FiUser,
-    FiBuilding,
     FiTag,
     FiTarget,
     FiLayers,
@@ -60,7 +59,7 @@ const AdminNav = ({ active }) => {
                 {
                     label: 'Developers',
                     href: '/admin/users/developers',
-                    icon: FiBuilding,
+                    icon: FiHome,
                     type: 'single'
                 },
                 {

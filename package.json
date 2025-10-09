@@ -13,6 +13,8 @@
     "@radix-ui/react-scroll-area": "^1.2.9",
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
+    "@react-three/drei": "^10.7.6",
+    "@react-three/fiber": "^9.3.0",
     "@schedule-x/calendar": "^2.36.0",
     "@schedule-x/theme-default": "^2.36.0",
     "@sendgrid/mail": "^8.1.6",
@@ -34,7 +36,8 @@
     "react-leaflet": "^5.0.0",
     "react-toastify": "^11.0.5",
     "swiper": "^11.2.10",
-    "tailwind-merge": "^3.3.1"
+    "tailwind-merge": "^3.3.1",
+    "three": "^0.180.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

@@ -4,7 +4,7 @@ import React from 'react'
 import { 
   FiUsers, 
   FiMapPin, 
-  FiBuilding, 
+  FiHome, 
   FiTrendingUp,
   FiDollarSign,
   FiEye,
@@ -34,7 +34,7 @@ const AdminDashboard = () => {
       value: '156',
       change: '+5%',
       changeType: 'positive',
-      icon: FiBuilding,
+      icon: FiHome,
       color: 'purple'
     },
     {
@@ -69,7 +69,7 @@ const AdminDashboard = () => {
       type: 'user_registration',
       message: 'New developer "ABC Construction" registered',
       time: '2 minutes ago',
-      icon: FiBuilding,
+      icon: FiHome,
       color: 'green'
     },
     {

@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 
-const VerifyEmailPage = () => {
+const VerifyEmailContent = () => {
   const [verificationStatus, setVerificationStatus] = useState('verifying') // 'verifying', 'success', 'error'
   const [message, setMessage] = useState('')
   const searchParams = useSearchParams()
@@ -103,6 +103,22 @@ const VerifyEmailPage = () => {
         )}
       </div>
     </div>
+  )
+}
+
+const VerifyEmailPage = () => {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-6"></div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Loading...</h1>
+          <p className="text-gray-600">Please wait...</p>
+        </div>
+      </div>
+    }>
+      <VerifyEmailContent />
+    </Suspense>
   )
 }
 
