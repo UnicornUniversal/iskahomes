@@ -129,7 +129,7 @@ const StatisticsView = () => {
 
   return (
     <>
-      <h3 className=" mb-6 ">Company Statistics</h3>
+      <h5 className=" mb-6 ">Statistics</h5>
     
     
    

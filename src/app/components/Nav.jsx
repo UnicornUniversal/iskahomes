@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   FaHome, 
   FaCogs, 
@@ -14,12 +15,15 @@ import {
   FaSignInAlt, 
   FaEnvelope,
   FaBars,
-  FaTimes
+  FaTimes,
+  FaUser,
+  FaSignOutAlt
 } from "react-icons/fa";
 
 const Nav = () => {
   const [show_nav, set_show_nav] = useState(false);
-  const [sub_menu, set_sub_menu] =  useState("")
+  const [sub_menu, set_sub_menu] =  useState("");
+  const { user, loading, logout } = useAuth();
 
     const nav_options = [
     { nav_name: "Home", nav_icon: FaHome, nav_link: "/" },
@@ -31,9 +35,9 @@ const Nav = () => {
       {"sub_link_name":"Smart Home Installation", "sub_link_link":"/smart-home-installation"  },
       {"sub_link_name":"Space Planning Consultation", "sub_link_link":"/space-planning-consultation"  },
     ] },  
-    // { nav_name: "Explore Properties", nav_icon: FaSearch, nav_link: "/events" },
+    { nav_name: "Explore Properties", nav_icon: FaSearch, nav_link: "/exploreProperties" },
     // { nav_name: "Sell A Property", nav_icon: FaHandshake, nav_link: "/projects" },
-    // { nav_name: "Developers", nav_icon: FaBuilding, nav_link: "/developers" },
+    { nav_name: "Developers", nav_icon: FaBuilding, nav_link: "/allDevelopers" },
     { nav_name: "Agents", nav_icon: FaUsers, nav_link: "/allAgents" },
     { nav_name: "About Us", nav_icon: FaInfoCircle, nav_link: "/aboutUs" },
     { nav_name: "Contact Us", nav_icon: FaEnvelope, nav_link: "/contactUs" },
@@ -46,7 +50,12 @@ const Nav = () => {
 const button_options = [
   { nav_name: "Sign Up", nav_icon: FaUserPlus, nav_link: "/signup", isButton: true },
   { nav_name: "Login", nav_icon: FaSignInAlt, nav_link: "/signin", isButton: true },
-]
+];
+
+const handleLogout = () => {
+  logout();
+  set_show_nav(false);
+};
 
   return (
     <div className="fixed top-0   w-full  left-1/2 -translate-x-1/2    overflow-y z-100 backdrop-blur-md ">
@@ -114,20 +123,48 @@ const button_options = [
 
         {/* Buttons (right on md+) */}
         <div className="flex flex-col gap-4 w-full md:flex-row md:gap-4 md:w-auto md:ml-8 md:justify-end mt-4 md:mt-0">
-          {button_options.map((each_value) => {
-            const IconComponent = each_value.nav_icon;
-            return (
-              <Link href={each_value.nav_link} key={each_value.nav_name} className="w-full md:w-auto">
+          {loading ? (
+            <div className="flex items-center justify-center px-4 py-3">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary_color"></div>
+            </div>
+          ) : user && user.user_type === 'developer' ? (
+            <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+              {/* Welcome message with link to dashboard */}
+              <Link href={`/developer/${user.profile?.slug || user.id}/dashboard`} className="w-full md:w-auto">
                 <div 
                   onClick={() => set_show_nav(false)}
-                  className="flex items-center gap-3 justify-center text-left md:text-center text-[1.1em] md:text-sm cursor-pointer transition-all duration-500 bg-primary_color text-white px-4 py-3 md:px-6 md:py-2 rounded-lg hover:bg-opacity-90 w-full md:w-auto"
+                  className="flex items-center gap-3 justify-center text-left md:text-center text-[1.1em] md:text-sm cursor-pointer transition-all duration-500 bg-primary_color text-white px-4 py-3 md:px-6 md:py-2 rounded-lg hover:bg-opacity-90 w-full md:w-auto shadow-md hover:shadow-lg"
                 >
-                  <IconComponent size={22} className="md:hidden" />
-                  <span className="text-xs ">{each_value.nav_name}</span>
+                  <FaUser size={22} className="md:hidden" />
+                  <span className="text-xs font-medium">Welcome, {user.profile?.name || user.email}</span>
                 </div>
               </Link>
-            );
-          })}
+              
+              {/* Logout button - commented out for now */}
+              {/* <button
+                onClick={handleLogout}
+                className="flex items-center gap-3 justify-center text-left md:text-center text-[1.1em] md:text-sm cursor-pointer transition-all duration-500 bg-red-600 text-white px-4 py-3 md:px-6 md:py-2 rounded-lg hover:bg-opacity-90 w-full md:w-auto"
+              >
+                <FaSignOutAlt size={22} className="md:hidden" />
+                <span className="text-xs">Logout</span>
+              </button> */}
+            </div>
+          ) : (
+            button_options.map((each_value) => {
+              const IconComponent = each_value.nav_icon;
+              return (
+                <Link href={each_value.nav_link} key={each_value.nav_name} className="w-full md:w-auto">
+                  <div 
+                    onClick={() => set_show_nav(false)}
+                    className="flex items-center gap-3 justify-center text-left md:text-center text-[1.1em] md:text-sm cursor-pointer transition-all duration-500 bg-primary_color text-white px-4 py-3 md:px-6 md:py-2 rounded-lg hover:bg-opacity-90 w-full md:w-auto"
+                  >
+                    <IconComponent size={22} className="md:hidden" />
+                    <span className="text-xs ">{each_value.nav_name}</span>
+                  </div>
+                </Link>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

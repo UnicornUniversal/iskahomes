@@ -1,25 +1,38 @@
-import React from 'react'
-import { appointments } from '../Data/Data'
+'use client'
 
-const AVATAR_PLACEHOLDER = '/iska-dark.png'
+import React, { useState, useEffect } from 'react'
+import { useAuth } from '@/hooks/useAuth'
+import { Calendar, Clock, User, MapPin, Loader2 } from 'lucide-react'
 
 const LatestAppointments = () => {
-  // Get pending appointments and sort by closest time (ascending)
-  const pendingAppointments = appointments
-    .filter(appointment => appointment.status === 'pending')
-    .sort((a, b) => {
-      const dateA = new Date(`${a.date}T${a.start_time}`)
-      const dateB = new Date(`${b.date}T${b.start_time}`)
-      return dateA - dateB
-    })
-    .slice(0, 10)
+  const { user } = useAuth()
+  const [appointments, setAppointments] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchAppointments()
+    }
+  }, [user?.id])
+
+  const fetchAppointments = async () => {
+    try {
+      const response = await fetch(`/api/appointments/latest?account_id=${user.id}&limit=5`)
+      if (response.ok) {
+        const result = await response.json()
+        setAppointments(result.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching appointments:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
-      day: 'numeric',
+    return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
-      year: 'numeric',
+      day: 'numeric'
     })
   }
 
@@ -28,63 +41,68 @@ const LatestAppointments = () => {
     const hour = parseInt(h, 10)
     const ampm = hour >= 12 ? 'PM' : 'AM'
     const hour12 = hour % 12 === 0 ? 12 : hour % 12
-    return `${hour12}:${m}`
+    return `${hour12}:${m} ${ampm}`
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl p-6">
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
+          <span className="text-gray-600">Loading...</span>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="bg-white rounded-3xl shadow-md p-6">
-      <div className="flex items-center mb-6">
-        <span className="text-blue-500 text-xl mr-2">📅</span>
-        <h3 className="text-lg font-semibold text-gray-900">Recent Appointments</h3>
+    <div className="bg-white rounded-xl p-6">
+      <div className="flex items-center mb-4">
+        <Calendar className="w-5 h-5 text-blue-600 mr-2" />
+        <h3 className="text-lg font-semibold text-gray-900">Latest Appointments</h3>
       </div>
-      <div className="space-y-4">
-        {pendingAppointments.map((appointment) => {
-          const { development_and_unit } = appointment
-          return (
-            <div
-              key={appointment.id}
-              className="flex items-center  justify-between bg-[#f8fbfd] rounded-full px-6 py-3 shadow-sm"
-            >
-              {/* Avatar */}
-              {/* <img
-                src={AVATAR_PLACEHOLDER}
-                alt="avatar"
-                className="w-12 h-12 rounded-full object-cover mr-4 border border-gray-200"
-              /> */}
-              {/* Seeker info */}
-              <div className="flex flex-col justify-center min-w-[140px] mr-6">
-                <span className="font-semibold text-gray-800 text-base leading-tight">{appointment.homeseeker.name}</span>
-                <span className="text-xs text-gray-400 leading-tight mt-1">{appointment.homeseeker.phone || appointment.homeseeker.email}</span>
+
+      <div className="space-y-3">
+        {appointments.map((appointment) => (
+          <div key={appointment.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex-1">
+              <div className="flex items-center mb-1">
+                <User className="w-4 h-4 text-gray-500 mr-2" />
+                <span className="font-medium text-gray-900">{appointment.clientName}</span>
               </div>
-              {/* Development & unit */}
-              <div className="flex flex-col justify-center min-w-[160px] mr-6">
-                <span className="flex items-center text-gray-800 text-base font-semibold leading-tight">
-                  <span className="mr-1">🏢</span>{development_and_unit?.development_name || '—'}
-                </span>
-                <span className="text-xs text-gray-400 leading-tight mt-1">{development_and_unit?.unit_name || '—'}</span>
-              </div>
-              {/* Date & time */}
-              <div className="flex flex-col justify-end min-w-[120px] mr-6">
-                <span className="flex items-end text-gray-800 text-base font-semibold leading-tight">
-                  <span className="mr-1">📅</span>{formatDate(appointment.date)}
-                </span>
-                <span className="text-xs text-gray-400 leading-tight mt-1">{formatTime(appointment.start_time)}</span>
+              <div className="flex items-center text-sm text-gray-600">
+                <MapPin className="w-3 h-3 mr-1" />
+                <span>{appointment.property.title}</span>
               </div>
             </div>
-          )
-        })}
+            <div className="text-right">
+              <div className="flex items-center text-sm text-gray-600 mb-1">
+                <Calendar className="w-3 h-3 mr-1" />
+                <span>{formatDate(appointment.date)}</span>
+              </div>
+              <div className="flex items-center text-sm text-gray-600">
+                <Clock className="w-3 h-3 mr-1" />
+                <span>{formatTime(appointment.startTime)}</span>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
-      {pendingAppointments.length === 0 && (
+
+      {appointments.length === 0 && (
         <div className="text-center py-8">
-          <div className="text-gray-400 text-4xl mb-2">📅</div>
-          <p className="text-gray-500">No appointments found</p>
+          <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500">No appointments yet</p>
         </div>
       )}
-      <div className="flex justify-center mt-8">
-        <button className="bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-full px-8 py-2 flex items-center gap-2 transition">
-          See All Appointments <span>→</span>
-        </button>
-      </div>
+
+      {appointments.length > 0 && (
+        <div className="text-center mt-4">
+          <button className="text-blue-600 hover:text-blue-700 font-medium">
+            View All Appointments
+          </button>
+        </div>
+      )}
     </div>
   )
 }

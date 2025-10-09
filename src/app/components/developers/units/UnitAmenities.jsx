@@ -1,145 +1,495 @@
-import React, { useState } from 'react'
-import { FaSnowflake, FaBuilding, FaBath, FaUtensils, FaTshirt, FaMobileAlt, FaSeedling, FaFan, FaFire, FaDoorOpen, FaCar, FaDog, FaCouch, FaBoxOpen } from 'react-icons/fa'
+"use client"
+import React, { useState, useEffect } from 'react'
 
-const unitAmenitiesList = [
-  { id: 'ac', name: 'Air Conditioning', icon: <FaSnowflake /> },
-  { id: 'balcony', name: 'Balcony', icon: <FaBuilding /> },
-  { id: 'ensuite', name: 'Ensuite Bathroom', icon: <FaBath /> },
-  { id: 'kitchen-appliances', name: 'Kitchen Appliances', icon: <FaUtensils /> },
-  { id: 'wardrobes', name: 'Built-in Wardrobes', icon: <FaTshirt /> },
-  { id: 'smart-home', name: 'Smart Home System', icon: <FaMobileAlt /> },
-  { id: 'private-garden', name: 'Private Garden', icon: <FaSeedling /> },
-  { id: 'laundry', name: 'In-unit Laundry', icon: <FaTshirt /> },
-  { id: 'ceiling-fan', name: 'Ceiling Fan', icon: <FaFan /> },
-  { id: 'fireplace', name: 'Fireplace', icon: <FaFire /> },
-  { id: 'walk-in-closet', name: 'Walk-in Closet', icon: <FaDoorOpen /> },
-  { id: 'private-parking', name: 'Private Parking', icon: <FaCar /> },
-  { id: 'pet-friendly', name: 'Pet Friendly', icon: <FaDog /> },
-  { id: 'furnished', name: 'Furnished', icon: <FaCouch /> },
-  { id: 'unfurnished', name: 'Unfurnished', icon: <FaBoxOpen /> },
-]
+const UnitAmenities = ({ formData, updateFormData, mode }) => {
+  const [amenitiesData, setAmenitiesData] = useState({
+    database: [],
+    loading: true
+  })
+  const [customAmenity, setCustomAmenity] = useState('')
 
-const UnitAmenities = () => {
-  const [selected, setSelected] = useState([])
-  const [customAmenities, setCustomAmenities] = useState([])
-  const [newCustom, setNewCustom] = useState('')
+  // Fetch amenities from database
+  useEffect(() => {
+    const fetchAmenities = async () => {
+      try {
+        setAmenitiesData(prev => ({ ...prev, loading: true }))
+        
+        const response = await fetch('/api/admin/property-amenities')
+        if (response.ok) {
+          const data = await response.json()
+          setAmenitiesData({
+            database: data.data || data || [],
+            loading: false
+          })
+        } else {
+          console.error('Failed to fetch amenities')
+          setAmenitiesData(prev => ({ ...prev, loading: false }))
+        }
+      } catch (error) {
+        console.error('Error fetching amenities:', error)
+        setAmenitiesData(prev => ({ ...prev, loading: false }))
+      }
+    }
 
-  const handleToggle = (id) => {
-    setSelected(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
-  }
+    fetchAmenities()
+  }, [])
 
-  const handleAddCustom = () => {
-    if (newCustom.trim()) {
-      setCustomAmenities(prev => [...prev, newCustom.trim()])
-      setNewCustom('')
+  // Property type specific amenity categories
+  const getAmenityCategories = () => {
+    switch (formData.property_type) {
+      case 'houses':
+      case 'apartments':
+        return [
+          'Kitchen & Dining',
+          'Living & Entertainment',
+          'Bedroom & Bathroom',
+          'Outdoor & Garden',
+          'Security & Safety',
+          'Utilities & Services',
+          'Parking & Storage'
+        ]
+      case 'offices':
+        return [
+          'Workspace Features',
+          'Meeting & Conference',
+          'Technology & Internet',
+          'Security & Access',
+          'Parking & Transportation',
+          'Food & Beverage',
+          'Recreation & Wellness'
+        ]
+      case 'warehouses':
+        return [
+          'Storage & Handling',
+          'Loading & Access',
+          'Security & Safety',
+          'Utilities & Power',
+          'Climate Control',
+          'Equipment & Machinery',
+          'Transportation'
+        ]
+      case 'event_centers':
+        return [
+          'Event Facilities',
+          'Audio & Visual',
+          'Catering & Food',
+          'Seating & Tables',
+          'Parking & Access',
+          'Security & Safety',
+          'Services & Support'
+        ]
+      case 'land':
+        return [
+          'Access & Roads',
+          'Utilities & Services',
+          'Topography & Features',
+          'Zoning & Permits',
+          'Security & Boundaries',
+          'Environmental',
+          'Development Potential'
+        ]
+      default:
+        return ['General']
     }
   }
 
-  const handleRemoveCustom = (idx) => {
-    setCustomAmenities(prev => prev.filter((_, i) => i !== idx))
-  }
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      handleAddCustom()
+  const getGeneralAmenities = () => {
+    switch (formData.property_type) {
+      case 'houses':
+      case 'apartments':
+        return [
+          'Air Conditioning',
+          'Heating',
+          'WiFi',
+          'Cable TV',
+          'Washing Machine',
+          'Dryer',
+          'Dishwasher',
+          'Microwave',
+          'Refrigerator',
+          'Stove',
+          'Balcony',
+          'Terrace',
+          'Garden',
+          'Swimming Pool',
+          'Gym',
+          'Sauna',
+          'Security System',
+          'CCTV',
+          'Intercom',
+          'Parking Space',
+          'Storage Room',
+          'Elevator',
+          'Pet Friendly',
+          'Furnished',
+          'Near Public Transport'
+        ]
+      case 'offices':
+        return [
+          'High-Speed Internet',
+          'WiFi',
+          'Air Conditioning',
+          'Heating',
+          'Reception Service',
+          'Cleaning Service',
+          'Security System',
+          'CCTV',
+          'Access Control',
+          'Parking Space',
+          'Elevator',
+          'Kitchenette',
+          'Coffee Machine',
+          'Printer/Scanner',
+          'Whiteboard',
+          'Projector',
+          'Phone System',
+          'Mail Handling',
+          'Flexible Hours',
+          'Meeting Rooms',
+          'Breakout Areas',
+          'Quiet Zones',
+          'Natural Light',
+          'Near Public Transport',
+          'Near Restaurants'
+        ]
+      case 'warehouses':
+        return [
+          'Loading Docks',
+          'Forklift Access',
+          'Crane Access',
+          'Rail Access',
+          'High Ceilings',
+          'Wide Aisles',
+          'Climate Control',
+          'Security System',
+          'CCTV',
+          'Access Control',
+          'Fire Suppression',
+          'Sprinkler System',
+          'Emergency Exits',
+          'Office Space',
+          'Restrooms',
+          'Parking Space',
+          'Truck Parking',
+          'Power Supply',
+          'Backup Generator',
+          'Water Supply',
+          'Drainage',
+          'Insulation',
+          'Ventilation',
+          'Near Highways',
+          'Near Ports'
+        ]
+      case 'event_centers':
+        return [
+          'Stage',
+          'Lighting System',
+          'Sound System',
+          'Microphones',
+          'Projector',
+          'Screens',
+          'Chairs',
+          'Tables',
+          'Linens',
+          'Catering Kitchen',
+          'Bar Area',
+          'Dance Floor',
+          'Bridal Suite',
+          'Changing Rooms',
+          'Parking Space',
+          'Valet Service',
+          'Security',
+          'CCTV',
+          'Air Conditioning',
+          'Heating',
+          'Restrooms',
+          'Accessibility',
+          'Outdoor Space',
+          'Garden Area',
+          'Near Hotels'
+        ]
+      case 'land':
+        return [
+          'Road Access',
+          'Paved Roads',
+          'Street Lighting',
+          'Water Supply',
+          'Electricity',
+          'Sewer System',
+          'Internet',
+          'Phone Lines',
+          'Gas Lines',
+          'Drainage',
+          'Surveyed',
+          'Title Deed',
+          'Building Permit',
+          'Zoning Approval',
+          'Environmental Clearance',
+          'Security Fence',
+          'Gate',
+          'CCTV',
+          'Near Schools',
+          'Near Hospitals',
+          'Near Shopping',
+          'Near Public Transport',
+          'Near Airport',
+          'Scenic Views',
+          'Development Ready'
+        ]
+      default:
+        return []
     }
   }
+
+  const handleDatabaseAmenityToggle = (amenity) => {
+    const isSelected = formData.amenities.database.some(a => a.id === amenity.id)
+    
+    if (isSelected) {
+      // Remove amenity
+      updateFormData({
+        amenities: {
+          ...formData.amenities,
+          database: formData.amenities.database.filter(a => a.id !== amenity.id)
+        }
+      })
+    } else {
+      // Add amenity
+      updateFormData({
+        amenities: {
+          ...formData.amenities,
+          database: [...formData.amenities.database, amenity]
+        }
+      })
+    }
+  }
+
+  const handleGeneralAmenityToggle = (amenity) => {
+    const isSelected = formData.amenities.general.includes(amenity)
+    
+    if (isSelected) {
+      // Remove amenity
+      updateFormData({
+        amenities: {
+          ...formData.amenities,
+          general: formData.amenities.general.filter(a => a !== amenity)
+        }
+      })
+    } else {
+      // Add amenity
+      updateFormData({
+        amenities: {
+          ...formData.amenities,
+          general: [...formData.amenities.general, amenity]
+        }
+      })
+    }
+  }
+
+  const handleCustomAmenityAdd = () => {
+    if (customAmenity.trim() && !formData.amenities.custom.includes(customAmenity.trim())) {
+      updateFormData({
+        amenities: {
+          ...formData.amenities,
+          custom: [...formData.amenities.custom, customAmenity.trim()]
+        }
+      })
+      setCustomAmenity('')
+    }
+  }
+
+  const handleCustomAmenityRemove = (amenity) => {
+    updateFormData({
+      amenities: {
+        ...formData.amenities,
+        custom: formData.amenities.custom.filter(a => a !== amenity)
+      }
+    })
+  }
+
+  const getAmenitiesByCategory = (category) => {
+    return amenitiesData.database.filter(amenity => 
+      amenity.category === category || amenity.name.toLowerCase().includes(category.toLowerCase())
+    )
+  }
+
+  const categories = getAmenityCategories()
+  const generalAmenities = getGeneralAmenities()
 
   return (
-    <div className="w-full p-6 bg-white rounded-lg shadow-sm">
-      <div className="mb-6">
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">Unit Amenities</h3>
-        <p className="text-gray-600">Select the amenities available in this unit.</p>
-      </div>
-      {/* Predefined Amenities */}
-      <div>
-        <h4 className="text-lg font-semibold text-gray-800 mb-4">Available Amenities</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {unitAmenitiesList.map(amenity => (
-            <label
-              key={amenity.id}
-              className={`flex items-start space-x-3 p-4 border rounded-lg cursor-pointer transition-all hover:bg-gray-50 ${selected.includes(amenity.id) ? 'border-primary_color bg-primary_color/5' : 'border-gray-200'}`}
-            >
-              <input
-                type="checkbox"
-                checked={selected.includes(amenity.id)}
-                onChange={() => handleToggle(amenity.id)}
-                className="mt-1 rounded border-gray-300 text-primary_color focus:ring-primary_color"
-              />
-              <div className="flex-1">
-                <div className="flex items-center space-x-2">
-                  <span className="text-xl">{amenity.icon}</span>
-                  <span className="font-medium text-gray-900">{amenity.name}</span>
+    <div className="space-y-6">
+      {/* Database Amenities */}
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Database Amenities</h3>
+        
+        {amenitiesData.loading ? (
+          <div className="text-center py-4">
+            <div className="text-gray-500">Loading amenities...</div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {categories.map(category => {
+              const categoryAmenities = getAmenitiesByCategory(category)
+              if (categoryAmenities.length === 0) return null
+
+              return (
+                <div key={category}>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">{category}</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {categoryAmenities.map(amenity => {
+                      const isSelected = formData.amenities.database.some(a => a.id === amenity.id)
+                      return (
+                        <label key={amenity.id} className="flex items-center space-x-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleDatabaseAmenityToggle(amenity)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">{amenity.name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            </label>
-          ))}
-        </div>
-      </div>
-      {/* Custom Amenities */}
-      <div className="mt-8">
-        <h4 className="text-lg font-semibold text-gray-800 mb-4">Additional Custom Amenities</h4>
-        <div className="flex space-x-2 mb-4">
-          <input
-            type="text"
-            placeholder="Add a custom amenity..."
-            value={newCustom}
-            onChange={e => setNewCustom(e.target.value)}
-            onKeyPress={handleKeyPress}
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-          <button
-            type="button"
-            onClick={handleAddCustom}
-            disabled={!newCustom.trim()}
-            className="bg-gray-100 px-3 py-2 rounded-lg text-gray-700 border border-gray-300 hover:bg-gray-200"
-          >
-            Add
-          </button>
-        </div>
-        {customAmenities.length > 0 && (
-          <div className="space-y-2">
-            {customAmenities.map((amenity, idx) => (
-              <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <span className="text-gray-900">{amenity}</span>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveCustom(idx)}
-                  className="text-red-500 hover:text-red-700"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
-      {/* Selected Amenities Summary */}
-      {(selected.length > 0 || customAmenities.length > 0) && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-8">
-          <h4 className="text-lg font-semibold text-blue-900 mb-3">Selected Amenities Summary</h4>
-          <div className="space-y-2">
-            {unitAmenitiesList.filter(a => selected.includes(a.id)).map(a => (
-              <div key={a.id} className="flex items-center space-x-2">
-                <span className="text-lg">{a.icon}</span>
-                <span className="text-blue-800">{a.name}</span>
-              </div>
-            ))}
-            {customAmenities.map((amenity, idx) => (
-              <div key={`custom-${idx}`} className="flex items-center space-x-2">
-                <span className="text-lg">✨</span>
-                <span className="text-blue-800">{amenity}</span>
-              </div>
-            ))}
-          </div>
-          <p className="text-sm text-blue-600 mt-3">
-            Total: {selected.length + customAmenities.length} amenities selected
-          </p>
+
+      {/* General Amenities */}
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">General Amenities</h3>
+        
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+          {generalAmenities.map(amenity => {
+            const isSelected = formData.amenities.general.includes(amenity)
+            return (
+              <label key={amenity} className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => handleGeneralAmenityToggle(amenity)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">{amenity}</span>
+              </label>
+            )
+          })}
         </div>
-      )}
+      </div>
+
+      {/* Custom Amenities */}
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Custom Amenities</h3>
+        
+        <div className="space-y-4">
+          <div className="flex space-x-2">
+            <input
+              type="text"
+              value={customAmenity}
+              onChange={(e) => setCustomAmenity(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleCustomAmenityAdd()}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Add custom amenity..."
+            />
+            <button
+              type="button"
+              onClick={handleCustomAmenityAdd}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Add
+            </button>
+          </div>
+
+          {formData.amenities.custom.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {formData.amenities.custom.map((amenity, index) => (
+                <div key={index} className="flex items-center space-x-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                  <span>{amenity}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleCustomAmenityRemove(amenity)}
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Selected Amenities Summary */}
+      <div className="bg-blue-50 p-4 rounded-lg">
+        <h3 className="text-lg font-semibold text-blue-900 mb-4">Selected Amenities Summary</h3>
+        
+        <div className="space-y-3">
+          {formData.amenities.database.length > 0 && (
+            <div>
+              <h4 className="text-sm font-medium text-blue-800 mb-2">
+                Database Amenities ({formData.amenities.database.length})
+              </h4>
+              <div className="flex flex-wrap gap-1">
+                {formData.amenities.database.map(amenity => (
+                  <span key={amenity.id} className="bg-blue-200 text-blue-800 px-2 py-1 rounded text-xs">
+                    {amenity.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {formData.amenities.general.length > 0 && (
+            <div>
+              <h4 className="text-sm font-medium text-blue-800 mb-2">
+                General Amenities ({formData.amenities.general.length})
+              </h4>
+              <div className="flex flex-wrap gap-1">
+                {formData.amenities.general.map(amenity => (
+                  <span key={amenity} className="bg-green-200 text-green-800 px-2 py-1 rounded text-xs">
+                    {amenity}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {formData.amenities.custom.length > 0 && (
+            <div>
+              <h4 className="text-sm font-medium text-blue-800 mb-2">
+                Custom Amenities ({formData.amenities.custom.length})
+              </h4>
+              <div className="flex flex-wrap gap-1">
+                {formData.amenities.custom.map(amenity => (
+                  <span key={amenity} className="bg-purple-200 text-purple-800 px-2 py-1 rounded text-xs">
+                    {amenity}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {formData.amenities.database.length === 0 && 
+           formData.amenities.general.length === 0 && 
+           formData.amenities.custom.length === 0 && (
+            <p className="text-blue-700 text-sm">No amenities selected yet.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Amenities Guidelines */}
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <h4 className="text-sm font-semibold text-gray-900 mb-2">Amenities Guidelines</h4>
+        <ul className="text-xs text-gray-600 space-y-1">
+          <li>• <strong>Database Amenities:</strong> Pre-defined amenities from our database</li>
+          <li>• <strong>General Amenities:</strong> Common amenities for this property type</li>
+          <li>• <strong>Custom Amenities:</strong> Add specific amenities unique to your property</li>
+          <li>• Select amenities that accurately represent your property's features</li>
+          <li>• Amenities help potential tenants/ buyers understand what's included</li>
+        </ul>
+      </div>
     </div>
   )
 }

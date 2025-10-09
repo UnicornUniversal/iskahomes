@@ -17,13 +17,15 @@ import {
   FiSearch,
   FiGrid,
   FiList,
-  FiTrash2
+  FiTrash2,
+  FiLoader
 } from 'react-icons/fi'
-import { appointments } from '../Data/Data'
+import { useAuth } from '@/contexts/AuthContext'
 import DeveloperNav from './DeveloperNav'
 import { Calendar, momentLocalizer } from 'react-big-calendar'
 import moment from 'moment'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
+import { toast } from 'react-toastify'
 
 // Custom CSS for modern calendar styling
 const calendarStyles = `
@@ -271,15 +273,124 @@ const calendarStyles = `
 `
 
 const Appointments = () => {
+  const { user, isAuthenticated } = useAuth()
+  const [appointments, setAppointments] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [page, setPage] = useState(1)
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [editingAppointment, setEditingAppointment] = useState(null)
-  // const [viewMode, setViewMode] = useState('calendar') // 'list' or 'calendar'
   const [viewMode, setViewMode] = useState('list') // Only list view for now
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [isEventModalOpen, setIsEventModalOpen] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(null)
   
   const localizer = momentLocalizer(moment)
+
+  // Fetch appointments from API
+  const fetchAppointments = async (pageNum = 1, reset = false) => {
+    if (!user?.id) return
+
+    try {
+      if (reset) {
+        setLoading(true)
+        setPage(1)
+      } else {
+        setLoadingMore(true)
+      }
+
+      const response = await fetch(`/api/appointments?account_id=${user.id}&account_type=developer&page=${pageNum}&limit=10`)
+      const result = await response.json()
+
+      if (result.success) {
+        const newAppointments = result.data || []
+        
+        if (reset) {
+          setAppointments(newAppointments)
+        } else {
+          setAppointments(prev => [...prev, ...newAppointments])
+        }
+        
+        setHasMore(newAppointments.length === 10)
+        setPage(pageNum)
+      } else {
+        toast.error(result.error || 'Failed to fetch appointments')
+      }
+    } catch (error) {
+      console.error('Error fetching appointments:', error)
+      toast.error('Failed to fetch appointments')
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
+    }
+  }
+
+  // Update appointment status
+  const updateAppointmentStatus = async (appointmentId, newStatus) => {
+    setUpdatingStatus(appointmentId)
+    
+    try {
+      const response = await fetch('/api/appointments', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: appointmentId,
+          status: newStatus
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        // Update the appointment in the local state
+        setAppointments(prev => 
+          prev.map(appointment => 
+            appointment.id === appointmentId 
+              ? { ...appointment, status: newStatus }
+              : appointment
+          )
+        )
+        
+        toast.success(`Appointment ${newStatus} successfully!`)
+        setEditingAppointment(null)
+      } else {
+        toast.error(result.error || 'Failed to update appointment')
+      }
+    } catch (error) {
+      console.error('Error updating appointment:', error)
+      toast.error('Failed to update appointment')
+    } finally {
+      setUpdatingStatus(null)
+    }
+  }
+
+  // Load more appointments
+  const loadMoreAppointments = () => {
+    if (!loadingMore && hasMore) {
+      fetchAppointments(page + 1, false)
+    }
+  }
+
+  // Initial load
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      fetchAppointments(1, true)
+    }
+  }, [isAuthenticated, user?.id])
+
+  // Filter appointments based on search and status
+  const filteredAppointments = appointments.filter(appointment => {
+    const matchesStatus = selectedStatus === 'all' || appointment.status === selectedStatus
+    const matchesSearch = searchTerm === '' || 
+      appointment.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      appointment.listings?.title?.toLowerCase().includes(searchTerm.toLowerCase())
+    
+    return matchesStatus && matchesSearch
+  })
 
   // Custom Toolbar Component
   const CustomToolbar = (toolbar) => {
@@ -372,12 +483,12 @@ const Appointments = () => {
 
   // Convert appointments to calendar events
   const calendarEvents = appointments.map(appointment => {
-    const startDateTime = moment(`${appointment.date} ${appointment.start_time}`, 'YYYY-MM-DD HH:mm')
-    const endDateTime = moment(`${appointment.date} ${appointment.end_time}`, 'YYYY-MM-DD HH:mm')
+    const startDateTime = moment(appointment.appointment_date)
+    const endDateTime = moment(appointment.appointment_date).add(appointment.duration || 60, 'minutes')
     
     return {
       id: appointment.id,
-      title: `${appointment?.homeseeker?.name || 'Unknown Client'} - ${appointment?.development_and_unit?.development_name || 'Unknown Property'}`,
+      title: `${appointment.client_name || 'Unknown Client'} - ${appointment.listings?.title || 'Unknown Property'}`,
       start: startDateTime.toDate(),
       end: endDateTime.toDate(),
       appointment: appointment, // Store the full appointment data
@@ -439,11 +550,6 @@ const Appointments = () => {
     }
   }
 
-  const updateAppointmentStatus = (appointmentId, newStatus) => {
-    // In a real app, this would update the database
-    console.log(`Updating appointment ${appointmentId} to status: ${newStatus}`)
-    setEditingAppointment(null)
-  }
 
   const handleEventSelect = (event) => {
     setSelectedEvent(event)
@@ -482,21 +588,70 @@ const Appointments = () => {
 
   // Event Modal Component
   const EventModal = ({ event, isOpen, onClose, onUpdate }) => {
-    const [isEditing, setIsEditing] = useState(false)
+    const [saving, setSaving] = useState(false)
+    const [responseNotes, setResponseNotes] = useState([])
+    const [newResponseNote, setNewResponseNote] = useState('')
     const [formData, setFormData] = useState({
       status: event?.appointment?.status || 'pending',
       notes: event?.appointment?.notes || '',
-      location: event?.appointment?.location || '',
-      appointment_type: event?.appointment?.appointment_type || 'in_person',
-      date: event?.start ? moment(event.start).format('YYYY-MM-DD') : '',
-      start_time: event?.start ? moment(event.start).format('HH:mm') : '',
-      end_time: event?.end ? moment(event.end).format('HH:mm') : ''
+      meeting_location: event?.appointment?.meeting_location || '',
+      appointment_type: event?.appointment?.appointment_type || 'virtual',
+      appointment_date: event?.appointment?.appointment_date || '',
+      appointment_time: event?.appointment?.appointment_time || '',
+      duration: event?.appointment?.duration || 60
     })
 
-    const handleSubmit = (e) => {
+    // Initialize response notes from appointment data
+    useEffect(() => {
+      if (event?.appointment?.response_notes) {
+        setResponseNotes(Array.isArray(event.appointment.response_notes) ? event.appointment.response_notes : [])
+      }
+    }, [event])
+
+    const handleSubmit = async (e) => {
       e.preventDefault()
-      onUpdate(event.id, formData)
-      setIsEditing(false)
+      setSaving(true)
+      
+      try {
+        const updateData = {
+          status: formData.status,
+          appointment_type: formData.appointment_type,
+          response_notes: responseNotes
+        }
+        
+        const response = await fetch('/api/appointments', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: event.appointment.id,
+            ...updateData
+          })
+        })
+
+        const result = await response.json()
+
+        if (result.success) {
+          // Update the appointment in the local state
+          setAppointments(prev => 
+            prev.map(appointment => 
+              appointment.id === event.appointment.id 
+                ? { ...appointment, ...updateData }
+                : appointment
+            )
+          )
+          
+          toast.success('Appointment updated successfully!')
+        } else {
+          toast.error(result.error || 'Failed to update appointment')
+        }
+      } catch (error) {
+        console.error('Error updating appointment:', error)
+        toast.error('Failed to update appointment')
+      } finally {
+        setSaving(false)
+      }
     }
 
     const handleInputChange = (field, value) => {
@@ -506,276 +661,301 @@ const Appointments = () => {
       }))
     }
 
-    const handleEdit = () => {
-      setIsEditing(true)
+
+    const addResponseNote = () => {
+      if (newResponseNote.trim()) {
+        setResponseNotes(prev => [...prev, {
+          id: Date.now(),
+          text: newResponseNote.trim(),
+          created_at: new Date().toISOString(),
+          created_by: user?.id
+        }])
+        setNewResponseNote('')
+      }
     }
 
-    const handleCancelEdit = () => {
-      setIsEditing(false)
-      // Reset form data to original values
-      setFormData({
-        status: event?.appointment?.status || 'pending',
-        notes: event?.appointment?.notes || '',
-        location: event?.appointment?.location || '',
-        appointment_type: event?.appointment?.appointment_type || 'in_person',
-        date: event?.start ? moment(event.start).format('YYYY-MM-DD') : '',
-        start_time: event?.start ? moment(event.start).format('HH:mm') : '',
-        end_time: event?.end ? moment(event.end).format('HH:mm') : ''
-      })
+    const removeResponseNote = (noteId) => {
+      setResponseNotes(prev => prev.filter(note => note.id !== noteId))
+    }
+
+    const updateResponseNote = (noteId, newText) => {
+      setResponseNotes(prev => prev.map(note => 
+        note.id === noteId ? { ...note, text: newText } : note
+      ))
     }
 
     if (!isOpen || !event) return null
 
     const appointment = event.appointment
-    const homeseeker = appointment?.homeseeker
-    const development = appointment?.development_and_unit
 
     return (
-      <div className="fixed inset-0 z-50 flex items-start justify-center pt-20">
-        <div className="bg-white rounded-lg shadow-lg border border-gray-200 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+      <div className="fixed  inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+        <div className="bg-white mt-20 rounded-2xl shadow-2xl border border-gray-200 max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-100">
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${getStatusColor(appointment?.status).split(' ')[0]}`}></div>
-              <h3 className="text-sm font-semibold text-gray-900">
-                {homeseeker?.name || 'Unknown Client'} - {development?.development_name || 'Unknown Property'}
-              </h3>
+          <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-primary_color to-blue-600 text-white">
+            <div className="flex items-center gap-3">
+              <div className={`w-4 h-4 rounded-full ${appointment?.status === 'confirmed' ? 'bg-green-400' : appointment?.status === 'pending' ? 'bg-yellow-400' : appointment?.status === 'completed' ? 'bg-blue-400' : 'bg-red-400'}`}></div>
+              <div>
+                <h3 className="text-lg  !text-white font-semibold">
+                  {appointment?.client_name || 'Unknown Client'}
+                </h3>
+                <p className="text-sm opacity-90 !text-white">
+                  {appointment?.listings?.title || 'Unknown Property'}
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={handleEdit}
-                className="p-1 text-white hover:text-gray-200 hover:bg-gray-700 rounded"
-              >
-                <FiEdit3 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => {/* Delete functionality */}}
-                className="p-1 text-white hover:text-red-300 hover:bg-red-600 rounded"
-              >
-                <FiTrash2 className="w-4 h-4" />
-              </button>
+            <div className="flex items-center gap-2">
               <button
                 onClick={onClose}
-                className="p-1 text-white hover:text-gray-200 hover:bg-gray-700 rounded"
+                className="p-2 text-white hover:text-gray-200 hover:bg-white hover:bg-opacity-20 rounded-lg transition-all"
+                title="Close"
               >
-                <FiX className="w-4 h-4" />
+                <FiX className="w-5 h-5" />
               </button>
             </div>
           </div>
 
           {/* Content */}
-          <div className="p-4 space-y-4">
-            {!isEditing ? (
-              // View Mode
-              <>
-                {/* Date and Time */}
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <FiCalendar className="w-4 h-4" />
-                  <span>{moment(event.start).format('dddd, D MMMM')} · {moment(event.start).format('HH:mm')} - {moment(event.end).format('HH:mm')}</span>
-                </div>
-
-                {/* Appointment Type */}
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  {appointment?.appointment_type === 'video_call' ? (
-                    <FiVideo className="w-4 h-4" />
-                  ) : (
-                    <FiHome className="w-4 h-4" />
-                  )}
-                  <span className="capitalize">
-                    {appointment?.appointment_type === 'video_call' ? 'Video Call' : 'In Person'}
-                  </span>
-                </div>
-
-                {/* Location */}
-                {appointment?.location && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <FiMapPin className="w-4 h-4" />
-                    <span>{appointment.location}</span>
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="space-y-6">
+                {/* Appointment Details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <FiCalendar className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900">Appointment Date</h4>
+                        <p className="text-sm text-gray-600">
+                          {moment(appointment?.appointment_date).format('dddd, MMMM Do, YYYY')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <FiClock className="w-4 h-4" />
+                      <span>
+                        {moment(appointment?.appointment_date).format('HH:mm')} - {moment(appointment?.appointment_date).add(appointment?.duration || 60, 'minutes').format('HH:mm')}
+                      </span>
+                    </div>
                   </div>
-                )}
+
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                        {appointment?.appointment_type === 'virtual' ? (
+                          <FiVideo className="w-5 h-5 text-green-600" />
+                        ) : appointment?.appointment_type === 'phone' ? (
+                          <FiPhone className="w-5 h-5 text-green-600" />
+                        ) : (
+                          <FiHome className="w-5 h-5 text-green-600" />
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900">Meeting Type</h4>
+                        <p className="text-sm text-gray-600 capitalize">
+                          {appointment?.appointment_type === 'virtual' ? 'Virtual Meeting' : 
+                           appointment?.appointment_type === 'phone' ? 'Phone Call' : 'In Person'}
+                        </p>
+                      </div>
+                    </div>
+                    {/* <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <FiMapPin className="w-4 h-4" />
+                      <span>{appointment?.meeting_location || 'Property Location'}</span>
+                    </div> */}
+                  </div>
+                </div>
 
                 {/* Client Information */}
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2 text-sm">
-                    <FiUser className="w-4 h-4" />
+                <div className="bg-white border border-gray-200 rounded-xl p-6">
+                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <FiUser className="w-4 h-4 text-purple-600" />
+                    </div>
                     Client Information
                   </h4>
-                  <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="text-xs font-medium text-gray-600">Name</label>
-                      <p className="text-sm text-gray-900">{homeseeker?.name || 'Not provided'}</p>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Name</label>
+                      <p className="text-sm text-gray-900 font-medium mt-1">{appointment?.client_name || 'Not provided'}</p>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600">Email</label>
-                      <p className="text-sm text-gray-900">{homeseeker?.email || 'Not provided'}</p>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</label>
+                      <p className="text-sm text-gray-900 font-medium mt-1">{appointment?.client_email || 'Not provided'}</p>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600">Phone</label>
-                      <p className="text-sm text-gray-900">{homeseeker?.phone || 'Not provided'}</p>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Phone</label>
+                      <p className="text-sm text-gray-900 font-medium mt-1">{appointment?.client_phone || 'Not provided'}</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Property Information */}
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2 text-sm">
-                    <FiHome className="w-4 h-4" />
+                <div className="bg-white border border-gray-200 rounded-xl p-6">
+                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                      <FiHome className="w-4 h-4 text-orange-600" />
+                    </div>
                     Property Information
                   </h4>
-                  <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs font-medium text-gray-600">Development</label>
-                      <p className="text-sm text-gray-900">{development?.development_name || 'Not specified'}</p>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Property Title</label>
+                      <p className="text-sm text-gray-900 font-medium mt-1">{appointment?.listings?.title || 'Not specified'}</p>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600">Unit</label>
-                      <p className="text-sm text-gray-900">{development?.unit_name || 'Not specified'}</p>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Type</label>
+                      <p className="text-sm text-gray-900 font-medium mt-1 capitalize">{appointment?.listings?.listing_type || 'Not specified'}</p>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600">Location</label>
-                      <p className="text-sm text-gray-900">{appointment?.location || 'Not specified'}</p>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">City</label>
+                      <p className="text-sm text-gray-900 font-medium mt-1">{appointment?.listings?.city || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">State</label>
+                      <p className="text-sm text-gray-900 font-medium mt-1">{appointment?.listings?.state || 'Not specified'}</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Notes */}
+                {/* Client Notes */}
                 {appointment?.notes && (
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2 text-sm">Notes</h4>
-                    <div className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
+                  <div className="bg-white border border-gray-200 rounded-xl p-6">
+                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                        <FiEdit3 className="w-4 h-4 text-yellow-600" />
+                      </div>
+                      Client Notes
+                    </h4>
+                    <div className="text-sm text-gray-700 bg-yellow-50 rounded-lg p-4 border-l-4 border-yellow-400">
                       {appointment.notes}
                     </div>
                   </div>
                 )}
 
-                {/* Quick Actions */}
-                <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
-                  <button
-                    onClick={() => handleInputChange('status', 'confirmed')}
-                    className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
-                  >
-                    Confirm
-                  </button>
-                  <button
-                    onClick={() => handleInputChange('status', 'cancelled')}
-                    className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleEdit}
-                    className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
-                  >
-                    Edit
-                  </button>
-                </div>
-              </>
-            ) : (
-              // Edit Mode
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <h4 className="font-semibold text-gray-900 text-sm">Edit Appointment</h4>
-                
-                {/* Date and Time */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
-                    <input
-                      type="date"
-                      value={formData.date}
-                      onChange={(e) => handleInputChange('date', e.target.value)}
-                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent"
-                    />
+                {/* Response Notes */}
+                <div className="bg-white border border-gray-200 rounded-xl p-6">
+                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <FiEdit3 className="w-4 h-4 text-blue-600" />
+                    </div>
+                    Response Notes ({responseNotes.length})
+                  </h4>
+                  
+                  {/* Add New Response Note */}
+                  <div className="mb-4">
+                    <div className="flex gap-2">
+                      <textarea
+                        value={newResponseNote}
+                        onChange={(e) => setNewResponseNote(e.target.value)}
+                        rows={2}
+                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent"
+                        placeholder="Add a response note..."
+                      />
+                      <button
+                        type="button"
+                        onClick={addResponseNote}
+                        disabled={!newResponseNote.trim()}
+                        className="px-4 py-3 bg-primary_color text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Add
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Start Time</label>
-                    <input
-                      type="time"
-                      value={formData.start_time}
-                      onChange={(e) => handleInputChange('start_time', e.target.value)}
-                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent"
-                    />
+
+                  {/* Response Notes List */}
+                  {responseNotes.length > 0 ? (
+                    <div className="space-y-3">
+                      {responseNotes.map((note, index) => (
+                        <div key={note.id || index} className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-400">
+                          <div className="flex items-start justify-between">
+                            <textarea
+                              value={note.text}
+                              onChange={(e) => updateResponseNote(note.id, e.target.value)}
+                              className="flex-1 bg-transparent border-none resize-none text-sm text-gray-800 focus:outline-none"
+                              rows={2}
+                            />
+                            <div className="flex items-center gap-2 ml-3">
+                              <span className="text-xs text-gray-500">
+                                {moment(note.created_at).format('MMM D, HH:mm')}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => removeResponseNote(note.id)}
+                                className="p-1 text-red-500 hover:text-red-700 hover:bg-red-100 rounded transition-colors"
+                                title="Delete note"
+                              >
+                                <FiTrash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <FiEdit3 className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                      <p>No response notes yet. Add your first note above.</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Status Change & Save */}
+                <div className="bg-white border border-gray-200 rounded-xl p-6">
+                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <FiEdit3 className="w-4 h-4 text-purple-600" />
+                    </div>
+                    Appointment Settings
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                      <select
+                        value={formData.status}
+                        onChange={(e) => handleInputChange('status', e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Meeting Type</label>
+                      <select
+                        value={formData.appointment_type}
+                        onChange={(e) => handleInputChange('appointment_type', e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent"
+                      >
+                        <option value="virtual">Virtual Meeting</option>
+                        <option value="in-person">In Person</option>
+                        <option value="phone">Phone Call</option>
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">End Time</label>
-                    <input
-                      type="time"
-                      value={formData.end_time}
-                      onChange={(e) => handleInputChange('end_time', e.target.value)}
-                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent"
-                    />
+
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleSubmit}
+                      disabled={saving}
+                      className="px-6 py-3 bg-primary_color text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {saving ? (
+                        <>
+                          <FiLoader className="w-4 h-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Changes'
+                      )}
+                    </button>
                   </div>
                 </div>
-
-                {/* Status */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => handleInputChange('status', e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent"
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
-
-                {/* Appointment Type */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Appointment Type</label>
-                  <select
-                    value={formData.appointment_type}
-                    onChange={(e) => handleInputChange('appointment_type', e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent"
-                  >
-                    <option value="in_person">In Person</option>
-                    <option value="video_call">Video Call</option>
-                  </select>
-                </div>
-
-                {/* Location */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Location</label>
-                  <input
-                    type="text"
-                    value={formData.location}
-                    onChange={(e) => handleInputChange('location', e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent"
-                    placeholder="Enter meeting location"
-                  />
-                </div>
-
-                {/* Notes */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) => handleInputChange('notes', e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent"
-                    placeholder="Add any additional notes..."
-                  />
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-200">
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    className="px-3 py-1 text-xs text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-3 py-1 text-xs bg-primary_color text-white hover:bg-blue-700 rounded transition-colors"
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </form>
-            )}
+            </div>
           </div>
         </div>
       </div>
@@ -948,8 +1128,14 @@ const Appointments = () => {
         )} */}
 
         {/* List View */}
-        <div className="space-y-4">
-          {appointments.map((appointment) => (
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <FiLoader className="w-8 h-8 animate-spin text-primary_color mr-3" />
+            <span className="text-gray-600">Loading appointments...</span>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredAppointments.map((appointment) => (
             <div key={appointment.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200">
               <div className="flex flex-col lg:flex-row gap-6">
                 {/* Left Section - Property Info */}
@@ -957,21 +1143,28 @@ const Appointments = () => {
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                        {appointment?.development_and_unit?.development_name || 'Unknown Property'}
+                        <a 
+                          href={`/property/${appointment?.listings?.listing_type}/${appointment?.listings?.slug}/${appointment?.listings?.id}`}
+                          className="hover:text-primary_color transition-colors"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {appointment?.listings?.title || 'Unknown Property'}
+                        </a>
                       </h3>
-                      <p className="text-gray-600 mb-2">{appointment?.development_and_unit?.unit_name || 'Unknown Unit'}</p>
+                      <p className="text-gray-600 mb-2">{appointment?.listings?.listing_type || 'Property'}</p>
                       <div className="flex items-center gap-4 text-sm text-gray-500">
                         <span className="flex items-center gap-1">
                           <FiMapPin className="w-4 h-4" />
-                          {appointment.location}
+                          {appointment.meeting_location || 'Property Location'}
                         </span>
                         <span className="flex items-center gap-1">
-                          {appointment.appointment_type === 'video_call' ? (
+                          {appointment.appointment_type === 'virtual' ? (
                             <FiVideo className="w-4 h-4" />
                           ) : (
                             <FiHome className="w-4 h-4" />
                           )}
-                          {appointment.appointment_type === 'video_call' ? 'Video Call' : 'In Person'}
+                          {appointment.appointment_type === 'virtual' ? 'Virtual Meeting' : 'In Person'}
                         </span>
                       </div>
                     </div>
@@ -985,13 +1178,19 @@ const Appointments = () => {
                         <div className="flex gap-1">
                           <button
                             onClick={() => updateAppointmentStatus(appointment.id, 'confirmed')}
-                            className="p-1 text-green-600 hover:bg-green-50 rounded"
+                            disabled={updatingStatus === appointment.id}
+                            className="p-1 text-green-600 hover:bg-green-50 rounded disabled:opacity-50"
                           >
-                            <FiCheck className="w-4 h-4" />
+                            {updatingStatus === appointment.id ? (
+                              <FiLoader className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <FiCheck className="w-4 h-4" />
+                            )}
                           </button>
                           <button
                             onClick={() => setEditingAppointment(null)}
-                            className="p-1 text-gray-600 hover:bg-gray-50 rounded"
+                            disabled={updatingStatus === appointment.id}
+                            className="p-1 text-gray-600 hover:bg-gray-50 rounded disabled:opacity-50"
                           >
                             <FiX className="w-4 h-4" />
                           </button>
@@ -1013,15 +1212,15 @@ const Appointments = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="flex items-center gap-2">
                         <FiUser className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-700">{appointment?.homeseeker?.name || 'Unknown'}</span>
+                        <span className="text-sm text-gray-700">{appointment?.client_name || 'Unknown'}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <FiMail className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-700">{appointment?.homeseeker?.email || 'No email'}</span>
+                        <span className="text-sm text-gray-700">{appointment?.client_email || 'No email'}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <FiPhone className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-700">{appointment?.homeseeker?.phone || 'No phone'}</span>
+                        <span className="text-sm text-gray-700">{appointment?.client_phone || 'No phone'}</span>
                       </div>
                     </div>
                   </div>
@@ -1052,26 +1251,59 @@ const Appointments = () => {
                         <span className="font-medium">Appointment</span>
                       </div>
                       <div className="text-2xl font-bold mb-1">
-                        {new Date(appointment.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                        {new Date(appointment.appointment_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
                       </div>
                       <div className="text-sm opacity-90 mb-3">
-                        {new Date(appointment.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric' })}
+                        {new Date(appointment.appointment_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric' })}
                       </div>
                       <div className="flex items-center justify-center gap-2 text-sm">
                         <FiClock className="w-4 h-4" />
-                        <span>{appointment.start_time} - {appointment.end_time}</span>
+                        <span>{moment(appointment.appointment_date).format('HH:mm')} - {moment(appointment.appointment_date).add(appointment.duration || 60, 'minutes').format('HH:mm')}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Action Buttons */}
                   <div className="mt-4 space-y-2">
-                    <button className="w-full bg-primary_color text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-200 text-sm font-medium">
+                    <button 
+                      onClick={() => {
+                        setSelectedEvent({ id: appointment.id, appointment: appointment })
+                        setIsEventModalOpen(true)
+                      }}
+                      className="w-full bg-primary_color text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-200 text-sm font-medium"
+                    >
                       View Details
                     </button>
                     {appointment.status === 'pending' && (
-                      <button className="w-full bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 transition-colors duration-200 text-sm font-medium">
-                        Confirm
+                      <button 
+                        onClick={() => updateAppointmentStatus(appointment.id, 'confirmed')}
+                        disabled={updatingStatus === appointment.id}
+                        className="w-full bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 transition-colors duration-200 text-sm font-medium disabled:opacity-50 flex items-center justify-center"
+                      >
+                        {updatingStatus === appointment.id ? (
+                          <>
+                            <FiLoader className="w-4 h-4 animate-spin mr-2" />
+                            Confirming...
+                          </>
+                        ) : (
+                          'Confirm'
+                        )}
+                      </button>
+                    )}
+                    {appointment.status === 'confirmed' && (
+                      <button 
+                        onClick={() => updateAppointmentStatus(appointment.id, 'completed')}
+                        disabled={updatingStatus === appointment.id}
+                        className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors duration-200 text-sm font-medium disabled:opacity-50 flex items-center justify-center"
+                      >
+                        {updatingStatus === appointment.id ? (
+                          <>
+                            <FiLoader className="w-4 h-4 animate-spin mr-2" />
+                            Completing...
+                          </>
+                        ) : (
+                          'Mark Complete'
+                        )}
                       </button>
                     )}
                   </div>
@@ -1079,14 +1311,35 @@ const Appointments = () => {
               </div>
             </div>
           ))}
+          
+          {/* Load More Button */}
+          {hasMore && !loadingMore && (
+            <div className="text-center py-6">
+              <button
+                onClick={loadMoreAppointments}
+                className="px-6 py-3 bg-primary_color text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium"
+              >
+                Load More Appointments
+              </button>
+            </div>
+          )}
+          
+          {/* Loading More */}
+          {loadingMore && (
+            <div className="flex items-center justify-center py-6">
+              <FiLoader className="w-6 h-6 animate-spin text-primary_color mr-3" />
+              <span className="text-gray-600">Loading more appointments...</span>
+            </div>
+          )}
         </div>
+        )}
 
         {/* Empty State */}
-        {appointments.length === 0 && (
+        {!loading && appointments.length === 0 && (
           <div className="text-center py-12">
             <FiCalendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No appointments found</h3>
-            <p className="text-gray-600">Try adjusting your search or filter criteria</p>
+            <p className="text-gray-600">You don't have any appointments yet</p>
           </div>
         )}
 

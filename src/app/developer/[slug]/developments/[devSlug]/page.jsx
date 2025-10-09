@@ -8,7 +8,7 @@ const page = ({ params }) => {
   const developmentId = isAddMode ? null : devSlug;
 
   return (
-    <div className='normal_div w-full'>
+    <div className='normal_div mt-10 w-full'>
       <DeveloperNav active={3} />
       <Development 
         isAddMode={isAddMode} 

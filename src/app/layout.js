@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Poppins } from "next/font/google";
 import Layout1 from "./layout/Layout1";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 import Nav from "./components/Nav";
 import Footer from "./components/Footer";
@@ -33,11 +34,13 @@ export default function RootLayout({ children }) {
       <body
         className={` ${poppins.variable} antialiased`}
       >
-        <Nav />
-        <Layout1>
-          {children}
-        </Layout1>
-        <Footer />
+        <AuthProvider>
+          <Nav />
+          <Layout1>
+            {children}
+          </Layout1>
+          <Footer />
+        </AuthProvider>
       </body>
     </html>
   );

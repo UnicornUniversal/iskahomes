@@ -1,19 +1,124 @@
 "use client"
 import React, { useState } from 'react'
+import { toast } from 'react-toastify'
 
-const ScheduleATour = () => {
-  const [mode, setMode] = useState('in-person');
+const ScheduleATour = ({ propertyId, propertyTitle, propertyType, developer }) => {
+  const [mode, setMode] = useState('in-person')
+  const [loading, setLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    date: '',
+    time: '',
+    name: '',
+    email: '',
+    phone: '',
+    message: ''
+  })
+
+  // Determine account type based on property type
+  const getAccountType = () => {
+    return propertyType === 'unit' ? 'developer' : 'agent'
+  }
+
+  // Get account ID based on property type
+  const getAccountId = () => {
+    if (propertyType === 'unit' && developer?.developer_id) {
+      return developer.developer_id
+    }
+    // For agents, you might need to fetch from a different source
+    // For now, we'll use the developer_id as a fallback
+    return developer?.developer_id || 'unknown'
+  }
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    
+    // Validate form
+    if (!formData.date || !formData.time || !formData.name || !formData.email) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+
+    // Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email)) {
+      toast.error('Please enter a valid email address')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const appointmentData = {
+        account_type: getAccountType(),
+        account_id: getAccountId(),
+        listing_id: propertyId,
+        appointment_date: new Date(`${formData.date}T${formData.time}`).toISOString(),
+        appointment_time: formData.time,
+        duration: 60,
+        appointment_type: mode === 'video' ? 'virtual' : 'in-person',
+        meeting_location: mode === 'video' ? 'Virtual Meeting' : 'Property Location',
+        client_name: formData.name,
+        client_email: formData.email,
+        client_phone: formData.phone,
+        notes: formData.message
+      }
+
+      console.log('Submitting appointment:', appointmentData)
+
+      const response = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(appointmentData)
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast.success('Appointment scheduled successfully! We\'ll contact you soon.')
+        
+        // Reset form
+        setFormData({
+          date: '',
+          time: '',
+          name: '',
+          email: '',
+          phone: '',
+          message: ''
+        })
+      } else {
+        toast.error(result.error || 'Failed to schedule appointment')
+      }
+
+    } catch (error) {
+      console.error('Error scheduling appointment:', error)
+      toast.error('Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className='w-full h-auto max-h-[800px] bg-white rounded-xl shadow p-6 max-w-md mx-auto'>
       <h2 className='text-2xl font-bold text-primary_color mb-1'>Schedule a tour</h2>
       <p className='text-gray-500 mb-4'>Choose your preferred day</p>
+      
       {/* Toggle */}
       <div className='flex gap-2 mb-4'>
         <button
           type='button'
           className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${mode === 'in-person' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-500'}`}
           onClick={() => setMode('in-person')}
+          disabled={loading}
         >
           In Person
         </button>
@@ -21,37 +126,104 @@ const ScheduleATour = () => {
           type='button'
           className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${mode === 'video' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-500'}`}
           onClick={() => setMode('video')}
+          disabled={loading}
         >
           Video Chat
         </button>
       </div>
-      <form className='flex flex-col gap-3'>
+
+      <form onSubmit={handleSubmit} className='flex flex-col gap-3'>
         <div>
-          <label className='block text-primary_color text-sm font-semibold mb-1'>Date:</label>
-          <input type='date' className='w-full p-2 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary_color' />
+          <label className='block text-primary_color text-sm font-semibold mb-1'>Date: <span className="text-red-500">*</span></label>
+          <input 
+            type='date' 
+            name="date"
+            value={formData.date}
+            onChange={handleInputChange}
+            className='w-full p-2 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary_color' 
+            required
+            disabled={loading}
+          />
         </div>
         <div>
-          <label className='block text-primary_color text-sm font-semibold mb-1'>Time:</label>
-          <input type='time' className='w-full p-2 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary_color' />
+          <label className='block text-primary_color text-sm font-semibold mb-1'>Time: <span className="text-red-500">*</span></label>
+          <input 
+            type='time' 
+            name="time"
+            value={formData.time}
+            onChange={handleInputChange}
+            className='w-full p-2 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary_color' 
+            required
+            disabled={loading}
+          />
         </div>
         <div>
-          <label className='block text-primary_color text-sm font-semibold mb-1'>Name:</label>
-          <input type='text' placeholder='Enter **************' className='w-full p-2 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary_color' />
+          <label className='block text-primary_color text-sm font-semibold mb-1'>Name: <span className="text-red-500">*</span></label>
+          <input 
+            type='text' 
+            name="name"
+            value={formData.name}
+            onChange={handleInputChange}
+            placeholder='Enter your full name' 
+            className='w-full p-2 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary_color' 
+            required
+            disabled={loading}
+          />
         </div>
         <div>
-          <label className='block text-primary_color text-sm font-semibold mb-1'>Email:</label>
-          <input type='email' placeholder='Email' className='w-full p-2 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary_color' />
+          <label className='block text-primary_color text-sm font-semibold mb-1'>Email: <span className="text-red-500">*</span></label>
+          <input 
+            type='email' 
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            placeholder='your@email.com' 
+            className='w-full p-2 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary_color' 
+            required
+            disabled={loading}
+          />
         </div>
         <div>
-          <label className='block text-primary_color text-sm font-semibold mb-1'>Tel:</label>
-          <input type='tel' placeholder='Phone' className='w-full p-2 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary_color' />
+          <label className='block text-primary_color text-sm font-semibold mb-1'>Phone:</label>
+          <input 
+            type='tel' 
+            name="phone"
+            value={formData.phone}
+            onChange={handleInputChange}
+            placeholder='+1234567890' 
+            className='w-full p-2 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary_color' 
+            disabled={loading}
+          />
         </div>
         <div>
           <label className='block text-primary_color text-sm font-semibold mb-1'>Message:</label>
-          <textarea placeholder='Message' rows={3} className='w-full p-2 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary_color resize-none' />
+          <textarea 
+            name="message"
+            value={formData.message}
+            onChange={handleInputChange}
+            placeholder='Any special requirements or questions...' 
+            rows={3} 
+            className='w-full p-2 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary_color resize-none' 
+            disabled={loading}
+          />
         </div>
-        <button type='submit' className='w-full mt-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-md transition-colors'>
-          Book Meetings
+        
+        <button 
+          type='submit' 
+          className='w-full mt-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center'
+          disabled={loading}
+        >
+          {loading ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Scheduling...
+            </>
+          ) : (
+            'Book Meeting'
+          )}
         </button>
       </form>
     </div>

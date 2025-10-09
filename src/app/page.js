@@ -14,13 +14,13 @@ export default function Home() {
 
       <div className="flex flex-col md:flex-row gap-4  w-full  mt-[3em]">
   
-  <div className="w-full h-full md:w-[75%]">
+  <div className="w-full h-full ">
   <HomeProperties />
   </div>
-      
+{/*       
         <div className="w-full h-full  md:w-[20%]">
         <SideBanner />
-        </div>
+        </div> */}
        
       </div>
 

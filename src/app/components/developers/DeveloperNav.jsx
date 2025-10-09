@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState } from 'react'
+import { usePathname } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 import { 
     FiHome, 
     FiCalendar, 
@@ -18,62 +20,67 @@ import {
 
 const DeveloperNav = ({ active }) => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const [isCollapsed, setIsCollapsed] = useState(false)
+    const pathname = usePathname()
+    const { user, logout } = useAuth()
+    
+    // Get the developer slug from user profile or use user ID as fallback
+    const developerSlug = user?.profile?.slug || user?.id || 'developer'
 
     const navItems = [
         {
             label: 'Dashboard',
-            href: '/developer/758594/dashboard',
+            href: `/developer/${developerSlug}/dashboard`,
             icon: FiHome
         },
         {
             label: 'Messages',
-            href: '/developer/758594/messages',
+            href: `/developer/${developerSlug}/messages`,
             icon: FiMessageSquare
         },
         {
             label: 'Developments',
-            href: '/developer/758594/developments',
+            href: `/developer/${developerSlug}/developments`,
             icon: FiMapPin
         },
-          {
+        {
             label: 'Units',
-            href: '/developer/758594/units',
+            href: `/developer/${developerSlug}/units`,
             icon: FiGrid
         },
         {
             label: 'Appointments',
-            href: '/developer/758594/appointments',
+            href: `/developer/${developerSlug}/appointments`,
             icon: FiCalendar
         },
         // {
         //     label: 'Agents',
-        //     href: '/developer/758594/agents',
+        //     href: `/developer/${developerSlug}/agents`,
         //     icon: FiUsers
         // },
-     
         // {
         //     label: 'Favorites',
-        //     href: '/developer/758594/favorites',
+        //     href: `/developer/${developerSlug}/favorites`,
         //     icon: FiHeart
         // },
-    
         {
             label: 'Profile',
-            href: '/developer/758594/profile',
+            href: `/developer/${developerSlug}/profile`,
             icon: FiUser
         },
         {
             label: 'Subscriptions',
-            href: '/developer/758594/subscriptions',
+            href: `/developer/${developerSlug}/subscriptions`,
             icon: FiCreditCard
         },
-
-     
-      
     ]
 
     const toggleMobileMenu = () => {
         setIsMobileMenuOpen(!isMobileMenuOpen)
+    }
+
+    const toggleCollapse = () => {
+        setIsCollapsed(!isCollapsed)
     }
 
     return (
@@ -100,57 +107,86 @@ const DeveloperNav = ({ active }) => {
             )}
 
             {/* Navigation Menu */}
-            <nav className={`fixed lg:relative flex flex-col bg-gradient-to-b from-white max-h-screen to-gray-50 min-h-screen py-8 w-[85vw] max-w-[300px] px-[1em] shadow-lg border-r border-gray-100 z-50 transition-transform duration-300 ease-in-out ${
+            <nav className={`fixed rounded-sm border-primary_color lg:relative flex flex-col bg-gradient-to-b from-white max-h-screen to-gray-50 min-h-screen py-8 px-[1em] shadow-lg border-r border-gray-100 z-50 transition-all duration-300 ease-in-out ${
                 isMobileMenuOpen 
                     ? 'translate-x-0' 
                     : '-translate-x-full lg:translate-x-0'
+            } ${
+                isCollapsed ? 'w-[85vw] max-w-[80px] lg:w-[80px]' : 'w-[85vw] max-w-[300px] lg:w-[300px]'
             }`}>
-                <div className="mb-8">
-                    <h5 className="mb-2">Developer </h5>
-                    <h3 className="mb-2">Dashboard</h3>
-                    <div className="w-12 h-1 bg-primary_color rounded-full"></div>
+                <div className="mb-8 flex items-center justify-between">
+                    {!isCollapsed && (
+                        <div>
+                            <h5 className="mb-2">Developer </h5>
+                            <h3 className="mb-2">Dashboard</h3>
+                            <div className="w-12 h-1 bg-primary_color rounded-full"></div>
+                        </div>
+                    )}
+                    
+                    {/* Collapse Toggle Button - Only visible on desktop */}
+                    <button
+                        onClick={toggleCollapse}
+                        className="hidden lg:flex items-center justify-center w-8 h-8 bg-primary_color/10 hover:bg-primary_color/20 text-primary_color rounded-lg transition-all duration-300"
+                        aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"}
+                    >
+                        {isCollapsed ? (
+                            <FiMenu className="w-4 h-4" />
+                        ) : (
+                            <FiX className="w-4 h-4" />
+                        )}
+                    </button>
                 </div>
                 
                 <div className="space-y-2 w-full">
                     {navItems.map((item, index) => {
                         const IconComponent = item.icon
-                        const isActive = active === index + 1
+                        const isActive = pathname === item.href || (active === index + 1)
                         
                         return (
                             <a
                                 key={index}
                                 href={item.href}
                                 onClick={() => setIsMobileMenuOpen(false)}
-                                className={`group relative text-[0.8em] flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 ease-in-out transform hover:scale-105 ${
+                                className={`group relative text-[0.8em] flex items-center ${isCollapsed ? 'justify-center px-2' : 'space-x-3 px-4'} w-full py-3 rounded-xl transition-all duration-300 ease-in-out transform hover:scale-105 ${
                                     isActive
-                                        ? 'bg-primary_color text-white shadow-lg shadow-primary_color/25'
+                                        ? 'bg-primary_color text-white shadow-lg shadow-primary_color/25 border-l-4 border-white'
                                         : 'text-gray-600 hover:text-primary_color hover:bg-white hover:shadow-md'
                                 }`}
+                                title={isCollapsed ? item.label : undefined}
                             >
                                 {/* Active indicator */}
                                 {isActive && (
-                                    <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-white rounded-r-full"></div>
+                                    <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-white rounded-r-full animate-pulse"></div>
+                                )}
+                                
+                                {/* Active background glow */}
+                                {isActive && (
+                                    <div className="absolute inset-0 bg-gradient-to-r from-primary_color/20 to-transparent rounded-xl"></div>
                                 )}
                                 
                                 {/* Icon */}
-                                <div className={`flex-shrink-0 transition-all duration-300 ${
+                                <div className={`flex-shrink-0 transition-all duration-300 relative z-10 ${
                                     isActive 
                                         ? 'text-white' 
                                         : 'text-gray-400 group-hover:text-primary_color'
                                 }`}>
                                     {IconComponent && (
-                                        <IconComponent className="w-5 h-5" />
+                                        <IconComponent className={`w-5 h-5 transition-all duration-300 ${
+                                            isActive ? 'scale-110' : 'group-hover:scale-105'
+                                        }`} />
                                     )}
                                 </div>
                                 
                                 {/* Label */}
-                                <span className={`font-medium transition-all duration-300 ${
-                                    isActive 
-                                        ? 'text-white' 
-                                        : 'text-gray-700 group-hover:text-primary_color'
-                                }`}>
-                                    {item.label}
-                                </span>
+                                {!isCollapsed && (
+                                    <span className={`font-medium transition-all duration-300 relative z-10 ${
+                                        isActive 
+                                            ? 'text-white font-semibold' 
+                                            : 'text-gray-700 group-hover:text-primary_color'
+                                    }`}>
+                                        {item.label}
+                                    </span>
+                                )}
                                 
                                 {/* Hover effect */}
                                 {!isActive && (
@@ -163,18 +199,24 @@ const DeveloperNav = ({ active }) => {
 
                 {/* Logout */}
                 <br/>
-                <div className="mb-4 space-y-2 w-full rounded-xl shadow-primary_red/25 bg-primary_red cursor-pointer">
-                    <a
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={`group relative text-[0.8em] flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 ease-in-out transform hover:scale-105`}
+                <div className="mb-4 space-y-2 w-full rounded-xl shadow-primary_color/25 bg-primary_color cursor-pointer">
+                    <button
+                        onClick={() => {
+                            logout()
+                            setIsMobileMenuOpen(false)
+                        }}
+                        className={`group relative text-[0.8em] flex items-center ${isCollapsed ? 'justify-center px-2' : 'space-x-3 px-4'} w-full py-3 rounded-xl transition-all duration-300 ease-in-out transform hover:scale-105`}
+                        title={isCollapsed ? "Logout" : undefined}
                     >
                         {/* Icon */}
                         <FiLogOut color='white' className="w-5 h-5" />
                         {/* Label */}
-                        <span className={`font-medium transition-all duration-300 text-text_color`}>
-                            Logout
-                        </span>
-                    </a>
+                        {!isCollapsed && (
+                            <span className={`font-medium transition-all duration-300 text-white`}>
+                                Logout
+                            </span>
+                        )}
+                    </button>
                 </div>
 
                 <br/>

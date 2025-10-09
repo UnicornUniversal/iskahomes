@@ -3,8 +3,8 @@ import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { cn } from '@/lib/utils'
 
-const DevelopmentMedia = ({ developmentData, isEditMode }) => {
-  const [formData, setFormData] = useState({
+const DevelopmentMedia = ({ formData, updateFormData, isEditMode }) => {
+  const [localMediaData, setLocalMediaData] = useState({
     banner: null,
     video: null,
     youtubeUrl: '',
@@ -18,54 +18,83 @@ const DevelopmentMedia = ({ developmentData, isEditMode }) => {
   const videoInputRef = useRef(null)
   const bannerInputRef = useRef(null)
 
-  // Populate form data when developmentData is available (edit mode)
+  // Initialize with form data
   useEffect(() => {
-    if (developmentData && isEditMode) {
-      // For demo purposes, we'll create sample media data since dummy data doesn't have all media fields
-      setFormData({
-        banner: null, // Would be set from actual file upload
-        video: null, // Would be set from actual file upload
-        youtubeUrl: 'https://www.youtube.com/watch?v=sample-video',
-        virtualTourUrl: 'https://example.com/virtual-tour',
-        mediaFiles: [] // Would be populated from actual file uploads
-      });
+    if (formData.media) {
+      setLocalMediaData(prev => ({
+        ...prev,
+        ...formData.media
+      }));
     }
-  }, [developmentData, isEditMode]);
+  }, [formData.media]);
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
+    const newMediaData = {
+      ...localMediaData,
       [field]: value
-    }))
+    };
+    setLocalMediaData(newMediaData);
+    updateFormData({
+      media: newMediaData
+    });
   }
 
   const handleFileUpload = (files, type) => {
     const fileArray = Array.from(files)
     
     if (type === 'media') {
-      setFormData(prev => ({
-        ...prev,
-        mediaFiles: [...prev.mediaFiles, ...fileArray]
-      }))
+      const newMediaFiles = [...localMediaData.mediaFiles, ...fileArray];
+      const newMediaData = {
+        ...localMediaData,
+        mediaFiles: newMediaFiles
+      };
+      setLocalMediaData(newMediaData);
+      updateFormData({
+        media: newMediaData
+      });
     } else if (type === 'banner') {
       if (fileArray.length > 0) {
-        setFormData(prev => ({
-          ...prev,
-          banner: fileArray[0]
-        }))
+        const file = fileArray[0];
+        // Check file size (5MB = 5 * 1024 * 1024 bytes)
+        if (file.size > 5 * 1024 * 1024) {
+          alert('Banner image size must be less than 5MB');
+          return;
+        }
+        // Check file type
+        if (!file.type.startsWith('image/')) {
+          alert('Please select an image file for the banner');
+          return;
+        }
+        const newMediaData = {
+          ...localMediaData,
+          banner: file
+        };
+        setLocalMediaData(newMediaData);
+        updateFormData({
+          media: newMediaData
+        });
       }
     } else if (type === 'video') {
       if (fileArray.length > 0) {
         const file = fileArray[0]
-        // Check file size (10MB = 10 * 1024 * 1024 bytes)
-        if (file.size > 10 * 1024 * 1024) {
-          alert('Video file size must be less than 10MB')
+        // Check file size (50MB = 50 * 1024 * 1024 bytes)
+        if (file.size > 50 * 1024 * 1024) {
+          alert('Video file size must be less than 50MB')
           return
         }
-        setFormData(prev => ({
-          ...prev,
+        // Check file type
+        if (!file.type.startsWith('video/')) {
+          alert('Please select a video file');
+          return;
+        }
+        const newMediaData = {
+          ...localMediaData,
           video: file
-        }))
+        };
+        setLocalMediaData(newMediaData);
+        updateFormData({
+          media: newMediaData
+        });
       }
     }
   }
@@ -92,20 +121,33 @@ const DevelopmentMedia = ({ developmentData, isEditMode }) => {
 
   const removeFile = (index, type) => {
     if (type === 'media') {
-      setFormData(prev => ({
-        ...prev,
-        mediaFiles: prev.mediaFiles.filter((_, i) => i !== index)
-      }))
+      const newMediaFiles = localMediaData.mediaFiles.filter((_, i) => i !== index);
+      const newMediaData = {
+        ...localMediaData,
+        mediaFiles: newMediaFiles
+      };
+      setLocalMediaData(newMediaData);
+      updateFormData({
+        media: newMediaData
+      });
     } else if (type === 'banner') {
-      setFormData(prev => ({
-        ...prev,
+      const newMediaData = {
+        ...localMediaData,
         banner: null
-      }))
+      };
+      setLocalMediaData(newMediaData);
+      updateFormData({
+        media: newMediaData
+      });
     } else if (type === 'video') {
-      setFormData(prev => ({
-        ...prev,
+      const newMediaData = {
+        ...localMediaData,
         video: null
-      }))
+      };
+      setLocalMediaData(newMediaData);
+      updateFormData({
+        media: newMediaData
+      });
     }
   }
 
@@ -119,7 +161,7 @@ const DevelopmentMedia = ({ developmentData, isEditMode }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    console.log('Development Media Data:', formData)
+    console.log('Development Media Data:', localMediaData)
     // Handle form submission - differentiate between add and edit
     if (isEditMode) {
       console.log('Updating media for existing development...');
@@ -139,18 +181,18 @@ const DevelopmentMedia = ({ developmentData, isEditMode }) => {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-6">
         {/* Banner Upload */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Development Banner *
           </label>
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-            {formData.banner ? (
+            {localMediaData.banner ? (
               <div className="space-y-4">
                 <div className="relative inline-block">
                   <img
-                    src={URL.createObjectURL(formData.banner)}
+                    src={localMediaData.banner instanceof File ? URL.createObjectURL(localMediaData.banner) : localMediaData.banner.url}
                     alt="Banner preview"
                     className="max-h-48 rounded-lg"
                   />
@@ -162,7 +204,9 @@ const DevelopmentMedia = ({ developmentData, isEditMode }) => {
                     ×
                   </button>
                 </div>
-                <p className="text-sm text-gray-600">{formData.banner.name}</p>
+                <p className="text-sm text-gray-600">
+                  {localMediaData.banner instanceof File ? localMediaData.banner.name : localMediaData.banner.name}
+                </p>
               </div>
             ) : (
               <div>
@@ -195,11 +239,11 @@ const DevelopmentMedia = ({ developmentData, isEditMode }) => {
             Video Upload (Max 10MB)
           </label>
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-            {formData.video ? (
+            {localMediaData.video ? (
               <div className="space-y-4">
                 <div className="relative inline-block">
                   <video
-                    src={URL.createObjectURL(formData.video)}
+                    src={localMediaData.video instanceof File ? URL.createObjectURL(localMediaData.video) : localMediaData.video.url}
                     controls
                     className="max-h-48 rounded-lg"
                   />
@@ -212,7 +256,7 @@ const DevelopmentMedia = ({ developmentData, isEditMode }) => {
                   </button>
                 </div>
                 <p className="text-sm text-gray-600">
-                  {formData.video.name} ({formatFileSize(formData.video.size)})
+                  {localMediaData.video.name} ({localMediaData.video instanceof File ? formatFileSize(localMediaData.video.size) : formatFileSize(localMediaData.video.size)})
                 </p>
               </div>
             ) : (
@@ -249,25 +293,51 @@ const DevelopmentMedia = ({ developmentData, isEditMode }) => {
             id="youtubeUrl"
             type="url"
             placeholder="https://www.youtube.com/watch?v=..."
-            value={formData.youtubeUrl}
+            value={localMediaData.youtubeUrl}
             onChange={(e) => handleInputChange('youtubeUrl', e.target.value)}
             className="w-full"
           />
         </div>
 
-        {/* Virtual Tour URL */}
+        {/* Virtual Tour Section */}
         <div>
-          <label htmlFor="virtualTourUrl" className="block text-sm font-medium text-gray-700 mb-2">
-            Virtual Tour URL
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Virtual Tour
           </label>
-          <Input
-            id="virtualTourUrl"
-            type="url"
-            placeholder="https://..."
-            value={formData.virtualTourUrl}
-            onChange={(e) => handleInputChange('virtualTourUrl', e.target.value)}
-            className="w-full"
-          />
+          <div className="space-y-4">
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700">Virtual Tour URL</h4>
+                  <p className="text-xs text-gray-500 mt-1">Currently disabled - request a virtual tour instead</p>
+                </div>
+                <div className="text-gray-400">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+              </div>
+              <Input
+                id="virtualTourUrl"
+                type="url"
+                placeholder="https://..."
+                value={localMediaData.virtualTourUrl}
+                onChange={(e) => handleInputChange('virtualTourUrl', e.target.value)}
+                className="w-full mt-2"
+                disabled
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              Request a virtual tour for this project
+            </Button>
+          </div>
         </div>
 
         {/* Additional Media Files */}
@@ -308,21 +378,21 @@ const DevelopmentMedia = ({ developmentData, isEditMode }) => {
         </div>
 
         {/* Media Files List */}
-        {formData.mediaFiles.length > 0 && (
+        {localMediaData.mediaFiles.length > 0 && (
           <div>
             <h3 className="text-lg font-semibold text-gray-800 mb-3">Uploaded Media Files</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {formData.mediaFiles.map((file, index) => (
+              {localMediaData.mediaFiles.map((file, index) => (
                 <div key={index} className="relative border rounded-lg p-3">
                   {file.type.startsWith('image/') ? (
                     <img
-                      src={URL.createObjectURL(file)}
+                      src={file instanceof File ? URL.createObjectURL(file) : file.url}
                       alt={`Media ${index + 1}`}
                       className="w-full h-32 object-cover rounded mb-2"
                     />
                   ) : (
                     <video
-                      src={URL.createObjectURL(file)}
+                      src={file instanceof File ? URL.createObjectURL(file) : file.url}
                       className="w-full h-32 object-cover rounded mb-2"
                     />
                   )}
@@ -340,14 +410,7 @@ const DevelopmentMedia = ({ developmentData, isEditMode }) => {
             </div>
           </div>
         )}
-
-        {/* Submit Button */}
-        <div className="flex justify-end pt-6">
-          <Button type="submit" className="px-8">
-            {isEditMode ? 'Update Media' : 'Save & Continue'}
-          </Button>
-        </div>
-      </form>
+      </div>
     </div>
   )
 }

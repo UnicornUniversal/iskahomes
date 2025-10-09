@@ -1,3 +1,4 @@
+'use client'
 import React from 'react'
 import DeveloperNav from '@/app/components/developers/DeveloperNav'
 import DeveloperHeader from '@/app/components/developers/DeveloperHeader'
@@ -8,6 +9,7 @@ import BestProperties from '@/app/components/developers/DataStats/BestProperties
 import PropertiesByType from '@/app/components/developers/DataStats/PropertiesByType'
 import PropertiesByStatus from '@/app/components/developers/DataStats/PropertiesByStatus'
 import LatestAppointments from '@/app/components/developers/LatestAppointments'
+import PropertiesBySubType from '@/app/components/developers/DataStats/PropertiesBySubType'
 const page = () => {
   return (
     <div className='flex  w-full gap-[3em]'>
@@ -16,26 +18,30 @@ const page = () => {
         <DeveloperHeader />
 
         <div className='flex gap-4'>
-      <DataCard title='Total Properties' value='100' link='/developer/properties' linkText='View All' />
       <DataCard title='Total Units' value='100' link='/developer/properties' linkText='View All' />
-     <DataCard title='Pending Prospects' value='100' link='/developer/properties' linkText='View All' />
-      <DataCard title='Sold Properties' value='100' link='/developer/properties' linkText='View All' />
+      <DataCard title='Total Developments' value='100' link='/developer/properties' linkText='View All' />
+     <DataCard title='Total Leads' value='100' link='/developer/properties' linkText='View All' />
+      <DataCard title='Closed Deals' value='100' link='/developer/properties' linkText='View All' />
        </div>
   
-        <div className='w-full flex gap-4'>
-          <div className='w-2/3'>
+        <div className='w-full flex flex-col gap-4'>
+    
           <StatisticsView />
-          <LatestAppointments />
+
           
-          </div>
+         
 
 
-          <div className='w-1/3 flex flex-col gap-4'>
+          <div className='w-full flex  gap-4'>
             <PropertiesByCategories />
-            <PropertiesByStatus />
+            <PropertiesBySubType />
+            {/* <PropertiesByStatus /> */}
            
-            {/* <PropertiesByType /> */}
+            <PropertiesByType />
           </div>
+          <BestProperties />
+
+          <LatestAppointments />
         
         </div> 
   

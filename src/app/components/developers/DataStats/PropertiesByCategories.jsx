@@ -1,6 +1,6 @@
 'use client'
-import React from 'react'
-import { developments } from '../../Data/Data'
+import React, { useState, useEffect } from 'react'
+import { useAuth } from '@/hooks/useAuth'
 import { Pie } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -9,34 +9,76 @@ import {
   Legend,
   Title,
 } from 'chart.js'
+import { Loader2 } from 'lucide-react'
 
 ChartJS.register(ArcElement, Tooltip, Legend, Title)
 
 const pieColors = [
-  '#36A2EB', // Residential
-  '#FF9800', // Commercial
-  '#7E57C2', // Industrial
-  '#26A69A', // Luxury
-  '#FF6384', // Other
+  '#36A2EB', // Blue
+  '#FF9800', // Orange
+  '#7E57C2', // Purple
+  '#26A69A', // Teal
+  '#FF6384', // Pink
+  '#4BC0C0', // Cyan
+  '#FF9F40', // Light Orange
+  '#9966FF', // Light Purple
 ]
 
 const PropertiesByCategories = () => {
-  // --- Pie Chart Data ---
-  const categoryCounts = developments.reduce((acc, dev) => {
-    const cat = dev.categorization.category
-    acc[cat] = (acc[cat] || 0) + 1
-    return acc
-  }, {})
-  const pieLabels = Object.keys(categoryCounts)
-  const pieData = Object.values(categoryCounts)
-  const total = pieData.reduce((a, b) => a + b, 0)
+  const { user } = useAuth()
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchData()
+    }
+  }, [user?.id])
+
+  const fetchData = async () => {
+    try {
+      const response = await fetch(`/api/developers/properties-stats?account_id=${user.id}`)
+      if (response.ok) {
+        const result = await response.json()
+        setData(result.data)
+      }
+    } catch (error) {
+      console.error('Error fetching purposes data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6 bg-white rounded-2xl shadow-xl flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
+        <span className="text-gray-600">Loading...</span>
+      </div>
+    )
+  }
+
+  if (!data || data.purposes.length === 0) {
+    return (
+      <div className="p-6 bg-white rounded-2xl shadow-xl flex flex-col items-center justify-center">
+        <div className="text-gray-400 text-4xl mb-3">📊</div>
+        <p className="text-gray-500 text-center">No property purposes data available</p>
+      </div>
+    )
+  }
+
+  // Prepare chart data
+  const purposes = data.purposes
+  const total = data.total
+  const pieLabels = purposes.map(purpose => purpose.name)
+  const pieData = purposes.map(purpose => purpose.count)
   const percentages = pieData.map(v => ((v / total) * 100).toFixed(1))
 
   const chartData = {
     labels: pieLabels,
     datasets: [
       {
-        label: 'Number of Developments',
+        label: 'Number of Properties',
         data: pieData,
         backgroundColor: pieColors.slice(0, pieLabels.length),
         borderWidth: 0,
@@ -47,14 +89,14 @@ const PropertiesByCategories = () => {
 
   const chartOptions = {
     responsive: true,
-    cutout: '70%', // donut style
+    cutout: '70%',
     plugins: {
       legend: {
         display: false,
       },
       title: {
         display: true,
-        text: 'Properties by Developments',
+        text: 'Properties by Purposes',
         font: { size: 13, family: 'Poppins, sans-serif' },
         color: '#222',
         padding: { bottom: 20 },
@@ -65,7 +107,7 @@ const PropertiesByCategories = () => {
             const label = ctx.label || ''
             const value = ctx.parsed || 0
             const percent = ((value / total) * 100).toFixed(1)
-            return ` ${label}: ${value} developments (${percent}%)`
+            return ` ${label}: ${value} properties (${percent}%)`
           },
         },
         bodyFont: { family: 'Poppins, sans-serif', size: 12 },

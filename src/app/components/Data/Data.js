@@ -10,6 +10,97 @@ const createSlug = (propertyName) => {
     .trim();
 };
 
+// Ghana city coordinates for mapping (approximate, restricted to Ghana)
+export const ghanaCityCoordinates = {
+  "Accra": { lat: 5.6037, lng: -0.1870 },
+  "East Legon": { lat: 5.6300, lng: -0.1600 },
+  "Tema": { lat: 5.6670, lng: -0.0160 },
+  "Tema Community 1": { lat: 5.6720, lng: -0.0120 },
+  "Takoradi": { lat: 4.9040, lng: -1.7590 },
+  "Kumasi": { lat: 6.6885, lng: -1.6244 },
+  "Koforidua": { lat: 6.0941, lng: -0.2591 },
+  "Tamale": { lat: 9.4040, lng: -0.8420 },
+  "Cape Coast": { lat: 5.1053, lng: -1.2466 },
+  "Elmina": { lat: 5.0840, lng: -1.3520 },
+  "Sekondi": { lat: 4.9340, lng: -1.7130 },
+  "Ho": { lat: 6.6010, lng: 0.4710 },
+  "Aburi": { lat: 5.8480, lng: -0.1740 },
+  "Sogakope": { lat: 5.9990, lng: 0.6270 },
+  "Dzorwulu": { lat: 5.6090, lng: -0.2150 },
+  "East Legon, Accra": { lat: 5.6300, lng: -0.1600 },
+  "City Center": { lat: 5.5560, lng: -0.1969 },
+  "Central Business District": { lat: 5.5560, lng: -0.1969 },
+  "Garden Estate": { lat: 5.6370, lng: -0.1670 }
+};
+
+// Property Taxonomy: Purposes, Sectors, Categories, and Property Types
+// - Every Sector connects to one or more Purposes (purposeIds)
+// - Every Category connects to one or more Sectors and Purposes (sectorIds + purposeIds)
+// - Every Property Type connects to exactly one Sector, Category, and Purpose
+export const purposes = [
+  { id: 'pur-rent', name: 'Rent' },
+  { id: 'pur-sale', name: 'Sale', aliases: ['Buy'] },
+  { id: 'pur-lease', name: 'Lease' }
+];
+
+export const sectors = [
+  { id: 'sec-land', name: 'Land', purposeIds: ['pur-sale', 'pur-lease'] },
+  { id: 'sec-house', name: 'House', purposeIds: ['pur-rent', 'pur-sale'] },
+  { id: 'sec-apartment', name: 'Apartment', purposeIds: ['pur-rent', 'pur-sale'] },
+  { id: 'sec-offices', name: 'Offices', purposeIds: ['pur-lease', 'pur-sale'] },
+  { id: 'sec-warehouse', name: 'Warehouse', purposeIds: ['pur-lease', 'pur-sale'] }
+];
+
+export const categories = [
+  {
+    id: 'cat-residential',
+    name: 'Residential',
+    sectorIds: ['sec-house', 'sec-apartment'],
+    purposeIds: ['pur-rent', 'pur-sale']
+  },
+  {
+    id: 'cat-commercial',
+    name: 'Commercial',
+    sectorIds: ['sec-offices', 'sec-land', 'sec-apartment'],
+    purposeIds: ['pur-sale', 'pur-lease', 'pur-rent']
+  },
+  {
+    id: 'cat-industrial',
+    name: 'Industrial',
+    sectorIds: ['sec-offices', 'sec-land', 'sec-warehouse'],
+    purposeIds: ['pur-sale', 'pur-lease']
+  }
+];
+
+export const propertyTypes = [
+  // Houses → Residential → Sale
+  { id: 'type-duplex', name: 'Duplex', sectorId: 'sec-house', categoryId: 'cat-residential', purposeId: 'pur-sale' },
+  { id: 'type-double-duplex', name: 'Double Duplex', sectorId: 'sec-house', categoryId: 'cat-residential', purposeId: 'pur-sale' },
+  { id: 'type-villa', name: 'Villa', sectorId: 'sec-house', categoryId: 'cat-residential', purposeId: 'pur-sale' },
+  { id: 'type-bungalow', name: 'Bungalow', sectorId: 'sec-house', categoryId: 'cat-residential', purposeId: 'pur-sale' },
+  { id: 'type-mansion', name: 'Mansion', sectorId: 'sec-house', categoryId: 'cat-residential', purposeId: 'pur-sale' },
+
+  // Apartments → Residential/Commercial → Rent/Sale
+  { id: 'type-studio', name: 'Studio', sectorId: 'sec-apartment', categoryId: 'cat-residential', purposeId: 'pur-rent' },
+  { id: 'type-single-room', name: 'Single Room', sectorId: 'sec-apartment', categoryId: 'cat-residential', purposeId: 'pur-rent' },
+  { id: 'type-1-bedroom', name: '1-Bedroom', sectorId: 'sec-apartment', categoryId: 'cat-residential', purposeId: 'pur-rent' },
+  { id: 'type-2-bedroom', name: '2-Bedroom', sectorId: 'sec-apartment', categoryId: 'cat-residential', purposeId: 'pur-rent' },
+  { id: 'type-penthouse', name: 'Penthouse', sectorId: 'sec-apartment', categoryId: 'cat-residential', purposeId: 'pur-sale' },
+  { id: 'type-loft', name: 'Loft', sectorId: 'sec-apartment', categoryId: 'cat-commercial', purposeId: 'pur-rent' },
+
+  // Offices → Commercial/Industrial → Lease
+  { id: 'type-office-suite', name: 'Office Suite', sectorId: 'sec-offices', categoryId: 'cat-commercial', purposeId: 'pur-lease' },
+  { id: 'type-shop-office', name: 'Shop Office', sectorId: 'sec-offices', categoryId: 'cat-commercial', purposeId: 'pur-lease' },
+  { id: 'type-office-tower', name: 'Office Tower', sectorId: 'sec-offices', categoryId: 'cat-commercial', purposeId: 'pur-lease' },
+  { id: 'type-retail-space', name: 'Retail Space', sectorId: 'sec-offices', categoryId: 'cat-commercial', purposeId: 'pur-lease' },
+  { id: 'type-warehouse', name: 'Warehouse', sectorId: 'sec-warehouse', categoryId: 'cat-industrial', purposeId: 'pur-lease' },
+
+  // Land → Commercial/Industrial → Sale/Lease
+  { id: 'type-plot', name: 'Plot', sectorId: 'sec-land', categoryId: 'cat-commercial', purposeId: 'pur-sale' },
+  { id: 'type-serviced-plot', name: 'Serviced Plot', sectorId: 'sec-land', categoryId: 'cat-commercial', purposeId: 'pur-sale' },
+  { id: 'type-industrial-plot', name: 'Industrial Plot', sectorId: 'sec-land', categoryId: 'cat-industrial', purposeId: 'pur-sale' }
+];
+
 const properties = [
   {
     propertyName: "Skyline Heights Apartment",
@@ -638,7 +729,7 @@ export const developments = [
     developmentType: "Mixed-Use",
     size: "25,000 sq ft",
     status: "completed",
-    numberOfBuildings: 3,
+    number_of_buildings: 3,
     unitTypes: ["Studio", "1-Bedroom", "2-Bedroom", "3-Bedroom", "Commercial"],
     total_units: 120,
     categorization: {
@@ -673,7 +764,7 @@ export const developments = [
     developmentType: "Residential",
     size: "50,000 sq ft",
     status: "ongoing",
-    numberOfBuildings: 8,
+    number_of_buildings: 8,
     unitTypes: ["Villa", "Duplex", "Bungalow"],
     total_units: 24,
     categorization: {
@@ -708,7 +799,7 @@ export const developments = [
     developmentType: "Commercial",
     size: "15,000 sq ft",
     status: "inDevelopment",
-    numberOfBuildings: 1,
+    number_of_buildings: 1,
     unitTypes: ["Office Suite", "Shop Office", "Retail Space"],
     total_units: 45,
     categorization: {
@@ -743,7 +834,7 @@ export const developments = [
     developmentType: "Residential",
     size: "30,000 sq ft",
     status: "rtc",
-    numberOfBuildings: 4,
+    number_of_buildings: 4,
     unitTypes: ["Studio", "1-Bedroom", "2-Bedroom"],
     total_units: 80,
     categorization: {
@@ -778,7 +869,7 @@ export const developments = [
     developmentType: "Luxury",
     size: "75,000 sq ft",
     status: "completed",
-    numberOfBuildings: 12,
+    number_of_buildings: 12,
     unitTypes: ["Villa", "Penthouse", "Duplex"],
     total_units: 18,
     categorization: {
@@ -813,7 +904,7 @@ export const developments = [
     developmentType: "Industrial",
     size: "200,000 sq ft",
     status: "ongoing",
-    numberOfBuildings: 15,
+    number_of_buildings: 15,
     unitTypes: ["Warehouse", "Factory", "Office Space"],
     total_units: 25,
     categorization: {

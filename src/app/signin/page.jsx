@@ -3,55 +3,50 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Input } from '@/app/components/ui/input'
 import { Button } from '@/app/components/ui/button'
-import { ChevronDown, Eye, EyeOff, Building2, Home, User, Users } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import { ToastContainer, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
+import { useAuth } from '@/contexts/AuthContext'
+import { useRouter } from 'next/navigation'
 
 const SignInPage = () => {
+  const { login, isAuthenticated, user, loading } = useAuth()
+  const router = useRouter()
+  
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
-    accountType: ''
+    password: ''
   })
   const [showPassword, setShowPassword] = useState(false)
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const dropdownRef = useRef(null)
 
-  const accountTypes = [
-    { 
-      value: 'developer', 
-      label: 'Developer', 
-      icon: Building2,
-      email: 'trassacovalley@gmail.com',
-      password: '12345',
-      redirectLink: '/developer/7868889796997/dashboard'
-    },
-    { 
-      value: 'agent', 
-      label: 'Agent', 
-      icon: User,
-      email: 'agent@iskahomes.com',
-      password: '12345',
-      redirectLink: '/agents/7868889796997/dashboard'
-    },
-    { 
-      value: 'homeowner', 
-      label: 'Homeowner', 
-      icon: Home,
-      email: 'homeowner@iskahomes.com',
-      password: 'homeowner123',
-      redirectLink: '/homeowner/dashboard'
-    },
-    { 
-      value: 'homeseeker', 
-      label: 'HomeSeeker', 
-      icon: Users,
-      email: 'homeseeker@iskahomes.com',
-      password: 'homeseeker123',
-      redirectLink: '/homeSeeker/67890/dashboard'
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!loading && isAuthenticated && user) {
+      const userType = user.user_type
+      let redirectUrl = '/'
+      
+      switch (userType) {
+        case 'developer':
+          redirectUrl = `/developer/${user.profile?.slug}/dashboard`
+          break
+        case 'agent':
+          redirectUrl = `/agents/${user.profile?.slug}/dashboard`
+          break
+        case 'seeker':
+          redirectUrl = `/homeSeeker/${user.profile?.slug}/dashboard`
+          break
+        case 'admin':
+          redirectUrl = '/admin/dashboard'
+          break
+        default:
+          redirectUrl = '/'
+      }
+      
+      router.push(redirectUrl)
     }
-  ]
+  }, [isAuthenticated, user, loading, router])
+
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -63,7 +58,7 @@ const SignInPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    if (!formData.email || !formData.password || !formData.accountType) {
+    if (!formData.email || !formData.password) {
       toast.error('Please fill in all fields', {
         position: "top-right",
         autoClose: 3000,
@@ -78,51 +73,58 @@ const SignInPage = () => {
     setIsLoading(true)
     
     try {
-      // Find the selected account type
-      const selectedType = accountTypes.find(type => type.value === formData.accountType)
-      
-      if (!selectedType) {
-        toast.error('Please select a valid account type', {
-          position: "top-right",
-          autoClose: 3000,
+      const result = await login(formData.email, formData.password)
+
+      if (result.success) {
+        // Success - show success message
+        const userType = result.user.user_type
+        const userName = result.user.profile?.name || userType
+        
+        toast.success(`Welcome back, ${userName}!`, {
+          position: "top-center",
+          autoClose: 2000,
           hideProgressBar: false,
           closeOnClick: true,
           pauseOnHover: true,
           draggable: true,
         })
-        setIsLoading(false)
-        return
+        
+        // Redirect based on user type
+        let redirectUrl = '/'
+        
+        switch (userType) {
+          case 'developer':
+            redirectUrl = `/developer/${result.user.profile?.slug || result.user.id}/dashboard`
+            break
+          case 'agent':
+            redirectUrl = `/agents/${result.user.profile?.slug || result.user.id}/dashboard`
+            break
+          case 'seeker':
+            redirectUrl = `/homeSeeker/${result.user.profile?.slug || result.user.id}/dashboard`
+            break
+          case 'admin':
+            redirectUrl = '/admin/dashboard'
+            break
+          default:
+            redirectUrl = '/'
+        }
+        
+        // Redirect after a short delay
+        setTimeout(() => {
+          router.push(redirectUrl)
+        }, 2000)
+        
+      } else {
+        // Error - show error message
+        toast.error(result.error || 'Invalid email or password', {
+          position: "top-center",
+          autoClose: 4000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        })
       }
-      
-             // Check if credentials match the dummy account
-       if (formData.email === selectedType.email && formData.password === selectedType.password) {
-         console.log('Authentication successful:', formData)
-         
-         // Show success toast
-         toast.success(`Welcome back! Redirecting to ${selectedType.label} dashboard...`, {
-           position: "top-center",
-           autoClose: 2000,
-           hideProgressBar: false,
-           closeOnClick: true,
-           pauseOnHover: true,
-           draggable: true,
-         })
-         
-         // Simulate API call
-         await new Promise(resolve => setTimeout(resolve, 1000))
-         
-         // Redirect to the appropriate dashboard
-         window.location.href = selectedType.redirectLink
-       } else {
-         toast.error('Invalid email or password for the selected account type', {
-           position: "top-center",
-           autoClose: 4000,
-           hideProgressBar: false,
-           closeOnClick: true,
-           pauseOnHover: true,
-           draggable: true,
-         })
-       }
     } catch (error) {
       console.error('Sign in error:', error)
       toast.error('An error occurred during sign in. Please try again.', {
@@ -138,24 +140,18 @@ const SignInPage = () => {
     }
   }
 
-  const selectedAccountType = accountTypes.find(type => type.value === formData.accountType)
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsDropdownOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [])
+  // Show loading spinner while auth context is loading
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen flex ">
+    <div cnpmassName="min-h-screen flex ">
       {/* Left Side - Image */}
       <div className="hidden lg:flex lg:w-1/2 relative ">
         <div className="absolute inset-0  max-h-[700px] bg-gradient-to-br from-primary_color/20 to-secondary_color/20 z-10"></div>
@@ -225,54 +221,6 @@ const SignInPage = () => {
               </div>
             </div>
 
-            {/* Account Type Dropdown */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Account Type
-              </label>
-              <div className="relative" ref={dropdownRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 bg-white text-left flex items-center justify-between"
-                >
-                  <div className="flex items-center space-x-3">
-                    {selectedAccountType ? (
-                      <>
-                        <selectedAccountType.icon size={20} className="text-primary_color" />
-                        <span className="text-gray-900">{selectedAccountType.label}</span>
-                      </>
-                    ) : (
-                      <span className="text-gray-500">Select account type</span>
-                    )}
-                  </div>
-                  <ChevronDown 
-                    size={20} 
-                    className={`text-gray-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}
-                  />
-                </button>
-
-                {/* Dropdown Menu */}
-                {isDropdownOpen && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                    {accountTypes.map((type) => (
-                      <span
-                        key={type.value}
-                        type="button "
-                        onClick={() => {
-                          handleInputChange('accountType', type.value)
-                          setIsDropdownOpen(false)
-                        }}
-                        className="w-full px-4 py-3 flex items-center space-x-3 hover:bg-gray-50 transition-colors duration-150 first:rounded-t-lg last:rounded-b-lg"
-                      >
-                        <type.icon size={20} className="text-primary_color" />
-                        <span className="text-gray-900">{type.label}</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
 
             {/* Remember Me & Forgot Password */}
             <div className="flex items-center justify-between">
@@ -286,7 +234,7 @@ const SignInPage = () => {
                   Remember me
                 </label>
               </div>
-              <a href="#" className="text-sm text-primary_color hover:text-primary_color/80 transition-colors">
+              <a href="/forgot-password" className="text-sm text-primary_color hover:text-primary_color/80 transition-colors">
                 Forgot password?
               </a>
             </div>
@@ -308,71 +256,7 @@ const SignInPage = () => {
             </Button>
           </form>
 
-          <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h3 className="text-sm font-semibold text-blue-800 mb-3">🧪 Demo Accounts for Testing:</h3>
-            <div className="space-y-4 text-sm text-blue-700">
-              {/* Developer Account */}
-              <div className="border-b border-blue-200 pb-3">
-                <h4 className="font-semibold text-blue-800 mb-2">👨‍💼 Developer Account:</h4>
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">Email:</span>
-                    <span className="bg-white px-2 py-1 rounded border">trassacovalley@gmail.com</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">Password:</span>
-                    <span className="bg-white px-2 py-1 rounded border">12345</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Agent Account */}
-              <div className="border-b border-blue-200 pb-3">
-                <h4 className="font-semibold text-blue-800 mb-2">👤 Agent Account:</h4>
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">Email:</span>
-                    <span className="bg-white px-2 py-1 rounded border">agent@iskahomes.com</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">Password:</span>
-                    <span className="bg-white px-2 py-1 rounded border">12345</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Homeowner Account */}
-              <div className="border-b border-blue-200 pb-3">
-                <h4 className="font-semibold text-blue-800 mb-2">🏠 Homeowner Account:</h4>
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">Email:</span>
-                    <span className="bg-white px-2 py-1 rounded border">homeowner@iskahomes.com</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">Password:</span>
-                    <span className="bg-white px-2 py-1 rounded border">homeowner123</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* HomeSeeker Account */}
-              <div>
-                <h4 className="font-semibold text-blue-800 mb-2">👥 HomeSeeker Account:</h4>
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">Email:</span>
-                    <span className="bg-white px-2 py-1 rounded border">homeseeker@iskahomes.com</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">Password:</span>
-                    <span className="bg-white px-2 py-1 rounded border">homeseeker123</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <p className="text-xs text-blue-600 mt-3 italic">Select the appropriate account type and use these credentials to test different dashboard functionalities</p>
-          </div>
+         
 
           {/* Divider */}
           <div className="relative">

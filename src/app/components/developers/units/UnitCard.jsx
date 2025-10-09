@@ -3,21 +3,33 @@ import React from 'react'
 import { useRouter } from 'next/navigation'
 import { Heart, MapPin, Bed, Bath, Car, Square } from 'lucide-react'
 
-const UnitCard = ({ unit, development }) => {
+const UnitCard = ({ unit, developerSlug }) => {
   const router = useRouter()
 
-  const formatPrice = (price) => {
-    if (price >= 1000000) {
-      return `$${(price / 1000000).toFixed(1)}M`
-    } else if (price >= 1000) {
-      return `$${(price / 1000).toFixed(0)}K`
+  const formatPrice = (price, currency = 'GHS') => {
+    const numPrice = parseFloat(price)
+    if (numPrice >= 1000000) {
+      return `${currency} ${(numPrice / 1000000).toFixed(1)}M`
+    } else if (numPrice >= 1000) {
+      return `${currency} ${(numPrice / 1000).toFixed(0)}K`
     }
-    return `$${price}`
+    return `${currency} ${numPrice}`
   }
 
-  const getPurposeColor = (purpose) => {
-    switch (purpose.toLowerCase()) {
+  // Get cover image from media files
+  const getCoverImage = () => {
+    if (unit.media?.mediaFiles && unit.media.mediaFiles.length > 0) {
+      return unit.media.mediaFiles[0].url
+    }
+    return null
+  }
+
+  const coverImage = getCoverImage()
+
+  const getPurposeColor = (priceType) => {
+    switch (priceType?.toLowerCase()) {
       case 'buy':
+      case 'sale':
         return 'bg-green-100 text-green-800'
       case 'rent':
         return 'bg-blue-100 text-blue-800'
@@ -42,8 +54,9 @@ const UnitCard = ({ unit, development }) => {
   }
 
   const handleCardClick = () => {
-    // Navigate to single unit page
-    router.push(`/developer/${development?.developerId || 'default'}/units/${unit.id}`)
+    // Navigate to single unit page with developer context
+    const slug = developerSlug || 'default'
+    router.push(`/developer/${slug}/units/${unit.id}`)
   }
 
   return (
@@ -53,14 +66,25 @@ const UnitCard = ({ unit, development }) => {
     >
       {/* Image Section */}
       <div className="relative h-48 overflow-hidden rounded-t-lg">
-        <img 
-          src={unit.projectImages[0]} 
-          alt={unit.title}
-          className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-        />
+        {coverImage ? (
+          <img 
+            src={coverImage} 
+            alt={unit.title}
+            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+            <div className="text-center text-gray-500">
+              <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              <p className="text-sm">No Image</p>
+            </div>
+          </div>
+        )}
         <div className="absolute top-3 left-3">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPurposeColor(unit.categorization.purpose)}`}>
-            {unit.categorization.purpose}
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPurposeColor(unit.price_type)}`}>
+            {unit.price_type}
           </span>
         </div>
         <div className="absolute top-3 right-3">
@@ -68,98 +92,98 @@ const UnitCard = ({ unit, development }) => {
             {unit.status}
           </span>
         </div>
-        {/* <button className="absolute top-3 right-12 p-1 bg-white rounded-full shadow-md hover:bg-gray-50">
-          <Heart className="w-4 h-4 text-gray-600" />
-        </button> */}
       </div>
 
       {/* Content Section */}
       <div className="p-4">
-            {/* Unit Title and Number */}
-            <div className="mb-3">
+        {/* Unit Title */}
+        <div className="mb-3">
           <h3 className="font-semibold text-lg text-gray-900 mb-1">{unit.title}</h3>
-          <p className="text-sm text-gray-600">Unit {unit.unitNumber}</p>
+          <p className="text-sm text-gray-600">{unit.size} sq ft</p>
         </div>
-        {/* Development Info */}
+
+        {/* Location Info */}
         <div className="mb-2">
           <div className="flex items-center text-sm text-gray-600 mb-1">
             <MapPin className="w-3 h-3 mr-1" />
-            <span>{development?.title || 'Development'}</span>
+            <span>{unit.city}, {unit.state}</span>
           </div>
           <p className="text-xs text-gray-500">
-            {development?.location?.neighborhood}, {development?.location?.city}
+            {unit.town}
           </p>
         </div>
-
-    
 
         {/* Price */}
         <div className="mb-3">
           <p className="text-2xl font-bold text-gray-900">
-            {formatPrice(unit.price)}
+            {formatPrice(unit.price, unit.currency)}
             <span className="text-sm font-normal text-gray-600 ml-1">
-              {unit.categorization.purpose === 'Rent' || unit.categorization.purpose === 'Lease' ? '/month' : ''}
+              {unit.price_type === 'rent' ? `/${unit.duration}` : ''}
             </span>
           </p>
         </div>
 
         {/* Property Details */}
-        {/* <div className="flex items-center justify-between mb-3 text-sm text-gray-600">
-          {unit.details.bedrooms && (
-            <div className="flex items-center">
-              <Bed className="w-4 h-4 mr-1" />
-              <span>{unit.details.bedrooms} bed</span>
-            </div>
-          )}
-          {unit.details.washrooms && (
-            <div className="flex items-center">
-              <Bath className="w-4 h-4 mr-1" />
-              <span>{unit.details.washrooms} bath</span>
-            </div>
-          )}
-          {unit.details.areaSqFt && (
-            <div className="flex items-center">
-              <Square className="w-4 h-4 mr-1" />
-              <span>{unit.details.areaSqFt} sq ft</span>
-            </div>
-          )}
-          {unit.details.floor && (
-            <div className="flex items-center">
-              <span>Floor {unit.details.floor}</span>
-            </div>
-          )}
-        </div> */}
-
-        {/* Amenities */}
-        {/* <div className="mb-3">
-          <div className="flex flex-wrap gap-1">
-            {unit.amenities.slice(0, 3).map((amenity, index) => (
-              <span 
-                key={index}
-                className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
-              >
-                {amenity}
-              </span>
-            ))}
-            {unit.amenities.length > 3 && (
-              <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
-                +{unit.amenities.length - 3} more
-              </span>
+        {unit.specifications && (
+          <div className="flex items-center justify-between mb-3 text-sm text-gray-600">
+            {unit.specifications.bedrooms && (
+              <div className="flex items-center">
+                <Bed className="w-4 h-4 mr-1" />
+                <span>{unit.specifications.bedrooms} bed</span>
+              </div>
+            )}
+            {unit.specifications.bathrooms && (
+              <div className="flex items-center">
+                <Bath className="w-4 h-4 mr-1" />
+                <span>{unit.specifications.bathrooms} bath</span>
+              </div>
+            )}
+            {unit.specifications.kitchen && (
+              <div className="flex items-center">
+                <Square className="w-4 h-4 mr-1" />
+                <span>{unit.specifications.kitchen} kitchen</span>
+              </div>
+            )}
+            {unit.specifications.floor_level && (
+              <div className="flex items-center">
+                <span>Floor {unit.specifications.floor_level}</span>
+              </div>
             )}
           </div>
-        </div> */}
+        )}
+
+        {/* Amenities */}
+        {unit.amenities && (unit.amenities.general?.length > 0 || unit.amenities.database?.length > 0) && (
+          <div className="mb-3">
+            <div className="flex flex-wrap gap-1">
+              {unit.amenities.general?.slice(0, 3).map((amenity, index) => (
+                <span 
+                  key={index}
+                  className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
+                >
+                  {amenity.replace('-', ' ')}
+                </span>
+              ))}
+              {unit.amenities.general?.length > 3 && (
+                <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
+                  +{unit.amenities.general.length - 3} more
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Description */}
-        {/* <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+        <p className="text-sm text-gray-600 line-clamp-2 mb-3">
           {unit.description}
-        </p> */}
+        </p>
 
         {/* Property Type */}
-        {/* <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <span className="text-xs text-gray-500 capitalize">
-            {unit.categorization.type} • {unit.categorization.sector}
+            {unit.listing_type} • {unit.property_status}
           </span>
-        </div> */}
+        </div>
       </div>
     </div>
   )

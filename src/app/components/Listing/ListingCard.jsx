@@ -1,112 +1,196 @@
-import React from 'react';
-import Link from 'next/link';
-import { FiMapPin } from 'react-icons/fi';
-import { BsHouseDoor, BsCupHot, BsDroplet } from 'react-icons/bs';
+'use client'
 
-const ListingCard = ({ property }) => {
-  const formatPrice = (price) => {
-    if (price >= 1000000) {
-      return `$${(price / 1000000).toFixed(1)}M`;
-    } else if (price >= 1000) {
-      return `$${(price / 1000).toFixed(0)}K`;
-    }
-    return `$${price}`;
-  };
+import React from 'react'
+import Link from 'next/link'
+import { MapPin, Bed, Bath, Square, Calendar, DollarSign, Users } from 'lucide-react'
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Available':
-        return 'bg-green-100 text-green-800';
-      case 'Rented Out':
-        return 'bg-red-100 text-red-800';
-      case 'Sold':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-blue-100 text-blue-800';
+const ListingCard = ({ listing }) => {
+  const {
+    id,
+    title,
+    description,
+    listing_type,
+    price,
+    currency,
+    price_type,
+    duration,
+    media,
+    specifications,
+    city,
+    state,
+    country,
+    slug,
+    developers,
+    available_from,
+    is_featured,
+    is_verified,
+    is_premium
+  } = listing
+
+  // Get the first media file as the main image
+  const mainImage = media?.mediaFiles?.[0]?.url || media?.banner?.url
+
+  // Format price
+  const formatPrice = (price, currency, priceType, duration) => {
+    const priceNum = parseFloat(price)
+    const formattedPrice = priceNum.toLocaleString()
+    
+    let priceText = `${currency} ${formattedPrice}`
+    
+    if (priceType === 'rent') {
+      priceText += `/${duration}`
     }
-  };
+    
+    return priceText
+  }
+
+  // Get specifications based on listing type
+  const getSpecifications = () => {
+    if (!specifications) return {}
+    
+    if (listing_type === 'unit') {
+      return {
+        bedrooms: specifications.bedrooms || 0,
+        bathrooms: specifications.bathrooms || 0,
+        size: specifications.property_size || specifications.size || 0,
+        floor: specifications.floor_level || 0,
+        furnishing: specifications.furnishing || 'unfurnished'
+      }
+    } else {
+      return {
+        bedrooms: specifications.bedrooms || 0,
+        bathrooms: specifications.bathrooms || 0,
+        size: specifications.property_size || specifications.size || 0,
+        floors: specifications.floors || 0,
+        age: specifications.property_age || 'unknown'
+      }
+    }
+  }
+
+  const specs = getSpecifications()
 
   return (
-    <Link href={`/property/${property.slug}`} className="block group">
-      <div className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 group-hover:border-gray-200">
-        {/* Image Container */}
-        <div className="relative h-64 overflow-hidden">
-          <img
-            src={property.projectImages[0]}
-            alt={property.propertyName}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-          {/* Status Badge */}
-          <div className="absolute top-4 left-4">
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(property.status)}`}>
-              {property.status}
-            </span>
+    <Link href={`/property/${listing_type}/${slug}/${id}`}>
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer group">
+        {/* Image Section */}
+        <div className="relative h-64 w-full overflow-hidden">
+          {mainImage ? (
+            <img
+              src={mainImage}
+              alt={title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+              <div className="text-white text-2xl font-bold">
+                {title?.charAt(0) || 'P'}
+              </div>
+            </div>
+          )}
+          
+          {/* Badges */}
+          <div className="absolute top-4 left-4 flex flex-col gap-2">
+            {is_featured && (
+              <span className="bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-medium">
+                Featured
+              </span>
+            )}
+            {is_verified && (
+              <span className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-medium">
+                Verified
+              </span>
+            )}
+            {is_premium && (
+              <span className="bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-medium">
+                Premium
+              </span>
+            )}
           </div>
+
           {/* Price Badge */}
-          <div className="absolute top-4 right-4">
-            <span className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full text-lg font-bold text-gray-900 shadow-lg">
-              {formatPrice(property.price)}
-            </span>
-          </div>
-          {/* Purpose Badge */}
-          <div className="absolute bottom-4 left-4">
-            <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
-              {property.categorization.purpose}
+          <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full">
+            <span className="text-sm font-bold text-gray-900">
+              {formatPrice(price, currency, price_type, duration)}
             </span>
           </div>
         </div>
 
-        {/* Content */}
+        {/* Content Section */}
         <div className="p-6">
-          {/* Property Name */}
-          <h6  className=" font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors duration-200">
-            {property.propertyName}
-          </h6>
-
-          {/* Location */}
-          <div className="flex items-center text-gray-600 mb-4">
-            <FiMapPin className="w-4 h-4 mr-2" />
-            <span className="text-sm">
-              {property.address.city}, {property.address.state}
-            </span>
-          </div>
-
-          {/* Property Details */}
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            {property.details.bedrooms && (
-              <div className="flex items-center text-gray-700">
-                <BsHouseDoor className="w-4 h-4 mr-2 text-gray-500" />
-                <span className="text-sm font-medium">{property.details.bedrooms} Bed</span>
-              </div>
-            )}
-            {property.details.kitchen && (
-              <div className="flex items-center text-gray-700">
-                <BsCupHot className="w-4 h-4 mr-2 text-gray-500" />
-                <span className="text-sm font-medium">{property.details.kitchen} Kitchen</span>
-              </div>
-            )}
-            {property.details.washrooms && (
-              <div className="flex items-center text-gray-700">
-                <BsDroplet className="w-4 h-4 mr-2 text-gray-500" />
-                <span className="text-sm font-medium">{property.details.washrooms} Bath</span>
-              </div>
-            )}
-          </div>
-
-          {/* Property Type */}
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500 font-medium">
-              {property.categorization.type} • {property.categorization.category}
-            </span>
-            {/* View Details Button */}
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-              <span className="text-blue-600 text-sm font-semibold">View Details →</span>
+          {/* Title and Location */}
+          <div className="mb-4">
+            <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
+              {title}
+            </h3>
+            <div className="flex items-center text-gray-600 text-sm">
+              <MapPin className="w-4 h-4 mr-1" />
+              <span className="line-clamp-1">
+                {city && state ? `${city}, ${state}` : country}
+              </span>
             </div>
+          </div>
+
+          {/* Description */}
+          <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+            {description}
+          </p>
+
+          {/* Specifications */}
+          <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+            <div className="flex items-center space-x-4">
+              {specs.bedrooms > 0 && (
+                <div className="flex items-center">
+                  <Bed className="w-4 h-4 mr-1" />
+                  <span>{specs.bedrooms}</span>
+                </div>
+              )}
+              {specs.bathrooms > 0 && (
+                <div className="flex items-center">
+                  <Bath className="w-4 h-4 mr-1" />
+                  <span>{specs.bathrooms}</span>
+                </div>
+              )}
+              {specs.size > 0 && (
+                <div className="flex items-center">
+                  <Square className="w-4 h-4 mr-1" />
+                  <span>{specs.size} {listing_type === 'unit' ? 'sq ft' : 'sq m'}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Additional Info */}
+          <div className="flex items-center justify-between text-sm text-gray-500">
+            <div className="flex items-center">
+              <Calendar className="w-4 h-4 mr-1" />
+              <span>
+                Available {available_from ? new Date(available_from).toLocaleDateString() : 'Now'}
+              </span>
+            </div>
+            
+            {/* Developer Info for Units */}
+            {listing_type === 'unit' && (
+              <div className="flex items-center">
+                <Users className="w-4 h-4 mr-1" />
+                <span className="line-clamp-1">Developer Unit</span>
+              </div>
+            )}
+          </div>
+
+          {/* Listing Type Badge */}
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+              listing_type === 'unit' 
+                ? 'bg-blue-100 text-blue-800' 
+                : 'bg-green-100 text-green-800'
+            }`}>
+              {listing_type === 'unit' ? 'Unit' : 'Property'}
+            </span>
           </div>
         </div>
       </div>
     </Link>
-  );
-};
+  )
+}
 
-export default ListingCard;
+export default ListingCard

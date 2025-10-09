@@ -5,12 +5,55 @@
   --foreground: #171717;
 }
 
+
 /* Line clamp utility for text truncation */
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Swiper custom styles */
+.featured-developers-swiper {
+  padding: 20px 0 50px 0;
+}
+
+.featured-developers-swiper .swiper-button-next,
+.featured-developers-swiper .swiper-button-prev {
+  color: #3b82f6;
+  background: white;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.featured-developers-swiper .swiper-button-next:after,
+.featured-developers-swiper .swiper-button-prev:after {
+  font-size: 18px;
+}
+
+.featured-developers-swiper .swiper-pagination-bullet {
+  background: #3b82f6;
+  opacity: 0.3;
+}
+
+.featured-developers-swiper .swiper-pagination-bullet-active {
+  opacity: 1;
+}
+
+/* Preserve whitespace in text content */
+.preserve-whitespace {
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 @theme inline {
@@ -48,9 +91,9 @@ body {
     @apply text-[0.8em]; 
   }
 
-  button{
+  /* button{
     @apply cursor-pointer text-[0.8em] md:text-[0.9em] text-white bg-secondary_color rounded-full p-4  duration-500;
-  }
+  } */
  
   p, h1, h2, h3, h4, h5, h6, pre , li{
     @apply cursor-pointer text-primary_color;

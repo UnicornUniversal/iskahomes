@@ -1,0 +1,220 @@
+{
+  "account_type": "agent",
+  "user_id": "user_987654321",
+  "listing_type": "property",
+  "title": "Modern 4-Bedroom House in Labone",
+  "description": "Beautiful 4-bedroom family house in the heart of Labone. This property features a spacious living area, modern kitchen, and a lovely garden. Perfect for families looking for comfort and convenience in one of Accra's most sought-after neighborhoods.",
+  "size": "2500",
+  "status": "Available",
+  "development_id": null,
+  
+  "purposes": [
+    {
+      "id": "purpose_sale",
+      "name": "Sale",
+      "description": "Properties available for purchase"
+    }
+  ],
+  "types": [
+    {
+      "id": "type_house",
+      "name": "House",
+      "description": "Single-family residential house"
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat_residential",
+      "name": "Residential",
+      "description": "Properties for residential use"
+    }
+  ],
+  "listing_types": {
+    "database": [
+      {
+        "id": "unit_type_4_bedroom",
+        "name": "4 Bedroom",
+        "description": "Four bedroom residential unit"
+      },
+      {
+        "id": "unit_type_house",
+        "name": "House",
+        "description": "Single-family residential house"
+      }
+    ],
+    "inbuilt": ["4 Bedroom", "House"],
+    "custom": ["Family Home", "Garden View"]
+  },
+  
+  "specifications": {
+    "bedrooms": 4,
+    "bathrooms": 3,
+    "living_rooms": 2,
+    "kitchen": 1,
+    "balconies": 0,
+    "parking_spaces": 2,
+    "floor_number": 1,
+    "total_floors": 2,
+    "square_footage": 2500,
+    "year_built": 2020,
+    "furnishing_status": "Unfurnished",
+    "flooring_type": "Tiles and Carpet",
+    "ceiling_height": "10 feet",
+    "windows": "Large windows",
+    "doors": "Solid wood",
+    "electrical": "Standard",
+    "plumbing": "Modern fixtures",
+    "heating_cooling": "Split AC units",
+    "security": "Gated community",
+    "elevator": false,
+    "gym": false,
+    "swimming_pool": false,
+    "concierge": false
+  },
+  
+  "location": {
+    "country": "Ghana",
+    "state": "Greater Accra",
+    "city": "Accra",
+    "town": "Labone",
+    "fullAddress": "45 Labone Street, Labone, Accra, Ghana",
+    "coordinates": {
+      "latitude": "5.5500",
+      "longitude": "-0.2000"
+    },
+    "additionalInformation": "Located in the prestigious Labone area, close to international schools and business centers"
+  },
+  
+  "amenities": {
+    "database": [
+      {
+        "id": "amenity_garden",
+        "name": "Garden",
+        "description": "Private garden space"
+      },
+      {
+        "id": "amenity_parking",
+        "name": "Parking",
+        "description": "Dedicated parking spaces"
+      },
+      {
+        "id": "amenity_security",
+        "name": "Security",
+        "description": "Gated community security"
+      }
+    ],
+    "general": [
+      {
+        "name": "Garden",
+        "description": "Private garden space"
+      },
+      {
+        "name": "Parking",
+        "description": "Dedicated parking spaces"
+      },
+      {
+        "name": "Security",
+        "description": "Gated community security"
+      },
+      {
+        "name": "Water Supply",
+        "description": "24/7 water supply"
+      }
+    ],
+    "custom": [
+      {
+        "name": "Study Room",
+        "description": "Dedicated study space"
+      },
+      {
+        "name": "Storage Room",
+        "description": "Additional storage space"
+      }
+    ]
+  },
+  
+  "pricing": {
+    "price": 450000,
+    "currency": "GHS",
+    "duration": "one_time",
+    "price_type": "sale",
+    "cancellation_policy": "Non-refundable deposit of 10% required. Full payment within 30 days of agreement.",
+    "is_negotiable": true,
+    "security_requirements": "Valid ID, proof of income, bank statements, and legal documentation required.",
+    "flexible_terms": false
+  },
+  
+  "availability": {
+    "available_from": "2024-03-01",
+    "available_until": "2024-12-31",
+    "acquisition_rules": "Serious buyers only. Viewing by appointment. All offers subject to verification and approval."
+  },
+  
+  "media": {
+
+    "video": null,
+
+    "virtualTourUrl": "",
+    "mediaFiles": [
+      {
+        "url": "https://storage.supabase.co/iskaHomes/property-media/front-view.jpg",
+        "filename": "front-view.jpg",
+        "size": 1024000,
+        "type": "image/jpeg"
+      },
+      {
+        "url": "https://storage.supabase.co/iskaHomes/property-media/living-room.jpg",
+        "filename": "living-room.jpg",
+        "size": 987654,
+        "type": "image/jpeg"
+      },
+      {
+        "url": "https://storage.supabase.co/iskaHomes/property-media/kitchen.jpg",
+        "filename": "kitchen.jpg",
+        "size": 1123456,
+        "type": "image/jpeg"
+      },
+      {
+        "url": "https://storage.supabase.co/iskaHomes/property-media/garden.jpg",
+        "filename": "garden.jpg",
+        "size": 876543,
+        "type": "image/jpeg"
+      }
+    ]
+  },
+  
+  "additional_files": [
+    {
+      "url": "https://storage.supabase.co/iskaHomes/property-documents/property-deed.pdf",
+      "filename": "property-deed.pdf",
+      "size": 512000,
+      "type": "application/pdf"
+    },
+    {
+      "url": "https://storage.supabase.co/iskaHomes/property-documents/survey-plan.pdf",
+      "filename": "survey-plan.pdf",
+      "size": 256000,
+      "type": "application/pdf"
+    }
+  ],
+  
+  "additional_information": "This beautiful family home is located in the heart of Labone, one of Accra's most prestigious neighborhoods. The property features a modern design with spacious rooms, a well-maintained garden, and all necessary amenities. Perfect for families looking for a comfortable and secure living environment. The house is close to international schools, shopping centers, and major business districts.",
+  
+  "listing_status": "published",
+  "is_featured": false,
+  "is_verified": true,
+  "is_premium": false,
+  
+  "created_at": "2024-01-20T14:30:00Z",
+  "updated_at": "2024-01-20T14:30:00Z",
+  "published_at": "2024-01-20T14:30:00Z",
+  "expires_at": "2024-12-31T23:59:59Z",
+  "created_by": "user_987654321",
+  "last_modified_by": "user_987654321",
+  
+  "tags": ["family", "house", "labone", "modern", "garden", "4-bedroom", "residential"],
+  "meta_description": "Modern 4-bedroom family house in Labone with garden and parking. Perfect for families seeking comfort in Accra's prestigious neighborhood.",
+  "meta_keywords": "family house, 4 bedroom, Labone, Accra, Ghana, modern, garden, residential",
+  "seo_title": "Modern 4-Bedroom House in Labone | Accra | Iska Homes",
+  "slug": "modern-4-bedroom-house-labone-accra"
+}

@@ -1,0 +1,252 @@
+{
+  "account_type": "developer",
+  "user_id": "user_123456789",
+  "developer_id": "dev_123456789",
+  "listing_type": "unit",
+  "title": "Luxury 3-Bedroom Apartment Unit A-101",
+  "description": "A stunning 3-bedroom apartment featuring modern amenities, spacious living areas, and breathtaking city views. This unit offers the perfect blend of comfort and luxury with premium finishes throughout.",
+  "size": "1200",
+  "status": "Available",
+  "development_id": "dev_987654321",
+  
+  "purposes": [
+    {
+      "id": "purpose_rent",
+      "name": "Rent",
+      "description": "Properties available for rental"
+    },
+    {
+      "id": "purpose_sale", 
+      "name": "Sale",
+      "description": "Properties available for purchase"
+    }
+  ],
+  "types": [
+    {
+      "id": "type_apartment",
+      "name": "Apartment",
+      "description": "Multi-unit residential building"
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat_residential",
+      "name": "Residential",
+      "description": "Properties for residential use"
+    }
+  ],
+  "unit_types": {
+    "database": [
+      {
+        "id": "unit_type_3_bedroom",
+        "name": "3 Bedroom",
+        "description": "Three bedroom residential unit"
+      },
+      {
+        "id": "unit_type_apartment",
+        "name": "Apartment",
+        "description": "Multi-unit residential building"
+      }
+    ],
+    "inbuilt": ["3 Bedroom", "Apartment"],
+    "custom": ["Luxury Unit", "City View"]
+  },
+  
+  "specifications": {
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "living_rooms": 1,
+    "kitchen": 1,
+    "balconies": 2,
+    "parking_spaces": 1,
+    "floor_number": 10,
+    "total_floors": 25,
+    "unit_number": "A-101",
+    "square_footage": 1200,
+    "year_built": 2023,
+    "furnishing_status": "Semi-furnished",
+    "flooring_type": "Marble and Hardwood",
+    "ceiling_height": "9 feet",
+    "windows": "Floor to ceiling",
+    "doors": "Solid wood",
+    "electrical": "3-phase",
+    "plumbing": "Modern fixtures",
+    "heating_cooling": "Central AC",
+    "security": "24/7 security",
+    "elevator": true,
+    "gym": true,
+    "swimming_pool": true,
+    "concierge": true
+  },
+  
+  "location": {
+    "country": "Ghana",
+    "state": "Greater Accra",
+    "city": "Accra",
+    "town": "East Legon",
+    "fullAddress": "123 Independence Avenue, East Legon, Accra, Ghana",
+    "coordinates": {
+      "latitude": "5.6037",
+      "longitude": "-0.1870"
+    },
+    "additionalInformation": "Located in the heart of East Legon, close to major shopping centers and business districts"
+  },
+  
+  "amenities": {
+    "database": [
+      {
+        "id": "amenity_pool",
+        "name": "Swimming Pool",
+        "description": "Outdoor swimming pool facility"
+      },
+      {
+        "id": "amenity_gym",
+        "name": "Fitness Center",
+        "description": "On-site gym and fitness facilities"
+      },
+      {
+        "id": "amenity_parking",
+        "name": "Parking",
+        "description": "Dedicated parking spaces"
+      },
+      {
+        "id": "amenity_security",
+        "name": "24/7 Security",
+        "description": "Round-the-clock security services"
+      }
+    ],
+    "general": [
+      {
+        "name": "Swimming Pool",
+        "description": "Outdoor swimming pool facility"
+      },
+      {
+        "name": "Fitness Center", 
+        "description": "On-site gym and fitness facilities"
+      },
+      {
+        "name": "Parking",
+        "description": "Dedicated parking spaces"
+      },
+      {
+        "name": "24/7 Security",
+        "description": "Round-the-clock security services"
+      },
+      {
+        "name": "Concierge Service",
+        "description": "Professional concierge assistance"
+      }
+    ],
+    "custom": [
+      {
+        "name": "Rooftop Garden",
+        "description": "Beautiful rooftop garden space"
+      },
+      {
+        "name": "Business Center",
+        "description": "Shared business and meeting facilities"
+      },
+      {
+        "name": "Children's Playground",
+        "description": "Safe playground area for children"
+      }
+    ]
+  },
+  
+  "pricing": {
+    "price": 2500,
+    "currency": "GHS",
+    "duration": "monthly",
+    "price_type": "rent",
+    "cancellation_policy": "30 days notice required. Security deposit of 2 months rent is non-refundable if cancelled within first 6 months.",
+    "is_negotiable": true,
+    "security_requirements": "Security deposit of 2 months rent. Employment letter and bank statements required. Credit check mandatory.",
+    "flexible_terms": true
+  },
+  
+  "availability": {
+    "available_from": "2024-02-01",
+    "available_until": "2024-12-31",
+    "acquisition_rules": "Priority given to professionals and families. No pets allowed. Smoking prohibited in common areas. Minimum 12-month lease required."
+  },
+  
+  "media": {
+    "banner": null,
+    "video": null,
+    "youtubeUrl": "",
+    "virtualTourUrl": "",
+    "mediaFiles": [
+      {
+        "url": "https://storage.supabase.co/iskaHomes/property-media/living-room-1.jpg",
+        "filename": "living-room-1.jpg",
+        "size": 1024000,
+        "type": "image/jpeg"
+      },
+      {
+        "url": "https://storage.supabase.co/iskaHomes/property-media/kitchen-1.jpg",
+        "filename": "kitchen-1.jpg",
+        "size": 987654,
+        "type": "image/jpeg"
+      },
+      {
+        "url": "https://storage.supabase.co/iskaHomes/property-media/bedroom-1.jpg",
+        "filename": "bedroom-1.jpg",
+        "size": 1123456,
+        "type": "image/jpeg"
+      },
+      {
+        "url": "https://storage.supabase.co/iskaHomes/property-media/bathroom-1.jpg",
+        "filename": "bathroom-1.jpg",
+        "size": 876543,
+        "type": "image/jpeg"
+      },
+      {
+        "url": "https://storage.supabase.co/iskaHomes/property-media/balcony-view.jpg",
+        "filename": "balcony-view.jpg",
+        "size": 1345678,
+        "type": "image/jpeg"
+      }
+    ]
+  },
+  
+  "additional_files": [
+    {
+      "url": "https://storage.supabase.co/iskaHomes/property-documents/floor-plan-a101.pdf",
+      "filename": "floor-plan-a101.pdf",
+      "size": 512000,
+      "type": "application/pdf"
+    },
+    {
+      "url": "https://storage.supabase.co/iskaHomes/property-documents/unit-specifications.docx",
+      "filename": "unit-specifications.docx",
+      "size": 256000,
+      "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    },
+    {
+      "url": "https://storage.supabase.co/iskaHomes/property-documents/amenities-list.pdf",
+      "filename": "amenities-list.pdf",
+      "size": 128000,
+      "type": "application/pdf"
+    }
+  ],
+  
+  "additional_information": "This premium unit offers stunning city views from the 10th floor. Features include marble flooring in living areas, hardwood in bedrooms, modern kitchen with granite countertops, and spacious balconies. The building offers 24/7 security, concierge service, fitness center, swimming pool, and rooftop garden. Located in the prestigious East Legon area with easy access to major business districts, shopping centers, and international schools. Perfect for professionals and families seeking luxury living in Accra.",
+  
+  "listing_status": "published",
+  "is_featured": true,
+  "is_verified": true,
+  "is_premium": true,
+  
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z",
+  "published_at": "2024-01-15T10:30:00Z",
+  "expires_at": "2024-12-31T23:59:59Z",
+  "created_by": "user_123456789",
+  "last_modified_by": "user_123456789",
+  
+  "tags": ["luxury", "city-view", "modern", "spacious", "east-legon", "3-bedroom", "apartment"],
+  "meta_description": "Luxury 3-bedroom apartment in East Legon with city views, modern amenities, and premium finishes. Perfect for professionals and families.",
+  "meta_keywords": "luxury apartment, 3 bedroom, East Legon, Accra, Ghana, modern, city view, amenities",
+  "seo_title": "Luxury 3-Bedroom Apartment A-101 | East Legon | Iska Homes",
+  "slug": "luxury-3-bedroom-apartment-a101-east-legon"
+}
