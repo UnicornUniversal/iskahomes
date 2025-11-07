@@ -289,7 +289,7 @@ const PropertySeekerForm = ({ isLoading, setIsLoading, setShowToast }) => {
         },
         body: JSON.stringify({
           ...formData,
-          userType: 'seeker'
+          userType: 'property_seeker'
         })
       })
 
@@ -301,8 +301,9 @@ const PropertySeekerForm = ({ isLoading, setIsLoading, setShowToast }) => {
         alert('Account created successfully! Please check your email for verification link.')
         window.location.href = '/signin'
       } else {
-        // Error - show error message
+        // Error - show specific error message
         console.error('Signup failed:', result.error)
+        alert(`Signup failed: ${result.error}`)
         setShowToast(true)
       }
     } catch (error) {
@@ -424,8 +425,9 @@ const AgentForm = ({ isLoading, setIsLoading, setShowToast }) => {
         alert('Account created successfully! Please check your email for verification link.')
         window.location.href = '/signin'
       } else {
-        // Error - show error message
+        // Error - show specific error message
         console.error('Signup failed:', result.error)
+        alert(`Signup failed: ${result.error}`)
         setShowToast(true)
       }
     } catch (error) {
@@ -569,8 +571,9 @@ const DeveloperForm = ({ isLoading, setIsLoading, setShowToast }) => {
         alert('Account created successfully! Please check your email for verification link.')
         window.location.href = '/signin'
       } else {
-        // Error - show error message
+        // Error - show specific error message
         console.error('Signup failed:', result.error)
+        alert(`Signup failed: ${result.error}`)
         setShowToast(true)
       }
     } catch (error) {

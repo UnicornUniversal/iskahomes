@@ -200,14 +200,14 @@
   
   "additional_information": "This beautiful family home is located in the heart of Labone, one of Accra's most prestigious neighborhoods. The property features a modern design with spacious rooms, a well-maintained garden, and all necessary amenities. Perfect for families looking for a comfortable and secure living environment. The house is close to international schools, shopping centers, and major business districts.",
   
-  "listing_status": "published",
+  "listing_status": "active",
   "is_featured": false,
   "is_verified": true,
   "is_premium": false,
   
   "created_at": "2024-01-20T14:30:00Z",
   "updated_at": "2024-01-20T14:30:00Z",
-  "published_at": "2024-01-20T14:30:00Z",
+  "active_at": "2024-01-20T14:30:00Z",
   "expires_at": "2024-12-31T23:59:59Z",
   "created_by": "user_987654321",
   "last_modified_by": "user_987654321",

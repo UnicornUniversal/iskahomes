@@ -3,6 +3,7 @@ import "./globals.css";
 import { Poppins } from "next/font/google";
 import Layout1 from "./layout/Layout1";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { PostHogProvider } from "./providers";
 
 import Nav from "./components/Nav";
 import Footer from "./components/Footer";
@@ -34,13 +35,15 @@ export default function RootLayout({ children }) {
       <body
         className={` ${poppins.variable} antialiased`}
       >
-        <AuthProvider>
-          <Nav />
-          <Layout1>
-            {children}
-          </Layout1>
-          <Footer />
-        </AuthProvider>
+        <PostHogProvider>
+          <AuthProvider>
+            <Nav />
+            <Layout1>
+              {children}
+            </Layout1>
+            <Footer />
+          </AuthProvider>
+        </PostHogProvider>
       </body>
     </html>
   );

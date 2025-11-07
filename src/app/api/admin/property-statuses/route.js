@@ -1,9 +1,50 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { cachePropertyStatuses, getCachedPropertyStatuses } from '@/lib/cache'
 
 // GET - Fetch all property statuses
-export async function GET() {
+export async function GET(request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const reconcile = searchParams.get('reconcile') === 'true'
+
+    // If reconcile is requested, fetch from DB and update Redis
+    if (reconcile) {
+      const { data, error } = await supabaseAdmin
+        .from('property_status')
+        .select('*')
+        .order('name', { ascending: true })
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      // Update Redis cache
+      try {
+        await cachePropertyStatuses(data)
+      } catch (redisError) {
+        console.error('Redis cache update error:', redisError)
+        // Continue even if Redis fails
+      }
+
+      return NextResponse.json({ 
+        data,
+        message: 'Data reconciled and cached successfully'
+      })
+    }
+
+    // Try to get from Redis first
+    try {
+      const cachedData = await getCachedPropertyStatuses()
+      if (cachedData) {
+        return NextResponse.json({ data: cachedData, cached: true })
+      }
+    } catch (redisError) {
+      console.error('Redis fetch error:', redisError)
+      // Fall through to database fetch
+    }
+
+    // Fallback to database if cache miss
     const { data, error } = await supabaseAdmin
       .from('property_status')
       .select('*')
@@ -13,7 +54,15 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ data })
+    // Cache the data for future requests
+    try {
+      await cachePropertyStatuses(data)
+    } catch (redisError) {
+      console.error('Redis cache update error:', redisError)
+      // Continue even if Redis fails
+    }
+
+    return NextResponse.json({ data, cached: false })
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
@@ -41,6 +90,21 @@ export async function POST(request) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Update Redis cache - fetch all and re-cache
+    try {
+      const { data: allData, error: fetchError } = await supabaseAdmin
+        .from('property_status')
+        .select('*')
+        .order('name', { ascending: true })
+      
+      if (!fetchError && allData) {
+        await cachePropertyStatuses(allData)
+      }
+    } catch (redisError) {
+      console.error('Redis cache update error:', redisError)
+      // Continue even if Redis fails
     }
 
     return NextResponse.json({ data, message: 'Property status created successfully' })
@@ -74,6 +138,21 @@ export async function PUT(request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    // Update Redis cache - fetch all and re-cache
+    try {
+      const { data: allData, error: fetchError } = await supabaseAdmin
+        .from('property_status')
+        .select('*')
+        .order('name', { ascending: true })
+      
+      if (!fetchError && allData) {
+        await cachePropertyStatuses(allData)
+      }
+    } catch (redisError) {
+      console.error('Redis cache update error:', redisError)
+      // Continue even if Redis fails
+    }
+
     return NextResponse.json({ data, message: 'Property status updated successfully' })
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -97,6 +176,21 @@ export async function DELETE(request) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Update Redis cache - fetch all and re-cache
+    try {
+      const { data: allData, error: fetchError } = await supabaseAdmin
+        .from('property_status')
+        .select('*')
+        .order('name', { ascending: true })
+      
+      if (!fetchError && allData) {
+        await cachePropertyStatuses(allData)
+      }
+    } catch (redisError) {
+      console.error('Redis cache update error:', redisError)
+      // Continue even if Redis fails
     }
 
     return NextResponse.json({ message: 'Property status deleted successfully' })

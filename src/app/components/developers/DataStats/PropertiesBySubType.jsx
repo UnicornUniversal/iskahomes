@@ -1,6 +1,6 @@
 'use client'
-import React, { useState, useEffect } from 'react'
-import { useAuth } from '@/hooks/useAuth'
+import React, { useMemo } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
 import { Pie } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -9,7 +9,6 @@ import {
   Legend,
   Title,
 } from 'chart.js'
-import { Loader2 } from 'lucide-react'
 
 ChartJS.register(ArcElement, Tooltip, Legend, Title)
 
@@ -26,39 +25,18 @@ const pieColors = [
 
 const PropertiesBySubType = () => {
   const { user } = useAuth()
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  
+  // Get data from user profile
+  const subtypes = useMemo(() => {
+    if (!user?.profile?.property_subtypes_stats) return []
+    return user.profile.property_subtypes_stats
+  }, [user?.profile?.property_subtypes_stats])
+  
+  const total = useMemo(() => {
+    return user?.profile?.total_units || 0
+  }, [user?.profile?.total_units])
 
-  useEffect(() => {
-    if (user?.id) {
-      fetchData()
-    }
-  }, [user?.id])
-
-  const fetchData = async () => {
-    try {
-      const response = await fetch(`/api/developers/properties-stats?account_id=${user.id}`)
-      if (response.ok) {
-        const result = await response.json()
-        setData(result.data)
-      }
-    } catch (error) {
-      console.error('Error fetching subtypes data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="p-6 bg-white rounded-2xl shadow-xl flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
-        <span className="text-gray-600">Loading...</span>
-      </div>
-    )
-  }
-
-  if (!data || data.subtypes.length === 0) {
+  if (!subtypes || subtypes.length === 0) {
     return (
       <div className="p-6 bg-white rounded-2xl shadow-xl flex flex-col items-center justify-center">
         <div className="text-gray-400 text-4xl mb-3">🏠</div>
@@ -68,11 +46,9 @@ const PropertiesBySubType = () => {
   }
 
   // Prepare chart data
-  const subtypes = data.subtypes
-  const total = data.total
-  const pieLabels = subtypes.map(subtype => subtype.name)
-  const pieData = subtypes.map(subtype => subtype.count)
-  const percentages = pieData.map(v => ((v / total) * 100).toFixed(1))
+  const pieLabels = subtypes.map(subtype => subtype.name || 'Unknown')
+  const pieData = subtypes.map(subtype => subtype.total_amount || 0)
+  const percentages = pieData.map(v => total > 0 ? ((v / total) * 100).toFixed(1) : '0.0')
 
   const chartData = {
     labels: pieLabels,
@@ -106,7 +82,7 @@ const PropertiesBySubType = () => {
           label: (ctx) => {
             const label = ctx.label || ''
             const value = ctx.parsed || 0
-            const percent = ((value / total) * 100).toFixed(1)
+            const percent = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0'
             return ` ${label}: ${value} properties (${percent}%)`
           },
         },

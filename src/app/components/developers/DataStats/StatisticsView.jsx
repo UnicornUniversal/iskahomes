@@ -35,37 +35,52 @@ const ViewsChart = ({ data }) => {
       {
         label: 'Views',
         data: data.map(item => item.viewCount),
-        borderColor: 'rgb(75, 192, 192)',
-        backgroundColor: 'rgba(75, 192, 192, 0.5)',
-        tension: 0.1,
-        fill: false,
+        borderColor: '#3B82F6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        pointBackgroundColor: '#3B82F6',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
       },
     ],
   }
 
   const options = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'top',
+        display: false,
       },
       title: {
-        display: true,
-        text: 'Property Views Over Time',
+        display: false,
       },
     },
     scales: {
       y: {
         beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Number of Views',
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)',
+        },
+        ticks: {
+          font: {
+            size: 11,
+          },
+          color: '#6B7280',
         },
       },
       x: {
-        title: {
-          display: true,
-          text: 'Date',
+        grid: {
+          display: false,
+        },
+        ticks: {
+          font: {
+            size: 11,
+          },
+          color: '#6B7280',
         },
       },
     },
@@ -85,37 +100,52 @@ const ImpressionsChart = ({ data }) => {
       {
         label: 'Impressions',
         data: data.map(item => item.impressionCount),
-        borderColor: 'rgb(255, 99, 132)',
-        backgroundColor: 'rgba(255, 99, 132, 0.5)',
-        tension: 0.1,
-        fill: false,
+        borderColor: '#10B981',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        pointBackgroundColor: '#10B981',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
       },
     ],
   }
 
   const options = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'top',
+        display: false,
       },
       title: {
-        display: true,
-        text: 'Property Impressions Over Time',
+        display: false,
       },
     },
     scales: {
       y: {
         beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Number of Impressions',
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)',
+        },
+        ticks: {
+          font: {
+            size: 11,
+          },
+          color: '#6B7280',
         },
       },
       x: {
-        title: {
-          display: true,
-          text: 'Date',
+        grid: {
+          display: false,
+        },
+        ticks: {
+          font: {
+            size: 11,
+          },
+          color: '#6B7280',
         },
       },
     },
@@ -127,77 +157,83 @@ const ImpressionsChart = ({ data }) => {
 const StatisticsView = () => {
   const [selectedMetric, setSelectedMetric] = useState('views')
 
+  const totalViews = viewsData.reduce((sum, item) => sum + item.viewCount, 0)
+  const totalImpressions = impressionsData.reduce((sum, item) => sum + item.impressionCount, 0)
+  const avgViews = Math.round(totalViews / viewsData.length)
+  const avgImpressions = Math.round(totalImpressions / impressionsData.length)
+
   return (
-    <>
-      <h5 className=" mb-6 ">Statistics</h5>
-    
-    
-   
-    <div className="p-6 bg-white rounded-lg shadow-md">
-    
-      
-      {/* Toggle Buttons */}
-      <div className="flex gap-4 mb-6">
-        <button
-          onClick={() => setSelectedMetric('views')}
-          className={`px-6 py-2 rounded-lg text-[0.8em] font-medium transition-colors ${
-            selectedMetric === 'views'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          Views
-        </button>
-        <button
-          onClick={() => setSelectedMetric('impressions')}
-          className={`px-6 py-2 rounded-lg text-[0.8em] font-medium transition-colors ${
-            selectedMetric === 'impressions'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          Impressions
-        </button>
+    <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+      {/* Header with Toggle */}
+      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between">
+          <h5 className="text-lg font-semibold text-gray-900">Statistics</h5>
+          
+          {/* Toggle Buttons */}
+          <div className="flex gap-2 bg-white rounded-lg p-1 border border-gray-200">
+            <button
+              onClick={() => setSelectedMetric('views')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                selectedMetric === 'views'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              suppressHydrationWarning
+            >
+              Views
+            </button>
+            <button
+              onClick={() => setSelectedMetric('impressions')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                selectedMetric === 'impressions'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              suppressHydrationWarning
+            >
+              Impressions
+            </button>
+          </div>
+        </div>
       </div>
 
-   {/* Summary Stats */}
-   <div className="mt-6 grid grid-cols-2 gap-4">
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <h4 className="text-sm font-medium text-blue-600 uppercase tracking-wide">
+      {/* Summary Stats */}
+      <div className="px-6 py-4 grid grid-cols-2 gap-4 border-b border-gray-100">
+        <div className="flex flex-col">
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
             Total {selectedMetric === 'views' ? 'Views' : 'Impressions'}
-          </h4>
-          <p className="text-2xl font-bold text-blue-900">
+          </span>
+          <span className="text-2xl font-bold text-gray-900">
             {selectedMetric === 'views' 
-              ? viewsData.reduce((sum, item) => sum + item.viewCount, 0).toLocaleString()
-              : impressionsData.reduce((sum, item) => sum + item.impressionCount, 0).toLocaleString()
+              ? totalViews.toLocaleString()
+              : totalImpressions.toLocaleString()
             }
-          </p>
+          </span>
         </div>
-        <div className="bg-green-50 p-4 rounded-lg">
-          <h4 className="text-sm font-medium text-green-600 uppercase tracking-wide">
-            Average Daily {selectedMetric === 'views' ? 'Views' : 'Impressions'}
-          </h4>
-          <p className="text-2xl font-bold text-green-900">
+        <div className="flex flex-col">
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+            Average Daily
+          </span>
+          <span className="text-2xl font-bold text-gray-900">
             {selectedMetric === 'views'
-              ? Math.round(viewsData.reduce((sum, item) => sum + item.viewCount, 0) / viewsData.length).toLocaleString()
-              : Math.round(impressionsData.reduce((sum, item) => sum + item.impressionCount, 0) / impressionsData.length).toLocaleString()
+              ? avgViews.toLocaleString()
+              : avgImpressions.toLocaleString()
             }
-          </p>
+          </span>
         </div>
-      </div>
-      <br/>
-      {/* Chart Container */}
-      <div className="bg-gray-50 p-4 rounded-lg">
-        {selectedMetric === 'views' ? (
-          <ViewsChart data={viewsData} />
-        ) : (
-          <ImpressionsChart data={impressionsData} />
-        )}
       </div>
 
-   
+      {/* Chart Container */}
+      <div className="px-6 py-4">
+        <div className="h-[300px]">
+          {selectedMetric === 'views' ? (
+            <ViewsChart data={viewsData} />
+          ) : (
+            <ImpressionsChart data={impressionsData} />
+          )}
+        </div>
+      </div>
     </div>
-    </>
   )
 }
 

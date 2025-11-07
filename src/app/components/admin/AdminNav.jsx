@@ -18,14 +18,20 @@ import {
     FiLayers,
     FiGrid,
     FiCheckCircle,
-    FiStar
+    FiStar,
+    FiPackage,
+    FiDollarSign,
+    FiCreditCard,
+    FiClock,
+    FiList
 } from 'react-icons/fi'
 
 const AdminNav = ({ active }) => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const [expandedSections, setExpandedSections] = useState({
         userManagement: false,
-        propertyCategories: false
+        propertyCategories: false,
+        subscriptionsManagement: false
     })
     const pathname = usePathname()
 
@@ -75,6 +81,38 @@ const AdminNav = ({ active }) => {
             href: '/admin/properties',
             icon: FiMapPin,
             type: 'single'
+        },
+        {
+            label: 'Subscriptions Management',
+            icon: FiDollarSign,
+            type: 'section',
+            key: 'subscriptionsManagement',
+            children: [
+                {
+                    label: 'Packages',
+                    href: '/admin/subscriptions-management/packages',
+                    icon: FiPackage,
+                    type: 'single'
+                },
+                {
+                    label: 'Subscriptions',
+                    href: '/admin/subscriptions-management/subscriptions',
+                    icon: FiCheckCircle,
+                    type: 'single'
+                },
+                {
+                    label: 'Subscription Requests',
+                    href: '/admin/subscriptions-management/subscriptions-requests',
+                    icon: FiClock,
+                    type: 'single'
+                },
+                {
+                    label: 'Subscription History',
+                    href: '/admin/subscriptions-management/subscription-history',
+                    icon: FiList,
+                    type: 'single'
+                }
+            ]
         },
         {
             label: 'Property Categories',

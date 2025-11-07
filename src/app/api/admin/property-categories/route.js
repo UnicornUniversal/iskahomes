@@ -1,21 +1,79 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { cache } from 'react'
+import { invalidatePropertyCategoriesCache } from '@/lib/cacheInvalidation'
+import { cachePropertyCategories, getCachedPropertyCategories } from '@/lib/cache'
+
+// Cached function to fetch property categories from database
+const getCachedPropertyCategoriesFromDB = cache(async () => {
+  const { data, error } = await supabaseAdmin
+    .from('property_categories')
+    .select('*')
+    .order('name', { ascending: true })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return data
+})
 
 // GET - Fetch all property categories
-export async function GET() {
+export async function GET(request) {
   try {
-    const { data, error } = await supabaseAdmin
-      .from('property_categories')
-      .select('*')
-      .order('name', { ascending: true })
+    const { searchParams } = new URL(request.url)
+    const reconcile = searchParams.get('reconcile') === 'true'
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    // If reconcile is requested, fetch from DB and update Redis
+    if (reconcile) {
+      const { data, error } = await supabaseAdmin
+        .from('property_categories')
+        .select('*')
+        .order('name', { ascending: true })
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      // Update Redis cache
+      try {
+        await cachePropertyCategories(data)
+      } catch (redisError) {
+        console.error('Redis cache update error:', redisError)
+        // Continue even if Redis fails
+      }
+
+      return NextResponse.json({ 
+        data,
+        message: 'Data reconciled and cached successfully'
+      })
     }
 
-    return NextResponse.json({ data })
+    // Try to get from Redis first
+    try {
+      const cachedData = await getCachedPropertyCategories()
+      if (cachedData) {
+        return NextResponse.json({ data: cachedData, cached: true })
+      }
+    } catch (redisError) {
+      console.error('Redis fetch error:', redisError)
+      // Fall through to database fetch
+    }
+
+    // Fallback to database if cache miss
+    const data = await getCachedPropertyCategoriesFromDB()
+    
+    // Cache the data for future requests
+    try {
+      await cachePropertyCategories(data)
+    } catch (redisError) {
+      console.error('Redis cache update error:', redisError)
+      // Continue even if Redis fails
+    }
+    
+    return NextResponse.json({ data, cached: false })
   } catch (error) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
@@ -51,6 +109,24 @@ export async function POST(request) {
     if (error) {
       console.error('Error inserting record:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Invalidate cache after successful creation
+    invalidatePropertyCategoriesCache()
+
+    // Update Redis cache - fetch all and re-cache
+    try {
+      const { data: allData, error: fetchError } = await supabaseAdmin
+        .from('property_categories')
+        .select('*')
+        .order('name', { ascending: true })
+      
+      if (!fetchError && allData) {
+        await cachePropertyCategories(allData)
+      }
+    } catch (redisError) {
+      console.error('Redis cache update error:', redisError)
+      // Continue even if Redis fails
     }
 
     return NextResponse.json({ 
@@ -96,6 +172,24 @@ export async function PUT(request) {
       return NextResponse.json({ error: updateError.message }, { status: 500 })
     }
 
+    // Invalidate cache after successful update
+    invalidatePropertyCategoriesCache()
+
+    // Update Redis cache - fetch all and re-cache
+    try {
+      const { data: allData, error: fetchError } = await supabaseAdmin
+        .from('property_categories')
+        .select('*')
+        .order('name', { ascending: true })
+      
+      if (!fetchError && allData) {
+        await cachePropertyCategories(allData)
+      }
+    } catch (redisError) {
+      console.error('Redis cache update error:', redisError)
+      // Continue even if Redis fails
+    }
+
     return NextResponse.json({ 
       data: updatedData, 
       message: `Property category updated successfully${propertyTypes.length > 1 ? ` for ${propertyTypes.length} property types` : ''}` 
@@ -122,6 +216,24 @@ export async function DELETE(request) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Invalidate cache after successful deletion
+    invalidatePropertyCategoriesCache()
+
+    // Update Redis cache - fetch all and re-cache
+    try {
+      const { data: allData, error: fetchError } = await supabaseAdmin
+        .from('property_categories')
+        .select('*')
+        .order('name', { ascending: true })
+      
+      if (!fetchError && allData) {
+        await cachePropertyCategories(allData)
+      }
+    } catch (redisError) {
+      console.error('Redis cache update error:', redisError)
+      // Continue even if Redis fails
     }
 
     return NextResponse.json({ message: 'Property category deleted successfully' })

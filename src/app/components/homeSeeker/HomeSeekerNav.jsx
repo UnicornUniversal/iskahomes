@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
 import { 
     FiHome, 
     FiCalendar, 
@@ -21,34 +22,43 @@ import {
     FiCheckCircle
 } from 'react-icons/fi'
 
-const HomeSeekerNav = ({ active }) => {
+const HomeSeekerNav = ({ pathname }) => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const { user, logout } = useAuth()
+
+    // Get user ID from pathname or user context
+    const userId = pathname?.split('/')[2] || user?.id || '67890'
 
     const navItems = [
         {
             label: 'Dashboard',
-            href: '/homeSeeker/67890/dashboard',
-            icon: FiHome
+            href: `/propertySeeker/${userId}/dashboard`,
+            icon: FiHome,
+            pathMatch: '/dashboard'
         },
         {
             label: 'Saved Listings',
-            href: '/homeSeeker/67890/saved-listings',
-            icon: FiHeart
+            href: `/propertySeeker/${userId}/saved-listings`,
+            icon: FiHeart,
+            pathMatch: '/saved-listings'
         },
         {
             label: 'Bookings',
-            href: '/homeSeeker/67890/bookings',
-            icon: FiCalendar
+            href: `/propertySeeker/${userId}/bookings`,
+            icon: FiCalendar,
+            pathMatch: '/bookings'
         },
         {
             label: 'Messages',
-            href: '/homeSeeker/67890/messages',
-            icon: FiMessageSquare
+            href: `/propertySeeker/${userId}/messages`,
+            icon: FiMessageSquare,
+            pathMatch: '/messages'
         },
         {
             label: 'Profile',
-            href: '/homeSeeker/67890/profile',
-            icon: FiUser
+            href: `/propertySeeker/${userId}/profile`,
+            icon: FiUser,
+            pathMatch: '/profile'
         }
     ]
 
@@ -86,7 +96,7 @@ const HomeSeekerNav = ({ active }) => {
                     : '-translate-x-full lg:translate-x-0'
             } lg:translate-x-0`}>
                 <div className="mb-8">
-                    <h5 className="mb-2 text-blue-600">HomeSeeker</h5>
+                    <h5 className="mb-2 text-blue-600">propertySeeker</h5>
                     <h3 className="mb-2 text-blue-900">Dashboard</h3>
                     <div className="w-12 h-1 bg-blue-600 rounded-full"></div>
                 </div>
@@ -94,7 +104,7 @@ const HomeSeekerNav = ({ active }) => {
                 <div className="space-y-2 w-full">
                     {navItems.map((item, index) => {
                         const IconComponent = item.icon
-                        const isActive = active === index + 1
+                        const isActive = pathname?.includes(item.pathMatch)
                         
                         return (
                             <a
@@ -144,8 +154,11 @@ const HomeSeekerNav = ({ active }) => {
                 {/* Logout */}
                 <br/>
                 <div className="mb-4 space-y-2 w-full rounded-xl shadow-red-500/25 bg-red-500 cursor-pointer">
-                    <a
-                        onClick={() => setIsMobileMenuOpen(false)}
+                    <button
+                        onClick={() => {
+                            setIsMobileMenuOpen(false)
+                            logout()
+                        }}
                         className={`group relative text-[0.8em] flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 ease-in-out transform hover:scale-105`}
                     >
                         {/* Icon */}
@@ -154,7 +167,7 @@ const HomeSeekerNav = ({ active }) => {
                         <span className={`font-medium transition-all duration-300 text-white`}>
                             Logout
                         </span>
-                    </a>
+                    </button>
                 </div>
 
                 <br/>

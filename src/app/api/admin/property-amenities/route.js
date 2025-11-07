@@ -1,9 +1,56 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { cacheAmenities, getCachedAmenities } from '@/lib/cache'
 
 // GET - Fetch all property amenities
-export async function GET() {
+export async function GET(request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const reconcile = searchParams.get('reconcile') === 'true'
+
+    // If reconcile is requested, fetch from DB and update Redis
+    if (reconcile) {
+      const { data, error } = await supabaseAdmin
+        .from('property_amenities')
+        .select('*')
+        .order('name', { ascending: true })
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      // Clean up property_type data for each amenity
+      const cleanedData = data.map(amenity => ({
+        ...amenity,
+        property_type: cleanPropertyTypes(amenity.property_type)
+      }))
+
+      // Update Redis cache
+      try {
+        await cacheAmenities(cleanedData)
+      } catch (redisError) {
+        console.error('Redis cache update error:', redisError)
+        // Continue even if Redis fails
+      }
+
+      return NextResponse.json({ 
+        data: cleanedData,
+        message: 'Data reconciled and cached successfully'
+      })
+    }
+
+    // Try to get from Redis first
+    try {
+      const cachedData = await getCachedAmenities()
+      if (cachedData) {
+        return NextResponse.json({ data: cachedData, cached: true })
+      }
+    } catch (redisError) {
+      console.error('Redis fetch error:', redisError)
+      // Fall through to database fetch
+    }
+
+    // Fallback to database if cache miss
     const { data, error } = await supabaseAdmin
       .from('property_amenities')
       .select('*')
@@ -19,7 +66,15 @@ export async function GET() {
       property_type: cleanPropertyTypes(amenity.property_type)
     }))
 
-    return NextResponse.json({ data: cleanedData })
+    // Cache the data for future requests
+    try {
+      await cacheAmenities(cleanedData)
+    } catch (redisError) {
+      console.error('Redis cache update error:', redisError)
+      // Continue even if Redis fails
+    }
+
+    return NextResponse.json({ data: cleanedData, cached: false })
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
@@ -86,6 +141,25 @@ export async function POST(request) {
 
     console.log('Successfully created amenity:', data)
 
+    // Update Redis cache - fetch all and re-cache
+    try {
+      const { data: allData, error: fetchError } = await supabaseAdmin
+        .from('property_amenities')
+        .select('*')
+        .order('name', { ascending: true })
+      
+      if (!fetchError && allData) {
+        const cleanedData = allData.map(amenity => ({
+          ...amenity,
+          property_type: cleanPropertyTypes(amenity.property_type)
+        }))
+        await cacheAmenities(cleanedData)
+      }
+    } catch (redisError) {
+      console.error('Redis cache update error:', redisError)
+      // Continue even if Redis fails
+    }
+
     return NextResponse.json({ 
       data, 
       message: `Property amenity created successfully${propertyTypes.length > 1 ? ` for ${propertyTypes.length} property types` : ''}` 
@@ -142,6 +216,25 @@ export async function PUT(request) {
 
     console.log('Successfully updated amenity:', updatedData)
 
+    // Update Redis cache - fetch all and re-cache
+    try {
+      const { data: allData, error: fetchError } = await supabaseAdmin
+        .from('property_amenities')
+        .select('*')
+        .order('name', { ascending: true })
+      
+      if (!fetchError && allData) {
+        const cleanedData = allData.map(amenity => ({
+          ...amenity,
+          property_type: cleanPropertyTypes(amenity.property_type)
+        }))
+        await cacheAmenities(cleanedData)
+      }
+    } catch (redisError) {
+      console.error('Redis cache update error:', redisError)
+      // Continue even if Redis fails
+    }
+
     return NextResponse.json({ 
       data: updatedData, 
       message: `Property amenity updated successfully${propertyTypes.length > 1 ? ` for ${propertyTypes.length} property types` : ''}` 
@@ -169,6 +262,25 @@ export async function DELETE(request) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Update Redis cache - fetch all and re-cache
+    try {
+      const { data: allData, error: fetchError } = await supabaseAdmin
+        .from('property_amenities')
+        .select('*')
+        .order('name', { ascending: true })
+      
+      if (!fetchError && allData) {
+        const cleanedData = allData.map(amenity => ({
+          ...amenity,
+          property_type: cleanPropertyTypes(amenity.property_type)
+        }))
+        await cacheAmenities(cleanedData)
+      }
+    } catch (redisError) {
+      console.error('Redis cache update error:', redisError)
+      // Continue even if Redis fails
     }
 
     return NextResponse.json({ message: 'Property amenity deleted successfully' })

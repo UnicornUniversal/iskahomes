@@ -11,9 +11,8 @@ const VerifyEmailContent = () => {
   useEffect(() => {
     const verifyEmail = async () => {
       const token = searchParams.get('token')
-      const email = searchParams.get('email')
 
-      if (!token || !email) {
+      if (!token) {
         setVerificationStatus('error')
         setMessage('Invalid verification link. Please check your email for the correct link.')
         return
@@ -25,7 +24,7 @@ const VerifyEmailContent = () => {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ token, email })
+          body: JSON.stringify({ token })
         })
 
         const result = await response.json()

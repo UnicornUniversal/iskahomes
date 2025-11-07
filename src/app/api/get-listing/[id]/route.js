@@ -3,7 +3,9 @@ import { supabase } from '@/lib/supabase'
 
 export async function GET(request, { params }) {
   try {
-    const { id } = params
+    // Await params if it's a Promise (Next.js 15+)
+    const resolvedParams = params instanceof Promise ? await params : params
+    const { id } = resolvedParams
 
     if (!id) {
       return NextResponse.json(
@@ -114,6 +116,18 @@ export async function GET(request, { params }) {
       }
     }
 
+    // Fetch social amenities for this listing
+    let socialAmenities = null
+    const { data: amenitiesData, error: amenitiesError } = await supabase
+      .from('social_amenities')
+      .select('*')
+      .eq('listing_id', id)
+      .single()
+
+    if (!amenitiesError && amenitiesData) {
+      socialAmenities = amenitiesData
+    }
+
     console.log('Listing fetched successfully for end user')
 
     return NextResponse.json({
@@ -122,7 +136,8 @@ export async function GET(request, { params }) {
         ...listing,
         developers: developer,
         propertySubtypes,
-        relatedListings
+        relatedListings,
+        socialAmenities
       }
     })
 

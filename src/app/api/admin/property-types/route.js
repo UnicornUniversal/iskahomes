@@ -1,21 +1,79 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { cache } from 'react'
+import { invalidatePropertyTypesCache } from '@/lib/cacheInvalidation'
+import { cachePropertyTypes, getCachedPropertyTypes } from '@/lib/cache'
+
+// Cached function to fetch property types from database
+const getCachedPropertyTypesFromDB = cache(async () => {
+  const { data, error } = await supabaseAdmin
+    .from('property_types')
+    .select('*')
+    .order('name', { ascending: true })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return data
+})
 
 // GET - Fetch all property types
-export async function GET() {
+export async function GET(request) {
   try {
-    const { data, error } = await supabaseAdmin
-      .from('property_types')
-      .select('*')
-      .order('name', { ascending: true })
+    const { searchParams } = new URL(request.url)
+    const reconcile = searchParams.get('reconcile') === 'true'
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    // If reconcile is requested, fetch from DB and update Redis
+    if (reconcile) {
+      const { data, error } = await supabaseAdmin
+        .from('property_types')
+        .select('*')
+        .order('name', { ascending: true })
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      // Update Redis cache
+      try {
+        await cachePropertyTypes(data)
+      } catch (redisError) {
+        console.error('Redis cache update error:', redisError)
+        // Continue even if Redis fails
+      }
+
+      return NextResponse.json({ 
+        data,
+        message: 'Data reconciled and cached successfully'
+      })
     }
 
-    return NextResponse.json({ data })
+    // Try to get from Redis first
+    try {
+      const cachedData = await getCachedPropertyTypes()
+      if (cachedData) {
+        return NextResponse.json({ data: cachedData, cached: true })
+      }
+    } catch (redisError) {
+      console.error('Redis fetch error:', redisError)
+      // Fall through to database fetch
+    }
+
+    // Fallback to database if cache miss
+    const data = await getCachedPropertyTypesFromDB()
+    
+    // Cache the data for future requests
+    try {
+      await cachePropertyTypes(data)
+    } catch (redisError) {
+      console.error('Redis cache update error:', redisError)
+      // Continue even if Redis fails
+    }
+    
+    return NextResponse.json({ data, cached: false })
   } catch (error) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
@@ -41,6 +99,24 @@ export async function POST(request) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Invalidate cache after successful creation
+    invalidatePropertyTypesCache()
+
+    // Update Redis cache - fetch all and re-cache
+    try {
+      const { data: allData, error: fetchError } = await supabaseAdmin
+        .from('property_types')
+        .select('*')
+        .order('name', { ascending: true })
+      
+      if (!fetchError && allData) {
+        await cachePropertyTypes(allData)
+      }
+    } catch (redisError) {
+      console.error('Redis cache update error:', redisError)
+      // Continue even if Redis fails
     }
 
     return NextResponse.json({ data, message: 'Property type created successfully' })
@@ -74,6 +150,24 @@ export async function PUT(request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    // Invalidate cache after successful update
+    invalidatePropertyTypesCache()
+
+    // Update Redis cache - fetch all and re-cache
+    try {
+      const { data: allData, error: fetchError } = await supabaseAdmin
+        .from('property_types')
+        .select('*')
+        .order('name', { ascending: true })
+      
+      if (!fetchError && allData) {
+        await cachePropertyTypes(allData)
+      }
+    } catch (redisError) {
+      console.error('Redis cache update error:', redisError)
+      // Continue even if Redis fails
+    }
+
     return NextResponse.json({ data, message: 'Property type updated successfully' })
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -97,6 +191,24 @@ export async function DELETE(request) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Invalidate cache after successful deletion
+    invalidatePropertyTypesCache()
+
+    // Update Redis cache - fetch all and re-cache
+    try {
+      const { data: allData, error: fetchError } = await supabaseAdmin
+        .from('property_types')
+        .select('*')
+        .order('name', { ascending: true })
+      
+      if (!fetchError && allData) {
+        await cachePropertyTypes(allData)
+      }
+    } catch (redisError) {
+      console.error('Redis cache update error:', redisError)
+      // Continue even if Redis fails
     }
 
     return NextResponse.json({ message: 'Property type deleted successfully' })

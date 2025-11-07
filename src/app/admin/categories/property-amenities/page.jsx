@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { FiSearch, FiPlus, FiEdit, FiTrash2, FiStar, FiCheckCircle, FiUpload, FiX } from 'react-icons/fi'
+import { FiSearch, FiPlus, FiEdit, FiTrash2, FiStar, FiCheckCircle, FiUpload, FiX, FiRefreshCw } from 'react-icons/fi'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'react-toastify'
 
@@ -13,6 +13,7 @@ const PropertyAmenitiesPage = () => {
   const [types, setTypes] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploadingIcon, setUploadingIcon] = useState(false)
+  const [reconciling, setReconciling] = useState(false)
   const [iconPreviewUrl, setIconPreviewUrl] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
@@ -45,6 +46,28 @@ const PropertyAmenitiesPage = () => {
       console.error('Error fetching data:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Reconcile data from database to Redis
+  const handleReconcile = async () => {
+    setReconciling(true)
+    try {
+      const response = await fetch('/api/admin/property-amenities?reconcile=true')
+      const result = await response.json()
+
+      if (response.ok) {
+        toast.success(result.message || 'Data reconciled and cached successfully')
+        // Refresh the data
+        await fetchData()
+      } else {
+        toast.error(result.error || 'Failed to reconcile data')
+      }
+    } catch (error) {
+      console.error('Error reconciling data:', error)
+      toast.error('Error reconciling data')
+    } finally {
+      setReconciling(false)
     }
   }
 
@@ -319,14 +342,25 @@ const PropertyAmenitiesPage = () => {
               />
             </div>
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base whitespace-nowrap"
-          >
-            <FiPlus className="w-4 h-4" />
-            <span className="hidden sm:inline">Add Amenity</span>
-            <span className="sm:hidden">Add</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleReconcile}
+              disabled={reconciling}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm sm:text-base whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <FiRefreshCw className={`w-4 h-4 ${reconciling ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{reconciling ? 'Reconciling...' : 'Reconcile Cache'}</span>
+              <span className="sm:hidden">{reconciling ? '...' : 'Sync'}</span>
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base whitespace-nowrap"
+            >
+              <FiPlus className="w-4 h-4" />
+              <span className="hidden sm:inline">Add Amenity</span>
+              <span className="sm:hidden">Add</span>
+            </button>
+          </div>
         </div>
       </div>
 

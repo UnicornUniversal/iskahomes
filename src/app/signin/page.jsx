@@ -15,7 +15,8 @@ const SignInPage = () => {
   
   const [formData, setFormData] = useState({
     email: '',
-    password: ''
+    password: '',
+    user_type: '' // Add user type selection
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -35,6 +36,9 @@ const SignInPage = () => {
           break
         case 'seeker':
           redirectUrl = `/homeSeeker/${user.profile?.slug}/dashboard`
+          break
+        case 'property_seeker':
+          redirectUrl = `/propertySeeker/${user.id}/dashboard`
           break
         case 'admin':
           redirectUrl = '/admin/dashboard'
@@ -58,8 +62,8 @@ const SignInPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    if (!formData.email || !formData.password) {
-      toast.error('Please fill in all fields', {
+    if (!formData.email || !formData.password || !formData.user_type) {
+      toast.error('Please fill in all fields including user type', {
         position: "top-right",
         autoClose: 3000,
         hideProgressBar: false,
@@ -73,7 +77,7 @@ const SignInPage = () => {
     setIsLoading(true)
     
     try {
-      const result = await login(formData.email, formData.password)
+      const result = await login(formData.email, formData.password, formData.user_type)
 
       if (result.success) {
         // Success - show success message
@@ -101,6 +105,9 @@ const SignInPage = () => {
             break
           case 'seeker':
             redirectUrl = `/homeSeeker/${result.user.profile?.slug || result.user.id}/dashboard`
+            break
+          case 'property_seeker':
+            redirectUrl = `/propertySeeker/${result.user.id}/dashboard`
             break
           case 'admin':
             redirectUrl = '/admin/dashboard'
@@ -151,7 +158,7 @@ const SignInPage = () => {
   }
 
   return (
-    <div cnpmassName="min-h-screen flex ">
+    <div className="min-h-screen flex ">
       {/* Left Side - Image */}
       <div className="hidden lg:flex lg:w-1/2 relative ">
         <div className="absolute inset-0  max-h-[700px] bg-gradient-to-br from-primary_color/20 to-secondary_color/20 z-10"></div>
@@ -180,6 +187,25 @@ const SignInPage = () => {
 
           {/* Form */}
           <form onSubmit={handleSubmit}  className="space-y-6">
+            {/* User Type Field */}
+            <div className="space-y-2">
+              <label htmlFor="user_type" className="block text-sm font-medium text-gray-700">
+                Account Type:
+              </label>
+              <select
+                id="user_type"
+                value={formData.user_type}
+                onChange={(e) => handleInputChange('user_type', e.target.value)}
+                className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 bg-white"
+                required
+              >
+                <option value="">Select account type</option>
+                <option value="developer">Developer</option>
+                <option value="agent">Agent</option>
+                <option value="property_seeker">Property Seeker</option>
+              </select>
+            </div>
+
             {/* Email Field */}
             <div className="space-y-2">
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">

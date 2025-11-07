@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { FiSearch, FiPlus, FiEdit, FiTrash2, FiTag, FiCheckCircle } from 'react-icons/fi'
+import { FiSearch, FiPlus, FiEdit, FiTrash2, FiTag, FiCheckCircle, FiRefreshCw } from 'react-icons/fi'
 import { toast } from 'react-toastify'
 
 const PropertySubtypePage = () => {
@@ -11,6 +11,7 @@ const PropertySubtypePage = () => {
   const [subtypes, setSubtypes] = useState([])
   const [types, setTypes] = useState([])
   const [loading, setLoading] = useState(true)
+  const [reconciling, setReconciling] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -154,6 +155,28 @@ const PropertySubtypePage = () => {
     return type ? type.name : 'Unknown Type'
   }
 
+  // Reconcile data from database to Redis
+  const handleReconcile = async () => {
+    setReconciling(true)
+    try {
+      const response = await fetch('/api/admin/property-subtypes?reconcile=true')
+      const result = await response.json()
+
+      if (response.ok) {
+        toast.success(result.message || 'Data reconciled and cached successfully')
+        // Refresh the data
+        await fetchData()
+      } else {
+        toast.error(result.error || 'Failed to reconcile data')
+      }
+    } catch (error) {
+      console.error('Error reconciling data:', error)
+      toast.error('Error reconciling data')
+    } finally {
+      setReconciling(false)
+    }
+  }
+
   const filteredSubtypes = subtypes.filter(subtype =>
     subtype.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     subtype.description?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -192,14 +215,25 @@ const PropertySubtypePage = () => {
               />
             </div>
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base whitespace-nowrap"
-          >
-            <FiPlus className="w-4 h-4" />
-            <span className="hidden sm:inline">Add Sub-type</span>
-            <span className="sm:hidden">Add</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleReconcile}
+              disabled={reconciling}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm sm:text-base whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <FiRefreshCw className={`w-4 h-4 ${reconciling ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{reconciling ? 'Reconciling...' : 'Reconcile Cache'}</span>
+              <span className="sm:hidden">{reconciling ? '...' : 'Sync'}</span>
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base whitespace-nowrap"
+            >
+              <FiPlus className="w-4 h-4" />
+              <span className="hidden sm:inline">Add Sub-type</span>
+              <span className="sm:hidden">Add</span>
+            </button>
+          </div>
         </div>
       </div>
 

@@ -16,8 +16,19 @@ const UnitCard = ({ unit, developerSlug }) => {
     return `${currency} ${numPrice}`
   }
 
-  // Get cover image from media files
+  // Get cover image from media albums (new structure)
   const getCoverImage = () => {
+    // Check if media.albums exists and has images
+    if (unit.media?.albums && Array.isArray(unit.media.albums)) {
+      // Loop through albums to find the first image
+      for (const album of unit.media.albums) {
+        if (album?.images && Array.isArray(album.images) && album.images.length > 0) {
+          // Return the first image URL from the first album with images
+          return album.images[0].url || null
+        }
+      }
+    }
+    // Fallback: Check for old mediaFiles structure (backward compatibility)
     if (unit.media?.mediaFiles && unit.media.mediaFiles.length > 0) {
       return unit.media.mediaFiles[0].url
     }
@@ -83,8 +94,8 @@ const UnitCard = ({ unit, developerSlug }) => {
           </div>
         )}
         <div className="absolute top-3 left-3">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPurposeColor(unit.price_type)}`}>
-            {unit.price_type}
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPurposeColor(unit.pricing?.price_type || unit.price_type)}`}>
+            {unit.pricing?.price_type || unit.price_type || 'rent'}
           </span>
         </div>
         <div className="absolute top-3 right-3">
@@ -98,8 +109,7 @@ const UnitCard = ({ unit, developerSlug }) => {
       <div className="p-4">
         {/* Unit Title */}
         <div className="mb-3">
-          <h3 className="font-semibold text-lg text-gray-900 mb-1">{unit.title}</h3>
-          <p className="text-sm text-gray-600">{unit.size} sq ft</p>
+          <h3 className="font-semibold text-lg text-gray-900">{unit.title}</h3>
         </div>
 
         {/* Location Info */}
@@ -116,9 +126,14 @@ const UnitCard = ({ unit, developerSlug }) => {
         {/* Price */}
         <div className="mb-3">
           <p className="text-2xl font-bold text-gray-900">
-            {formatPrice(unit.price, unit.currency)}
+            {formatPrice(
+              unit.pricing?.price || unit.price, 
+              unit.pricing?.currency || unit.currency
+            )}
             <span className="text-sm font-normal text-gray-600 ml-1">
-              {unit.price_type === 'rent' ? `/${unit.duration}` : ''}
+              {(unit.pricing?.price_type || unit.price_type) === 'rent' 
+                ? `/${unit.pricing?.duration || unit.duration || 'month'}` 
+                : ''}
             </span>
           </p>
         </div>
@@ -153,37 +168,43 @@ const UnitCard = ({ unit, developerSlug }) => {
         )}
 
         {/* Amenities */}
-        {unit.amenities && (unit.amenities.general?.length > 0 || unit.amenities.database?.length > 0) && (
-          <div className="mb-3">
-            <div className="flex flex-wrap gap-1">
-              {unit.amenities.general?.slice(0, 3).map((amenity, index) => (
-                <span 
-                  key={index}
-                  className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
-                >
-                  {amenity.replace('-', ' ')}
-                </span>
-              ))}
-              {unit.amenities.general?.length > 3 && (
-                <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
-                  +{unit.amenities.general.length - 3} more
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Description */}
-        <p className="text-sm text-gray-600 line-clamp-2 mb-3">
-          {unit.description}
-        </p>
+        {(() => {
+          // Handle both new (inbuilt) and old (general) structures
+          const amenities = unit.amenities || {}
+          const inbuiltAmenities = amenities.inbuilt || []
+          const generalAmenities = amenities.general || [] // backward compatibility
+          const allAmenities = [...inbuiltAmenities, ...generalAmenities]
+          
+          if (allAmenities.length > 0) {
+            return (
+              <div className="mb-3">
+                <div className="flex flex-wrap gap-1">
+                  {allAmenities.slice(0, 3).map((amenity, index) => (
+                    <span 
+                      key={index}
+                      className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
+                    >
+                      {typeof amenity === 'string' ? amenity.replace(/-/g, ' ') : amenity}
+                    </span>
+                  ))}
+                  {allAmenities.length > 3 && (
+                    <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
+                      +{allAmenities.length - 3} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          }
+          return null
+        })()}
 
         {/* Property Type */}
-        <div className="flex items-center justify-between">
+        {/* <div className="flex items-center justify-between">
           <span className="text-xs text-gray-500 capitalize">
             {unit.listing_type} • {unit.property_status}
           </span>
-        </div>
+        </div> */}
       </div>
     </div>
   )

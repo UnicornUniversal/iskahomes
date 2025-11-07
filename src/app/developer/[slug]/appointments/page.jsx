@@ -4,8 +4,8 @@ import Appointments from '@/app/components/developers/Appointments'
 
 const page = () => {
   return (
-    <div className='w-full flex '>
-        <DeveloperNav active={5} />
+    <div className='w-full  '>
+       
 
       
       <Appointments />

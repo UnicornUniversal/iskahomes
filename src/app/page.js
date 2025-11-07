@@ -4,6 +4,7 @@ import Header from "./components/Header";
 import HomeProperties from "./components/HomeProperties";
 import SideBanner from "./components/Ads/SideBanner";
 import Layout1 from "./layout/Layout1";
+import PostHogDebug from "./components/PostHogDebug";
 
 export default function Home() {
   return (
@@ -24,6 +25,7 @@ export default function Home() {
        
       </div>
 
+      {/* <PostHogDebug /> */}
    </div>
   );
 }

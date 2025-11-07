@@ -127,18 +127,46 @@ const handleLogout = () => {
             <div className="flex items-center justify-center px-4 py-3">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary_color"></div>
             </div>
-          ) : user && user.user_type === 'developer' ? (
+          ) : user ? (
             <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-              {/* Welcome message with link to dashboard */}
-              <Link href={`/developer/${user.profile?.slug || user.id}/dashboard`} className="w-full md:w-auto">
-                <div 
-                  onClick={() => set_show_nav(false)}
-                  className="flex items-center gap-3 justify-center text-left md:text-center text-[1.1em] md:text-sm cursor-pointer transition-all duration-500 bg-primary_color text-white px-4 py-3 md:px-6 md:py-2 rounded-lg hover:bg-opacity-90 w-full md:w-auto shadow-md hover:shadow-lg"
-                >
+              {/* Welcome message with link to appropriate dashboard */}
+              {user.user_type === 'developer' ? (
+                <Link href={`/developer/${user.profile?.slug || user.id}/dashboard`} className="w-full md:w-auto">
+                  <div 
+                    onClick={() => set_show_nav(false)}
+                    className="flex items-center gap-3 justify-center text-left md:text-center text-[1.1em] md:text-sm cursor-pointer transition-all duration-500 bg-primary_color text-white px-4 py-3 md:px-6 md:py-2 rounded-lg hover:bg-opacity-90 w-full md:w-auto shadow-md hover:shadow-lg"
+                  >
+                    <FaUser size={22} className="md:hidden" />
+                    <span className="text-xs font-medium">Welcome, {user.profile?.name || user.email}</span>
+                  </div>
+                </Link>
+              ) : user.user_type === 'property_seeker' ? (
+                <Link href={`/propertySeeker/${user.profile?.slug || user.id}/dashboard`} className="w-full md:w-auto">
+                  <div 
+                    onClick={() => set_show_nav(false)}
+                    className="flex items-center gap-3 justify-center text-left md:text-center text-[1.1em] md:text-sm cursor-pointer transition-all duration-500 bg-primary_color text-white px-4 py-3 md:px-6 md:py-2 rounded-lg hover:bg-opacity-90 w-full md:w-auto shadow-md hover:shadow-lg"
+                  >
+                    <FaUser size={22} className="md:hidden" />
+                    <span className="text-xs font-medium">Welcome, {user.profile?.name || user.email}</span>
+                  </div>
+                </Link>
+              ) : user.user_type === 'agent' ? (
+                <Link href={`/agents/${user.profile?.slug || user.id}/dashboard`} className="w-full md:w-auto">
+                  <div 
+                    onClick={() => set_show_nav(false)}
+                    className="flex items-center gap-3 justify-center text-left md:text-center text-[1.1em] md:text-sm cursor-pointer transition-all duration-500 bg-primary_color text-white px-4 py-3 md:px-6 md:py-2 rounded-lg hover:bg-opacity-90 w-full md:w-auto shadow-md hover:shadow-lg"
+                  >
+                    <FaUser size={22} className="md:hidden" />
+                    <span className="text-xs font-medium">Welcome, {user.profile?.name || user.email}</span>
+                  </div>
+                </Link>
+              ) : (
+                // Fallback for any other user types
+                <div className="flex items-center gap-3 justify-center text-left md:text-center text-[1.1em] md:text-sm bg-primary_color text-white px-4 py-3 md:px-6 md:py-2 rounded-lg w-full md:w-auto">
                   <FaUser size={22} className="md:hidden" />
                   <span className="text-xs font-medium">Welcome, {user.profile?.name || user.email}</span>
                 </div>
-              </Link>
+              )}
               
               {/* Logout button - commented out for now */}
               {/* <button

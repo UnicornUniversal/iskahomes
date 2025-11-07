@@ -1,120 +1,120 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
-import crypto from 'crypto'
+import { supabaseAdmin } from '@/lib/supabase'
+import { sendWelcomeEmail } from '@/lib/sendgrid'
 
 export async function POST(request) {
   try {
-    const body = await request.json()
-    const { token, email } = body
+    const { token } = await request.json()
 
-    if (!token || !email) {
+    if (!token) {
       return NextResponse.json(
-        { error: 'Missing token or email' },
+        { error: 'Verification token is required' },
         { status: 400 }
       )
     }
 
-    // Verify the token
-    const activationSecret = process.env.ACTIVATION_SECRET
-    const verificationHash = crypto
-      .createHash('sha256')
-      .update(token + activationSecret)
-      .digest('hex')
+    // Find user with this verification token in user_metadata
+    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers()
 
-    // Find user with matching email and verification token
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id, email, verification_token, is_verified, account_status')
-      .eq('email', email)
-      .eq('verification_token', verificationHash)
-      .single()
-
-    if (userError || !user) {
+    if (listError) {
+      console.error('Error listing users:', listError)
       return NextResponse.json(
-        { error: 'Invalid verification token or email' },
+        { error: 'Verification failed' },
+        { status: 500 }
+      )
+    }
+
+    // Find user with matching verification token
+    const user = users.find(u => 
+      u.user_metadata?.verification_token === token
+    )
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Invalid or expired verification token' },
         { status: 400 }
       )
     }
 
     // Check if already verified
-    if (user.is_verified) {
-      return NextResponse.json(
-        { error: 'Email already verified' },
-        { status: 400 }
-      )
+    if (user.email_confirmed_at) {
+      return NextResponse.json({
+        success: true,
+        message: 'Email already verified. You can sign in.'
+      })
     }
 
-    // Update user to verified status
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({
-        is_verified: true,
-        account_status: 'active',
-        verification_token: null, // Clear the token
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', user.id)
+    // Update user email_confirmed_at in Supabase Auth
+    const { data: updatedUser, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      user.id,
+      {
+        email_confirm: true,
+        user_metadata: {
+          ...user.user_metadata,
+          verification_token: null, // Clear the token after verification
+          verified_at: new Date().toISOString()
+        }
+      }
+    )
 
     if (updateError) {
-      console.error('Failed to update user verification status:', updateError)
+      console.error('Error updating user:', updateError)
       return NextResponse.json(
         { error: 'Failed to verify email' },
         { status: 500 }
       )
     }
 
-    // Update profile status in the appropriate table
-    const userType = user.user_type || 'seeker' // Default to seeker if not set
-    let profileUpdateError = null
-
+    // Update the appropriate profile table (property_seekers, developers, or agents)
+    const userType = user.user_metadata?.user_type
+    let tableName = ''
+    
     switch (userType) {
+      case 'property_seeker':
+        tableName = 'property_seekers'
+        break
       case 'developer':
-        const { error: devError } = await supabase
-          .from('developers')
-          .update({
-            account_status: 'active',
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id)
-        profileUpdateError = devError
+        tableName = 'developers'
         break
-
       case 'agent':
-        const { error: agentError } = await supabase
-          .from('agents')
-          .update({
-            account_status: 'active',
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id)
-        profileUpdateError = agentError
+        tableName = 'agents'
         break
-
-      case 'seeker':
-        const { error: seekerError } = await supabase
-          .from('home_seekers')
-          .update({
-            account_status: 'active',
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id)
-        profileUpdateError = seekerError
-        break
+      default:
+        tableName = null
     }
 
-    if (profileUpdateError) {
-      console.error('Failed to update profile status:', profileUpdateError)
-      // Don't fail the verification if profile update fails
+    if (tableName) {
+      const { error: profileUpdateError } = await supabaseAdmin
+        .from(tableName)
+        .update({
+          is_verified: true,
+          email_verified_at: new Date().toISOString(),
+          status: 'active', // Change from 'pending' to 'active'
+          is_active: true
+        })
+        .eq('user_id', user.id)
+
+      if (profileUpdateError) {
+        console.error('Error updating profile:', profileUpdateError)
+        // Don't fail the verification if profile update fails
+      }
+    }
+
+    // Send welcome email
+    try {
+      await sendWelcomeEmail(
+        user.email,
+        user.user_metadata?.full_name || 'there',
+        userType
+      )
+    } catch (emailError) {
+      console.error('Error sending welcome email:', emailError)
+      // Don't fail verification if welcome email fails
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Email verified successfully',
-      user: {
-        id: user.id,
-        email: user.email,
-        user_type: userType
-      }
+      message: 'Email verified successfully! You can now sign in.'
     })
 
   } catch (error) {

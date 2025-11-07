@@ -1,72 +1,58 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { cn } from '@/lib/utils'
-import { PREDEFINED_AMENITIES, getAmenityById, getAmenityIcon, getAmenityName } from '@/lib/StaticData'
+import { 
+  getAmenitiesByPropertyType, 
+  getAllAmenities,
+  getAmenityIcon,
+  getAmenityName,
+  PROPERTY_TYPE_IDS,
+  GENERAL_AMENITIES
+} from '@/lib/StaticData'
+import { FaSearch, FaTimes } from 'react-icons/fa'
 
 const PropertyAmenities = ({ formData, updateFormData, mode }) => {
-  const [amenitiesData, setAmenitiesData] = useState({
-    amenities: [],
-    customAmenities: []
-  })
-
-  const [databaseAmenities, setDatabaseAmenities] = useState([])
-  const [loadingAmenities, setLoadingAmenities] = useState(false)
   const [newCustomAmenity, setNewCustomAmenity] = useState('')
-  const [showGeneralAmenities, setShowGeneralAmenities] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showGeneralAmenities, setShowGeneralAmenities] = useState(true)
+  const [generalAmenitiesLimit, setGeneralAmenitiesLimit] = useState(10) // Start with 10
+  const [typeSpecificAmenitiesLimit, setTypeSpecificAmenitiesLimit] = useState(10) // Start with 10
 
-  // Initialize with form data
-  useEffect(() => {
-    if (formData.amenities) {
-      setAmenitiesData(prev => ({
-        ...prev,
-        amenities: formData.amenities
-      }));
-    }
-  }, [formData.amenities]);
+  // Show general amenities incrementally (start with 10, then load more)
+  const generalAmenities = useMemo(() => {
+    return GENERAL_AMENITIES.slice(0, generalAmenitiesLimit);
+  }, [generalAmenitiesLimit]);
+  
+  const hasMoreGeneralAmenities = GENERAL_AMENITIES.length > generalAmenitiesLimit
 
-  // Fetch amenities based on selected property types
-  useEffect(() => {
-    if (formData.types && formData.types.length > 0) {
-      fetchAmenitiesForTypes(formData.types);
-    } else {
-      setDatabaseAmenities([]);
+  // Get all type-specific amenities when property type is selected
+  const allTypeSpecificAmenities = useMemo(() => {
+    if (!formData.types || formData.types.length === 0) {
+      return [];
     }
+    
+    const propertyTypeId = formData.types[0];
+    const allTypeAmenities = getAmenitiesByPropertyType(propertyTypeId);
+    
+    // Return only type-specific amenities (exclude general ones)
+    const generalIds = GENERAL_AMENITIES.map(a => a.id);
+    return allTypeAmenities.filter(a => !generalIds.includes(a.id));
   }, [formData.types]);
 
-  const fetchAmenitiesForTypes = async (propertyTypeIds) => {
-    setLoadingAmenities(true);
-    try {
-      const response = await fetch('/api/admin/property-amenities');
-      if (response.ok) {
-        const result = await response.json();
-        
-        // Filter amenities that match any of the selected property types
-        // Since property_type is now an array in the database, we need to check if any of the amenity's property types match our selected types
-        const relevantAmenities = result.data?.filter(amenity => {
-          const amenityPropertyTypes = Array.isArray(amenity.property_type) ? amenity.property_type : [amenity.property_type];
-          return amenityPropertyTypes.some(type => propertyTypeIds.includes(type));
-        }) || [];
-        
-        setDatabaseAmenities(relevantAmenities);
-      } else {
-        console.error('Failed to fetch amenities');
-        setDatabaseAmenities([]);
-      }
-    } catch (error) {
-      console.error('Error fetching amenities:', error);
-      setDatabaseAmenities([]);
-    } finally {
-      setLoadingAmenities(false);
-    }
-  };
+  // Show type-specific amenities incrementally (start with 10, then load more)
+  const typeSpecificAmenities = useMemo(() => {
+    return allTypeSpecificAmenities.slice(0, typeSpecificAmenitiesLimit);
+  }, [allTypeSpecificAmenities, typeSpecificAmenitiesLimit]);
+  
+  const hasMoreTypeSpecificAmenities = allTypeSpecificAmenities.length > typeSpecificAmenitiesLimit
 
-  const predefinedAmenities = PREDEFINED_AMENITIES
 
-  const handleAmenityToggle = (amenityId, amenityType = 'general') => {
-    const currentAmenities = formData.amenities || { database: [], general: [], custom: [] };
+  const handleAmenityToggle = (amenityId, amenityType = 'inbuilt') => {
+    const currentAmenities = formData.amenities || { inbuilt: [], custom: [] };
     const currentArray = currentAmenities[amenityType] || [];
     
+    // Only store the amenity ID (string), not the full object
     const updatedArray = currentArray.includes(amenityId)
       ? currentArray.filter(id => id !== amenityId)
       : [...currentArray, amenityId];
@@ -76,11 +62,6 @@ const PropertyAmenities = ({ formData, updateFormData, mode }) => {
       [amenityType]: updatedArray
     };
     
-    setAmenitiesData(prev => ({
-      ...prev,
-      amenities: updatedAmenities
-    }));
-    
     updateFormData({
       amenities: updatedAmenities
     });
@@ -88,19 +69,15 @@ const PropertyAmenities = ({ formData, updateFormData, mode }) => {
 
   const handleCustomAmenityAdd = () => {
     if (newCustomAmenity.trim()) {
-      const currentAmenities = formData.amenities || { database: [], general: [], custom: [] };
+      const currentAmenities = formData.amenities || { inbuilt: [], custom: [] };
       const currentCustomAmenities = currentAmenities.custom || [];
+      // Only store the amenity name (string), not an object
       const newCustomAmenities = [...currentCustomAmenities, newCustomAmenity.trim()];
       
       const updatedAmenities = {
         ...currentAmenities,
         custom: newCustomAmenities
       };
-      
-      setAmenitiesData(prev => ({
-        ...prev,
-        amenities: updatedAmenities
-      }));
       
       updateFormData({
         amenities: updatedAmenities
@@ -110,7 +87,7 @@ const PropertyAmenities = ({ formData, updateFormData, mode }) => {
   }
 
   const handleCustomAmenityRemove = (index) => {
-    const currentAmenities = formData.amenities || { database: [], general: [], custom: [] };
+    const currentAmenities = formData.amenities || { inbuilt: [], custom: [] };
     const currentCustomAmenities = currentAmenities.custom || [];
     const newCustomAmenities = currentCustomAmenities.filter((_, i) => i !== index);
     
@@ -118,11 +95,6 @@ const PropertyAmenities = ({ formData, updateFormData, mode }) => {
       ...currentAmenities,
       custom: newCustomAmenities
     };
-    
-    setAmenitiesData(prev => ({
-      ...prev,
-      amenities: updatedAmenities
-    }));
     
     updateFormData({
       amenities: updatedAmenities
@@ -137,11 +109,37 @@ const PropertyAmenities = ({ formData, updateFormData, mode }) => {
   }
 
   const getSelectedAmenities = () => {
-    const generalAmenities = formData.amenities?.general || [];
-    return predefinedAmenities.filter(amenity => 
-      generalAmenities.includes(amenity.id)
+    // Get selected amenity IDs from inbuilt array
+    const selectedIds = formData.amenities?.inbuilt || [];
+    const allAmenities = [...generalAmenities, ...typeSpecificAmenities];
+    // Reconstruct full amenity objects from StaticData using the stored IDs
+    return allAmenities.filter(amenity => 
+      selectedIds.includes(amenity.id)
     )
   }
+
+  // Get property type name for display
+  const getPropertyTypeName = () => {
+    if (!formData.types || formData.types.length === 0) {
+      return 'General';
+    }
+    
+    const typeId = formData.types[0];
+    const typeNames = {
+      [PROPERTY_TYPE_IDS.HOUSES_APARTMENTS]: 'Houses & Apartments',
+      [PROPERTY_TYPE_IDS.OFFICES]: 'Offices',
+      [PROPERTY_TYPE_IDS.WAREHOUSES]: 'Warehouses',
+      [PROPERTY_TYPE_IDS.EVENT_CENTERS]: 'Event Centers',
+      [PROPERTY_TYPE_IDS.LAND]: 'Land',
+    };
+    
+    return typeNames[typeId] || 'General';
+  }
+
+  // Get selected amenity IDs (strings only, not full objects)
+  const selectedInbuiltAmenityIds = formData.amenities?.inbuilt || [];
+  const customAmenities = formData.amenities?.custom || [];
+  const totalAmenities = selectedInbuiltAmenityIds.length + customAmenities.length;
 
   return (
     <div className="w-full p-6 bg-white rounded-lg shadow-sm">
@@ -150,123 +148,69 @@ const PropertyAmenities = ({ formData, updateFormData, mode }) => {
         <p className="text-gray-600">
           {mode === 'edit' ? 'Update the amenities available for this property' : 'Select the amenities available for this property'}
         </p>
+        {formData.types && formData.types.length > 0 && (
+          <div className="mt-2 p-2 bg-blue-50 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <span className="font-semibold">Property Type:</span> {getPropertyTypeName()} - Showing relevant amenities
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="space-y-8">
-        {/* Database Amenities (Category-based) */}
-        {formData.types && formData.types.length > 0 ? (
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Amenities for Selected Property Types
-            </h3>
-            {loadingAmenities ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="text-gray-600 mt-2">Loading amenities...</p>
-              </div>
-            ) : databaseAmenities.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {databaseAmenities.map(amenity => (
-                  <label
-                    key={amenity.id}
-                    className={cn(
-                      "flex items-start space-x-3 p-4 border rounded-lg cursor-pointer transition-all hover:bg-gray-50",
-                      (formData.amenities?.database || []).includes(amenity.id.toString())
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-200"
-                    )}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={(formData.amenities?.database || []).includes(amenity.id.toString())}
-                      onChange={() => handleAmenityToggle(amenity.id.toString(), 'database')}
-                      className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        {amenity.icon ? (
-                          <img 
-                            src={amenity.icon} 
-                            alt={amenity.name}
-                            className="w-6 h-6 object-contain"
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                              e.target.nextSibling.style.display = 'inline';
-                            }}
-                          />
-                        ) : null}
-                        <span className="text-xl" style={{ display: amenity.icon ? 'none' : 'inline' }}>🏢</span>
-                        <span className="font-medium text-gray-900">{amenity.name}</span>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">{amenity.description || 'No description available'}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <p>No specific amenities found for the selected property types.</p>
-                <p className="text-sm mt-1">You can still select from the general amenities below.</p>
-              </div>
-            )}
+        {/* Search Bar */}
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <FaSearch className="h-5 w-5 text-gray-400" />
           </div>
-        ) : (
-          <div className="text-center py-8 text-gray-500">
-            <p>Please select property types first to see relevant amenities.</p>
+          <Input
+            type="text"
+            placeholder="Search amenities..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 pr-10 w-full"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+            >
+              <FaTimes className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+            </button>
+          )}
+        </div>
+
+        {/* Selected Amenities Summary */}
+        {totalAmenities > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-blue-900 mb-3">Selected Amenities</h3>
+            <div className="space-y-2 flex flex-wrap gap-2">
+              {/* General amenities */}
+              {getSelectedAmenities().map(amenity => {
+                const IconComponent = amenity.icon;
+                return (
+                  <div key={amenity.id} className="flex items-center border border-blue-200 rounded-full p-2 space-x-2">
+                    {IconComponent && <IconComponent className="text-sm text-blue-600" />}
+                    <span className="text-blue-800 text-sm">{amenity.name}</span>
+                  </div>
+                );
+              })}
+              
+              {/* Custom amenities */}
+              {customAmenities.map((amenity, index) => (
+                <div key={`custom-${index}`} className="flex items-center space-x-2">
+                  <span className="text-lg">✨</span>
+                  <span className="text-blue-800">{amenity}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-sm text-blue-600 mt-3">
+              Total: {totalAmenities} amenities selected
+            </p>
           </div>
         )}
 
-        {/* Selected Amenities Summary - Show First */}
-        {(() => {
-          const selectedDatabaseAmenities = formData.amenities?.database || [];
-          const generalAmenities = formData.amenities?.general || [];
-          const customAmenities = formData.amenities?.custom || [];
-          const totalAmenities = selectedDatabaseAmenities.length + generalAmenities.length + customAmenities.length;
-          
-          return totalAmenities > 0 ? (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h3 className="text-lg font-semibold text-blue-900 mb-3">Selected Amenities</h3>
-              <div className="space-y-2">
-                {/* Database amenities */}
-                {selectedDatabaseAmenities.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-blue-800 mb-1">From Database:</h4>
-                    {selectedDatabaseAmenities.map((amenityId, index) => {
-                      const amenity = databaseAmenities.find(a => a.id === amenityId) || { name: amenityId };
-                      return (
-                        <div key={`db-${index}`} className="flex items-center space-x-2 ml-2">
-                          <span className="text-lg">🏢</span>
-                          <span className="text-blue-800">{amenity.name}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                
-                {/* General amenities */}
-                {getSelectedAmenities().map(amenity => (
-                  <div key={amenity.id} className="flex items-center space-x-2">
-                    <span className="text-lg">{getAmenityIcon(amenity.id)}</span>
-                    <span className="text-blue-800">{amenity.name}</span>
-                  </div>
-                ))}
-                
-                {/* Custom amenities */}
-                {customAmenities.map((amenity, index) => (
-                  <div key={`custom-${index}`} className="flex items-center space-x-2">
-                    <span className="text-lg">✨</span>
-                    <span className="text-blue-800">{amenity}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="text-sm text-blue-600 mt-3">
-                Total: {totalAmenities} amenities selected
-              </p>
-            </div>
-          ) : null;
-        })()}
-
-        {/* General Predefined Amenities */}
+        {/* General Amenities Section */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-800">General Amenities</h3>
@@ -281,36 +225,158 @@ const PropertyAmenities = ({ formData, updateFormData, mode }) => {
           </div>
           
           {showGeneralAmenities && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {predefinedAmenities.map(amenity => (
-                <label
-                  key={amenity.id}
-                  className={cn(
-                    "flex items-start space-x-3 p-4 border rounded-lg cursor-pointer transition-all hover:bg-gray-50",
-                    (formData.amenities?.general || []).includes(amenity.id)
-                      ? "border-primary bg-primary/5"
-                      : "border-gray-200"
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={(formData.amenities?.general || []).includes(amenity.id)}
-                    onChange={() => handleAmenityToggle(amenity.id, 'general')}
-                    className="mt-1 rounded border-gray-300 text-primary focus:ring-primary"
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                    <span className="text-xl">{getAmenityIcon(amenity.id)}</span>
-                      <span className="font-medium text-gray-900">{amenity.name}</span>
-                    </div>
-                    <p className="text-sm text-gray-600 mt-1">{amenity.description}</p>
+            <>
+              {(() => {
+                // Filter general amenities based on search
+                const filteredGeneral = searchQuery.trim()
+                  ? generalAmenities.filter(amenity => {
+                      const query = searchQuery.toLowerCase();
+                      return amenity.name.toLowerCase().includes(query) ||
+                        amenity.description.toLowerCase().includes(query) ||
+                        amenity.id.toLowerCase().includes(query);
+                    })
+                  : generalAmenities;
+
+                return filteredGeneral.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredGeneral.map(amenity => {
+                      const IconComponent = amenity.icon;
+                      // Check if this amenity ID is in the selected inbuilt array
+                      const isSelected = selectedInbuiltAmenityIds.includes(amenity.id);
+                      
+                      return (
+                        <label
+                          key={amenity.id}
+                          className={cn(
+                            "flex items-start space-x-3 p-4 border rounded-lg cursor-pointer transition-all hover:bg-gray-50",
+                            isSelected
+                              ? "border-blue-500 bg-blue-50"
+                              : "border-gray-200"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleAmenityToggle(amenity.id, 'inbuilt')}
+                            className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              {IconComponent && (
+                                <IconComponent className="text-lg text-gray-700" />
+                              )}
+                              <span className="font-medium text-gray-900">{amenity.name}</span>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">{amenity.description}</p>
+                          </div>
+                        </label>
+                      );
+                    })}
                   </div>
-                </label>
-              ))}
-            </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No general amenities found matching "{searchQuery}"</p>
+                    <p className="text-sm mt-1">Try a different search term</p>
+                  </div>
+                );
+              })()}
+              
+              {/* Load More Button */}
+              {!searchQuery && hasMoreGeneralAmenities && (
+                <div className="flex justify-center mt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setGeneralAmenitiesLimit(prev => Math.min(prev + 10, GENERAL_AMENITIES.length))}
+                    className="text-sm"
+                  >
+                    Load More ({GENERAL_AMENITIES.length - generalAmenitiesLimit} remaining)
+                  </Button>
+                </div>
+              )}
+            </>
           )}
-          
         </div>
+
+        {/* Type-Specific Amenities Section */}
+        {formData.types && formData.types.length > 0 && allTypeSpecificAmenities.length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              {getPropertyTypeName()} Specific Amenities
+            </h3>
+            
+            {(() => {
+              // Filter type-specific amenities based on search
+              const filteredTypeSpecific = searchQuery.trim()
+                ? typeSpecificAmenities.filter(amenity => {
+                    const query = searchQuery.toLowerCase();
+                    return amenity.name.toLowerCase().includes(query) ||
+                      amenity.description.toLowerCase().includes(query) ||
+                      amenity.id.toLowerCase().includes(query);
+                  })
+                : typeSpecificAmenities;
+
+              return filteredTypeSpecific.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredTypeSpecific.map(amenity => {
+                      const IconComponent = amenity.icon;
+                      // Check if this amenity ID is in the selected inbuilt array
+                      const isSelected = selectedInbuiltAmenityIds.includes(amenity.id);
+                      
+                      return (
+                        <label
+                          key={amenity.id}
+                          className={cn(
+                            "flex items-start space-x-3 p-4 border rounded-lg cursor-pointer transition-all hover:bg-gray-50",
+                            isSelected
+                              ? "border-green-500 bg-green-50"
+                              : "border-gray-200"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleAmenityToggle(amenity.id, 'inbuilt')}
+                            className="mt-1 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              {IconComponent && (
+                                <IconComponent className="text-lg text-gray-700" />
+                              )}
+                              <span className="font-medium text-gray-900">{amenity.name}</span>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">{amenity.description}</p>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Load More Button for Type-Specific Amenities */}
+                  {!searchQuery && hasMoreTypeSpecificAmenities && (
+                    <div className="flex justify-center mt-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setTypeSpecificAmenitiesLimit(prev => Math.min(prev + 10, allTypeSpecificAmenities.length))}
+                        className="text-sm"
+                      >
+                        Load More ({allTypeSpecificAmenities.length - typeSpecificAmenitiesLimit} remaining)
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No {getPropertyTypeName().toLowerCase()} amenities found matching "{searchQuery}"</p>
+                  <p className="text-sm mt-1">Try a different search term</p>
+                </div>
+              );
+            })()}
+          </div>
+        )}
 
         {/* Custom Amenities */}
         <div>
@@ -336,9 +402,9 @@ const PropertyAmenities = ({ formData, updateFormData, mode }) => {
             </div>
 
             {/* Custom Amenities List */}
-            {(formData.amenities?.custom || []).length > 0 && (
+            {customAmenities.length > 0 && (
               <div className="space-y-2">
-                {(formData.amenities?.custom || []).map((amenity, index) => (
+                {customAmenities.map((amenity, index) => (
                   <div
                     key={index}
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
@@ -349,9 +415,7 @@ const PropertyAmenities = ({ formData, updateFormData, mode }) => {
                       onClick={() => handleCustomAmenityRemove(index)}
                       className="text-red-500 hover:text-red-700"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
+                      <FaTimes className="w-5 h-5" />
                     </button>
                   </div>
                 ))}

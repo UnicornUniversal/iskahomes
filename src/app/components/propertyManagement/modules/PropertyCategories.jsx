@@ -3,16 +3,24 @@ import React, { useState, useEffect } from 'react'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { cn } from '@/lib/utils'
+import { 
+  usePropertyPurposes, 
+  usePropertyTypes, 
+  usePropertyCategories, 
+  usePropertySubtypes 
+} from '@/hooks/useCachedData'
 
 const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
-  console.log('🔍 PropertyCategories formData:', formData);
   
-  const [categoriesData, setCategoriesData] = useState({
-    purposes: [],
-    types: [],
-    categories: [],
-    subtypes: []
-  })
+  // Use cached data hooks
+  const { data: purposes = [], loading: purposesLoading } = usePropertyPurposes()
+  const { data: types = [], loading: typesLoading } = usePropertyTypes()
+  const { data: allCategories = [], loading: categoriesLoading } = usePropertyCategories()
+  const { data: allSubtypes = [], loading: subtypesLoading } = usePropertySubtypes()
+  
+  // Local state for filtered data
+  const [filteredCategories, setFilteredCategories] = useState([])
+  const [filteredSubtypes, setFilteredSubtypes] = useState([])
 
   // Built-in property types for custom selection (hidden from main view)
   const builtInPropertyTypes = [
@@ -66,30 +74,21 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
     'CPI Security', 'Bay Alarm', 'SafeStreets', 'Smith Thompson', 'Mace Security'
   ]
 
-  const [loading, setLoading] = useState({
-    purposes: false,
-    types: false,
-    categories: false,
-    subtypes: false
-  })
-
   const [customPropertyType, setCustomPropertyType] = useState('')
   const [showCustomInput, setShowCustomInput] = useState(false)
   const [showBuiltInTypes, setShowBuiltInTypes] = useState(false)
   const [searchBuiltInTypes, setSearchBuiltInTypes] = useState('')
   const [hydratedFromExisting, setHydratedFromExisting] = useState(false)
 
-  // Fetch all categories data on component mount
+  // Auto-populate categories and subtypes when property types change
   useEffect(() => {
-    fetchCategoriesData();
-  }, []);
-
-  const fetchCategoriesData = async () => {
-    await Promise.all([
-      fetchPurposes(),
-      fetchTypes()
-    ]);
-  };
+    if (formData?.types && formData.types.length > 0) {
+      autoPopulateCategoriesAndSubtypes(formData.types)
+    } else {
+      setFilteredCategories([])
+      setFilteredSubtypes([])
+    }
+  }, [formData?.types, allCategories, allSubtypes])
 
   // Hydrate option lists from existing saved IDs so the selects show names by default
   useEffect(() => {
@@ -102,47 +101,8 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
   // Debug logging for subtype selection
   useEffect(() => {
     const propertyTypes = formData.listing_types || { database: [], inbuilt: [], custom: [] };
-    console.log('🔍 PropertyCategories - Debug subtype selection:', {
-      listing_types: propertyTypes,
-      database_value: propertyTypes.database[0],
-      subtypes_available: categoriesData.subtypes.length,
-      subtypes: categoriesData.subtypes.map(s => ({ id: s.id, name: s.name }))
-    });
-  }, [formData.listing_types, categoriesData.subtypes])
+  }, [formData.listing_types, filteredSubtypes])
 
-  const fetchPurposes = async () => {
-    setLoading(prev => ({ ...prev, purposes: true }));
-    try {
-      const response = await fetch('/api/admin/property-purposes');
-      if (response.ok) {
-        const result = await response.json();
-        setCategoriesData(prev => ({ ...prev, purposes: result.data || [] }));
-      } else {
-        console.error('Failed to fetch purposes');
-      }
-    } catch (error) {
-      console.error('Error fetching purposes:', error);
-    } finally {
-      setLoading(prev => ({ ...prev, purposes: false }));
-    }
-  };
-
-  const fetchTypes = async () => {
-    setLoading(prev => ({ ...prev, types: true }));
-    try {
-      const response = await fetch('/api/admin/property-types');
-      if (response.ok) {
-        const result = await response.json();
-        setCategoriesData(prev => ({ ...prev, types: result.data || [] }));
-      } else {
-        console.error('Failed to fetch types');
-      }
-    } catch (error) {
-      console.error('Error fetching types:', error);
-    } finally {
-      setLoading(prev => ({ ...prev, types: false }));
-    }
-  };
 
   const handleCategoryToggle = (categoryType, item) => {
     // For single selection, replace the entire array with just the selected item
@@ -164,66 +124,38 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
       updateFormData({
         categories: []
       });
-      setCategoriesData(prev => ({ 
-        ...prev, 
-        categories: [],
-        subtypes: []
-      }));
+      setFilteredCategories([]);
+      setFilteredSubtypes([]);
       return;
     }
 
     try {
-      // Fetch all categories and filter by selected types
-      const categoriesResponse = await fetch('/api/admin/property-categories');
-      if (categoriesResponse.ok) {
-        const categoriesResult = await categoriesResponse.json();
+      // Filter categories that have any of the selected property types
+      const relevantCategories = allCategories.filter(category => {
+        const categoryPropertyTypes = Array.isArray(category.property_type) 
+          ? category.property_type 
+          : [category.property_type];
         
-        // Filter categories that have any of the selected property types
-        const relevantCategories = categoriesResult.data?.filter(category => {
-          const categoryPropertyTypes = Array.isArray(category.property_type) 
-            ? category.property_type 
-            : [category.property_type];
-          
-          // Check if any of the category's property types match any of the selected types
-          return categoryPropertyTypes.some(type => selectedTypes.includes(type));
-        }) || [];
-        
-        console.log('All categories:', categoriesResult.data);
-        console.log('Selected types:', selectedTypes);
-        console.log('Relevant categories:', relevantCategories);
-        
-        // Auto-select all relevant categories
-        const categoryIds = relevantCategories.map(cat => cat.id);
-        updateFormData({
-          categories: categoryIds
-        });
+        // Check if any of the category's property types match any of the selected types
+        return categoryPropertyTypes.some(type => selectedTypes.includes(type));
+      });
+      
+      // Auto-select all relevant categories
+      const categoryIds = relevantCategories.map(cat => cat.id);
+      updateFormData({
+        categories: categoryIds
+      });
 
-        // Update the categories data state to show the filtered categories
-        setCategoriesData(prev => ({ 
-          ...prev, 
-          categories: relevantCategories 
-        }));
+      // Update the filtered categories state
+      setFilteredCategories(relevantCategories);
 
-        // Fetch subtypes based on selected property types (not categories)
-        const subtypesResponse = await fetch('/api/admin/property-subtypes');
-        if (subtypesResponse.ok) {
-          const subtypesResult = await subtypesResponse.json();
-          
-          // Filter subtypes that match any of the selected property types
-          const relevantSubtypes = subtypesResult.data?.filter(subtype => 
-            selectedTypes.includes(subtype.property_type)
-          ) || [];
-          
-          console.log('All subtypes:', subtypesResult.data);
-          console.log('Relevant subtypes:', relevantSubtypes);
-          
-          // Store relevant subtypes in state for manual selection (don't auto-select)
-          setCategoriesData(prev => ({ 
-            ...prev, 
-            subtypes: relevantSubtypes 
-          }));
-        }
-      }
+      // Filter subtypes that match any of the selected property types
+      const relevantSubtypes = allSubtypes.filter(subtype => 
+        selectedTypes.includes(subtype.property_type)
+      );
+      
+      // Store relevant subtypes in state for manual selection (don't auto-select)
+      setFilteredSubtypes(relevantSubtypes);
     } catch (error) {
       console.error('Error auto-populating categories and subtypes:', error);
     }
@@ -242,7 +174,10 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
   };
 
   const getSelectedItems = (categoryType) => {
-    const items = categoriesData[categoryType] || [];
+    const items = categoryType === 'purposes' ? purposes :
+                  categoryType === 'types' ? types :
+                  categoryType === 'categories' ? filteredCategories :
+                  filteredSubtypes;
     return items.filter(item => formData[categoryType].includes(item.id));
   };
 
@@ -260,12 +195,6 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
       propertyTypes.inbuilt = [propertyType];
     }
     
-    console.log('🔍 handlePropertyTypeToggle:', {
-      propertyType,
-      isDatabaseSubtype,
-      propertyTypes,
-      currentPropertyTypes
-    });
     
     updateFormData({ listing_types: propertyTypes });
   };
@@ -346,7 +275,7 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2  gap-4 sm:gap-6">
         {/* Property Purpose */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 sm:p-4 rounded-xl border border-blue-200">
           <div className="flex items-center mb-2 sm:mb-3">
@@ -360,6 +289,7 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
           <p className="text-blue-700 text-xs mb-2 sm:mb-3">Select the primary purpose</p>
           
           <select
+            suppressHydrationWarning
             value={formData.purposes.length > 0 ? formData.purposes[0] : ''}
             onChange={(e) => {
               if (e.target.value) {
@@ -371,11 +301,11 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
             required
             className="w-full px-2 sm:px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-xs sm:text-sm"
           >
-         
-            {loading.purposes ? (
+            <option value="">Select Purpose</option>
+            {purposesLoading ? (
               <option disabled>Loading...</option>
             ) : (
-              categoriesData.purposes.map(purpose => (
+              purposes.map(purpose => (
                 <option key={purpose.id} value={purpose.id}>{purpose.name}</option>
               ))
             )}
@@ -395,6 +325,7 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
           <p className="text-green-700 text-xs mb-2 sm:mb-3">Choose the property type</p>
           
           <select
+            suppressHydrationWarning
             value={formData.types.length > 0 ? formData.types[0] : ''}
             onChange={(e) => {
               if (e.target.value) {
@@ -406,11 +337,11 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
             required
             className="w-full px-2 sm:px-3 py-2 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-xs sm:text-sm"
           >
-            {/* <option value="">Select type</option> */}
-            {loading.types ? (
+            <option value="">Select Property Type</option>
+            {typesLoading ? (
               <option disabled>Loading...</option>
             ) : (
-              categoriesData.types.map(type => (
+              types.map(type => (
                 <option key={type.id} value={type.id}>{type.name}</option>
               ))
             )}
@@ -431,6 +362,7 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
           {/* <p>{formData.categories.length > 0 ? formData.categories[0] : 'Nothing is showing'}</p>
            */}
           <select
+            suppressHydrationWarning
             value={formData.categories.length > 0 ? formData.categories[0] : ''}
             onChange={(e) => {
               if (e.target.value) {
@@ -443,10 +375,10 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
             className="w-full px-2 sm:px-3 py-2 border border-purple-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-xs sm:text-sm disabled:bg-gray-100"
           >
             {/* <option value="">Select category</option> */}
-            {loading.categories ? (
+            {categoriesLoading ? (
               <option disabled>Loading...</option>
             ) : formData.types.length > 0 ? (
-              categoriesData.categories.map(category => (
+              filteredCategories.map(category => (
                 <option key={category.id} value={category.id}>{category.name}</option>
               ))
             ) : (
@@ -469,6 +401,7 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
           
           {formData.types.length > 0 ? (
             <select
+              suppressHydrationWarning
               value={(() => {
                 const propertyTypes = formData.listing_types || { database: [], inbuilt: [], custom: [] };
                 if (!propertyTypes.database || propertyTypes.database.length === 0) return '';
@@ -476,13 +409,7 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
                 const subtypeId = typeof dbVal === 'object' ? dbVal.id : dbVal;
                 
                 // Find the subtype by ID to ensure it exists in available options
-                const foundSubtype = categoriesData.subtypes.find(subtype => subtype.id === subtypeId);
-                console.log('🔍 Subtype selection debug:', {
-                  dbVal,
-                  subtypeId,
-                  foundSubtype,
-                  availableSubtypes: categoriesData.subtypes.map(s => ({ id: s.id, name: s.name }))
-                });
+                const foundSubtype = filteredSubtypes.find(subtype => subtype.id === subtypeId);
                 return foundSubtype ? foundSubtype.id : '';
               })()}
               onChange={(e) => {
@@ -496,10 +423,10 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
               className="w-full px-2 sm:px-3 py-2 border border-orange-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white text-xs sm:text-sm"
             >
       
-              {loading.subtypes ? (
+              {subtypesLoading ? (
                 <option disabled>Loading...</option>
-              ) : categoriesData.subtypes.length > 0 ? (
-                categoriesData.subtypes.map(subtype => (
+              ) : filteredSubtypes.length > 0 ? (
+                filteredSubtypes.map(subtype => (
                   <option key={subtype.id} value={subtype.id}>{subtype.name}</option>
                 ))
               ) : (

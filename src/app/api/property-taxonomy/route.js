@@ -55,7 +55,7 @@ export async function GET(request) {
     const { data: locations, error: locationsError } = await supabase
       .from('listings')
       .select('country, state, city, town')
-      .eq('listing_status', 'published')
+      .eq('listing_status', 'active')
       .not('country', 'is', null)
 
     if (locationsError) {

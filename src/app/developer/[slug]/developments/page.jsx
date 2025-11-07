@@ -1,6 +1,5 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import DeveloperNav from '@/app/components/developers/DeveloperNav'
 import DevelopmentCard from '@/app/components/developers/DevelopmentCard'
 import DeveloperHeader from '@/app/components/developers/DeveloperHeader'
 import { useAuth } from '@/contexts/AuthContext'
@@ -216,7 +215,6 @@ const page = () => {
   if (loading) {
     return (
       <div className='normal_div'>
-        <DeveloperNav active={3} />
         <div className='w-full flex flex-col gap-4 p-6'>
           <div className='flex justify-center items-center h-64'>
             <div className='text-lg text-gray-600'>Loading developments...</div>
@@ -229,7 +227,6 @@ const page = () => {
   if (error) {
     return (
       <div className='normal_div'>
-        <DeveloperNav active={3} />
         <div className='w-full flex flex-col gap-4 p-6'>
           <div className='flex justify-center items-center h-64'>
             <div className='text-lg text-red-600'>Error: {error}</div>
@@ -241,7 +238,6 @@ const page = () => {
 
   return (
     <div className='normal_div'>
-      <DeveloperNav active={3} />
       <div className='w-full flex gap-6 p-6'>
         {/* Main Content Area */}
         <div className='flex-1 flex flex-col gap-4'>

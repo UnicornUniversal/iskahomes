@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useEffect } from 'react'
-import ListingCard from './Listing/ListingCard'
+import SecondaryListingCard from './Listing/SecondaryListingCard'
 import Filter from './Filters/Filter'
 import LoadingSpinner from './ui/LoadingSpinner'
 
@@ -28,8 +28,24 @@ const HomeProperties = () => {
         console.log('API Response:', result)
         
         if (result.success) {
-          setListings(result.data)
-          console.log('Listings set:', result.data.length)
+          // Parse JSON fields if they come as strings
+          const parsedListings = result.data.map(listing => {
+            const parsed = { ...listing }
+            
+            // Parse media if it's a string
+            if (typeof parsed.media === 'string') {
+              try {
+                parsed.media = JSON.parse(parsed.media)
+              } catch (e) {
+                console.error('Error parsing media:', e)
+              }
+            }
+            
+            return parsed
+          })
+          
+          setListings(parsedListings)
+          console.log('Listings set:', parsedListings.length)
         } else {
           setError(result.error || 'Failed to fetch listings')
         }
@@ -90,7 +106,7 @@ const HomeProperties = () => {
           {listings.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {listings.map((listing, index) => (
-                <ListingCard key={listing.id || index} listing={listing} />
+                <SecondaryListingCard key={listing.id || index} listing={listing} />
               ))}
             </div>
           ) : (

@@ -7,7 +7,6 @@ const PropertyDescription = ({ formData, updateFormData, isEditMode }) => {
   const statusOptions = [
     'Available',
     'Unavailable',
-    'Reserved / On Hold',
     'Sold',
     'Under Maintenance / Renovation',
     'Coming Soon'
@@ -82,6 +81,7 @@ const PropertyDescription = ({ formData, updateFormData, isEditMode }) => {
               Status *
             </label>
             <select
+              suppressHydrationWarning
               id="status"
               value={formData.status || ''}
               onChange={(e) => handleInputChange('status', e.target.value)}

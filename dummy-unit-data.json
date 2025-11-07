@@ -232,14 +232,14 @@
   
   "additional_information": "This premium unit offers stunning city views from the 10th floor. Features include marble flooring in living areas, hardwood in bedrooms, modern kitchen with granite countertops, and spacious balconies. The building offers 24/7 security, concierge service, fitness center, swimming pool, and rooftop garden. Located in the prestigious East Legon area with easy access to major business districts, shopping centers, and international schools. Perfect for professionals and families seeking luxury living in Accra.",
   
-  "listing_status": "published",
+  "listing_status": "active",
   "is_featured": true,
   "is_verified": true,
   "is_premium": true,
   
   "created_at": "2024-01-15T10:30:00Z",
   "updated_at": "2024-01-15T10:30:00Z",
-  "published_at": "2024-01-15T10:30:00Z",
+  "active_at": "2024-01-15T10:30:00Z",
   "expires_at": "2024-12-31T23:59:59Z",
   "created_by": "user_123456789",
   "last_modified_by": "user_123456789",

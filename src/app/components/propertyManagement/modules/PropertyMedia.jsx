@@ -1,285 +1,249 @@
 "use client"
 import React, { useState, useRef } from 'react'
-import Model3DViewer, { Model3DPreview, Model3DModal } from './Model3DViewer'
+import AlbumGallery from './AlbumGallery'
+import FloorPlan from './FloorPlan'
+import { Input } from '../../ui/input'
+import { toast } from 'react-toastify'
 
 const PropertyMedia = ({ formData, updateFormData, mode, accountType = 'developer' }) => {
-  const [dragOver, setDragOver] = useState(false)
-  const [showModelModal, setShowModelModal] = useState(false)
-  const [showImageModal, setShowImageModal] = useState(false)
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
-  const fileInputRef = useRef(null)
+  const [showVideoModal, setShowVideoModal] = useState(false)
+  const videoInputRef = useRef(null)
+  const isViewMode = mode === 'view'
 
-  const handleFileUpload = (files) => {
-    const fileArray = Array.from(files)
-    
-    // Check 20-file limit for images
-    const currentImageCount = formData.media.mediaFiles?.length || 0
-    if (currentImageCount + fileArray.length > 20) {
-      alert(`Maximum 20 images allowed. You currently have ${currentImageCount} images.`)
+  // Handle albums change from AlbumGallery
+  const handleAlbumsChange = (albums) => {
+    updateFormData({
+      media: {
+        ...formData.media,
+        albums: albums
+      }
+    })
+  }
+
+  // Handle YouTube URL change
+  const handleYouTubeUrlChange = (e) => {
+    const url = e.target.value
+    updateFormData({
+      media: {
+        ...formData.media,
+        youtubeUrl: url
+      }
+    })
+  }
+
+  // Handle video file upload
+  const handleVideoUpload = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    // Validate video file
+    if (!file.type.startsWith('video/')) {
+      toast.error('Please upload a valid video file')
       return
     }
-    
-    // Validate file types and sizes
-    const validFiles = fileArray.filter(file => {
-      return file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024 // 5MB
-    })
 
-    if (validFiles.length !== fileArray.length) {
-      alert(`Some files were rejected. Please check file types and sizes.`)
+    // Check file size (max 100MB)
+    const maxSize = 100 * 1024 * 1024 // 100MB
+    if (file.size > maxSize) {
+      const fileSizeMB = (file.size / 1024 / 1024).toFixed(2)
+      toast.error(`Video file size (${fileSizeMB}MB) exceeds the 100MB limit. Please compress the video.`)
+      return
     }
 
-    if (validFiles.length === 0) return
-
-    // Add files to mediaFiles
     updateFormData({
       media: {
         ...formData.media,
-        mediaFiles: [...(formData.media.mediaFiles || []), ...validFiles]
-      }
-    })
-  }
-
-  const removeFile = (index) => {
-    const updatedFiles = formData.media.mediaFiles.filter((_, i) => i !== index)
-    updateFormData({
-      media: {
-        ...formData.media,
-        mediaFiles: updatedFiles
-      }
-    })
-  }
-
-  const replaceFile = (index) => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'image/*'
-    input.multiple = false
-    input.onchange = (e) => {
-      const file = e.target.files[0]
-      if (file && file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024) {
-        const updatedFiles = [...formData.media.mediaFiles]
-        // Mark the old file for removal if it's an existing file with URL
-        const oldFile = updatedFiles[index]
-        if (oldFile && oldFile.url && !(oldFile instanceof File)) {
-          // Keep the old file info but mark it for removal
-          oldFile._markedForRemoval = true
+        video: {
+          file: file,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          url: URL.createObjectURL(file)
         }
-        // Replace with new file
-        updatedFiles[index] = file
-        updateFormData({
-          media: {
-            ...formData.media,
-            mediaFiles: updatedFiles
-          }
-        })
-      } else {
-        alert('Please select a valid image file under 5MB')
       }
-    }
-    input.click()
+    })
+
+    toast.success('Video uploaded successfully')
+    e.target.value = '' // Reset input
   }
 
-  const handleDragOver = (e) => {
-    e.preventDefault()
-    setDragOver(true)
-  }
-
-  const handleDragLeave = (e) => {
-    e.preventDefault()
-    setDragOver(false)
-  }
-
-  const handleDrop = (e) => {
-    e.preventDefault()
-    setDragOver(false)
-    const files = e.dataTransfer.files
-    if (files.length > 0) {
-      handleFileUpload(files)
-    }
-  }
-
-  const handleFileSelect = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click()
+  // Remove video
+  const handleRemoveVideo = () => {
+    if (confirm('Are you sure you want to remove the video?')) {
+      // Revoke object URL to free memory
+      if (formData.media.video?.url && formData.media.video.url.startsWith('blob:')) {
+        URL.revokeObjectURL(formData.media.video.url)
+      }
+      
+      updateFormData({
+        media: {
+          ...formData.media,
+          video: null
+        }
+      })
+      toast.success('Video removed')
     }
   }
 
-  const handleFileInputChange = (e) => {
-    const files = e.target.files
-    if (files.length > 0) {
-      handleFileUpload(files)
-    }
+  // Validate YouTube URL
+  const isValidYouTubeUrl = (url) => {
+    if (!url) return false
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/
+    return youtubeRegex.test(url)
+  }
+
+  // Extract YouTube video ID
+  const getYouTubeVideoId = (url) => {
+    if (!url) return null
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/
+    const match = url.match(regExp)
+    return (match && match[2].length === 11) ? match[2] : null
   }
 
   return (
     <div className='bg-white rounded-xl shadow-sm border border-gray-100 p-6'>
-      <h3 className='text-lg font-semibold text-primary_color mb-4'>Property Media</h3>
+      <h3 className='text-lg font-semibold text-primary_color mb-6'>Property Media</h3>
       
-      <div className="space-y-6">
-        {/* Images Section */}
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Images</h3>
-            <div className="text-sm text-gray-600">
-              {formData.media.mediaFiles?.length || 0}/20 images
-            </div>
-          </div>
-          
-          {/* File Upload Area */}
-          <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
-              dragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
-            }`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={handleFileSelect}
-          >
-            <div className="space-y-4">
-              <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <div>
-                <p className="text-lg font-medium text-gray-700 mb-2">
-                  Click to upload images or drag and drop
-                </p>
-                <p className="text-sm text-gray-500">
-                  PNG, JPG, GIF up to 5MB each • Maximum 20 images
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handleFileInputChange}
-            className="hidden"
+      <div className="space-y-8">
+        {/* Image Albums Section */}
+        <div>
+          <AlbumGallery
+            albums={formData.media?.albums || []}
+            onAlbumsChange={handleAlbumsChange}
+            mode={isViewMode ? 'view' : 'edit'}
           />
-
-          {/* Image Preview Grid */}
-          {formData.media.mediaFiles && formData.media.mediaFiles.length > 0 && (
-            <div className="mt-6">
-              <p className="!text-sm font-medium text-gray-900 mb-4">
-                Uploaded Images ({formData.media.mediaFiles.length})
-              </p>
-              <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-                {formData.media.mediaFiles.map((file, index) => (
-                  <div key={index} className="relative group">
-                    <div 
-                      className="aspect-square bg-gray-200 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => {
-                        setSelectedImageIndex(index)
-                        setShowImageModal(true)
-                      }}
-                    >
-                      {file && (file instanceof File ? file.type.startsWith('image/') : file.url) ? (
-                        <img
-                          src={file instanceof File ? URL.createObjectURL(file) : file.url}
-                          alt={`Upload ${index + 1}`}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.nextSibling.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
-                      <div className="w-full h-full flex items-center justify-center bg-gray-100" style={{ display: 'none' }}>
-                        <span className="text-gray-400 text-xs">
-                          {file && (file.name || file.originalName) ? (file.name || file.originalName) : 'Invalid file'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        type="button"
-                        onClick={() => replaceFile(index)}
-                        className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-blue-600"
-                        title="Replace image"
-                      >
-                        ↻
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeFile(index)}
-                        className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
-                        title="Remove image"
-                      >
-                        ×
-                      </button>
-                    </div>
-                    <div className="mt-1 text-xs text-gray-500 truncate">
-                      {file.name || file.originalName || file.filename}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Empty state */}
-          {(!formData.media.mediaFiles || formData.media.mediaFiles.length === 0) && (
-            <div className="mt-6 text-center py-8 text-gray-500">
-              <p className="text-sm">No images uploaded yet</p>
-              <p className="text-xs">Use the upload area above to add images</p>
-            </div>
-          )}
         </div>
 
-        {/* Image Modal */}
-        {showImageModal && formData.media.mediaFiles && formData.media.mediaFiles[selectedImageIndex] && formData.media.mediaFiles[selectedImageIndex] instanceof File && (
-          <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[9999] p-4">
-            <div className="bg-white rounded-lg overflow-hidden w-full max-w-5xl h-full max-h-[85vh] flex flex-col">
-              {/* Header */}
-              <div className="flex justify-between items-center p-4 border-b flex-shrink-0">
-                <h3 className="text-lg font-semibold truncate">
-                  {formData.media.mediaFiles[selectedImageIndex].name}
-                </h3>
-                <button
-                  onClick={() => setShowImageModal(false)}
-                  className="text-gray-500 hover:text-gray-700 text-2xl ml-4 flex-shrink-0"
-                >
-                  ×
-                </button>
-              </div>
-              
-              {/* Image Container */}
-              <div className="flex-1 flex items-center justify-center p-4 min-h-0">
-                <img
-                  src={URL.createObjectURL(formData.media.mediaFiles[selectedImageIndex])}
-                  alt={formData.media.mediaFiles[selectedImageIndex].name}
-                  className="max-w-full max-h-full object-contain"
-                />
-              </div>
-              
-              {/* Navigation */}
-              {formData.media.mediaFiles.length > 1 && (
-                <div className="flex justify-between items-center p-4 border-t flex-shrink-0">
-                  <button
-                    onClick={() => setSelectedImageIndex(Math.max(0, selectedImageIndex - 1))}
-                    disabled={selectedImageIndex === 0}
-                    className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                  <span className="text-sm text-gray-500">
-                    {selectedImageIndex + 1} of {formData.media.mediaFiles.length}
-                  </span>
-                  <button
-                    onClick={() => setSelectedImageIndex(Math.min(formData.media.mediaFiles.length - 1, selectedImageIndex + 1))}
-                    disabled={selectedImageIndex === formData.media.mediaFiles.length - 1}
-                    className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
+        {/* Floor Plan Section */}
+        <div className="border-t pt-6">
+          <FloorPlan
+            formData={formData}
+            updateFormData={updateFormData}
+            mode={isViewMode ? 'view' : 'edit'}
+          />
+        </div>
+
+        {/* YouTube URL Section */}
+        <div className="border-t pt-6">
+          <h4 className="text-base font-semibold text-gray-900 mb-4">YouTube Video</h4>
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="youtubeUrl" className="block text-sm font-medium text-gray-700 mb-2">
+                YouTube Video URL
+              </label>
+              <Input
+                id="youtubeUrl"
+                type="url"
+                placeholder="https://www.youtube.com/watch?v=..."
+                value={formData.media?.youtubeUrl || ''}
+                onChange={handleYouTubeUrlChange}
+                readOnly={isViewMode}
+                className="w-full"
+              />
+              {formData.media?.youtubeUrl && isValidYouTubeUrl(formData.media.youtubeUrl) && (
+                <div className="mt-3">
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <p className="text-sm text-gray-600 mb-2">Preview:</p>
+                    <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                      <iframe
+                        src={`https://www.youtube.com/embed/${getYouTubeVideoId(formData.media.youtubeUrl)}`}
+                        title="YouTube video player"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        className="w-full h-full"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
+              {formData.media?.youtubeUrl && !isValidYouTubeUrl(formData.media.youtubeUrl) && (
+                <p className="text-sm text-red-600 mt-2">Please enter a valid YouTube URL</p>
+              )}
+              <p className="text-xs text-gray-500 mt-2">
+                Enter a YouTube video URL to embed it in your property listing
+              </p>
             </div>
           </div>
-        )}
+        </div>
+
+        {/* Video Upload Section */}
+        <div className="border-t pt-6">
+          <h4 className="text-base font-semibold text-gray-900 mb-4">Video Upload</h4>
+          <div className="space-y-4">
+            {formData.media?.video ? (
+              <div className="space-y-4">
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <video
+                    src={formData.media.video.url || formData.media.video}
+                    controls
+                    className="w-full rounded-lg"
+                    style={{ maxHeight: '400px' }}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {formData.media.video.name || formData.media.video.filename || 'Video file'}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Size: {(formData.media.video.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                  </div>
+                  {!isViewMode && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveVideo}
+                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm font-medium"
+                    >
+                      Remove Video
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : !isViewMode ? (
+              <div
+                className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all"
+                onClick={() => videoInputRef.current?.click()}
+              >
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={handleVideoUpload}
+                  className="hidden"
+                />
+                <div className="space-y-4">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  <div>
+                    <p className="text-base font-medium text-gray-700 mb-1">
+                      Click to upload a video or drag and drop
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      MP4, MOV, AVI up to 100MB
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center text-gray-500 py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+                <svg className="mx-auto h-12 w-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <p className="text-sm font-medium">No video uploaded</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

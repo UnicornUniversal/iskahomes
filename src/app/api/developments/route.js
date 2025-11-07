@@ -1,6 +1,23 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { cache } from 'react'
+import { invalidateDevelopmentsCache } from '@/lib/cacheInvalidation'
+
+// Cached function to fetch developments for a developer
+const getCachedDevelopments = cache(async (developerId) => {
+  const { data: developments, error } = await supabase
+    .from('developments')
+    .select('*')
+    .eq('developer_id', developerId)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    throw new Error('Failed to fetch developments')
+  }
+
+  return developments
+})
 
 // GET - Fetch all developments for a developer
 export async function GET(request) {
@@ -55,21 +72,8 @@ export async function GET(request) {
       )
     }
 
-    // Fetch developments for the developer
-    const { data: developments, error } = await supabase
-      .from('developments')
-      .select('*')
-      .eq('developer_id', developerId)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching developments:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch developments' },
-        { status: 500 }
-      )
-    }
-
+    // Use cached function to fetch developments
+    const developments = await getCachedDevelopments(developerId)
     return NextResponse.json({ data: developments })
 
   } catch (error) {
@@ -154,6 +158,9 @@ export async function POST(request) {
         { status: 500 }
       )
     }
+
+    // Invalidate cache after successful creation
+    invalidateDevelopmentsCache(developer_id)
 
     return NextResponse.json({ 
       success: true, 

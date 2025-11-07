@@ -53,7 +53,7 @@ export async function GET(request) {
         categories,
         listing_types
       `)
-      .eq('listing_status', 'published')
+      .eq('listing_status', 'active')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 

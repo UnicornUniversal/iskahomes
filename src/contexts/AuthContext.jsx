@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { verifyToken } from '@/lib/jwt';
 import { supabase } from '@/lib/supabase';
+import posthog from 'posthog-js';
 
 const AuthContext = createContext();
 
@@ -14,52 +15,127 @@ export const useAuth = () => {
   return context;
 };
 
+// Helper function to enrich developer stats with category names
+const enrichDeveloperStats = async (developerData) => {
+  try {
+    const enrichedData = { ...developerData };
+    
+    // Enrich property_purposes_stats
+    if (developerData.property_purposes_stats && Array.isArray(developerData.property_purposes_stats) && developerData.property_purposes_stats.length > 0) {
+      const purposeIds = developerData.property_purposes_stats.map(stat => stat.category_id);
+      const { data: purposes } = await supabase
+        .from('property_purposes')
+        .select('id, name')
+        .in('id', purposeIds);
+      
+      if (purposes) {
+        // Create lookup map for O(1) access
+        const purposeMap = {};
+        purposes.forEach(purpose => {
+          purposeMap[purpose.id] = purpose.name;
+        });
+        
+        enrichedData.property_purposes_stats = developerData.property_purposes_stats.map(stat => ({
+          ...stat,
+          name: purposeMap[stat.category_id] || 'Unknown Purpose'
+        }));
+      }
+    }
+    
+    // Enrich property_categories_stats
+    if (developerData.property_categories_stats && Array.isArray(developerData.property_categories_stats) && developerData.property_categories_stats.length > 0) {
+      const categoryIds = developerData.property_categories_stats.map(stat => stat.category_id);
+      const { data: categories } = await supabase
+        .from('property_categories')
+        .select('id, name')
+        .in('id', categoryIds);
+      
+      if (categories) {
+        // Create lookup map for O(1) access
+        const categoryMap = {};
+        categories.forEach(category => {
+          categoryMap[category.id] = category.name;
+        });
+        
+        enrichedData.property_categories_stats = developerData.property_categories_stats.map(stat => ({
+          ...stat,
+          name: categoryMap[stat.category_id] || 'Unknown Category'
+        }));
+      }
+    }
+    
+    // Enrich property_types_stats
+    if (developerData.property_types_stats && Array.isArray(developerData.property_types_stats) && developerData.property_types_stats.length > 0) {
+      const typeIds = developerData.property_types_stats.map(stat => stat.category_id);
+      const { data: types } = await supabase
+        .from('property_types')
+        .select('id, name')
+        .in('id', typeIds);
+      
+      if (types) {
+        // Create lookup map for O(1) access
+        const typeMap = {};
+        types.forEach(type => {
+          typeMap[type.id] = type.name;
+        });
+        
+        enrichedData.property_types_stats = developerData.property_types_stats.map(stat => ({
+          ...stat,
+          name: typeMap[stat.category_id] || 'Unknown Type'
+        }));
+      }
+    }
+    
+    // Enrich property_subtypes_stats
+    if (developerData.property_subtypes_stats && Array.isArray(developerData.property_subtypes_stats) && developerData.property_subtypes_stats.length > 0) {
+      const subtypeIds = developerData.property_subtypes_stats.map(stat => stat.category_id);
+      const { data: subtypes } = await supabase
+        .from('property_subtypes')
+        .select('id, name')
+        .in('id', subtypeIds);
+      
+      if (subtypes) {
+        // Create lookup map for O(1) access
+        const subtypeMap = {};
+        subtypes.forEach(subtype => {
+          subtypeMap[subtype.id] = subtype.name;
+        });
+        
+        enrichedData.property_subtypes_stats = developerData.property_subtypes_stats.map(stat => ({
+          ...stat,
+          name: subtypeMap[stat.category_id] || 'Unknown Subtype'
+        }));
+      }
+    }
+    
+    return enrichedData;
+  } catch (error) {
+    console.error('Error enriching developer stats:', error);
+    // Return original data if enrichment fails
+    return developerData;
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [developerToken, setDeveloperToken] = useState('');
+  const [propertySeekerToken, setPropertySeekerToken] = useState('');
 
   const loadUser = async () => {
-    console.log('🚀 loadUser function called');
     try {
-      const token = localStorage.getItem('developer_token');
+      // Check for developer token first
+      const developerTokenValue = localStorage.getItem('developer_token');
+      const propertySeekerTokenValue = localStorage.getItem('property_seeker_token');
       
-      console.log('loadUser - Retrieved from localStorage:', {
-        token: token ? 'exists' : 'missing',
-        tokenLength: token ? token.length : 0,
-        tokenValue: token ? token.substring(0, 50) + '...' : 'null'
-      });
-      
-      if (token) {
-        // Verify token is still valid
-        const decoded = verifyToken(token);
-        
-        console.log('loadUser debug:', {
-          token: token ? 'exists' : 'missing',
-          token_preview: token ? token.substring(0, 50) + '...' : 'null',
-          decoded: decoded ? {
-            id: decoded.id,
-            developer_id: decoded.developer_id,
-            email: decoded.email,
-            user_type: decoded.user_type
-          } : null
-        });
-
-        console.log('🔍 Decoded token details:', {
-          id: decoded?.id,
-          developer_id: decoded?.developer_id,
-          email: decoded?.email,
-          user_type: decoded?.user_type
-        });
+      if (developerTokenValue) {
+        // Verify developer token
+        const decoded = verifyToken(developerTokenValue);
         
         if (decoded && decoded.developer_id) {
-          setDeveloperToken(token);
+          setDeveloperToken(developerTokenValue);
           
-          // Get developer_id from decoded token
           const developerId = decoded.developer_id;
-          
-          // Fetch user data directly from Supabase using developer_id from token
-          console.log('Fetching developer data from Supabase for developer_id:', developerId);
           
           const { data: userData, error } = await supabase
             .from('developers')
@@ -67,161 +143,221 @@ export const AuthProvider = ({ children }) => {
             .eq('developer_id', developerId)
             .single();
 
-          console.log('🔍 Supabase query result:', {
-            userData: userData ? 'found' : 'not found',
-            error: error ? error.message : 'none',
-            developerId: developerId
-          });
-
           if (error) {
-            console.error('🚨 Supabase query failed:', error);
-            
-            // Only clear localStorage if it's a permission issue (token invalid)
             if (error.code === 'PGRST301' || error.message.includes('permission')) {
-              console.log('Permission denied - clearing localStorage due to invalid token');
               localStorage.removeItem('developer_token');
               setDeveloperToken('');
-            } else {
-              console.log('Database error - keeping token, user can retry');
-              // Don't clear localStorage for database errors
             }
           } else if (userData) {
-            console.log('Developer data fetched successfully:', userData);
+            // Enrich stats with category names
+            const enrichedProfile = await enrichDeveloperStats(userData);
             
-            // Structure the user data to match expected format
             setUser({
               id: userData.developer_id,
               email: userData.email,
               user_type: 'developer',
-              profile: {
-                id: userData.id,
-                developer_id: userData.developer_id,
-                name: userData.name,
-                slug: userData.slug,
-                account_status: userData.account_status,
-                company_name: userData.name
-              }
+              profile: enrichedProfile // Store enriched developer profile
             });
           } else {
-            console.log('No developer found with developer_id:', developerId);
-            // Developer doesn't exist - clear token
             localStorage.removeItem('developer_token');
             setDeveloperToken('');
           }
         } else {
-          // Token verification failed - clear storage
-          console.error('🚨 Token verification failed, clearing localStorage');
-          console.error('Decoded token:', decoded);
-          console.error('Token exists:', !!token);
-          
           localStorage.removeItem('developer_token');
           setDeveloperToken('');
         }
+      } else if (propertySeekerTokenValue) {
+        // Verify property seeker token
+        const decoded = verifyToken(propertySeekerTokenValue);
+        
+        if (decoded && decoded.id) {
+          setPropertySeekerToken(propertySeekerTokenValue);
+          
+          const seekerId = decoded.id;
+          
+          const { data: userData, error } = await supabase
+            .from('property_seekers')
+            .select('*')
+            .eq('id', seekerId)
+            .single();
+
+          if (error) {
+            if (error.code === 'PGRST301' || error.message.includes('permission')) {
+              localStorage.removeItem('property_seeker_token');
+              setPropertySeekerToken('');
+            }
+          } else if (userData) {
+            console.log('🔍 Property Seeker Auth - User data:', userData)
+            console.log('🔍 Property Seeker Auth - Token:', propertySeekerTokenValue)
+            setUser({
+              id: userData.id,
+              email: userData.email,
+              user_type: 'property_seeker',
+              profile: {
+                id: userData.id,
+                user_id: userData.user_id,
+                name: userData.name,
+                slug: userData.slug,
+                status: userData.status
+              }
+            });
+          } else {
+            localStorage.removeItem('property_seeker_token');
+            setPropertySeekerToken('');
+          }
+        } else {
+          localStorage.removeItem('property_seeker_token');
+          setPropertySeekerToken('');
+        }
       }
     } catch (error) {
-      console.error('🚨 Error loading user:', error);
-      console.error('Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-      
-      // Only clear localStorage if it's a token verification error
       if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-        console.log('Token verification error - clearing localStorage');
         localStorage.removeItem('developer_token');
+        localStorage.removeItem('property_seeker_token');
         setDeveloperToken('');
-      } else {
-        console.log('Network or other error - keeping token, user can retry');
-        // Don't clear localStorage for network errors
+        setPropertySeekerToken('');
       }
     } finally {
-      console.log('🏁 loadUser finally block - setting loading to false');
       setLoading(false);
     }
   };
 
   // Load user from token on mount
   useEffect(() => {
-    console.log('AuthContext: useEffect triggered, calling loadUser()');
     
     // Check if there's a token in localStorage first
     const token = localStorage.getItem('developer_token');
-    console.log('Initial token check:', {
-      tokenExists: !!token,
-      tokenValue: token ? token.substring(0, 50) + '...' : 'null'
-    });
     
     loadUser();
   }, []);
 
-  const login = async (email, password) => {
+  const login = async (email, password, userType = null) => {
     try {
       const response = await fetch('/api/auth/signin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, user_type: userType }),
       });
 
       if (response.ok) {
         const data = await response.json();
         
-        if (data.user && data.user.user_type === 'developer' && data.token) {
-          // Store only token
-          localStorage.setItem('developer_token', data.token);
-          
-          console.log('Stored in localStorage:', {
-            developer_token: data.token ? 'Yes' : 'No',
-            token_preview: data.token ? data.token.substring(0, 50) + '...' : 'null',
-            user_id: data.user.id,
-            profile_id: data.user.profile?.id
-          });
-          
-          setDeveloperToken(data.token);
-          setUser(data.user);
-          
-          console.log('User set in context:', data.user);
-          
-          return { success: true, user: data.user };
-        } else if (data.user && data.user.user_type === 'developer' && !data.token) {
-          return { success: false, error: 'Developer profile not found. Please contact support.' };
+        if (data.user && data.token) {
+          // Handle different user types
+          if (data.user.user_type === 'developer') {
+            // Store developer token
+            localStorage.setItem('developer_token', data.token);
+            setDeveloperToken(data.token);
+            setUser(data.user);
+            
+            // Track login with PostHog
+            posthog.identify(data.user.id, {
+              email: data.user.email,
+              user_type: data.user.user_type,
+              name: data.user.profile?.name,
+              developer_id: data.user.profile?.developer_id
+            });
+            
+            posthog.capture('user_logged_in', {
+              user_type: data.user.user_type,
+              login_method: 'email'
+            });
+            
+            return { success: true, user: data.user };
+          } else if (data.user.user_type === 'property_seeker') {
+            // Store property seeker token
+            console.log('🔍 Property Seeker Login - Storing token:', data.token)
+            console.log('🔍 Property Seeker Login - User data:', data.user)
+            localStorage.setItem('property_seeker_token', data.token);
+            setPropertySeekerToken(data.token);
+            setUser(data.user);
+            
+            // Track login with PostHog
+            posthog.identify(data.user.id, {
+              email: data.user.email,
+              user_type: data.user.user_type,
+              name: data.user.profile?.name
+            });
+            
+            posthog.capture('user_logged_in', {
+              user_type: data.user.user_type,
+              login_method: 'email'
+            });
+            
+            return { success: true, user: data.user };
+          } else {
+            return { success: false, error: 'Invalid user type' };
+          }
         } else {
-          return { success: false, error: 'Invalid user type' };
+          return { success: false, error: 'Profile not found. Please contact support.' };
         }
       } else {
         const errorData = await response.json();
         return { success: false, error: errorData.message || 'Login failed' };
       }
     } catch (error) {
-      console.error('Login error:', error);
       return { success: false, error: 'Network error' };
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('developer_token');
-    setDeveloperToken('');
-    setUser(null);
+  const logout = async () => {
+    try {
+      // Track logout
+      posthog.capture('user_logged_out');
+      posthog.reset();
+      
+      // Call server-side logout API to handle any server-side cleanup
+      try {
+        const currentToken = developerToken || propertySeekerToken;
+        await fetch('/api/auth/signout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(currentToken && { 'Authorization': `Bearer ${currentToken}` })
+          },
+          body: JSON.stringify({
+            token: currentToken
+          })
+        });
+      } catch (apiError) {
+        console.warn('Logout API call failed, continuing with client-side logout:', apiError);
+        // Continue with client-side logout even if API fails
+      }
+      
+      // Clear client-side tokens and state
+      localStorage.removeItem('developer_token');
+      localStorage.removeItem('property_seeker_token');
+      setDeveloperToken('');
+      setPropertySeekerToken('');
+      setUser(null);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Logout error:', error);
+      
+      // Even if there's an error, clear local state to prevent stuck sessions
+      localStorage.removeItem('developer_token');
+      localStorage.removeItem('property_seeker_token');
+      setDeveloperToken('');
+      setPropertySeekerToken('');
+      setUser(null);
+      
+      return { success: false, error: error.message };
+    }
   };
 
   const value = {
     user,
     loading,
     developerToken,
+    propertySeekerToken,
     login,
     logout,
-    isAuthenticated: !!user && !!developerToken,
+    isAuthenticated: !!user && (!!developerToken || !!propertySeekerToken),
   };
   
-  // Debug context value
-  console.log('AuthContext value:', {
-    user: user ? 'exists' : 'null',
-    loading,
-    developerToken: developerToken ? 'exists' : 'empty',
-    isAuthenticated: !!user && !!developerToken
-  });
 
   return (
     <AuthContext.Provider value={value}>

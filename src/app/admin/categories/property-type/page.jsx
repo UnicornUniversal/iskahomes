@@ -1,13 +1,14 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { FiPlus, FiEdit2, FiTrash2, FiSave, FiX, FiLayers } from 'react-icons/fi'
+import { FiPlus, FiEdit2, FiTrash2, FiSave, FiX, FiLayers, FiRefreshCw } from 'react-icons/fi'
 import { toast } from 'react-toastify'
 
 const PropertyTypesPage = () => {
   const [types, setTypes] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [reconciling, setReconciling] = useState(false)
   const [editingType, setEditingType] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
@@ -118,6 +119,28 @@ const PropertyTypesPage = () => {
     })
   }
 
+  // Reconcile data from database to Redis
+  const handleReconcile = async () => {
+    setReconciling(true)
+    try {
+      const response = await fetch('/api/admin/property-types?reconcile=true')
+      const result = await response.json()
+
+      if (response.ok) {
+        toast.success(result.message || 'Data reconciled and cached successfully')
+        // Refresh the data
+        await fetchTypes()
+      } else {
+        toast.error(result.error || 'Failed to reconcile data')
+      }
+    } catch (error) {
+      console.error('Error reconciling data:', error)
+      toast.error('Error reconciling data')
+    } finally {
+      setReconciling(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="p-8">
@@ -141,13 +164,23 @@ const PropertyTypesPage = () => {
           <h1 className="text-3xl font-bold text-gray-800">Property Types</h1>
           <p className="text-gray-600 mt-2">Manage property types and their configurations</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2"
-        >
-          <FiPlus className="w-5 h-5" />
-          <span>Add Type</span>
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleReconcile}
+            disabled={reconciling}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FiRefreshCw className={`w-5 h-5 ${reconciling ? 'animate-spin' : ''}`} />
+            <span>{reconciling ? 'Reconciling...' : 'Reconcile Cache'}</span>
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+          >
+            <FiPlus className="w-5 h-5" />
+            <span>Add Type</span>
+          </button>
+        </div>
       </div>
 
       {/* Types List */}

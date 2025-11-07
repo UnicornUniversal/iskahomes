@@ -32,6 +32,7 @@ const Filter = ({ filters, setFilters,  totalProperties }) => {
             value={filters.purpose}
             onChange={(e) => handleFilterChange('purpose', e.target.value)}
             className="bg-white px-3 py-2 rounded-md text-[#19505b] font-medium text-xs md:text-sm  min-w-[120px] focus:outline-none border border-gray-200"
+            suppressHydrationWarning={true}
           >
             <option value="">All Purposes</option>
             <option value="Buy">Buy</option>
@@ -44,6 +45,7 @@ const Filter = ({ filters, setFilters,  totalProperties }) => {
             value={filters.sector}
             onChange={(e) => handleFilterChange('sector', e.target.value)}
             className="bg-white px-3 py-2 rounded-md text-[#19505b] font-medium text-xs md:text-sm min-w-[120px] focus:outline-none border border-gray-200"
+            suppressHydrationWarning={true}
           >
             <option value="">All Sectors</option>
             <option value="Apartment">Apartment</option>
@@ -57,6 +59,7 @@ const Filter = ({ filters, setFilters,  totalProperties }) => {
             value={filters.category}
             onChange={(e) => handleFilterChange('category', e.target.value)}
             className="bg-white px-3 py-2 rounded-md text-[#19505b] font-medium text-xs md:text-sm  min-w-[120px] focus:outline-none border border-gray-200"
+            suppressHydrationWarning={true}
           >
             <option value="">All Categories</option>
             <option value="Residential">Residential</option>
@@ -68,6 +71,7 @@ const Filter = ({ filters, setFilters,  totalProperties }) => {
             value={filters.location}
             onChange={(e) => handleFilterChange('location', e.target.value)}
             className="bg-white px-3 py-2 rounded-md text-[#19505b] font-medium text-xs md:text-sm  min-w-[120px] focus:outline-none border border-gray-200"
+            suppressHydrationWarning={true}
           >
             <option value="">All Locations</option>
             <option value="Accra">Accra</option>
@@ -90,12 +94,16 @@ const Filter = ({ filters, setFilters,  totalProperties }) => {
             <button
               onClick={clearAllFilters}
               className="bg-orange-500 hover:bg-orange-600 px-4 py-2 rounded-md text-white text-sm font-medium transition-colors"
+              suppressHydrationWarning={true}
             >
               Clear All
             </button>
           )}
 
-          <button className='bg-secondary_color text-white px-4 py-2 rounded-md text-xs md:text-sm  font-medium transition-colors'>
+          <button 
+            className='bg-secondary_color text-white px-4 py-2 rounded-md text-xs md:text-sm  font-medium transition-colors'
+            suppressHydrationWarning={true}
+          >
             Explore All
           </button>
         </div>

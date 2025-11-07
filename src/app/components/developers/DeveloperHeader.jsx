@@ -7,28 +7,21 @@ import { useAuth } from '@/contexts/AuthContext'
 const DeveloperHeader = () => {
   const { user, isAuthenticated } = useAuth()
 
-  if (!isAuthenticated || !user) {
-    return (
-      <div className='w-full flex justify-between items-end'>
-        <div className='w-full md:w-2/3'>
-          <h5>Welcome,</h5>
-          <h1 className='text-[4em]'>Loading...</h1>
-        </div>
-        <SearchBar />
-      </div>
-    )
-  }
-
-  const companyName = user.profile?.company_name || user.profile?.name || 'Developer'
-  const accountStatus = user.profile?.account_status || 'Unknown'
+  // Always render the same structure to prevent hydration mismatches
+  const companyName = user?.profile?.company_name || user?.profile?.name || 'Developer'
+  const accountStatus = user?.profile?.account_status || 'Unknown'
 
   return (
     <>
-      <div className='w-full flex justify-between items-end'>
-        <div className='w-full '>
-          <h5>Welcome,</h5>
-          <h2 className='text-[4em] w-full'>{companyName}</h2>
-          <div className='flex items-center space-x-2 mt-2'>
+      <div className='shadow w-full border border-white/40 p-[1em] md:p-[2em] rounded-lg flex flex-col relative justify-between items-start'>
+        <div className='w-full flex items-center gap-2 flex-wrap  '>
+        <div>
+            <h5 className='text-sm md:text-base'>Welcome,</h5>
+            <h2 className=' text-[2em] md:text-[4em] w-full'>
+              {!isAuthenticated || !user ? 'Loading...' : companyName}
+            </h2>
+        </div>
+          <div className='flex items-start   space-x-2 mt-2'>
             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
               accountStatus === 'active' 
                 ? 'bg-green-100 text-green-800' 
@@ -36,7 +29,7 @@ const DeveloperHeader = () => {
                 ? 'bg-red-100 text-red-800'
                 : 'bg-gray-100 text-gray-800'
             }`}>
-              {accountStatus.charAt(0).toUpperCase() + accountStatus.slice(1)}
+              {(!isAuthenticated || !user) ? 'Loading' : accountStatus.charAt(0).toUpperCase() + accountStatus.slice(1)}
             </span>
           </div>
         </div>

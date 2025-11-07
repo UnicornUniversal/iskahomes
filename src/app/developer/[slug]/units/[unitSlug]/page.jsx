@@ -11,16 +11,13 @@ const SingleUnitPage = ({ params }) => {
   // Handle add new unit case
   if (unitSlug === 'addNewUnit') {
     return (
-      <div className='flex min-h-screen'>
-        <DeveloperNav active={4} />
-        <div className='flex-1 overflow-x-auto'>
-          <PropertyManagement 
-            slug="addNewUnit" 
-            propertyId={null} 
-            accountType="developer" 
-          />
-        </div>
-      </div>
+      <div className='flex-1 overflow-x-auto'>
+      <PropertyManagement 
+        slug="addNewUnit" 
+        propertyId={null} 
+        accountType="developer" 
+      />
+    </div>
     )
   }
 
@@ -28,23 +25,20 @@ const SingleUnitPage = ({ params }) => {
   if (unitSlug.endsWith('/edit')) {
     const unitId = unitSlug.replace('/edit', '')
     return (
-      <div className='flex min-h-screen'>
-        <DeveloperNav active={4} />
-        <div className='flex-1 overflow-x-auto'>
-          <PropertyManagement 
-            slug="editUnit" 
-            propertyId={unitId} 
-            accountType="developer" 
-          />
-        </div>
-      </div>
+      <div className='flex-1 overflow-x-auto'>
+      <PropertyManagement 
+        slug="editUnit" 
+        propertyId={unitId} 
+        accountType="developer" 
+      />
+    </div>
     )
   }
 
   // For regular unit viewing - show in edit mode
   return (
-    <div className='flex min-h-screen'>
-      <DeveloperNav active={4} />
+  
+    
       <div className='flex-1 overflow-x-auto'>
         <PropertyManagement 
           slug="editUnit" 
@@ -52,7 +46,7 @@ const SingleUnitPage = ({ params }) => {
           accountType="developer" 
         />
       </div>
-    </div>
+ 
   )
 }
 

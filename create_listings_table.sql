@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS listings (
   additional_information TEXT,
   
   -- Listing status and metadata
-  listing_status VARCHAR(20) DEFAULT 'draft' CHECK (listing_status IN ('draft', 'published', 'archived', 'sold', 'rented')),
+  listing_status VARCHAR(20) DEFAULT 'draft' CHECK (listing_status IN ('draft', 'active', 'archived', 'sold', 'rented')),
   is_featured BOOLEAN DEFAULT false,
   is_verified BOOLEAN DEFAULT false,
   is_premium BOOLEAN DEFAULT false,
@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS listings (
   -- Timestamps
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  published_at TIMESTAMP WITH TIME ZONE,
+  active_at TIMESTAMP WITH TIME ZONE,
   expires_at TIMESTAMP WITH TIME ZONE,
   
   -- Audit fields
@@ -156,5 +156,5 @@ COMMENT ON COLUMN listings.amenities IS 'JSONB object with database, general, an
 COMMENT ON COLUMN listings.media IS 'JSONB object containing media files and URLs';
 COMMENT ON COLUMN listings.model_3d IS 'JSONB object containing 3D model file information (for developers)';
 COMMENT ON COLUMN listings.additional_files IS 'JSONB array of additional file objects';
-COMMENT ON COLUMN listings.listing_status IS 'Current status of the listing: draft, published, archived, sold, rented';
+COMMENT ON COLUMN listings.listing_status IS 'Current status of the listing: draft, active, archived, sold, rented';
 COMMENT ON COLUMN listings.slug IS 'URL-friendly slug for the listing';

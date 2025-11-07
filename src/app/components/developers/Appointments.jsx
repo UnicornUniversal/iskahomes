@@ -413,7 +413,7 @@ const Appointments = () => {
     }
 
     return (
-      <div className="flex items-center justify-between mb-4 p-4 bg-gray-50 rounded-lg">
+      <div className="flex items-center justify-between mb-4 p-4 rounded-lg">
         <div className="flex items-center gap-2">
           <button
             onClick={goToToday}
@@ -963,7 +963,7 @@ const Appointments = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen ">
       <style dangerouslySetInnerHTML={{ __html: calendarStyles }} />
     
     

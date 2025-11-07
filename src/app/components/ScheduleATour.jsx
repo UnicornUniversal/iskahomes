@@ -1,10 +1,17 @@
 "use client"
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
+import { useAuth } from '@/contexts/AuthContext'
+import { useRouter } from 'next/navigation'
+import { useAnalytics } from '@/hooks/useAnalytics'
 
 const ScheduleATour = ({ propertyId, propertyTitle, propertyType, developer }) => {
+  const { user, propertySeekerToken } = useAuth()
+  const router = useRouter()
+  const analytics = useAnalytics()
   const [mode, setMode] = useState('in-person')
   const [loading, setLoading] = useState(false)
+  const [showAuthMessage, setShowAuthMessage] = useState(false)
   const [formData, setFormData] = useState({
     date: '',
     time: '',
@@ -13,6 +20,18 @@ const ScheduleATour = ({ propertyId, propertyTitle, propertyType, developer }) =
     phone: '',
     message: ''
   })
+
+  // Pre-fill form with property seeker data if logged in
+  useEffect(() => {
+    if (user && user.user_type === 'property_seeker' && user.profile) {
+      setFormData(prev => ({
+        ...prev,
+        name: user.profile.name || '',
+        email: user.email || '',
+        phone: user.profile.phone || ''
+      }))
+    }
+  }, [user])
 
   // Determine account type based on property type
   const getAccountType = () => {
@@ -40,6 +59,23 @@ const ScheduleATour = ({ propertyId, propertyTitle, propertyType, developer }) =
   const handleSubmit = async (e) => {
     e.preventDefault()
     
+    // Check if user is logged in as property seeker
+    if (!user || !propertySeekerToken || user.user_type !== 'property_seeker') {
+      // Show toast notification
+      toast.error('Only registered property seekers can book appointments. Please sign up first.')
+      
+      // Show message under button
+      setShowAuthMessage(true)
+      
+      // Hide message and redirect after 3 seconds
+      setTimeout(() => {
+        setShowAuthMessage(false)
+        router.push('/signup')
+      }, 3000)
+      
+      return
+    }
+    
     // Validate form
     if (!formData.date || !formData.time || !formData.name || !formData.email) {
       toast.error('Please fill in all required fields')
@@ -60,6 +96,7 @@ const ScheduleATour = ({ propertyId, propertyTitle, propertyType, developer }) =
         account_type: getAccountType(),
         account_id: getAccountId(),
         listing_id: propertyId,
+        seeker_id: user.id, // Add property seeker ID
         appointment_date: new Date(`${formData.date}T${formData.time}`).toISOString(),
         appointment_time: formData.time,
         duration: 60,
@@ -77,6 +114,7 @@ const ScheduleATour = ({ propertyId, propertyTitle, propertyType, developer }) =
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${propertySeekerToken}`
         },
         body: JSON.stringify(appointmentData)
       })
@@ -84,6 +122,15 @@ const ScheduleATour = ({ propertyId, propertyTitle, propertyType, developer }) =
       const result = await response.json()
 
       if (result.success) {
+        // Track appointment booking event
+        analytics.trackAppointmentClick({
+          contextType: 'listing',
+          listingId: propertyId,
+          lister_id: getAccountId(),
+          lister_type: getAccountType(),
+          appointmentType: mode === 'video' ? 'virtual' : 'in-person'
+        })
+        
         toast.success('Appointment scheduled successfully! We\'ll contact you soon.')
         
         // Reset form
@@ -225,6 +272,24 @@ const ScheduleATour = ({ propertyId, propertyTitle, propertyType, developer }) =
             'Book Meeting'
           )}
         </button>
+        
+        {/* Authentication Message */}
+        {showAuthMessage && (
+          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-800">
+                  <strong>Authentication Required:</strong> Only registered property seekers can book appointments. Redirecting to signup page...
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </form>
     </div>
   )

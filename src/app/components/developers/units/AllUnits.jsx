@@ -32,7 +32,7 @@ const AllUnits = () => {
         return
       }
 
-      const response = await fetch(`/api/listings?listing_type=unit`, {
+      const response = await fetch(`/api/user-listings?listing_type=unit`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
