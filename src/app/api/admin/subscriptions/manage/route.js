@@ -68,7 +68,7 @@ export async function POST(request) {
     // Calculate dates if not provided
     const now = new Date()
     const startDate = start_date ? new Date(start_date) : new Date(now)
-    const duration = duration_months || 1
+    let duration = duration_months || 1
     
     let endDate
     if (end_date) {

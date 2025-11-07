@@ -1166,8 +1166,6 @@ const TestPage = memo(() => {
       </div>
     </div>
   )
-}
-
 })
 
 TestPage.displayName = 'TestPage'
