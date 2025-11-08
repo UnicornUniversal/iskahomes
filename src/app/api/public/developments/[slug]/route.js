@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 
 export async function GET(request, { params }) {
   try {
-    const { slug } = params
+    const { slug } = await params
     console.log('🔍 Public API - Fetching development with slug:', slug)
 
     if (!slug) {

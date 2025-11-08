@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 
 export async function GET(request, { params }) {
   try {
-    const { developerslug } = params
+    const { developerslug } = await params
     
     console.log('🔍 Public API - Fetching developer with slug:', developerslug)
 
