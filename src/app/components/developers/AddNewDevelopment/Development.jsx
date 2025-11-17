@@ -5,7 +5,7 @@ import { toast } from 'react-toastify'
 import { uploadFileToStorage, uploadMultipleFilesToStorage } from '@/lib/fileUpload'
 import DevelopmentDescription from './DevelopmentDescription'
 import DevelopmentCategories from './DevelopmentCategories'
-import DevelopmentLocation from './DevelopmentLocation'
+import PropertyLocation from '@/app/components/propertyManagement/modules/PropertyLocation'
 import DevelopmentAmenities from './DevelopmentAmenities'
 import DevelopmentMedia from './DevelopmentMedia'
 import DevelopmentFiles from './DevelopmentFiles'
@@ -486,7 +486,7 @@ const Development = ({ isAddMode, developmentId }) => {
 
         {/* Location Section */}
         <div id='location' className='scroll-mt-20'>
-          <DevelopmentLocation 
+          <PropertyLocation 
             formData={formData}
             updateFormData={updateFormData}
             isEditMode={!isAddMode} 

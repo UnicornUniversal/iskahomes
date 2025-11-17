@@ -67,7 +67,7 @@ const ImmersiveExperience = ({ formData, updateFormData, mode, accountType = 'de
 
             {formData.model_3d ? (
               <div className="space-y-4">
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 relative">
                   <Model3DViewer 
                     modelUrl={formData.model_3d.url}
                     modelFormat={getModelFormat()}

@@ -1,12 +1,7 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
-
-
-const formatPrice = (n) => {
-  if (n === undefined || n === null || isNaN(Number(n))) return "-";
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(Number(n));
-};
+import React, { useState, useEffect } from "react";
+import SecondaryListingCard from '../Listing/SecondaryListingCard';
 
 const SearchProperties = ({ filters = {} }) => {
   const [listings, setListings] = useState([]);
@@ -22,11 +17,21 @@ const SearchProperties = ({ filters = {} }) => {
       try {
         const params = new URLSearchParams();
         
-        // Add filter parameters
-        if (filters.purposeId) params.append('purpose_id', filters.purposeId);
-        if (filters.typeId) params.append('property_type_id', filters.typeId);
-        if (filters.categoryId) params.append('category_id', filters.categoryId);
-        if (filters.subtypeId) params.append('subtype_id', filters.subtypeId);
+        // Map filters from Filters component to API parameters
+        // Handle purposeIds array - send all values
+        if (filters.purposeIds && filters.purposeIds.length > 0) {
+          filters.purposeIds.forEach(id => params.append('purpose_id', id));
+        }
+        
+        if (filters.typeId) {
+          params.append('property_type_id', filters.typeId);
+        }
+        
+        // Handle subtypeIds array - send all values
+        if (filters.subtypeIds && filters.subtypeIds.length > 0) {
+          filters.subtypeIds.forEach(id => params.append('subtype_id', id));
+        }
+        
         if (filters.country) params.append('country', filters.country);
         if (filters.state) params.append('state', filters.state);
         if (filters.city) params.append('city', filters.city);
@@ -36,15 +41,60 @@ const SearchProperties = ({ filters = {} }) => {
         if (filters.bedrooms) params.append('bedrooms', filters.bedrooms);
         if (filters.bathrooms) params.append('bathrooms', filters.bathrooms);
         
-        params.append('limit', '50'); // Limit results for performance
+        // Send specifications object as JSON string
+        if (filters.specifications && Object.keys(filters.specifications).length > 0) {
+          params.append('specifications', JSON.stringify(filters.specifications));
+        }
+        
+        params.append('limit', '15'); // Limit results for performance
 
         const response = await fetch(`/api/listings/search?${params.toString()}`);
         
         if (response.ok) {
           const result = await response.json();
-          setListings(result.data || []);
+          // Transform API response to match SecondaryListingCard format
+          const transformedListings = (result.data || []).map(listing => ({
+            id: listing.id,
+            title: listing.propertyName || listing.title,
+            description: listing.description || '',
+            listing_type: listing.listingType || listing.listing_type || 'property',
+            price: listing.price || 0,
+            currency: listing.currency || 'GHS',
+            price_type: listing.priceType || listing.price_type || 'rent',
+            duration: listing.duration || 'monthly',
+            media: {
+              albums: listing.projectImages && listing.projectImages.length > 0 ? [{
+                images: listing.projectImages.map(url => ({ url }))
+              }] : [],
+              mediaFiles: listing.projectImages ? listing.projectImages.map(url => ({ url })) : [],
+              banner: listing.projectImages && listing.projectImages[0] ? { url: listing.projectImages[0] } : null
+            },
+            specifications: listing.specifications || {
+              bedrooms: listing.details?.bedrooms || 0,
+              bathrooms: listing.details?.washrooms || listing.details?.bathrooms || 0,
+              property_size: listing.details?.areaSqFt || listing.details?.area || 0,
+              size: listing.details?.areaSqFt || listing.details?.area || 0
+            },
+            types: listing.types || [],
+            city: listing.address?.city || listing.city || '',
+            state: listing.address?.state || listing.state || '',
+            country: listing.address?.country || listing.country || '',
+            slug: listing.slug || '',
+            developers: null,
+            available_from: listing.available_from || listing.createdAt || null,
+            is_featured: listing.isFeatured || listing.is_featured || false,
+            is_verified: listing.isVerified || listing.is_verified || false,
+            is_premium: listing.isPremium || listing.is_premium || false,
+            user_id: listing.userId || null,
+            purpose_name: listing.purpose_name || null,
+            purpose_names: listing.purpose_names || [],
+            status: listing.status || 'Available'
+          }));
+          
+          setListings(transformedListings);
         } else {
-          setError('Failed to fetch listings');
+          const errorData = await response.json().catch(() => ({}));
+          setError(errorData.error || 'Failed to fetch listings');
         }
       } catch (err) {
         console.error('Error fetching listings:', err);
@@ -54,15 +104,16 @@ const SearchProperties = ({ filters = {} }) => {
       }
     };
 
+    // Only fetch if we have at least one filter or on initial load
     fetchListings();
   }, [filters]);
 
   return (
-    <div className="w-full p-4 bg_blur max-h-screen overflow-y-auto gap-5">
+    <div className="w-full p-4 max-h-screen overflow-y-auto">
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-4">
           <h6 className="text-primary_color font-semibold">
-            {loading ? 'Loading...' : error ? 'Error loading properties' : `${listings.length} results`}
+            {loading ? 'Loading...' : error ? 'Error loading properties' : `${listings.length} ${listings.length === 1 ? 'result' : 'results'}`}
           </h6>
         </div>
 
@@ -73,76 +124,27 @@ const SearchProperties = ({ filters = {} }) => {
           </div>
         ) : error ? (
           <div className="text-center py-8 text-red-500">
-            <p>{error}</p>
+            <p className="mb-2">{error}</p>
             <button 
               onClick={() => {
-                // Simple reload without window reference
-                location.reload();
+                window.location.reload();
               }} 
-              className="mt-2 px-4 py-2 bg-primary_color text-white rounded-lg hover:bg-blue-700"
+              className="mt-2 px-4 py-2 bg-primary_color text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               Retry
             </button>
           </div>
+        ) : listings.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 mb-2">No properties found</p>
+            <p className="text-sm text-gray-400">Try adjusting your filters</p>
+          </div>
         ) : (
-        <div className="grid grid-cols-1 gap-5">
-            {listings.map((listing) => {
-              const price = formatPrice(listing.price);
-              const img = (listing.projectImages && listing.projectImages[0]) || "";
-              const state = listing.address?.state || '';
-              const city = listing.address?.city || '';
-              const beds = listing.details?.bedrooms;
-              const baths = listing.details?.washrooms;
-              const area = listing.details?.areaSqFt || listing.details?.areaSqm || listing.details?.area || listing.details?.floorArea;
-              const purpose = listing.categorization?.purpose;
-
-            return (
-                <div key={listing.id} className="rounded-2xl overflow-hidden bg-white border border-primary_color/10 shadow-sm w-full">
-                <div className="relative h-44 w-full bg-gray-100">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img 
-                      src={img} 
-                      alt={listing.propertyName} 
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        e.target.src = '/placeholder-property.jpg';
-                      }}
-                    />
-                  <div className="absolute top-3 left-3 bg-white text-primary_color rounded-full px-3 py-1 text-xs font-semibold shadow">
-                      {listing.currency} {price}{purpose === 'Rent' ? " / mo" : ""}
-                    </div>
-                    {listing.isFeatured && (
-                      <div className="absolute top-3 right-3 bg-yellow-500 text-white rounded-full px-2 py-1 text-xs font-semibold">
-                        Featured
-                      </div>
-                    )}
-                </div>
-                <div className="p-4">
-                    <p className="text-primary_color font-semibold mb-1">{listing.propertyName}</p>
-                    <p className="text-primary_color/70 text-xs mb-3">
-                      {city}{city && state ? ", " : ""}{state}
-                    </p>
-                  <div className="flex items-center gap-5 text-xs text-primary_color/80 mb-3">
-                    {typeof beds === 'number' && <span>🛏 {beds} bed</span>}
-                    {typeof baths === 'number' && <span>🛁 {baths} bath</span>}
-                    {area && <span>📐 {area} sqft</span>}
-                  </div>
-                  <div className="pt-3 border-t border-primary_color/10 text-xs text-primary_color/70">
-                    {purpose === 'Rent' ? 'For Rent' : purpose === 'Buy' ? 'For Sale' : purpose}
-                    </div>
-                    <div className="mt-2 flex gap-2">
-                      <a
-                        href={`/property/${listing.listingType}/${listing.slug}/${listing.id}`}
-                        className="flex-1 bg-primary_color text-white text-center py-2 px-3 rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
-                      >
-                        View Details
-                      </a>
-                    </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+          <div className="grid grid-cols-1 gap-5">
+            {listings.map((listing) => (
+              <SecondaryListingCard key={listing.id} listing={listing} />
+            ))}
+          </div>
         )}
       </div>
     </div>

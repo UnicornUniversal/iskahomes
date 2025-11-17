@@ -53,12 +53,12 @@ const generatePricingPreview = (pricingData) => {
 };
 
 const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyLocations = [] }) => {
-  // Get unique currencies from company_locations and always include local currency and USD
+  // Only allow: 1) Property location currency, 2) USD
   const availableCurrencies = useMemo(() => {
     const currencies = new Map()
-    const currencyOrder = [] // Track order: local currency first, then USD, then others
+    const currencyOrder = [] // Track order: property location currency first, then USD
     
-    // Add local currency from selected country using country code from Google Places (FIRST)
+    // Add property location currency from selected country using country code from Google Places (FIRST)
     // Use countryCode if available (from Google Places), fallback to country name
     const countryCode = formData.location?.countryCode || formData.location?.country
     if (countryCode) {
@@ -84,29 +84,18 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
     currencies.set('USD', 'US Dollar')
     currencyOrder.push('USD') // Add to order second
     
-    // Add currencies from company locations (THIRD)
-    companyLocations.forEach(loc => {
-      if (loc.currency && loc.currency_name) {
-        // Only add if not already added (avoid duplicates)
-        if (!currencies.has(loc.currency)) {
-          currencies.set(loc.currency, loc.currency_name)
-          currencyOrder.push(loc.currency) // Add to order
-        }
-      }
-    })
-    
-    // If no local currency was added, default to GHS as first
+    // If no property location currency was added, default to GHS as first
     if (currencyOrder.length === 1) { // Only USD
       currencies.set('GHS', 'Ghanaian Cedi')
       currencyOrder.unshift('GHS') // Add GHS as first
     }
     
-    // Return in the correct order: local currency first, then USD, then others
+    // Return in the correct order: property location currency first, then USD
     return currencyOrder.map(code => ({
       code,
       name: currencies.get(code) || code
     }))
-  }, [companyLocations, formData.location?.countryCode, formData.location?.country])
+  }, [formData.location?.countryCode, formData.location?.country])
 
   // Default currency (prioritize local currency from selected country)
   const defaultCurrency = useMemo(() => {
@@ -265,12 +254,21 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
     }
   }, [purposeData]);
 
+  // Track if user has explicitly chosen a currency (to prevent auto-update if they chose USD)
+  const [userExplicitlyChoseCurrency, setUserExplicitlyChoseCurrency] = useState(false)
+  
   // Update pricing data when form data changes
   const handlePricingChange = (field, value) => {
     const updatedPricing = {
       ...pricingData,
       [field]: value
     };
+    
+    // If user manually changes currency, mark it as explicit choice
+    if (field === 'currency') {
+      setUserExplicitlyChoseCurrency(true)
+      console.log(`💱 User explicitly chose currency: ${value}`)
+    }
     
     // Recalculate estimated_revenue if relevant fields change
     if (updatedPricing.price_type === 'sale' && updatedPricing.price) {
@@ -294,12 +292,25 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
       updatedPricing.estimated_revenue = ''
     }
     
+    // Console log for debugging
+    console.log('💰 Pricing Change:', {
+      field,
+      value,
+      price: updatedPricing.price,
+      currency: updatedPricing.currency,
+      estimated_revenue: updatedPricing.estimated_revenue,
+      price_type: updatedPricing.price_type,
+      ideal_duration: updatedPricing.ideal_duration,
+      time_span: updatedPricing.time_span,
+      userExplicitlyChoseCurrency: field === 'currency' ? true : userExplicitlyChoseCurrency
+    })
+    
     setPricingData(updatedPricing);
     updateFormData({
       pricing: updatedPricing
     });
   };
-
+  
   // Auto-update currency when country code changes
   useEffect(() => {
     const countryCode = formData.location?.countryCode
@@ -309,11 +320,25 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
       const localCurrency = getCurrencyFromCountryCode(countryCode)
       
       if (localCurrency) {
-        // Auto-update currency if:
-        // 1. No currency is set yet, OR
-        // 2. Current currency doesn't match the country's currency (and not USD)
-        if (!currentCurrency || (currentCurrency !== localCurrency && currentCurrency !== 'USD')) {
-          handlePricingChange('currency', localCurrency)
+        // Always auto-update to location currency when location changes, UNLESS:
+        // 1. User has explicitly chosen USD (we respect their choice and don't override it)
+        // 2. Current currency already matches the location currency (no need to change)
+        const isUserChoseUSD = userExplicitlyChoseCurrency && currentCurrency === 'USD'
+        const alreadyMatches = currentCurrency === localCurrency
+        
+        if (!isUserChoseUSD && !alreadyMatches) {
+          console.log(`🌍 Location changed to ${countryCode}, auto-updating currency from ${currentCurrency} to ${localCurrency}`)
+          // Update currency without marking as explicit choice (since it's auto-update)
+          const updatedPricing = {
+            ...pricingData,
+            currency: localCurrency
+          }
+          setPricingData(updatedPricing)
+          updateFormData({
+            pricing: updatedPricing
+          })
+        } else if (isUserChoseUSD) {
+          console.log(`🌍 Location changed to ${countryCode}, but keeping USD (user's explicit choice)`)
         }
       }
     }
@@ -321,8 +346,16 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
   }, [formData.location?.countryCode])
 
 
+  // Prevent form submission on Enter key
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  }
+
   return (
-    <div className="w-full p-4 sm:p-6 bg-white rounded-lg shadow-sm">
+    <div className="w-full p-4 sm:p-6 bg-white rounded-lg shadow-sm" onKeyDown={handleKeyDown}>
       <div className="mb-4 sm:mb-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Property Pricing & Availability</h2>
         <p className="text-sm sm:text-base text-gray-600">
@@ -343,6 +376,12 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
               step="0.01"
               value={pricingData.price || ''}
               onChange={(e) => handlePricingChange('price', parseFloat(e.target.value) || 0)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }
+              }}
               placeholder="Enter price"
               className="flex-1 !text-sm"
               required
@@ -384,6 +423,12 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
                   // Allow completely free typing - just update local state
                   const inputValue = e.target.value;
                   setTimeInputValue(inputValue);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }
                 }}
                 onBlur={(e) => {
                   // Only validate and default to 1 when field loses focus
@@ -480,6 +525,12 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
               min="1"
               value={pricingData.ideal_duration || ''}
               onChange={(e) => handlePricingChange('ideal_duration', parseInt(e.target.value) || '')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }
+              }}
               placeholder="e.g., 12"
               className="w-full !text-sm"
               required

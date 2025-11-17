@@ -125,14 +125,12 @@ const PropertyDetailPage = () => {
           if (listingData) {
             analytics.trackPropertyView(listingData.id, {
               viewedFrom: 'listing_page',
-              lister_id: listingData.developers?.developer_id || listingData.developers?.agent_id || listingData.user_id,
-              lister_type: listingData.developers?.developer_id ? 'developer' : (listingData.developers?.agent_id ? 'agent' : 'developer'),
+              listing: listingData, // Pass full listing object so lister_id can be extracted
               listingType: listingData.listing_type
             })
 
             analytics.trackListingImpression(listingData.id, {
-              lister_id: listingData.developers?.developer_id || listingData.developers?.agent_id || listingData.user_id,
-              lister_type: listingData.developers?.developer_id ? 'developer' : (listingData.developers?.agent_id ? 'agent' : 'developer'),
+              listing: listingData, // Pass full listing object so lister_id can be extracted
               listingType: listingData.listing_type,
               viewedFrom: 'listing_page',
               sessionId: Math.random().toString(36).substr(2, 9),
@@ -392,11 +390,17 @@ const PropertyDetailPage = () => {
   const handlePhoneClick = async (phoneNumber, context = 'listing') => {
     try {
       await navigator.clipboard.writeText(phoneNumber)
+      
+      // Ensure lister_id is always available - extract from listing or developers
+      const listerId = listing?.user_id || developers?.developer_id || null
+      const listerType = listing?.account_type || (developers?.developer_id ? 'developer' : null)
+      
       analytics.trackPhoneInteraction('click', {
         contextType: context,
         listingId: id,
-        developerId: developers?.developer_id,
-        agentId: developers?.agent_id,
+        listing: listing, // Pass full listing object so lister_id can be extracted
+        lister_id: listerId, // Explicitly pass lister_id as fallback
+        lister_type: listerType, // Explicitly pass lister_type as fallback
         phoneNumber: phoneNumber
       })
       toast.success('Phone number copied!')
@@ -409,11 +413,17 @@ const PropertyDetailPage = () => {
   const handleEmailClick = async (email, context = 'listing') => {
     try {
       await navigator.clipboard.writeText(email)
+      
+      // Ensure lister_id is always available - extract from listing or developers
+      const listerId = listing?.user_id || developers?.developer_id || null
+      const listerType = listing?.account_type || (developers?.developer_id ? 'developer' : null)
+      
       analytics.trackMessageClick({
         contextType: context,
         listingId: id,
-        developerId: developers?.developer_id,
-        agentId: developers?.agent_id,
+        listing: listing, // Pass full listing object so lister_id can be extracted
+        lister_id: listerId, // Explicitly pass lister_id as fallback
+        lister_type: listerType, // Explicitly pass lister_type as fallback
         messageType: 'email'
       })
       toast.success('Email copied!')
@@ -427,8 +437,7 @@ const PropertyDetailPage = () => {
       analytics.trackWebsiteClick(websiteUrl, {
       contextType: context,
       listingId: id,
-        lister_id: developers?.developer_id || developers?.agent_id || listing?.user_id,
-        lister_type: developers?.developer_id ? 'developer' : (developers?.agent_id ? 'agent' : 'developer')
+      listing: listing // Pass full listing object so lister_id can be extracted
     })
   }
 
@@ -436,16 +445,14 @@ const PropertyDetailPage = () => {
     analytics.trackSocialMediaClick(platform, {
       contextType: context,
       listingId: id,
-      lister_id: developers?.developer_id || developers?.agent_id || listing?.user_id,
-      lister_type: developers?.developer_id ? 'developer' : (developers?.agent_id ? 'agent' : 'developer')
+      listing: listing // Pass full listing object so lister_id can be extracted
     })
   }
 
   const handleShareClick = (platform) => {
     analytics.trackShare('listing', platform, {
       listingId: id,
-      lister_id: developers?.developer_id || developers?.agent_id || listing?.user_id,
-      lister_type: developers?.developer_id ? 'developer' : (developers?.agent_id ? 'agent' : 'developer')
+      listing: listing // Pass full listing object so lister_id can be extracted
     })
   }
 
@@ -453,20 +460,24 @@ const PropertyDetailPage = () => {
     analytics.trackAppointmentClick({
       contextType: 'listing',
       listingId: id,
-      lister_id: developers?.developer_id || developers?.agent_id || listing?.user_id,
-      lister_type: developers?.developer_id ? 'developer' : (developers?.agent_id ? 'agent' : 'developer'),
+      listing: listing, // Pass full listing object so lister_id can be extracted
       appointmentType: 'viewing'
     })
   }
 
   // Handle sending message to developer
   const handleSendMessage = async () => {
+    // Ensure lister_id is always available - extract from listing or developers
+    const listerId = listing?.user_id || developers?.developer_id || null
+    const listerType = listing?.account_type || (developers?.developer_id ? 'developer' : null)
+    
     // Track message click
     analytics.trackMessageClick({
       contextType: 'listing',
       listingId: id,
-      lister_id: developers?.developer_id || developers?.agent_id || listing?.user_id,
-      lister_type: developers?.developer_id ? 'developer' : (developers?.agent_id ? 'agent' : 'developer'),
+      listing: listing, // Pass full listing object so lister_id can be extracted
+      lister_id: listerId, // Explicitly pass lister_id as fallback
+      lister_type: listerType, // Explicitly pass lister_type as fallback
       messageType: 'direct_message'
     })
 
@@ -487,8 +498,8 @@ const PropertyDetailPage = () => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          otherUserId: developers?.developer_id,
-          otherUserType: 'developer',
+          otherUserId: listing?.user_id || developers?.developer_id || developers?.agent_id,
+          otherUserType: listing?.account_type || 'developer',
           listingId: id,
           conversationType: 'listing_inquiry',
           subject: `Inquiry about ${title}`
@@ -524,8 +535,7 @@ const PropertyDetailPage = () => {
     
     // Track saved listing action
     analytics.trackSavedListing(id, action, {
-      developerId: developers?.developer_id,
-      agentId: developers?.agent_id
+      listing: listing // Pass full listing object so lister_id can be extracted
     })
 
     setSaving(true)
@@ -1232,6 +1242,7 @@ const PropertyDetailPage = () => {
                 propertyTitle={title}
                 propertyType={listing_type}
                 developer={developers}
+                listing={listing} // Pass full listing object so account_type and user_id can be used directly
               />
             </div>
 

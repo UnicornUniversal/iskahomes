@@ -89,7 +89,7 @@ export async function POST(request) {
       )
     }
 
-    // Update total_saved_listings count
+    // Update total_saved_listings count for property seeker
     const { error: updateError } = await supabase
       .from('property_seekers')
       .update({ 
@@ -100,6 +100,52 @@ export async function POST(request) {
     if (updateError) {
       console.error('Error updating saved count:', updateError)
       // Don't fail the request, just log the error
+    }
+
+    // Update total_saved in listings table - increment by 1
+    const { data: listing, error: listingError } = await supabase
+      .from('listings')
+      .select('id, user_id, account_type, total_saved')
+      .eq('id', listingId)
+      .single()
+
+    if (!listingError && listing) {
+      const newSavedCount = (listing.total_saved || 0) + 1
+      const { error: updateListingError } = await supabase
+        .from('listings')
+        .update({ 
+          total_saved: newSavedCount
+        })
+        .eq('id', listingId)
+
+      if (updateListingError) {
+        console.error('Error updating listing saved count:', updateListingError)
+        // Don't fail the request, just log the error
+      } else {
+        // If listing belongs to a developer, also update developers table
+        if (listing.account_type === 'developer' && listing.user_id) {
+          const { data: developer, error: devError } = await supabase
+            .from('developers')
+            .select('developer_id, total_saved')
+            .eq('developer_id', listing.user_id)
+            .single()
+
+          if (!devError && developer) {
+            const newDevSavedCount = (developer.total_saved || 0) + 1
+            const { error: updateDevError } = await supabase
+              .from('developers')
+              .update({ 
+                total_saved: newDevSavedCount
+              })
+              .eq('developer_id', listing.user_id)
+
+            if (updateDevError) {
+              console.error('Error updating developer saved count:', updateDevError)
+              // Don't fail the request, just log the error
+            }
+          }
+        }
+      }
     }
 
     return NextResponse.json({
@@ -189,7 +235,7 @@ export async function DELETE(request) {
       )
     }
 
-    // Update total_saved_listings count
+    // Update total_saved_listings count for property seeker
     const newCount = Math.max(0, propertySeeker.total_saved_listings - 1)
     const { error: updateError } = await supabase
       .from('property_seekers')
@@ -201,6 +247,52 @@ export async function DELETE(request) {
     if (updateError) {
       console.error('Error updating saved count:', updateError)
       // Don't fail the request, just log the error
+    }
+
+    // Update total_saved in listings table - decrement by 1 (but not below 0)
+    const { data: listing, error: listingError } = await supabase
+      .from('listings')
+      .select('id, user_id, account_type, total_saved')
+      .eq('id', listingId)
+      .single()
+
+    if (!listingError && listing) {
+      const newSavedCount = Math.max(0, (listing.total_saved || 0) - 1)
+      const { error: updateListingError } = await supabase
+        .from('listings')
+        .update({ 
+          total_saved: newSavedCount
+        })
+        .eq('id', listingId)
+
+      if (updateListingError) {
+        console.error('Error updating listing saved count:', updateListingError)
+        // Don't fail the request, just log the error
+      } else {
+        // If listing belongs to a developer, also update developers table
+        if (listing.account_type === 'developer' && listing.user_id) {
+          const { data: developer, error: devError } = await supabase
+            .from('developers')
+            .select('developer_id, total_saved')
+            .eq('developer_id', listing.user_id)
+            .single()
+
+          if (!devError && developer) {
+            const newDevSavedCount = Math.max(0, (developer.total_saved || 0) - 1)
+            const { error: updateDevError } = await supabase
+              .from('developers')
+              .update({ 
+                total_saved: newDevSavedCount
+              })
+              .eq('developer_id', listing.user_id)
+
+            if (updateDevError) {
+              console.error('Error updating developer saved count:', updateDevError)
+              // Don't fail the request, just log the error
+            }
+          }
+        }
+      }
     }
 
     return NextResponse.json({

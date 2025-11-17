@@ -1,16 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
-import { 
-  Phone, 
-  MessageCircle, 
-  Mail, 
-  Calendar, 
-  TrendingUp, 
-  TrendingDown,
-  BarChart3,
-  CheckCircle
-} from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Loader2 } from 'lucide-react'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -38,91 +29,105 @@ ChartJS.register(
 
 export default function LeadsTrend({ listerId, listerType = 'developer', listingId = null }) {
   const [timeRange, setTimeRange] = useState('week')
+  const [leadsData, setLeadsData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  // Dummy lead analytics data based on listing_analytics schema
-  const leadsData = {
-    week: {
-      overview: {
-        totalLeads: 45,
-        phoneLeads: 12,
-        messageLeads: 8,
-        emailLeads: 6,
-        appointmentLeads: 4,
-        websiteLeads: 2,
-        uniqueLeads: 38,
-        conversionRate: 5.2,
-        leadsChange: 8.7,
-        phoneChange: 12.3,
-        messageChange: 6.2,
-        emailChange: 15.8,
-        appointmentChange: 22.1,
-        websiteChange: 4.5
-      },
-      performance: {
-        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-        phone: [2, 3, 1, 2, 2, 1, 1],
-        message: [1, 2, 1, 2, 1, 1, 0],
-        email: [1, 1, 1, 1, 1, 1, 0],
-        appointment: [0, 1, 1, 1, 1, 0, 0],
-        website: [0, 1, 0, 1, 0, 0, 0]
+  useEffect(() => {
+    async function fetchLeadsTrend() {
+      if (!listerId) {
+        setLoading(false)
+        return
       }
+
+      setLoading(true)
+      setError(null)
+
+      try {
+        const params = new URLSearchParams({
+          lister_id: listerId,
+          lister_type: listerType,
+          period: timeRange
+        })
+
+        if (listingId) {
+          params.append('listing_id', listingId)
+        }
+
+        const response = await fetch(`/api/leads/trends?${params.toString()}`)
+        const result = await response.json()
+
+        if (response.ok && result.success) {
+          setLeadsData(result.data)
+        } else {
+          setError(result.error || 'Failed to load leads data')
+        }
+      } catch (err) {
+        console.error('Error fetching leads trend:', err)
+        setError('Failed to load leads data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchLeadsTrend()
+  }, [listerId, listerType, listingId, timeRange])
+
+  // Default empty data structure
+  const defaultData = {
+    overview: {
+      totalLeads: 0,
+      phoneLeads: 0,
+      messageLeads: 0,
+      emailLeads: 0,
+      appointmentLeads: 0,
+      websiteLeads: 0,
+      uniqueLeads: 0,
+      conversionRate: 0,
+      leadsChange: 0,
+      phoneChange: 0,
+      messageChange: 0,
+      emailChange: 0,
+      appointmentChange: 0,
+      websiteChange: 0
     },
-    month: {
-      overview: {
-        totalLeads: 156,
-        phoneLeads: 45,
-        messageLeads: 32,
-        emailLeads: 28,
-        appointmentLeads: 18,
-        websiteLeads: 12,
-        uniqueLeads: 134,
-        conversionRate: 5.5,
-        leadsChange: 8.7,
-        phoneChange: 12.3,
-        messageChange: 6.2,
-        emailChange: 15.8,
-        appointmentChange: 22.1,
-        websiteChange: 4.5
-      },
-      performance: {
-        labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-        phone: [12, 15, 11, 18],
-        message: [8, 10, 7, 12],
-        email: [6, 8, 9, 11],
-        appointment: [4, 6, 5, 8],
-        website: [2, 3, 2, 4]
-      }
-    },
-    year: {
-      overview: {
-        totalLeads: 1847,
-        phoneLeads: 542,
-        messageLeads: 384,
-        emailLeads: 336,
-        appointmentLeads: 216,
-        websiteLeads: 144,
-        uniqueLeads: 1589,
-        conversionRate: 5.8,
-        leadsChange: 12.4,
-        phoneChange: 15.2,
-        messageChange: 8.7,
-        emailChange: 18.3,
-        appointmentChange: 25.6,
-        websiteChange: 6.8
-      },
-      performance: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-        phone: [42, 38, 45, 48, 52, 46, 44, 49, 51, 47, 43, 41],
-        message: [28, 32, 35, 38, 34, 31, 29, 33, 36, 32, 30, 28],
-        email: [24, 28, 31, 34, 30, 27, 25, 29, 32, 28, 26, 24],
-        appointment: [16, 18, 21, 24, 20, 17, 15, 19, 22, 18, 16, 14],
-        website: [12, 14, 16, 18, 15, 13, 11, 15, 17, 14, 12, 11]
-      }
+    performance: {
+      labels: [],
+      phone: [],
+      message: [],
+      email: [],
+      appointment: [],
+      website: []
     }
   }
 
-  // Get current data based on selected time range
-  const currentData = leadsData[timeRange] || leadsData.month
+  // Get current data from API response
+  const currentData = leadsData || defaultData
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
+            <span className="text-gray-600">Loading leads trend data...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-center py-12">
+            <span className="text-red-600">{error}</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   // Chart configuration
   const chartOptions = {
@@ -168,91 +173,6 @@ export default function LeadsTrend({ listerId, listerType = 'developer', listing
 
   return (
     <div className="space-y-6">
-      {/* Overview Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Leads</p>
-              <p className="text-2xl font-bold text-gray-900">{currentData?.overview?.totalLeads || 0}</p>
-            </div>
-            <div className="p-3 bg-blue-50 rounded-full">
-              <BarChart3 className="w-6 h-6 text-blue-600" />
-            </div>
-          </div>
-          <div className="flex items-center mt-2">
-            {(currentData?.overview?.leadsChange || 0) > 0 ? (
-              <TrendingUp className="w-4 h-4 text-green-500" />
-            ) : (
-              <TrendingDown className="w-4 h-4 text-red-500" />
-            )}
-            <span className={`text-sm ml-1 ${(currentData?.overview?.leadsChange || 0) > 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {Math.abs(currentData?.overview?.leadsChange || 0)}%
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Conversion Rate</p>
-              <p className="text-2xl font-bold text-gray-900">{currentData?.overview?.conversionRate || 0}%</p>
-            </div>
-            <div className="p-3 bg-green-50 rounded-full">
-              <CheckCircle className="w-6 h-6 text-green-600" />
-            </div>
-          </div>
-          <div className="text-sm text-gray-500 mt-2">
-            View to lead conversion
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Phone Leads</p>
-              <p className="text-2xl font-bold text-gray-900">{currentData?.overview?.phoneLeads || 0}</p>
-            </div>
-            <div className="p-3 bg-green-50 rounded-full">
-              <Phone className="w-6 h-6 text-green-600" />
-            </div>
-          </div>
-          <div className="text-sm text-gray-500 mt-2">
-            Phone interactions
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Message Leads</p>
-              <p className="text-2xl font-bold text-gray-900">{currentData?.overview?.messageLeads || 0}</p>
-            </div>
-            <div className="p-3 bg-blue-50 rounded-full">
-              <MessageCircle className="w-6 h-6 text-blue-600" />
-            </div>
-          </div>
-          <div className="text-sm text-gray-500 mt-2">
-            Message interactions
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Appointments</p>
-              <p className="text-2xl font-bold text-gray-900">{currentData?.overview?.appointmentLeads || 0}</p>
-            </div>
-            <div className="p-3 bg-orange-50 rounded-full">
-              <Calendar className="w-6 h-6 text-orange-600" />
-            </div>
-          </div>
-          <div className="text-sm text-gray-500 mt-2">
-            Appointment bookings
-          </div>
-        </div>
-      </div>
-
       {/* Leads chart with per-type series */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
@@ -325,53 +245,6 @@ export default function LeadsTrend({ listerId, listerType = 'developer', listing
         </div>
       </div>
 
-      {/* Bottom percentage share cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-4 text-center">
-          <div className="p-3 bg-green-50 rounded-full w-12 h-12 mx-auto mb-2 flex items-center justify-center">
-            <Phone className="w-6 h-6 text-green-600" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900">
-            {currentData?.overview?.totalLeads > 0 
-              ? Math.round((currentData?.overview?.phoneLeads / currentData?.overview?.totalLeads) * 100)
-              : 0}%
-          </div>
-          <div className="text-sm text-gray-500">Phone Share</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 text-center">
-          <div className="p-3 bg-blue-50 rounded-full w-12 h-12 mx-auto mb-2 flex items-center justify-center">
-            <MessageCircle className="w-6 h-6 text-blue-600" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900">
-            {currentData?.overview?.totalLeads > 0 
-              ? Math.round((currentData?.overview?.messageLeads / currentData?.overview?.totalLeads) * 100)
-              : 0}%
-          </div>
-          <div className="text-sm text-gray-500">Message Share</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 text-center">
-          <div className="p-3 bg-purple-50 rounded-full w-12 h-12 mx-auto mb-2 flex items-center justify-center">
-            <Mail className="w-6 h-6 text-purple-600" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900">
-            {currentData?.overview?.totalLeads > 0 
-              ? Math.round((currentData?.overview?.emailLeads / currentData?.overview?.totalLeads) * 100)
-              : 0}%
-          </div>
-          <div className="text-sm text-gray-500">Email Share</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 text-center">
-          <div className="p-3 bg-orange-50 rounded-full w-12 h-12 mx-auto mb-2 flex items-center justify-center">
-            <Calendar className="w-6 h-6 text-orange-600" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900">
-            {currentData?.overview?.totalLeads > 0 
-              ? Math.round((currentData?.overview?.appointmentLeads / currentData?.overview?.totalLeads) * 100)
-              : 0}%
-          </div>
-          <div className="text-sm text-gray-500">Appointment Share</div>
-        </div>
-      </div>
     </div>
   )
 }

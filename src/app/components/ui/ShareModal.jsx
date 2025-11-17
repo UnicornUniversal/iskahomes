@@ -43,8 +43,10 @@ const ShareModal = ({ isOpen, onClose, property, propertyType = 'listing' }) => 
       // Track copy link action
       analytics.trackShare(propertyType, 'copy_link', {
         listingId: property.id,
-        lister_id: property.developer_id || property.developers?.developer_id || property.agent_id || property.developers?.agent_id,
-        lister_type: property.developer_id || property.developers?.developer_id ? 'developer' : (property.agent_id || property.developers?.agent_id ? 'agent' : 'developer')
+        listing: propertyType === 'listing' ? property : undefined, // Pass listing object if it's a listing
+        profileId: propertyType === 'developer' ? property.developer_id : undefined, // For profile-based shares
+        lister_id: property.user_id || property.developer_id || property.developers?.developer_id || property.agent_id || property.developers?.agent_id,
+        lister_type: property.account_type || (property.developer_id || property.developers?.developer_id ? 'developer' : (property.agent_id || property.developers?.agent_id ? 'agent' : 'developer'))
       })
       
       setTimeout(() => setCopied(false), 2000)
@@ -58,8 +60,10 @@ const ShareModal = ({ isOpen, onClose, property, propertyType = 'listing' }) => 
     // Track social media share
     analytics.trackShare(propertyType, platform, {
       listingId: property.id,
-      lister_id: property.developer_id || property.developers?.developer_id || property.agent_id || property.developers?.agent_id,
-      lister_type: property.developer_id || property.developers?.developer_id ? 'developer' : (property.agent_id || property.developers?.agent_id ? 'agent' : 'developer')
+      listing: propertyType === 'listing' ? property : undefined, // Pass listing object if it's a listing
+      profileId: propertyType === 'developer' ? property.developer_id : undefined, // For profile-based shares
+      lister_id: property.user_id || property.developer_id || property.developers?.developer_id || property.agent_id || property.developers?.agent_id,
+      lister_type: property.account_type || (property.developer_id || property.developers?.developer_id ? 'developer' : (property.agent_id || property.developers?.agent_id ? 'agent' : 'developer'))
     })
   }
 

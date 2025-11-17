@@ -1,6 +1,6 @@
 "use client"
 import React, { Suspense, useRef, useState } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Environment, Html, useProgress } from '@react-three/drei'
 import { useLoader } from '@react-three/fiber'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
@@ -8,40 +8,68 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 import * as THREE from 'three'
 
-// Helper function to fit camera to object
-function fitCameraToObject(camera, object, controls, offset = 1.25) {
+// Improved helper function to fit camera to object with better positioning
+function fitCameraToObject(camera, object, controls, canvasAspect, offset = 1.25) {
   const box = new THREE.Box3().setFromObject(object)
-  const size = box.getSize(new THREE.Vector3())
   const center = box.getCenter(new THREE.Vector3())
 
-  // Compute max size (largest dimension)
-  const maxDim = Math.max(size.x, size.y, size.z)
+  // Compute the bounding sphere for more consistent sizing
+  const sphere = new THREE.Sphere()
+  box.getBoundingSphere(sphere)
+  const radius = sphere.radius
 
-  // Compute distance required to fit object fully in view
-  const fitHeightDistance = maxDim / (2 * Math.atan((Math.PI * camera.fov) / 360))
-  const fitWidthDistance = fitHeightDistance / camera.aspect
-  const distance = offset * Math.max(fitHeightDistance, fitWidthDistance)
+  // Calculate the optimal distance to fit the object
+  const fov = camera.fov * (Math.PI / 180)
+  let distance
+  
+  if (canvasAspect >= 1) {
+    distance = Math.abs(radius / Math.sin(fov / 2))
+  } else {
+    distance = Math.abs(radius / Math.sin(fov / 2)) / canvasAspect
+  }
 
-  // Move the camera away from the model center
-  const direction = new THREE.Vector3(0, 0, 1)
-    .applyQuaternion(camera.quaternion)
-    .normalize()
+  distance *= offset
 
-  camera.position.copy(center).add(direction.multiplyScalar(distance))
+  // Position camera at eye level with 3/4 view angle
+  const angleH = Math.PI / 4
+  
+  const cameraPosition = new THREE.Vector3(
+    center.x + distance * Math.cos(angleH) * 0.9,
+    center.y,
+    center.z + distance * Math.sin(angleH) * 0.9
+  )
+
+  camera.position.copy(cameraPosition)
   camera.lookAt(center)
-  camera.near = distance / 100
-  camera.far = distance * 100
+  
+  // Set reasonable clip planes
+  camera.near = Math.max(0.1, distance / 100)
+  camera.far = Math.max(1000, distance * 100)
   camera.updateProjectionMatrix()
 
-  // If OrbitControls exist, update the target
+  // Update controls
   if (controls) {
     controls.target.copy(center)
     controls.update()
   }
+
+  return { center, radius, distance }
 }
 
 // Loading component
 function Loader() {
+  return (
+    <Html center>
+      <div className="text-center">
+        <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+        <div className="text-sm text-gray-600">Loading 3D Model...</div>
+      </div>
+    </Html>
+  )
+}
+
+// Progress loader component
+function ProgressLoader() {
   const { progress } = useProgress()
   return (
     <Html center>
@@ -54,21 +82,24 @@ function Loader() {
   )
 }
 
-// Model component that handles different file formats
-const Model = React.forwardRef(({ url, format, onCenterChange, controlsRef }, ref) => {
+// Improved Model component with proper centering and one-time initialization
+const Model = React.forwardRef(({ url, format, onModelReady, controlsRef, canvasAspect }, ref) => {
   const meshRef = useRef()
+  const groupRef = useRef()
+  const { camera, scene } = useThree()
   const [error, setError] = useState(null)
   const [model, setModel] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [modelCenter, setModelCenter] = useState([0, 0, 0])
+  const [initialized, setInitialized] = useState(false)
 
-  // Load model asynchronously to avoid re-render issues
+  // Load model
   React.useEffect(() => {
     if (!url || !format) return
 
     setLoading(true)
     setError(null)
-    setModel(null) // Clear previous model
+    setModel(null)
+    setInitialized(false)
 
     const loadModel = async () => {
       try {
@@ -104,89 +135,82 @@ const Model = React.forwardRef(({ url, format, onCenterChange, controlsRef }, re
     }
 
     loadModel()
-
-    // Cleanup function to prevent memory leaks
-    return () => {
-      if (model) {
-        console.log('Cleaning up model')
-        // Don't dispose the model here as it might be used elsewhere
-      }
-    }
   }, [url, format])
 
-  // Expose the model center to parent component (always call this hook)
+  // Expose model data to parent
   React.useImperativeHandle(ref, () => ({
-    getCenter: () => modelCenter
+    getMesh: () => groupRef.current
   }))
 
-  // Auto-rotate the model
+  // Auto-rotate the model around its actual center
   useFrame((state, delta) => {
-    if (meshRef.current && model) {
-      meshRef.current.rotation.y += delta * 0.2
+    if (groupRef.current && model && initialized) {
+      groupRef.current.rotation.y += delta * 0.2
     }
   })
 
-  // Center and scale the model when it loads
+  // Center, scale, and fit camera - ONE TIME when model loads
   React.useEffect(() => {
-    if (model && meshRef.current) {
-      try {
-        console.log('Initializing model positioning...')
-        
-        // Wait a bit for the model to be fully rendered
-        setTimeout(() => {
-          if (meshRef.current) {
-            const box = new THREE.Box3().setFromObject(meshRef.current)
-            const center = box.getCenter(new THREE.Vector3())
-            const size = box.getSize(new THREE.Vector3())
-            
-            console.log('Model bounds:', { center, size })
-            
-            // Center the model at origin
-            meshRef.current.position.sub(center)
-            
-            // Adaptive scaling based on model size
-            const maxDim = Math.max(size.x, size.y, size.z)
-            if (maxDim > 0) {
-              // Use normalized scale factor (2 units max dimension)
-              const scaleFactor = 2 / maxDim
-              meshRef.current.scale.setScalar(scaleFactor)
-              console.log('Model scaled by:', scaleFactor, 'Max dimension:', maxDim)
-            }
-            
-            // Find camera and fit it to the model
-            const parent = meshRef.current.parent
-            const camera = parent?.children.find(obj => obj.isPerspectiveCamera)
-            const controls = controlsRef?.current
-            
-            if (camera) {
-              console.log('Fitting camera to model...')
-              fitCameraToObject(camera, meshRef.current, controls, 1.5)
-              console.log('Camera fitted successfully')
-            }
-            
-            // Store the model center for orbit controls (always at origin after centering)
-            const centerArray = [0, 0, 0] // Model will be centered at origin
-            setModelCenter(centerArray)
-            if (onCenterChange) {
-              onCenterChange(centerArray)
-            }
+    if (model && groupRef.current && !initialized) {
+      console.log('Initializing model positioning...')
+      
+      const initializeModel = () => {
+        try {
+          // Calculate the bounding box and center
+          const box = new THREE.Box3().setFromObject(groupRef.current)
+          const center = box.getCenter(new THREE.Vector3())
+          const size = box.getSize(new THREE.Vector3())
+          
+          console.log('Model bounds:', { center, size })
+          
+          // Calculate the bounding sphere for consistent sizing
+          const sphere = new THREE.Sphere()
+          box.getBoundingSphere(sphere)
+          const radius = sphere.radius
+          
+          // Center the model at origin by offsetting the group
+          groupRef.current.position.x = -center.x
+          groupRef.current.position.y = -center.y
+          groupRef.current.position.z = -center.z
+          
+          // Adaptive scaling - normalize to a reasonable size
+          const targetSize = 2
+          if (radius > 0) {
+            const scaleFactor = targetSize / radius
+            groupRef.current.scale.setScalar(scaleFactor)
+            console.log('Model scaled by:', scaleFactor, 'Radius:', radius)
           }
-        }, 100) // Small delay to ensure model is rendered
-      } catch (err) {
-        console.error('Error initializing model:', err)
+          
+          // Fit camera to the centered and scaled model
+          if (controlsRef?.current) {
+            const scaledRadius = radius * groupRef.current.scale.x
+            console.log('Fitting camera to scaled model, radius:', scaledRadius)
+            
+            fitCameraToObject(camera, groupRef.current, controlsRef.current, canvasAspect, 1.5)
+          }
+          
+          setInitialized(true)
+          
+          if (onModelReady) {
+            onModelReady({
+              center: [0, 0, 0],
+              radius: radius * groupRef.current.scale.x
+            })
+          }
+          
+          console.log('Model initialization complete')
+        } catch (err) {
+          console.error('Error initializing model:', err)
+        }
       }
+
+      // Small delay to ensure everything is ready
+      setTimeout(initializeModel, 100)
     }
-  }, [model, onCenterChange, controlsRef])
+  }, [model, initialized, camera, controlsRef, canvasAspect, onModelReady])
 
   if (loading) {
-    return (
-      <Html center>
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-          <div className="text-sm text-gray-600">Loading 3D Model...</div>
-        </div>
-      </Html>
-    )
+    return <Loader />
   }
 
   if (error) {
@@ -211,35 +235,26 @@ const Model = React.forwardRef(({ url, format, onCenterChange, controlsRef }, re
     )
   }
 
-  if (format.toLowerCase() === 'gltf' || format.toLowerCase() === 'glb') {
-    return (
-      <primitive 
-        ref={meshRef} 
-        object={model.scene} 
-        dispose={null}
-        onUpdate={(self) => {
-          // Ensure the model stays visible
-          if (self && self.visible === false) {
-            self.visible = true
-          }
-        }}
-      />
-    )
-  } else {
-    return (
-      <primitive 
-        ref={meshRef} 
-        object={model} 
-        dispose={null}
-        onUpdate={(self) => {
-          // Ensure the model stays visible
-          if (self && self.visible === false) {
-            self.visible = true
-          }
-        }}
-      />
-    )
-  }
+  // Wrap the model in a group for proper centering and rotation
+  const modelElement = format.toLowerCase() === 'gltf' || format.toLowerCase() === 'glb' ? (
+    <primitive 
+      ref={meshRef} 
+      object={model.scene} 
+      dispose={null}
+    />
+  ) : (
+    <primitive 
+      ref={meshRef} 
+      object={model} 
+      dispose={null}
+    />
+  )
+
+  return (
+    <group ref={groupRef}>
+      {modelElement}
+    </group>
+  )
 })
 
 // Main 3D Viewer Component
@@ -254,14 +269,37 @@ const Model3DViewer = ({
 }) => {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [modelCenter, setModelCenter] = useState([0, 0, 0])
+  const [modelData, setModelData] = useState({ center: [0, 0, 0], radius: 1 })
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
   const modelRef = useRef()
   const controlsRef = useRef()
+  const canvasRef = useRef()
 
-  // Debug logging
+  // Get canvas aspect ratio for proper camera fitting
+  const canvasAspect = canvasSize.width / canvasSize.height
+
+  // Handle model ready event
+  const handleModelReady = (data) => {
+    console.log('Model ready with data:', data)
+    setModelData(data)
+  }
+
+  // Monitor canvas size changes
   React.useEffect(() => {
-    console.log('Model3DViewer props:', { modelUrl, modelFormat, isLoading, error })
-  }, [modelUrl, modelFormat, isLoading, error])
+    const updateSize = () => {
+      if (canvasRef.current) {
+        const rect = canvasRef.current.getBoundingClientRect()
+        setCanvasSize({
+          width: rect.width,
+          height: rect.height
+        })
+      }
+    }
+
+    updateSize()
+    window.addEventListener('resize', updateSize)
+    return () => window.removeEventListener('resize', updateSize)
+  }, [])
 
   if (!modelUrl) {
     return (
@@ -282,33 +320,41 @@ const Model3DViewer = ({
 
   return (
     <div 
+      ref={canvasRef}
       className={`bg-gray-900 rounded-lg overflow-hidden ${className}`}
       style={{ width, height }}
     >
       <Canvas
-        camera={{ position: [0, 0, 2], fov: 50 }}
-        onCreated={() => setIsLoading(false)}
+        camera={{ position: [0, 2, 3], fov: 45 }}
+        onCreated={(state) => {
+          setIsLoading(false)
+          console.log('Canvas created:', state)
+        }}
         onError={(error) => {
           console.error('Canvas error:', error)
           setError('Failed to initialize 3D viewer')
         }}
       >
-        {/* Lighting */}
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[10, 10, 5]} intensity={1} />
-        <pointLight position={[-10, -10, -5]} intensity={0.5} />
+        {/* Improved Lighting */}
+        <ambientLight intensity={0.6} />
+        <directionalLight 
+          position={[5, 5, 5]} 
+          intensity={0.8} 
+        />
+        <pointLight position={[-5, -5, -5]} intensity={0.3} />
         
         {/* Environment */}
         <Environment preset="studio" />
         
-        {/* Model */}
+        {/* Model - handles its own initialization */}
         <Suspense fallback={<Loader />}>
           <Model 
             ref={modelRef}
             url={modelUrl} 
             format={modelFormat}
-            onCenterChange={setModelCenter}
+            onModelReady={handleModelReady}
             controlsRef={controlsRef}
+            canvasAspect={canvasAspect}
           />
         </Suspense>
         
@@ -320,10 +366,10 @@ const Model3DViewer = ({
             enableZoom={true}
             enableRotate={true}
             autoRotate={autoRotate}
-            autoRotateSpeed={0.5}
+            autoRotateSpeed={1}
             minDistance={0.1}
-            maxDistance={100}
-            target={[0, 0, 0]}
+            maxDistance={50}
+            target={modelData.center}
             makeDefault
           />
         )}
@@ -335,6 +381,16 @@ const Model3DViewer = ({
           <div>🖱️ Left click + drag: Rotate</div>
           <div>🖱️ Right click + drag: Pan</div>
           <div>🖱️ Scroll: Zoom</div>
+        </div>
+      )}
+      
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-30">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <div className="text-sm text-gray-300">Loading 3D Model...</div>
+          </div>
         </div>
       )}
       

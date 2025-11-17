@@ -447,6 +447,7 @@ const TestPage = memo(() => {
             {/* Cron Result Display */}
             {cronResult && (
               <div className={`p-4 rounded-lg ${cronResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                <div className="space-y-4">
                 <div className="flex items-start">
                   <div className="flex-shrink-0">
                     {cronResult.success ? (
@@ -461,20 +462,470 @@ const TestPage = memo(() => {
                   </div>
                   <div className="ml-3 flex-1">
                     <h3 className={`text-sm font-medium ${cronResult.success ? 'text-green-800' : 'text-red-800'}`}>
-                      {cronResult.success ? 'Cron Job Success!' : 'Cron Job Error'}
+                        {cronResult.success ? '✅ Cron Job Success!' : '❌ Cron Job Error'}
                     </h3>
                     <p className={`mt-1 text-sm ${cronResult.success ? 'text-green-700' : 'text-red-700'}`}>
                       {cronResult.message}
                     </p>
-                    {cronResult.data && (
-                      <div className="mt-2">
-                        <p className="text-xs text-gray-600 font-medium">Response Data:</p>
-                        <pre className="text-xs bg-gray-100 p-2 rounded mt-1 overflow-auto max-h-64">
+                    </div>
+                  </div>
+
+                  {cronResult.success && cronResult.data && (
+                    <>
+                      {/* Summary Stats */}
+                      <div className="bg-white rounded-lg p-4 border border-gray-200">
+                        <h4 className="font-semibold text-gray-900 mb-3">Run Summary</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                          <div>
+                            <div className="text-gray-600">Date</div>
+                            <div className="text-lg font-bold text-blue-600">{cronResult.data.date || 'N/A'}</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-600">Hour</div>
+                            <div className="text-lg font-bold text-purple-600">{cronResult.data.hour !== undefined ? `${cronResult.data.hour}:00` : 'N/A'}</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-600">Run ID</div>
+                            <div className="text-xs font-mono text-gray-600 break-all">{cronResult.data.run_id?.substring(0, 8)}...</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-600">Time Range</div>
+                            <div className="text-xs text-gray-600">{cronResult.data.timeRange?.hours || 'N/A'} hours</div>
+                          </div>
+                        </div>
+
+                        {/* Events Summary */}
+                        {cronResult.data.events && (
+                          <div className="border-t border-gray-200 pt-4">
+                            <h5 className="font-semibold text-gray-900 mb-2">Events Processed</h5>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                              <div>
+                                <div className="text-gray-600">Total Events</div>
+                                <div className="font-bold text-blue-600">{cronResult.data.events.total || 0}</div>
+                              </div>
+                              <div>
+                                <div className="text-gray-600">Custom Events</div>
+                                <div className="font-bold text-green-600">{cronResult.data.events.custom || 0}</div>
+                              </div>
+                              <div>
+                                <div className="text-gray-600">Lead Events</div>
+                                <div className="font-bold text-orange-600">{cronResult.data.events.lead_events || 0}</div>
+                              </div>
+                              <div>
+                                <div className="text-gray-600">PostHog API Calls</div>
+                                <div className="font-bold text-purple-600">{cronResult.data.posthog?.api_calls || 0}</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Records Processed */}
+                        {cronResult.data.processed && (
+                          <div className="border-t border-gray-200 pt-4 mt-4">
+                            <h5 className="font-semibold text-gray-900 mb-2">Records Processed</h5>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                              <div>
+                                <div className="text-gray-600">Listings</div>
+                                <div className="font-bold text-blue-600">{cronResult.data.processed.listings || 0}</div>
+                              </div>
+                              <div>
+                                <div className="text-gray-600">Users</div>
+                                <div className="font-bold text-green-600">{cronResult.data.processed.users || 0}</div>
+                              </div>
+                              <div>
+                                <div className="text-gray-600">Developments</div>
+                                <div className="font-bold text-purple-600">{cronResult.data.processed.developments || 0}</div>
+                              </div>
+                              <div>
+                                <div className="text-gray-600">Leads</div>
+                                <div className="font-bold text-orange-600">{cronResult.data.processed.leads || 0}</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Records Inserted */}
+                        {cronResult.data.inserted && (
+                          <div className="border-t border-gray-200 pt-4 mt-4">
+                            <h5 className="font-semibold text-gray-900 mb-2">Records Inserted</h5>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                              <div>
+                                <div className="text-gray-600">Listings</div>
+                                <div className={`font-bold ${cronResult.data.inserted.listings?.inserted > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                                  {cronResult.data.inserted.listings?.inserted || 0}
+                                </div>
+                                {cronResult.data.inserted.listings?.errors?.length > 0 && (
+                                  <div className="text-xs text-red-600">{cronResult.data.inserted.listings.errors.length} errors</div>
+                                )}
+                              </div>
+                              <div>
+                                <div className="text-gray-600">Users</div>
+                                <div className={`font-bold ${cronResult.data.inserted.users?.inserted > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                                  {cronResult.data.inserted.users?.inserted || 0}
+                                </div>
+                                {cronResult.data.inserted.users?.errors?.length > 0 && (
+                                  <div className="text-xs text-red-600">{cronResult.data.inserted.users.errors.length} errors</div>
+                                )}
+                              </div>
+                              <div>
+                                <div className="text-gray-600">Developments</div>
+                                <div className={`font-bold ${cronResult.data.inserted.developments?.inserted > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                                  {cronResult.data.inserted.developments?.inserted || 0}
+                                </div>
+                                {cronResult.data.inserted.developments?.errors?.length > 0 && (
+                                  <div className="text-xs text-red-600">{cronResult.data.inserted.developments.errors.length} errors</div>
+                                )}
+                              </div>
+                              <div>
+                                <div className="text-gray-600">Leads</div>
+                                <div className={`font-bold ${cronResult.data.inserted.leads?.inserted > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                                  {cronResult.data.inserted.leads?.inserted || 0}
+                                </div>
+                                {cronResult.data.inserted.leads?.errors?.length > 0 && (
+                                  <div className="text-xs text-red-600">{cronResult.data.inserted.leads.errors.length} errors</div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Event Breakdown */}
+                        {cronResult.data.events?.breakdown && Object.keys(cronResult.data.events.breakdown).length > 0 && (
+                          <div className="border-t border-gray-200 pt-4 mt-4">
+                            <h5 className="font-semibold text-gray-900 mb-2">Event Breakdown</h5>
+                            <div className="space-y-1 max-h-32 overflow-y-auto">
+                              {Object.entries(cronResult.data.events.breakdown).map(([eventName, count]) => (
+                                <div key={eventName} className="flex items-center justify-between text-xs bg-gray-50 p-2 rounded">
+                                  <span className="font-medium text-gray-700">{eventName}</span>
+                                  <span className="font-bold text-blue-600">{count}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Time Range Details */}
+                        {cronResult.data.timeRange && (
+                          <div className="border-t border-gray-200 pt-4 mt-4">
+                            <h5 className="font-semibold text-gray-900 mb-2">Time Range</h5>
+                            <div className="text-xs text-gray-600 space-y-1">
+                              <div><span className="font-medium">Start:</span> {new Date(cronResult.data.timeRange.start).toLocaleString()}</div>
+                              <div><span className="font-medium">End:</span> {new Date(cronResult.data.timeRange.end).toLocaleString()}</div>
+                              <div><span className="font-medium">Duration:</span> {cronResult.data.timeRange.hours} hours</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Conversion Rate Explanation */}
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                        <h4 className="font-semibold text-blue-900 mb-2">📊 Conversion Rate Calculations Explained</h4>
+                        <div className="space-y-2 text-sm text-blue-800">
+                          <div>
+                            <strong>For Listings:</strong>
+                            <ul className="ml-4 mt-1 space-y-1 text-xs">
+                              <li>• <strong>Conversion Rate</strong> = (Total Leads ÷ Total Views) × 100</li>
+                              <li>• <strong>Lead to Sale Rate</strong> = (Total Sales ÷ Total Leads) × 100</li>
+                              <li>Example: 100 views, 5 leads, 1 sale → 5% conversion, 20% lead-to-sale</li>
+                            </ul>
+                          </div>
+                          <div>
+                            <strong>For Users (Developers/Agents):</strong>
+                            <ul className="ml-4 mt-1 space-y-1 text-xs">
+                              <li>• <strong>Overall Conversion Rate</strong> = (Total Leads ÷ Total Views) × 100</li>
+                              <li>• <strong>Total Views</strong> = Listing Views + Profile Views</li>
+                              <li>• <strong>Total Leads</strong> = Listing Leads + Profile Leads</li>
+                              <li>• <strong>View to Lead Rate</strong> = Same as Overall Conversion Rate</li>
+                              <li>• <strong>Lead to Sale Rate</strong> = (Total Sales ÷ Total Leads) × 100</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Listing Analytics Data */}
+                      {cronResult.data?.data?.listing_analytics && cronResult.data.data.listing_analytics.length > 0 && (
+                        <div className="bg-white rounded-lg p-4 border border-gray-200">
+                          <h4 className="font-semibold text-gray-900 mb-3">Listing Analytics Data ({cronResult.data.data.listing_analytics.length} records)</h4>
+                          <div className="space-y-3 max-h-96 overflow-y-auto">
+                            {cronResult.data.data.listing_analytics.slice(0, 10).map((listing, idx) => {
+                              const views = listing.total_views || 0
+                              const leads = listing.total_leads || 0
+                              const sales = listing.total_sales || 0
+                              const conversionRate = listing.conversion_rate || 0
+                              const leadToSaleRate = listing.lead_to_sale_rate || 0
+                              const calculatedConversion = views > 0 ? ((leads / views) * 100).toFixed(2) : '0.00'
+                              const calculatedLeadToSale = leads > 0 ? ((sales / leads) * 100).toFixed(2) : '0.00'
+                              
+                              return (
+                                <div key={idx} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mb-2">
+                                    <div>
+                                      <div className="text-gray-600">Listing ID</div>
+                                      <div className="font-mono text-xs break-all">{listing.listing_id?.substring(0, 12)}...</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-600">Total Views</div>
+                                      <div className="font-bold text-blue-600">{views}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-600">Total Leads</div>
+                                      <div className="font-bold text-green-600">{leads}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-600">Conversion Rate</div>
+                                      <div className="font-bold text-purple-600">{conversionRate}%</div>
+                                      <div className="text-xs text-gray-500 mt-0.5">
+                                        ({leads} ÷ {views}) × 100 = {calculatedConversion}%
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                                    <div>
+                                      <div className="text-gray-600">Unique Views</div>
+                                      <div>{listing.unique_views || 0}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-600">Lead to Sale Rate</div>
+                                      <div className="font-medium">{leadToSaleRate}%</div>
+                                      {leads > 0 && (
+                                        <div className="text-xs text-gray-500 mt-0.5">
+                                          ({sales} ÷ {leads}) × 100 = {calculatedLeadToSale}%
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-600">Total Sales</div>
+                                      <div>{sales}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-600">Sales Value</div>
+                                      <div>${(listing.sales_value || 0).toLocaleString()}</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                            {cronResult.data.data.listing_analytics.length > 10 && (
+                              <div className="text-xs text-gray-500 text-center">
+                                ... and {cronResult.data.data.listing_analytics.length - 10} more listings
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* User Analytics Data */}
+                      {cronResult.data?.data?.user_analytics && cronResult.data.data.user_analytics.length > 0 && (
+                        <div className="bg-white rounded-lg p-4 border border-gray-200">
+                          <h4 className="font-semibold text-gray-900 mb-3">User Analytics Data ({cronResult.data.data.user_analytics.length} records)</h4>
+                          <div className="space-y-3 max-h-96 overflow-y-auto">
+                            {cronResult.data.data.user_analytics.slice(0, 10).map((user, idx) => {
+                              const totalViews = user.total_views || 0
+                              const totalLeads = user.total_leads || 0
+                              const listingViews = user.total_listing_views || 0
+                              const profileViews = user.profile_views || 0
+                              const listingLeads = user.total_listing_leads || 0
+                              const sales = user.total_listing_sales || 0
+                              const overallConversion = user.overall_conversion_rate || 0
+                              const leadToSaleRate = user.lead_to_sale_rate || 0
+                              const calculatedConversion = totalViews > 0 ? ((totalLeads / totalViews) * 100).toFixed(2) : '0.00'
+                              const calculatedLeadToSale = totalLeads > 0 ? ((sales / totalLeads) * 100).toFixed(2) : '0.00'
+                              
+                              return (
+                                <div key={idx} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mb-2">
+                                    <div>
+                                      <div className="text-gray-600">User ID</div>
+                                      <div className="font-mono text-xs break-all">{user.user_id?.substring(0, 12)}...</div>
+                                      <div className="text-gray-500 text-xs mt-1">{user.user_type}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-600">Total Views</div>
+                                      <div className="font-bold text-blue-600">{totalViews}</div>
+                                      <div className="text-xs text-gray-500 mt-0.5">
+                                        Listing: {listingViews} + Profile: {profileViews}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-600">Total Leads</div>
+                                      <div className="font-bold text-green-600">{totalLeads}</div>
+                                      <div className="text-xs text-gray-500 mt-0.5">
+                                        Listing: {listingLeads}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-600">Overall Conversion Rate</div>
+                                      <div className="font-bold text-purple-600">{overallConversion}%</div>
+                                      <div className="text-xs text-gray-500 mt-0.5">
+                                        ({totalLeads} ÷ {totalViews}) × 100 = {calculatedConversion}%
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                                    <div>
+                                      <div className="text-gray-600">Profile Views</div>
+                                      <div>{profileViews}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-600">View to Lead Rate</div>
+                                      <div className="font-medium">{user.view_to_lead_rate || 0}%</div>
+                                      <div className="text-xs text-gray-500 mt-0.5">
+                                        (Same as Overall)
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-600">Lead to Sale Rate</div>
+                                      <div className="font-medium">{leadToSaleRate}%</div>
+                                      {totalLeads > 0 && (
+                                        <div className="text-xs text-gray-500 mt-0.5">
+                                          ({sales} ÷ {totalLeads}) × 100 = {calculatedLeadToSale}%
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-600">Profile to Lead Rate</div>
+                                      <div className="font-medium">{user.profile_to_lead_rate || 0}%</div>
+                                      <div className="text-xs text-gray-500 mt-0.5">
+                                        (Same as Overall)
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="mt-2 text-xs text-gray-500">
+                                    Total Listings: {user.total_listings || 0} | Active: {user.active_listings || 0} | Sold: {user.sold_listings || 0}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                            {cronResult.data.data.user_analytics.length > 10 && (
+                              <div className="text-xs text-gray-500 text-center">
+                                ... and {cronResult.data.data.user_analytics.length - 10} more users
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Development Analytics Data */}
+                      {cronResult.data?.data?.development_analytics && cronResult.data.data.development_analytics.length > 0 && (
+                        <div className="bg-white rounded-lg p-4 border border-gray-200">
+                          <h4 className="font-semibold text-gray-900 mb-3">Development Analytics Data ({cronResult.data.data.development_analytics.length} records)</h4>
+                          <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {cronResult.data.data.development_analytics.slice(0, 5).map((dev, idx) => (
+                              <div key={idx} className="border border-gray-200 rounded-lg p-2 bg-gray-50 text-xs">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                  <div>
+                                    <div className="text-gray-600">Development ID</div>
+                                    <div className="font-mono break-all">{dev.development_id?.substring(0, 12)}...</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-gray-600">Total Views</div>
+                                    <div className="font-bold text-blue-600">{dev.total_views || 0}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-gray-600">Total Leads</div>
+                                    <div className="font-bold text-green-600">{dev.total_leads || 0}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-gray-600">Conversion Rate</div>
+                                    <div className="font-bold text-purple-600">{dev.conversion_rate || 0}%</div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Leads Data */}
+                      {cronResult.data?.data?.leads && cronResult.data.data.leads.length > 0 && (
+                        <div className="bg-white rounded-lg p-4 border border-gray-200">
+                          <h4 className="font-semibold text-gray-900 mb-3">Leads Data ({cronResult.data.data.leads.length} records)</h4>
+                          <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {cronResult.data.data.leads.slice(0, 5).map((lead, idx) => (
+                              <div key={idx} className="border border-gray-200 rounded-lg p-2 bg-gray-50 text-xs">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                  <div>
+                                    <div className="text-gray-600">Listing ID</div>
+                                    <div className="font-mono break-all">{lead.listing_id?.substring(0, 12)}...</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-gray-600">Seeker ID</div>
+                                    <div className="font-mono break-all">{lead.seeker_id?.substring(0, 12)}...</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-gray-600">Total Actions</div>
+                                    <div className="font-bold text-blue-600">{lead.total_actions || 0}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-gray-600">Status</div>
+                                    <div className="font-medium">{lead.status || 'N/A'}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Admin Analytics Data */}
+                      {cronResult.data?.data?.admin_analytics && (
+                        <div className="bg-white rounded-lg p-4 border border-gray-200">
+                          <h4 className="font-semibold text-gray-900 mb-3">Admin Analytics Data (Platform-Wide)</h4>
+                          {(() => {
+                            const adminData = cronResult.data.data.admin_analytics
+                            const totalViews = adminData.views?.total_views || 0
+                            const totalLeads = adminData.leads?.total_leads || 0
+                            const conversionRate = adminData.conversion_rates?.conversion_rate || 0
+                            const leadToSaleRate = adminData.conversion_rates?.lead_to_sale_rate || 0
+                            const calculatedConversion = totalViews > 0 ? ((totalLeads / totalViews) * 100).toFixed(2) : '0.00'
+                            
+                            return (
+                              <div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
+                                  <div>
+                                    <div className="text-gray-600">Total Views</div>
+                                    <div className="font-bold text-blue-600">{totalViews.toLocaleString()}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-gray-600">Total Leads</div>
+                                    <div className="font-bold text-green-600">{totalLeads.toLocaleString()}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-gray-600">Conversion Rate</div>
+                                    <div className="font-bold text-purple-600">{conversionRate}%</div>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      ({totalLeads.toLocaleString()} ÷ {totalViews.toLocaleString()}) × 100 = {calculatedConversion}%
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="text-gray-600">Lead to Sale Rate</div>
+                                    <div className="font-bold text-orange-600">{leadToSaleRate}%</div>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      )}
+
+                      {/* Full Response (Collapsible) */}
+                      <details className="bg-white rounded-lg p-4 border border-gray-200">
+                        <summary className="cursor-pointer font-semibold text-gray-900">View Full Response Data</summary>
+                        <pre className="text-xs bg-gray-100 p-2 rounded mt-2 overflow-auto max-h-96">
+                          {JSON.stringify(cronResult.data, null, 2)}
+                        </pre>
+                      </details>
+                    </>
+                  )}
+
+                  {!cronResult.success && cronResult.data && (
+                    <div className="bg-white rounded-lg p-4 border border-red-200">
+                      <p className="text-sm text-red-700 font-medium">Error Details:</p>
+                      <pre className="text-xs bg-gray-100 p-2 rounded mt-2 overflow-auto max-h-64">
                           {JSON.stringify(cronResult.data, null, 2)}
                         </pre>
                       </div>
                     )}
-                  </div>
                 </div>
               </div>
             )}

@@ -33,21 +33,9 @@ const page = () => {
         {/* Center - Map */}
         <UserMap />
 
-        {/* Right side - Search Properties - Temporarily Disabled */}
-        <div className='absolute z-1000 top-0 border border-primary_color/10 max-w-[500px] right-0 w-full'>
-          <div className="bg-white rounded-2xl shadow-sm p-6 border border-primary_color/10">
-            <h3 className="text-lg font-semibold text-primary_color mb-4">Search Results</h3>
-            <div className="text-center py-8">
-              <p className="text-gray-500 mb-4">Property search is temporarily disabled</p>
-              <p className="text-sm text-gray-400">Filters are working - check the console for filter data</p>
-              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-600 mb-2">Current filters:</p>
-                <pre className="text-xs text-gray-500 overflow-auto max-h-32">
-                  {JSON.stringify(filters, null, 2)}
-                </pre>
-              </div>
-            </div>
-          </div>
+        {/* Right side - Search Properties */}
+        <div className='absolute bg-white/20 backdrop-blur-sm z-1000 top-0 border border-primary_color/10 max-w-[500px] right-0 w-full'>
+          <SearchProperties filters={filters} />
         </div>
       </div>
     </div>

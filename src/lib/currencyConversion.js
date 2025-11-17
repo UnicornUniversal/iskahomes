@@ -171,30 +171,221 @@ export async function processCurrencyConversions({
       timeSpan
     )
 
-    // Get developer's primary currency (for developers only)
+    // Get user's primary currency (for both developers and agents)
     let primaryCurrency = 'USD' // Default to USD
-    if (accountType === 'developer' && userId) {
+    console.log(`🔍 Determining primary currency for userId: ${userId}, accountType: ${accountType}`)
+    
+    if (userId) {
       try {
         const { supabaseAdmin } = await import('@/lib/supabase')
-        const { data: profile } = await supabaseAdmin
+        
+        if (accountType === 'developer') {
+          const { data: profile, error: profileError } = await supabaseAdmin
           .from('developers')
           .select('company_locations, default_currency')
-          .eq('user_id', userId)
+          .eq('developer_id', userId)
           .single()
 
-        if (profile?.company_locations) {
-          const primaryLocation = profile.company_locations.find(
-            loc => loc.primary_location === true
+          if (profileError) {
+            console.error('❌ Error fetching developer profile:', profileError)
+          }
+
+          if (profile) {
+            console.log('📋 Developer profile found:', {
+              hasCompanyLocations: !!profile.company_locations,
+              hasDefaultCurrency: !!profile.default_currency,
+              companyLocationsType: typeof profile.company_locations,
+              defaultCurrencyType: typeof profile.default_currency,
+              defaultCurrencyValue: profile.default_currency
+            })
+            
+            // Parse company_locations if it's a string (JSONB might be returned as string in some cases)
+            let companyLocations = profile.company_locations
+            if (typeof companyLocations === 'string') {
+              try {
+                companyLocations = JSON.parse(companyLocations)
+                console.log('✅ Parsed company_locations from string')
+              } catch (parseError) {
+                console.warn('❌ Failed to parse company_locations as JSON:', parseError)
+                companyLocations = null
+              }
+            }
+
+            // Ensure it's an array (JSONB is usually already an array)
+            if (Array.isArray(companyLocations) && companyLocations.length > 0) {
+              console.log(`📍 Found ${companyLocations.length} company locations`)
+              console.log('📍 Company locations:', JSON.stringify(companyLocations, null, 2))
+              
+              const primaryLocation = companyLocations.find(
+                loc => loc.primary_location === true || loc.primary_location === 'true'
+              )
+              
+              if (primaryLocation) {
+                console.log('✅ Found primary location:', {
+                  currency: primaryLocation.currency,
+                  city: primaryLocation.city,
+                  country: primaryLocation.country,
+                  primary_location: primaryLocation.primary_location
+                })
+                if (primaryLocation?.currency) {
+                  primaryCurrency = primaryLocation.currency
+                  console.log(`✅✅✅ Set primary currency from primary location: ${primaryCurrency}`)
+                } else {
+                  console.warn('⚠️ Primary location found but has no currency field')
+                }
+              } else {
+                console.warn('⚠️ No primary location found in company_locations')
+                console.warn('⚠️ All locations:', companyLocations.map(loc => ({
+                  id: loc.id,
+                  city: loc.city,
+                  primary_location: loc.primary_location,
+                  currency: loc.currency
+                })))
+              }
+            }
+            
+            // ALWAYS check default_currency as fallback if primaryCurrency is still USD
+            // This ensures we use default_currency even if company_locations detection failed
+            if (primaryCurrency === 'USD' && profile.default_currency) {
+              console.log('⚠️ Primary currency is still USD, trying default_currency fallback')
+              let defaultCurrency = profile.default_currency
+              // default_currency is usually already an object (JSONB), but handle string case
+              if (typeof defaultCurrency === 'string') {
+                try {
+                  defaultCurrency = JSON.parse(defaultCurrency)
+                } catch (parseError) {
+                  console.warn('Failed to parse default_currency as JSON:', parseError)
+                }
+              }
+              // default_currency is an object like {code: "GHS", name: "Ghanaian Cedi"}
+              if (defaultCurrency && typeof defaultCurrency === 'object' && defaultCurrency.code) {
+                primaryCurrency = defaultCurrency.code
+                console.log(`✅✅✅ Using default_currency as fallback: ${primaryCurrency}`)
+              } else {
+                console.warn('⚠️ default_currency exists but has no code:', defaultCurrency)
+              }
+            } else if (!Array.isArray(companyLocations) || companyLocations.length === 0) {
+              // Fallback to default_currency if no company_locations array
+              if (profile.default_currency) {
+                console.log('⚠️ No company_locations array, using default_currency')
+                let defaultCurrency = profile.default_currency
+                // default_currency is usually already an object (JSONB)
+                if (typeof defaultCurrency === 'string') {
+                  try {
+                    defaultCurrency = JSON.parse(defaultCurrency)
+                  } catch (parseError) {
+                    console.warn('Failed to parse default_currency as JSON:', parseError)
+                  }
+                }
+                // default_currency is an object like {code: "GHS", name: "Ghanaian Cedi"}
+                if (defaultCurrency && typeof defaultCurrency === 'object' && defaultCurrency.code) {
+                  primaryCurrency = defaultCurrency.code
+                  console.log(`✅✅✅ Using default_currency (no locations): ${primaryCurrency}`)
+                } else {
+                  console.warn('⚠️ default_currency exists but has no code:', defaultCurrency)
+                }
+              } else {
+                console.warn('⚠️ No company_locations or default_currency found, using USD default')
+              }
+            }
+          } else {
+            console.warn('⚠️ Developer profile not found')
+          }
+        } else if (accountType === 'agent') {
+          // For agents, check if they have company_locations or default_currency
+          const { data: profile } = await supabaseAdmin
+            .from('agents')
+            .select('company_locations, default_currency')
+            .eq('developer_id', userId)
+          .single()
+
+          if (profile) {
+            // Parse company_locations if it exists and is a string
+            let companyLocations = profile.company_locations
+            if (companyLocations) {
+              if (typeof companyLocations === 'string') {
+                try {
+                  companyLocations = JSON.parse(companyLocations)
+                } catch (parseError) {
+                  console.warn('Failed to parse agent company_locations as JSON:', parseError)
+                  companyLocations = null
+                }
+              }
+
+              if (Array.isArray(companyLocations) && companyLocations.length > 0) {
+                const primaryLocation = companyLocations.find(
+                  loc => loc.primary_location === true || loc.primary_location === 'true'
           )
           if (primaryLocation?.currency) {
             primaryCurrency = primaryLocation.currency
-          } else if (profile.default_currency?.code) {
-            primaryCurrency = profile.default_currency.code
+                  console.log(`✅ Found agent primary location currency: ${primaryCurrency}`)
+                } else if (primaryLocation) {
+                  console.warn('⚠️ Agent primary location found but has no currency')
+                }
+              }
+            }
+
+            // Fallback to default_currency for agents
+            if (primaryCurrency === 'USD' && profile.default_currency) {
+              let defaultCurrency = profile.default_currency
+              if (typeof defaultCurrency === 'string') {
+                try {
+                  defaultCurrency = JSON.parse(defaultCurrency)
+                } catch (parseError) {
+                  console.warn('Failed to parse agent default_currency as JSON:', parseError)
+                }
+              }
+              if (defaultCurrency?.code) {
+                primaryCurrency = defaultCurrency.code
+                console.log(`✅ Using agent default_currency: ${primaryCurrency}`)
+              }
+            }
           }
         }
       } catch (error) {
-        console.error('Error fetching developer primary currency:', error)
+        console.error('Error fetching user primary currency:', error)
         // Continue with USD default
+      }
+    }
+
+    console.log(`💰 Primary currency determined: ${primaryCurrency} (accountType: ${accountType})`)
+    
+    // FINAL VALIDATION: If we still have USD but have userId, something is wrong
+    // Try one more time to get default_currency as absolute last resort
+    if (primaryCurrency === 'USD' && userId) {
+      console.error('❌❌❌ CRITICAL: Primary currency is still USD after detection!')
+      console.error('❌ Attempting emergency fallback to default_currency...')
+      
+      try {
+        const { supabaseAdmin } = await import('@/lib/supabase')
+        if (accountType === 'developer') {
+          const { data: emergencyProfile } = await supabaseAdmin
+            .from('developers')
+            .select('default_currency')
+            .eq('developer_id', userId)
+            .single()
+          
+          if (emergencyProfile?.default_currency) {
+            let emergencyCurrency = emergencyProfile.default_currency
+            // default_currency is usually already an object (JSONB)
+            if (typeof emergencyCurrency === 'string') {
+              try {
+                emergencyCurrency = JSON.parse(emergencyCurrency)
+              } catch (e) {
+                // Ignore parse error
+              }
+            }
+            // default_currency is an object like {code: "GHS", name: "Ghanaian Cedi"}
+            if (emergencyCurrency && typeof emergencyCurrency === 'object' && emergencyCurrency.code && emergencyCurrency.code !== 'USD') {
+              primaryCurrency = emergencyCurrency.code
+              console.error(`✅✅✅ EMERGENCY FALLBACK: Using default_currency ${primaryCurrency}`)
+            } else {
+              console.error('❌ Emergency fallback failed - default_currency has no valid code:', emergencyCurrency)
+            }
+          }
+        }
+      } catch (emergencyError) {
+        console.error('❌ Emergency fallback also failed:', emergencyError)
       }
     }
 
@@ -205,43 +396,71 @@ export async function processCurrencyConversions({
     ])
 
     // Convert to primary currency (for estimated_revenue)
-    let primaryPrice = usdPrice
-    let primaryEstimatedRevenue = usdEstimatedRevenue
+    // If listing currency is already the primary currency, no conversion needed
+    let primaryPrice = price
+    let primaryEstimatedRevenue = originalEstimatedRevenue
     let primaryRate = 1
 
-    if (primaryCurrency !== 'USD') {
+    if (currency === primaryCurrency) {
+      // Listing currency matches primary currency - no conversion needed
+      primaryPrice = price
+      primaryEstimatedRevenue = originalEstimatedRevenue
+      primaryRate = 1
+      console.log(`✅ Listing currency (${currency}) matches primary currency - no conversion needed`)
+    } else if (primaryCurrency !== 'USD') {
+      // Convert from listing currency to primary currency
+      console.log(`🔄 Converting from ${currency} to ${primaryCurrency}...`)
       primaryPrice = await convertCurrency(price, currency, primaryCurrency)
       primaryEstimatedRevenue = await convertCurrency(
         originalEstimatedRevenue,
         currency,
         primaryCurrency
       )
+      console.log(`✅ Converted: ${price} ${currency} → ${primaryPrice} ${primaryCurrency}`)
+      console.log(`✅ Estimated revenue: ${originalEstimatedRevenue} ${currency} → ${primaryEstimatedRevenue} ${primaryCurrency}`)
     } else {
       // If primary is USD, use the USD conversion we already did
       primaryPrice = usdPrice
       primaryEstimatedRevenue = usdEstimatedRevenue
+      console.log(`✅ Using USD conversion for primary currency`)
     }
 
     // Get exchange rates for audit trail
     const [usdRate, primaryRateObj] = await Promise.all([
       fetchExchangeRate(currency, 'USD'),
-      primaryCurrency !== 'USD' ? fetchExchangeRate(currency, primaryCurrency) : Promise.resolve(1)
+      currency === primaryCurrency 
+        ? Promise.resolve(1) 
+        : (primaryCurrency !== 'USD' 
+          ? fetchExchangeRate(currency, primaryCurrency) 
+          : Promise.resolve(1))
     ])
 
-    // Build estimated_revenue JSONB
+    // Build estimated_revenue JSONB - MUST be in primary currency
     const estimatedRevenue = {
-      currency: primaryCurrency,
+      currency: primaryCurrency, // This MUST be the user's primary location currency, NOT USD
       price: parseFloat(primaryPrice.toFixed(2)),
       estimated_revenue: parseFloat(primaryEstimatedRevenue.toFixed(2)),
       exchange_rate: parseFloat(primaryRateObj.toFixed(6))
     }
 
-    // Build global_price JSONB
+    // Build global_price JSONB - MUST be in USD
     const globalPrice = {
-      currency: 'USD',
+      currency: 'USD', // Always USD for global_price
       price: parseFloat(usdPrice.toFixed(2)),
       estimated_revenue: parseFloat(usdEstimatedRevenue.toFixed(2)),
       exchange_rate: parseFloat(usdRate.toFixed(6))
+    }
+
+    console.log(`📊 Currency conversion results:`)
+    console.log(`   Primary currency detected: ${primaryCurrency}`)
+    console.log(`   Listing currency: ${currency}`)
+    console.log(`   estimated_revenue: ${estimatedRevenue.estimated_revenue} ${estimatedRevenue.currency} (SHOULD BE PRIMARY CURRENCY)`)
+    console.log(`   global_price: ${globalPrice.estimated_revenue} ${globalPrice.currency} (SHOULD BE USD)`)
+    
+    // CRITICAL CHECK: If primaryCurrency is still USD but we have a userId, something went wrong
+    if (primaryCurrency === 'USD' && userId) {
+      console.error('⚠️⚠️⚠️ WARNING: Primary currency is USD but userId exists! This means detection failed!')
+      console.error('⚠️ This should NOT happen if company_locations or default_currency is set correctly')
     }
 
     return {
@@ -249,11 +468,73 @@ export async function processCurrencyConversions({
       global_price: globalPrice
     }
   } catch (error) {
-    console.error('Error processing currency conversions:', error)
-    // Return empty objects on error
+    console.error('❌ Error processing currency conversions:', error)
+    console.error('❌ Error details:', {
+      message: error.message,
+      stack: error.stack,
+      price,
+      currency,
+      priceType,
+      idealDuration,
+      timeSpan,
+      userId,
+      accountType
+    })
+    
+    // Calculate estimated revenue even on error (fallback)
+    const fallbackEstimatedRevenue = calculateEstimatedRevenue(price, priceType, idealDuration, timeSpan)
+    
+    // Try to get primary currency as fallback
+    let fallbackPrimaryCurrency = 'USD'
+    try {
+      if (userId) {
+        const { supabaseAdmin } = await import('@/lib/supabase')
+        if (accountType === 'developer') {
+          const { data: profile } = await supabaseAdmin
+            .from('developers')
+            .select('company_locations, default_currency')
+            .eq('developer_id', userId)
+            .single()
+          
+          if (profile) {
+            let companyLocations = profile.company_locations
+            if (typeof companyLocations === 'string') {
+              companyLocations = JSON.parse(companyLocations)
+            }
+            if (Array.isArray(companyLocations)) {
+              const primaryLocation = companyLocations.find(loc => loc.primary_location === true)
+              if (primaryLocation?.currency) {
+                fallbackPrimaryCurrency = primaryLocation.currency
+              } else if (profile.default_currency) {
+                const defaultCurrency = typeof profile.default_currency === 'string' 
+                  ? JSON.parse(profile.default_currency) 
+                  : profile.default_currency
+                if (defaultCurrency?.code) {
+                  fallbackPrimaryCurrency = defaultCurrency.code
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (fallbackError) {
+      console.error('❌ Error getting fallback primary currency:', fallbackError)
+    }
+    
+    // Return fallback values instead of empty objects
     return {
-      estimated_revenue: {},
-      global_price: {}
+      estimated_revenue: {
+        currency: fallbackPrimaryCurrency,
+        price: parseFloat(price.toFixed(2)),
+        estimated_revenue: parseFloat(fallbackEstimatedRevenue.toFixed(2)),
+        exchange_rate: currency === fallbackPrimaryCurrency ? 1 : null
+      },
+      global_price: {
+        currency: 'USD',
+        price: null, // Can't convert without exchange rate
+        estimated_revenue: null,
+        exchange_rate: null
+      }
     }
   }
 }

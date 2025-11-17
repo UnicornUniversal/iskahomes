@@ -6,7 +6,7 @@ const cache = new Map()
 const cacheTimestamps = new Map()
 const pendingRequests = new Map() // Track pending requests to prevent duplicates
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes (for non-Redis data)
-const REDIS_CACHE_DURATION = 10 * 1000 // 10 seconds (very short cache for Redis-backed data since Redis is already caching)
+const REDIS_CACHE_DURATION = 30 * 60 * 1000 // 30 minutes (Redis-backed data - cache longer since Redis is already caching server-side)
 
 // Custom hook for cached data fetching
 export function useCachedData(key, fetchFunction, dependencies = []) {
@@ -110,64 +110,225 @@ export function useCachedData(key, fetchFunction, dependencies = []) {
   }
 }
 
-// SUPER SIMPLE - Just fetch from API, NO caching, NO complexity
+// Optimized API hook with proper client-side caching
 function useCachedDataAPI(type) {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const cacheKey = `api-cached-${type}` // Unique cache key for this type
 
+  // Check cache first
   useEffect(() => {
-    let cancelled = false
-    
-    setLoading(true)
-    setError(null)
+    const cachedData = cache.get(cacheKey)
+    const cacheTimestamp = cacheTimestamps.get(cacheKey)
+    const now = Date.now()
 
-    fetch(`/api/cached-data?type=${type}`)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-        return response.json()
-      })
-      .then(result => {
-        if (!cancelled) {
-          setData(result.data || [])
+    // If we have valid cached data, use it immediately
+    if (cachedData && cacheTimestamp && (now - cacheTimestamp) < REDIS_CACHE_DURATION) {
+      console.log(`✅ Using cached data for ${type} (age: ${Math.round((now - cacheTimestamp) / 1000)}s)`)
+      setData(cachedData)
+      setLoading(false)
+      return // Don't fetch if we have valid cache
+    }
+
+    // Check if there's already a pending request for this type
+    if (pendingRequests.has(cacheKey)) {
+      console.log(`⏳ Waiting for pending request for ${type}`)
+      const pendingPromise = pendingRequests.get(cacheKey)
+      pendingPromise
+        .then(result => {
+          setData(result)
           setLoading(false)
-        }
-      })
-      .catch(err => {
-        if (!cancelled) {
-          console.error(`Error fetching ${type}:`, err)
+        })
+        .catch(err => {
           setError(err)
           setData([])
           setLoading(false)
-        }
-      })
-
-    return () => {
-      cancelled = true
+        })
+      return
     }
-  }, [type])
+
+    // Create a new request promise
+    const requestPromise = (async () => {
+      setLoading(true)
+      setError(null)
+
+      try {
+        console.log(`📡 Fetching ${type} from API...`)
+        const response = await fetch(`/api/cached-data?type=${type}`)
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        
+        const result = await response.json()
+        const fetchedData = result.data || []
+        
+        // Cache the result
+        cache.set(cacheKey, fetchedData)
+        cacheTimestamps.set(cacheKey, Date.now())
+        console.log(`💾 Cached ${type} (${fetchedData.length} items)`)
+        
+        setData(fetchedData)
+        setLoading(false)
+        
+        return fetchedData
+      } catch (err) {
+        console.error(`❌ Error fetching ${type}:`, err)
+        setError(err)
+        setData([])
+        setLoading(false)
+        throw err
+      } finally {
+        // Remove from pending requests
+        pendingRequests.delete(cacheKey)
+      }
+    })()
+
+    // Store the promise to prevent duplicate requests
+    pendingRequests.set(cacheKey, requestPromise)
+  }, [type, cacheKey])
 
   const refresh = useCallback(async () => {
+    // Invalidate cache and force refresh
+    cache.delete(cacheKey)
+    cacheTimestamps.delete(cacheKey)
+    pendingRequests.delete(cacheKey)
+    
     setLoading(true)
     setError(null)
     
     try {
+      console.log(`🔄 Force refreshing ${type}...`)
       const response = await fetch(`/api/cached-data?type=${type}`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       const result = await response.json()
-      setData(result.data || [])
+      const fetchedData = result.data || []
+      
+      // Update cache
+      cache.set(cacheKey, fetchedData)
+      cacheTimestamps.set(cacheKey, Date.now())
+      
+      setData(fetchedData)
     } catch (err) {
-      console.error(`Error fetching ${type}:`, err)
+      console.error(`Error refreshing ${type}:`, err)
       setError(err)
       setData([])
     } finally {
       setLoading(false)
     }
-  }, [type])
+  }, [type, cacheKey])
+
+  return { data, loading, error, refresh }
+}
+
+// Hook to fetch all static data at once (more efficient than individual calls)
+export function useAllStaticData() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const cacheKey = 'api-cached-all'
+
+  useEffect(() => {
+    const cachedData = cache.get(cacheKey)
+    const cacheTimestamp = cacheTimestamps.get(cacheKey)
+    const now = Date.now()
+
+    // If we have valid cached data, use it immediately
+    if (cachedData && cacheTimestamp && (now - cacheTimestamp) < REDIS_CACHE_DURATION) {
+      console.log(`✅ Using cached all data (age: ${Math.round((now - cacheTimestamp) / 1000)}s)`)
+      setData(cachedData)
+      setLoading(false)
+      return
+    }
+
+    // Check if there's already a pending request
+    if (pendingRequests.has(cacheKey)) {
+      console.log(`⏳ Waiting for pending all data request`)
+      const pendingPromise = pendingRequests.get(cacheKey)
+      pendingPromise
+        .then(result => {
+          setData(result)
+          setLoading(false)
+        })
+        .catch(err => {
+          setError(err)
+          setData(null)
+          setLoading(false)
+        })
+      return
+    }
+
+    // Create a new request promise
+    const requestPromise = (async () => {
+      setLoading(true)
+      setError(null)
+
+      try {
+        console.log(`📡 Fetching all static data from API...`)
+        const response = await fetch(`/api/cached-data?type=all`)
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        
+        const result = await response.json()
+        const fetchedData = result.data || {}
+        
+        // Cache the result
+        cache.set(cacheKey, fetchedData)
+        cacheTimestamps.set(cacheKey, Date.now())
+        console.log(`💾 Cached all static data`)
+        
+        setData(fetchedData)
+        setLoading(false)
+        
+        return fetchedData
+      } catch (err) {
+        console.error(`❌ Error fetching all data:`, err)
+        setError(err)
+        setData(null)
+        setLoading(false)
+        throw err
+      } finally {
+        pendingRequests.delete(cacheKey)
+      }
+    })()
+
+    pendingRequests.set(cacheKey, requestPromise)
+  }, [cacheKey])
+
+  const refresh = useCallback(async () => {
+    cache.delete(cacheKey)
+    cacheTimestamps.delete(cacheKey)
+    pendingRequests.delete(cacheKey)
+    
+    setLoading(true)
+    setError(null)
+    
+    try {
+      console.log(`🔄 Force refreshing all data...`)
+      const response = await fetch(`/api/cached-data?type=all`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const result = await response.json()
+      const fetchedData = result.data || {}
+      
+      cache.set(cacheKey, fetchedData)
+      cacheTimestamps.set(cacheKey, Date.now())
+      
+      setData(fetchedData)
+    } catch (err) {
+      console.error(`Error refreshing all data:`, err)
+      setError(err)
+      setData(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [cacheKey])
 
   return { data, loading, error, refresh }
 }

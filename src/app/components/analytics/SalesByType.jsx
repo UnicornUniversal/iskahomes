@@ -1,5 +1,5 @@
 'use client'
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Pie } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -23,13 +23,53 @@ const pieColors = [
 ]
 
 const SalesByType = ({ listerId }) => {
-  // Dummy data for sales by type
-  const salesByTypeData = [
-    { name: 'Apartments', count: 18 },
-    { name: 'Houses', count: 15 },
-    { name: 'Townhouses', count: 8 },
-    { name: 'Condos', count: 6 }
-  ]
+  const [salesByTypeData, setSalesByTypeData] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch(`/api/sales/summary?slug=${listerId}`)
+        const result = await response.json()
+        
+        if (result.success && result.data?.summary?.by_type_property) {
+          const typeData = Object.values(result.data.summary.by_type_property)
+            .map(item => ({
+              name: item.name || 'Unknown',
+              count: item.count || 0
+            }))
+            .filter(item => item.count > 0)
+            .sort((a, b) => b.count - a.count)
+          
+          setSalesByTypeData(typeData)
+        }
+      } catch (error) {
+        console.error('Error fetching sales by type:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (listerId) {
+      fetchData()
+    }
+  }, [listerId])
+
+  if (loading) {
+    return (
+      <div className="p-4 sm:p-6 bg-white rounded-2xl shadow-xl flex items-center justify-center" style={{ minHeight: '300px' }}>
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    )
+  }
+
+  if (salesByTypeData.length === 0) {
+    return (
+      <div className="p-4 sm:p-6 bg-white rounded-2xl shadow-xl flex items-center justify-center" style={{ minHeight: '300px' }}>
+        <div className="text-gray-500">No sales data available</div>
+      </div>
+    )
+  }
 
   const total = salesByTypeData.reduce((sum, item) => sum + item.count, 0)
   const pieLabels = salesByTypeData.map(item => item.name)
@@ -98,7 +138,9 @@ const SalesByType = ({ listerId }) => {
                 style={{ width: 12, height: 12, background: pieColors[i], boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}
               ></span>
               <span className="text-xs font-semibold text-gray-800 flex-1" style={{ fontFamily: 'Poppins, sans-serif' }}>{label}</span>
-              <span className="text-xs font-bold flex-shrink-0" style={{ color: pieColors[i], fontFamily: 'Poppins, sans-serif' }}>{percentages[i]}%</span>
+              <span className="text-xs font-bold flex-shrink-0" style={{ color: pieColors[i], fontFamily: 'Poppins, sans-serif' }}>
+                {pieData[i]} ({percentages[i]}%)
+              </span>
             </div>
           ))}
         </div>

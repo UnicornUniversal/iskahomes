@@ -47,7 +47,8 @@ const DevelopmentPage = () => {
           if (data.data.development) {
             analytics.trackDevelopmentView(data.data.development.id, {
               viewedFrom: 'development_page',
-              developerId: data.data.development.developers?.developer_id,
+              lister_id: data.data.development.developers?.developer_id,
+              lister_type: 'developer',
               location: {
                 city: data.data.development.city,
                 state: data.data.development.state
@@ -78,11 +79,11 @@ const DevelopmentPage = () => {
   const handlePhoneClick = async (phoneNumber, context = 'development') => {
     try {
       await navigator.clipboard.writeText(phoneNumber)
-      analytics.trackPhoneInteraction('click', {
-        contextType: context,
-        listingId: development?.id,
+      // Track as development lead (not listing lead)
+      analytics.trackDevelopmentLead(development?.id, 'phone', {
         lister_id: developer?.developer_id,
         lister_type: 'developer',
+        contactMethod: 'phone',
         phoneNumber: phoneNumber
       })
       toast.success('Phone number copied!')
@@ -95,12 +96,11 @@ const DevelopmentPage = () => {
   const handleEmailClick = async (email, context = 'development') => {
     try {
       await navigator.clipboard.writeText(email)
-    analytics.trackMessageClick({
-        contextType: context,
-        listingId: development?.id,
-      lister_id: developer?.developer_id,
-      lister_type: 'developer',
-        messageType: 'email'
+      // Track as development lead (not listing lead)
+      analytics.trackDevelopmentLead(development?.id, 'email', {
+        lister_id: developer?.developer_id,
+        lister_type: 'developer',
+        contactMethod: 'email'
       })
       toast.success('Email copied!')
     } catch (error) {
@@ -110,37 +110,38 @@ const DevelopmentPage = () => {
   }
 
   const handleWebsiteClick = (websiteUrl, context = 'development') => {
-    analytics.trackWebsiteClick(websiteUrl, {
-      contextType: context,
-      listingId: development?.id,
+    // Track as development interaction (website visit)
+    analytics.trackDevelopmentInteraction(development?.id, 'website_visit', {
       lister_id: developer?.developer_id,
-      lister_type: 'developer'
+      lister_type: 'developer',
+      websiteUrl: websiteUrl
     })
   }
 
   const handleSocialMediaClick = (platform, url, context = 'development') => {
-    analytics.trackSocialMediaClick(platform, {
-      contextType: context,
-      listingId: development?.id,
+    // Track as development interaction (social media click)
+    analytics.trackDevelopmentInteraction(development?.id, 'social_media_click', {
       lister_id: developer?.developer_id,
-      lister_type: 'developer'
+      lister_type: 'developer',
+      platform: platform,
+      url: url
     })
   }
 
   const handleMessageClick = () => {
-    analytics.trackMessageClick({
-      contextType: 'development',
-      listingId: development?.id,
+    // Track as development lead (message)
+    analytics.trackDevelopmentLead(development?.id, 'message', {
       lister_id: developer?.developer_id,
       lister_type: 'developer',
-      messageType: 'direct_message'
+      contactMethod: 'direct_message'
     })
   }
 
   const handleRelatedDevelopmentClick = (relatedDevelopment) => {
     analytics.trackDevelopmentView(relatedDevelopment.id, {
       viewedFrom: 'development_page',
-      developerId: developer?.developer_id,
+      lister_id: developer?.developer_id,
+      lister_type: 'developer',
       location: {
         city: relatedDevelopment.city,
         state: relatedDevelopment.state
@@ -151,8 +152,7 @@ const DevelopmentPage = () => {
   const handleUnitClick = (unit) => {
     analytics.trackPropertyView(unit.id, {
       viewedFrom: 'development_page',
-      lister_id: developer?.developer_id,
-      lister_type: 'developer',
+      listing: unit, // Pass full listing object so lister_id can be extracted
       listingType: unit.listing_type
     })
   }

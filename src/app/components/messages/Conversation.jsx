@@ -13,7 +13,9 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
   const [messages, setMessages] = useState([]);
   const [conversation, setConversation] = useState(conversationData || null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [sending, setSending] = useState(false);
+  const [pagination, setPagination] = useState({ hasMore: false, offset: 0, limit: 50 });
   const scrollRef = useRef(null);
   const { user, developerToken, propertySeekerToken } = useAuth();
 
@@ -21,40 +23,26 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
   const token = user?.user_type === 'developer' ? developerToken : propertySeekerToken;
   const currentUserId = user?.id || user?.profile?.developer_id;
 
-
-  // Fetch conversation details
+  // Use conversationData from props if available, otherwise keep existing state
   useEffect(() => {
-    const fetchConversation = async () => {
-      if (!selectedChatId || !token) return;
-
-      try {
-        const response = await fetch(`/api/conversations/${selectedChatId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setConversation(data.conversation);
-        }
-      } catch (error) {
-        console.error('Error fetching conversation:', error);
-      }
-    };
-
-    fetchConversation();
-  }, [selectedChatId, token]);
+    if (conversationData) {
+      setConversation(conversationData);
+    }
+  }, [conversationData]);
 
   // Fetch messages and subscribe to realtime updates
   useEffect(() => {
     if (!selectedChatId || !token) return;
 
-    const fetchMessages = async () => {
-      setLoading(true);
+    const fetchMessages = async (offset = 0, limit = 50, isLoadMore = false) => {
+      if (isLoadMore) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+
       try {
-        const response = await fetch(`/api/messages?conversation_id=${selectedChatId}`, {
+        const response = await fetch(`/api/messages?conversation_id=${selectedChatId}&limit=${limit}&offset=${offset}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -63,26 +51,57 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
 
         if (response.ok) {
           const data = await response.json();
-          setMessages(data.messages || []);
+          const newMessages = data.messages || [];
           
-          // Mark conversation as read
-          await fetch(`/api/conversations/${selectedChatId}/read`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
+          if (isLoadMore) {
+            // Prepend older messages (they come in reverse chronological order)
+            setMessages(prev => [...newMessages.reverse(), ...prev]);
+          } else {
+            // Initial load - reverse to show oldest first
+            setMessages(newMessages.reverse());
+          }
+          
+          // Update pagination state
+          setPagination({
+            hasMore: data.pagination?.hasMore || false,
+            offset: offset + newMessages.length,
+            limit
           });
+          
+          // Mark conversation as read (only on initial load)
+          if (!isLoadMore) {
+            try {
+              const readResponse = await fetch(`/api/conversations/${selectedChatId}/read`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              if (readResponse.ok) {
+                // Trigger conversation list refresh (debounced in Chats component)
+                window.dispatchEvent(new CustomEvent('refreshConversations'));
+              }
+            } catch (readError) {
+              console.error('Error marking conversation as read:', readError);
+            }
+          }
         }
       } catch (error) {
         console.error('Error fetching messages:', error);
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     };
 
+    // Reset state when conversation changes
+    setMessages([]);
+    setPagination({ hasMore: false, offset: 0, limit: 50 });
+
     // Initial fetch
-    fetchMessages();
+    fetchMessages(0, 50, false);
 
     // Subscribe to realtime messages
     const channel = supabase
@@ -99,9 +118,58 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
           console.log('💬 Realtime message event:', payload);
           
           if (payload.eventType === 'INSERT') {
-            // New message added
+            // New message added - append to end (most recent)
             console.log('📨 New message received:', payload.new);
-            setMessages(prev => [...prev, payload.new]);
+            // Need to fetch sender name for new message
+            const fetchSenderName = async () => {
+              try {
+                let senderName = 'User';
+                let senderImage = null;
+                
+                if (payload.new.sender_type === 'property_seeker') {
+                  const { data } = await supabase
+                    .from('property_seekers')
+                    .select('id, name, profile_picture')
+                    .eq('id', payload.new.sender_id)
+                    .single();
+                  if (data) {
+                    senderName = data.name || 'Property Seeker';
+                    senderImage = data.profile_picture;
+                  }
+                } else if (payload.new.sender_type === 'developer') {
+                  const { data } = await supabase
+                    .from('developers')
+                    .select('developer_id, name, profile_image')
+                    .eq('developer_id', payload.new.sender_id)
+                    .single();
+                  if (data) {
+                    senderName = data.name || 'Developer';
+                    senderImage = data.profile_image;
+                  }
+                } else if (payload.new.sender_type === 'agent') {
+                  const { data } = await supabase
+                    .from('agents')
+                    .select('agent_id, name, profile_image')
+                    .eq('agent_id', payload.new.sender_id)
+                    .single();
+                  if (data) {
+                    senderName = data.name || 'Agent';
+                    senderImage = data.profile_image;
+                  }
+                }
+                
+                setMessages(prev => [...prev, {
+                  ...payload.new,
+                  sender_name: senderName,
+                  sender_profile_image: senderImage
+                }]);
+              } catch (err) {
+                console.error('Error fetching sender name:', err);
+                setMessages(prev => [...prev, payload.new]);
+              }
+            };
+            
+            fetchSenderName();
           } else if (payload.eventType === 'UPDATE') {
             // Message updated (e.g., edited)
             console.log('✏️ Message updated:', payload.new);
@@ -134,12 +202,75 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
     };
   }, [selectedChatId, token]);
 
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  // Load more messages when scrolling to top
+  const handleScroll = () => {
+    if (!scrollRef.current || loadingMore || !pagination.hasMore) return;
+
+    const { scrollTop } = scrollRef.current;
+    // Load more when user scrolls within 200px of the top
+    if (scrollTop < 200) {
+      loadMoreMessages();
     }
-  }, [messages]);
+  };
+
+  const loadMoreMessages = async () => {
+    if (loadingMore || !pagination.hasMore || !selectedChatId || !token) return;
+
+    setLoadingMore(true);
+    const previousScrollHeight = scrollRef.current?.scrollHeight || 0;
+    
+    try {
+      // Fetch next page
+      const response = await fetch(`/api/messages?conversation_id=${selectedChatId}&limit=${pagination.limit}&offset=${pagination.offset}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const newMessages = (data.messages || []).reverse(); // Reverse to show oldest first
+        
+        if (newMessages.length > 0) {
+          // Prepend older messages
+          setMessages(prev => [...newMessages, ...prev]);
+          
+          // Update pagination
+          setPagination({
+            hasMore: data.pagination?.hasMore || false,
+            offset: pagination.offset + newMessages.length,
+            limit: pagination.limit
+          });
+
+          // Restore scroll position after loading (prevent jump)
+          setTimeout(() => {
+            if (scrollRef.current) {
+              const newScrollHeight = scrollRef.current.scrollHeight;
+              scrollRef.current.scrollTop = newScrollHeight - previousScrollHeight;
+            }
+          }, 0);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading more messages:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Auto-scroll to bottom only on initial load or new message
+  useEffect(() => {
+    if (scrollRef.current && !loadingMore) {
+      // Only auto-scroll if we're near the bottom (within 100px)
+      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      
+      if (isNearBottom || messages.length <= pagination.limit) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    }
+  }, [messages.length]); // Only trigger on message count change, not on every render
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedChatId || sending) return;
@@ -274,7 +405,12 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4" ref={scrollRef} style={{ minHeight: 0 }}>
+      <div 
+        className="flex-1 overflow-y-auto p-4" 
+        ref={scrollRef} 
+        style={{ minHeight: 0 }}
+        onScroll={handleScroll}
+      >
         {loading && messages.length === 0 ? (
           <div className="space-y-4">
             {/* Skeleton Loaders for Messages */}
@@ -301,8 +437,25 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
           </div>
         ) : (
           <div className="space-y-4">
+            {pagination.hasMore && (
+              <div className="flex justify-center py-2">
+                {loadingMore ? (
+                  <p className="text-sm text-gray-500">Loading older messages...</p>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadMoreMessages}
+                    className="text-sm"
+                  >
+                    Load Older Messages
+                  </Button>
+                )}
+              </div>
+            )}
             {messages.map((message) => {
               const isMine = message.sender_id === currentUserId && message.sender_type === user?.user_type;
+              const senderName = message.sender_name || 'User';
               
               return (
                 <div
@@ -312,9 +465,9 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
                   <div className={`flex max-w-xs md:max-w-md lg:max-w-2xl ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
                     {!isMine && (
                       <Avatar className="h-8 w-8 mt-1 flex-shrink-0">
-                        <AvatarImage src={getOtherUserImage()} alt={getOtherUserName()} />
+                        <AvatarImage src={message.sender_profile_image || getOtherUserImage()} alt={senderName} />
                         <AvatarFallback>
-                          {getOtherUserName().split(' ').map(n => n[0]).join('')}
+                          {senderName.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
                         </AvatarFallback>
                       </Avatar>
                     )}
@@ -326,6 +479,11 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
                       }`}
                       style={{ wordBreak: 'break-word' }}
                     >
+                      {!isMine && (
+                        <p className={`text-xs font-medium mb-1 ${'text-gray-600'}`}>
+                          {senderName}
+                        </p>
+                      )}
                       <p className={`text-sm break-words ${isMine ? '!text-white' : 'text-gray-900'}`}>
                         {message.message_text}
                       </p>

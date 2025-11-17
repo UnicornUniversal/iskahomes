@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { verifyToken } from '@/lib/jwt';
 
 // GET all messages in a conversation
@@ -41,14 +41,29 @@ export async function GET(request) {
       );
     }
 
-    // Verify user is part of this conversation
-    const { data: conversation } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('id', conversationId)
-      .single();
+    // Verify user is part of this conversation and fetch messages in parallel
+    const [conversationResult, messagesResult] = await Promise.all([
+      // Check conversation and authorization
+      supabaseAdmin
+        .from('conversations')
+        .select('user1_id, user1_type, user2_id, user2_type')
+        .eq('id', conversationId)
+        .single(),
+      
+      // Fetch messages (we'll verify authorization after)
+      supabaseAdmin
+        .from('messages')
+        .select('*', { count: 'exact' })
+        .eq('conversation_id', conversationId)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1)
+    ])
 
-    if (!conversation) {
+    const { data: conversation, error: convError } = conversationResult
+    const { data: messages, error, count } = messagesResult
+
+    if (convError || !conversation) {
       return NextResponse.json(
         { error: 'Conversation not found' },
         { status: 404 }
@@ -66,15 +81,6 @@ export async function GET(request) {
       );
     }
 
-    // Fetch messages with pagination
-    const { data: messages, error, count } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact' })
-      .eq('conversation_id', conversationId)
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: false }) // Most recent first for pagination
-      .range(offset, offset + limit - 1);
-
     if (error) {
       console.error('Error fetching messages:', error);
       return NextResponse.json(
@@ -83,8 +89,84 @@ export async function GET(request) {
       );
     }
 
+    // Get unique sender IDs and types to fetch their names
+    const senderIdsByType = {
+      property_seeker: [],
+      developer: [],
+      agent: []
+    }
+
+    // Group sender IDs by type
+    messages?.forEach(msg => {
+      if (msg.sender_type && msg.sender_id) {
+        if (!senderIdsByType[msg.sender_type]?.includes(msg.sender_id)) {
+          if (senderIdsByType[msg.sender_type]) {
+            senderIdsByType[msg.sender_type].push(msg.sender_id)
+          }
+        }
+      }
+    })
+
+    const sendersMap = {}
+
+    // Batch fetch all senders of each type in parallel (much faster!)
+    const [seekersData, developersData, agentsData] = await Promise.all([
+      // Fetch all property seekers at once
+      senderIdsByType.property_seeker.length > 0
+        ? supabase
+            .from('property_seekers')
+            .select('id, name, profile_picture')
+            .in('id', senderIdsByType.property_seeker)
+        : { data: [] },
+      
+      // Fetch all developers at once
+      senderIdsByType.developer.length > 0
+        ? supabase
+            .from('developers')
+            .select('developer_id, name, profile_image')
+            .in('developer_id', senderIdsByType.developer)
+        : { data: [] },
+      
+      // Fetch all agents at once
+      senderIdsByType.agent.length > 0
+        ? supabase
+            .from('agents')
+            .select('agent_id, name, profile_image')
+            .in('agent_id', senderIdsByType.agent)
+        : { data: [] }
+    ])
+
+    // Map the results
+    seekersData.data?.forEach(seeker => {
+      sendersMap[seeker.id] = {
+        name: seeker.name || 'Property Seeker',
+        profile_image: seeker.profile_picture || null
+      }
+    })
+
+    developersData.data?.forEach(developer => {
+      sendersMap[developer.developer_id] = {
+        name: developer.name || 'Developer',
+        profile_image: developer.profile_image || null
+      }
+    })
+
+    agentsData.data?.forEach(agent => {
+      sendersMap[agent.agent_id] = {
+        name: agent.name || 'Agent',
+        profile_image: agent.profile_image || null
+      }
+    })
+
+    // Enrich messages with sender information
+    const enrichedMessages = (messages || []).map(msg => ({
+      ...msg,
+      sender_name: sendersMap[msg.sender_id]?.name || 'User',
+      sender_profile_image: sendersMap[msg.sender_id]?.profile_image || null
+    }))
+
     // Reverse messages to show oldest first
-    const sortedMessages = (messages || []).reverse();
+    const sortedMessages = enrichedMessages.reverse();
 
     return NextResponse.json({
       success: true,

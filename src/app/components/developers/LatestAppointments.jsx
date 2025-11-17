@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { Calendar, Clock, User, MapPin, Loader2 } from 'lucide-react'
+import { Calendar, Clock, User, MapPin, Loader2, ChevronRight } from 'lucide-react'
+import Link from 'next/link'
 
 const LatestAppointments = () => {
   const { user } = useAuth()
@@ -46,42 +47,51 @@ const LatestAppointments = () => {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl p-6">
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
-          <span className="text-gray-600">Loading...</span>
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-5 h-5 animate-spin text-primary_color" />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="bg-white rounded-xl p-6">
-      <div className="flex items-center mb-4">
-        <Calendar className="w-5 h-5 text-blue-600 mr-2" />
-        <h3 className="text-lg font-semibold text-gray-900">Latest Appointments</h3>
+    <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-primary_color/10 flex items-center justify-center">
+            <Calendar className="w-4 h-4 text-primary_color" />
+          </div>
+          <h3 className="text-base font-semibold text-gray-900">Latest Appointments</h3>
+        </div>
+        {appointments.length > 0 && (
+          <span className="text-xs text-gray-500">{appointments.length}</span>
+        )}
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {appointments.map((appointment) => (
-          <div key={appointment.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div className="flex-1">
-              <div className="flex items-center mb-1">
-                <User className="w-4 h-4 text-gray-500 mr-2" />
-                <span className="font-medium text-gray-900">{appointment.clientName}</span>
+          <div 
+            key={appointment.id} 
+            className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:border-primary_color/20 hover:bg-gray-50/50 transition-all"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1.5">
+                <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                <span className="font-medium text-sm text-gray-900 truncate">{appointment.clientName}</span>
               </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <MapPin className="w-3 h-3 mr-1" />
-                <span>{appointment.property.title}</span>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                <span className="truncate">{appointment.property.title}</span>
               </div>
             </div>
-            <div className="text-right">
-              <div className="flex items-center text-sm text-gray-600 mb-1">
-                <Calendar className="w-3 h-3 mr-1" />
+            <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-3">
+              <div className="flex items-center gap-1 text-xs text-gray-600">
+                <Calendar className="w-3 h-3 text-gray-400" />
                 <span>{formatDate(appointment.date)}</span>
               </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <Clock className="w-3 h-3 mr-1" />
+              <div className="flex items-center gap-1 text-xs text-gray-600">
+                <Clock className="w-3 h-3 text-gray-400" />
                 <span>{formatTime(appointment.startTime)}</span>
               </div>
             </div>
@@ -90,17 +100,23 @@ const LatestAppointments = () => {
       </div>
 
       {appointments.length === 0 && (
-        <div className="text-center py-8">
-          <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500">No appointments yet</p>
+        <div className="text-center py-12">
+          <div className="w-16 h-16 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-3">
+            <Calendar className="w-6 h-6 text-gray-300" />
+          </div>
+          <p className="text-sm text-gray-500">No appointments yet</p>
         </div>
       )}
 
       {appointments.length > 0 && (
-        <div className="text-center mt-4">
-          <button className="text-blue-600 hover:text-blue-700 font-medium">
+        <div className="mt-6 pt-4 border-t border-gray-100">
+          <Link
+            href="#"
+            className="flex items-center justify-center gap-1 text-sm font-medium text-primary_color hover:text-primary_color/80 transition-colors"
+          >
             View All Appointments
-          </button>
+            <ChevronRight className="w-4 h-4" />
+          </Link>
         </div>
       )}
     </div>

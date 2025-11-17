@@ -1,12 +1,25 @@
 "use client"
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import PropertyManagement from '@/app/components/propertyManagement/PropertyManagement'
 import DeveloperNav from '@/app/components/developers/DeveloperNav'
 
 const SingleUnitPage = ({ params }) => {
   const router = useRouter()
-  const { unitSlug } = React.use(params)
+  const [unitSlug, setUnitSlug] = useState(null)
+  
+  useEffect(() => {
+    const resolveParams = async () => {
+      const resolvedParams = params instanceof Promise ? await params : params
+      setUnitSlug(resolvedParams.unitSlug)
+    }
+    resolveParams()
+  }, [params])
+  
+  // Don't render until params are resolved
+  if (!unitSlug) {
+    return <div>Loading...</div>
+  }
 
   // Handle add new unit case
   if (unitSlug === 'addNewUnit') {

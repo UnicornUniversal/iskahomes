@@ -22,28 +22,47 @@ export function useAnalytics() {
 
   // Helper function to get lister context (who owns/manages the listing)
   const getListerContext = useCallback((context = {}) => {
-    // 1) Prefer explicit generic fields if provided
+    // 1) CRITICAL: Extract directly from listing object if provided (most reliable)
+    // Every listing has account_type and user_id - use these directly
+    if (context.listing) {
+      const listing = context.listing
+      if (listing.user_id && listing.account_type) {
+        return { 
+          lister_id: listing.user_id, 
+          lister_type: listing.account_type // 'developer', 'agent', etc.
+        }
+      }
+      // Fallback to created_by if user_id is missing
+      if (listing.created_by && listing.account_type) {
+        return { 
+          lister_id: listing.created_by, 
+          lister_type: listing.account_type 
+        }
+      }
+    }
+
+    // 2) Prefer explicit generic fields if provided
     if (context.lister_id && context.lister_type) {
       return { lister_id: context.lister_id, lister_type: context.lister_type }
     }
 
-    // 2) Accept camelCase as well
+    // 3) Accept camelCase as well
     if (context.listerId && context.listerType) {
       return { lister_id: context.listerId, lister_type: context.listerType }
     }
 
-    // 3) Backward-compatible fallbacks
-    if (context.developer_id) {
-      return { lister_id: context.developer_id, lister_type: 'developer' }
+    // 4) Backward-compatible fallbacks (for profile-based tracking)
+    if (context.developer_id || context.developerId) {
+      return { lister_id: context.developer_id || context.developerId, lister_type: 'developer' }
     }
-    if (context.agent_id) {
-      return { lister_id: context.agent_id, lister_type: 'agent' }
+    if (context.agent_id || context.agentId) {
+      return { lister_id: context.agent_id || context.agentId, lister_type: 'agent' }
     }
-    if (context.agency_id) {
-      return { lister_id: context.agency_id, lister_type: 'agency' }
+    if (context.agency_id || context.agencyId) {
+      return { lister_id: context.agency_id || context.agencyId, lister_type: 'agency' }
     }
-    if (context.property_manager_id) {
-      return { lister_id: context.property_manager_id, lister_type: 'property_manager' }
+    if (context.property_manager_id || context.propertyManagerId) {
+      return { lister_id: context.property_manager_id || context.propertyManagerId, lister_type: 'property_manager' }
     }
 
     return { lister_id: null, lister_type: null }
@@ -52,11 +71,49 @@ export function useAnalytics() {
   // Helper function to get seeker context for logged-in property seekers
   const getSeekerContext = useCallback((additionalContext = {}) => {
     const isPropertySeeker = user?.user_type === 'property_seeker'
+    
+    // Normalize property names - handle both camelCase and snake_case
+    const listingId = additionalContext.listingId || additionalContext.listing_id
+    const profileId = additionalContext.profileId || additionalContext.profile_id
+    const contextType = additionalContext.contextType || additionalContext.context_type
+    const messageType = additionalContext.messageType || additionalContext.message_type
+    const appointmentType = additionalContext.appointmentType || additionalContext.appointment_type
+    const phoneNumber = additionalContext.phoneNumber || additionalContext.phone_number
+    const viewedFrom = additionalContext.viewedFrom || additionalContext.viewed_from
+    const listingType = additionalContext.listingType || additionalContext.listing_type
+    
+    // Always provide seeker_id - use user.id if logged in, otherwise "anonymous"
+    const seekerId = isPropertySeeker ? user.id : (additionalContext.seekerId || additionalContext.seeker_id || 'anonymous')
+    const distinctId = getDistinctId() || 'anonymous'
+    // Use seekerId if available, otherwise fall back to distinct_id, otherwise "anonymous"
+    const finalSeekerId = seekerId !== 'anonymous' ? seekerId : (distinctId !== 'anonymous' ? distinctId : 'anonymous')
+    
     return {
       ...additionalContext,
-      seekerId: isPropertySeeker ? user.id : null,
+      // Normalized properties (use snake_case for consistency with PostHog)
+      listingId: listingId,
+      listing_id: listingId, // Also set snake_case version
+      profileId: profileId,
+      profile_id: profileId, // Also set snake_case version
+      contextType: contextType,
+      context_type: contextType, // Also set snake_case version
+      messageType: messageType,
+      message_type: messageType,
+      appointmentType: appointmentType,
+      appointment_type: appointmentType,
+      phoneNumber: phoneNumber,
+      phone_number: phoneNumber,
+      viewedFrom: viewedFrom,
+      viewed_from: viewedFrom,
+      listingType: listingType,
+      listing_type: listingType,
+      // User-specific properties - ALWAYS provide seeker_id (never null)
+      seekerId: finalSeekerId,
+      seeker_id: finalSeekerId, // Also set snake_case version
       seekerName: isPropertySeeker ? user.profile?.name : null,
+      seeker_name: isPropertySeeker ? user.profile?.name : null,
       seekerEmail: isPropertySeeker ? user.email : null,
+      seeker_email: isPropertySeeker ? user.email : null,
       is_logged_in: isPropertySeeker
     }
   }, [user])
@@ -230,7 +287,8 @@ export function useAnalytics() {
     const seekerContext = getSeekerContext(context)
     const listerContext = getListerContext(context)
     
-    captureAndQueue('lead_phone', {
+    captureAndQueue('lead', {
+      lead_type: 'phone', // Unified lead event with lead_type
       action: phoneAction, // 'click' or 'copy'
       context_type: seekerContext.contextType, // 'profile' or 'listing'
       listing_id: seekerContext.listingId,
@@ -252,7 +310,8 @@ export function useAnalytics() {
     const seekerContext = getSeekerContext(context)
     const listerContext = getListerContext(context)
     
-    captureAndQueue('lead_message', {
+    captureAndQueue('lead', {
+      lead_type: 'message', // Unified lead event with lead_type
       context_type: seekerContext.contextType, // 'profile' or 'listing'
       listing_id: seekerContext.listingId,
       profile_id: seekerContext.profileId,
@@ -273,7 +332,8 @@ export function useAnalytics() {
     const seekerContext = getSeekerContext(context)
     const listerContext = getListerContext(context)
     
-    captureAndQueue('lead_appointment', {
+    captureAndQueue('lead', {
+      lead_type: 'appointment', // Unified lead event with lead_type
       context_type: seekerContext.contextType, // 'profile' or 'listing'
       listing_id: seekerContext.listingId,
       profile_id: seekerContext.profileId,
@@ -414,14 +474,17 @@ export function useAnalytics() {
    * @param {object} context - Additional context
    */
   const trackDevelopmentView = useCallback((developmentId, context = {}) => {
+    const listerContext = getListerContext(context)
+    
     captureAndQueue('development_view', {
       development_id: developmentId,
       viewed_from: context.viewedFrom || 'unknown', // 'home', 'explore', 'development_page', 'search_results'
-      developer_id: context.developerId,
+      lister_id: listerContext.lister_id,
+      lister_type: listerContext.lister_type,
       location: context.location,
       timestamp: nowIso()
     })
-  }, [posthog])
+  }, [posthog, getListerContext])
 
   /**
    * Track development interaction (saves, shares, etc.)
@@ -430,14 +493,17 @@ export function useAnalytics() {
    * @param {object} context - Additional context
    */
   const trackDevelopmentInteraction = useCallback((developmentId, action, context = {}) => {
+    const listerContext = getListerContext(context)
+    
     captureAndQueue('development_interaction', {
       development_id: developmentId,
       action: action, // 'save', 'share', 'inquiry', 'contact'
-      developer_id: context.developerId,
+      lister_id: listerContext.lister_id,
+      lister_type: listerContext.lister_type,
       platform: context.platform, // For shares
       timestamp: nowIso()
     })
-  }, [posthog])
+  }, [posthog, getListerContext])
 
   /**
    * Track development lead (inquiries, contact forms, etc.)
@@ -446,14 +512,17 @@ export function useAnalytics() {
    * @param {object} context - Additional context
    */
   const trackDevelopmentLead = useCallback((developmentId, leadType, context = {}) => {
+    const listerContext = getListerContext(context)
+    
     captureAndQueue('development_lead', {
       development_id: developmentId,
       lead_type: leadType, // 'inquiry', 'contact_form', 'phone', 'email'
-      developer_id: context.developerId,
+      lister_id: listerContext.lister_id,
+      lister_type: listerContext.lister_type,
       contact_method: context.contactMethod,
       timestamp: nowIso()
     })
-  }, [posthog])
+  }, [posthog, getListerContext])
 
   return {
     // Core Analytics (Main 4 categories)

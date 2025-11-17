@@ -31,8 +31,7 @@ export default function EnhancedListingCard({ listing }) {
     if (listing?.id) {
       // Track detailed impression for property owners
       analytics.trackListingImpression(listing.id, {
-        lister_id: listing.developer_id || listing.agent_id || listing.user_id,
-        lister_type: listing.developer_id ? 'developer' : (listing.agent_id ? 'agent' : 'developer'),
+        listing: listing, // Pass full listing object so lister_id can be extracted
         listingType: listing.listing_type,
         viewedFrom: 'home', // or 'explore', 'search_results'
         sessionId: sessionId,
@@ -43,8 +42,7 @@ export default function EnhancedListingCard({ listing }) {
 
       // Also track the general property view
       analytics.trackPropertyView(listing.id, {
-        lister_id: listing.developer_id || listing.agent_id || listing.user_id,
-        lister_type: listing.developer_id ? 'developer' : (listing.agent_id ? 'agent' : 'developer'),
+        listing: listing, // Pass full listing object so lister_id can be extracted
         listingType: listing.listing_type,
         viewedFrom: 'home'
       })
@@ -55,8 +53,7 @@ export default function EnhancedListingCard({ listing }) {
   const handleCardClick = () => {
     // Track the click as a property view
     analytics.trackPropertyView(listing.id, {
-      lister_id: listing.developer_id || listing.agent_id || listing.user_id,
-      lister_type: listing.developer_id ? 'developer' : (listing.agent_id ? 'agent' : 'developer'),
+      listing: listing, // Pass full listing object so lister_id can be extracted
       listingType: listing.listing_type,
       viewedFrom: 'home'
     })
@@ -73,8 +70,7 @@ export default function EnhancedListingCard({ listing }) {
     
     // Track the save/unsave action
     analytics.trackSavedListing(listing.id, action, {
-      lister_id: listing.developer_id || listing.agent_id || listing.user_id,
-      lister_type: listing.developer_id ? 'developer' : (listing.agent_id ? 'agent' : 'developer')
+      listing: listing // Pass full listing object so lister_id can be extracted
     })
     
     // Update backend
@@ -101,8 +97,7 @@ export default function EnhancedListingCard({ listing }) {
     // Track the share action
     analytics.trackShare('listing', platform, {
       listingId: listing.id,
-      lister_id: listing.developer_id || listing.agent_id || listing.user_id,
-      lister_type: listing.developer_id ? 'developer' : (listing.agent_id ? 'agent' : 'developer')
+      listing: listing // Pass full listing object so lister_id can be extracted
     })
     
     // Implement share logic
@@ -136,8 +131,7 @@ export default function EnhancedListingCard({ listing }) {
       analytics.trackPhoneInteraction('click', {
         contextType: 'listing',
         listingId: listing.id,
-        lister_id: listing.developer_id || listing.agent_id || listing.user_id,
-        lister_type: listing.developer_id ? 'developer' : (listing.agent_id ? 'agent' : 'developer'),
+        listing: listing, // Pass full listing object so lister_id can be extracted
         phoneNumber: listing.phone
       })
       
@@ -156,8 +150,7 @@ export default function EnhancedListingCard({ listing }) {
     analytics.trackMessageClick({
       contextType: 'listing',
       listingId: listing.id,
-      lister_id: listing.developer_id || listing.agent_id || listing.user_id,
-      lister_type: listing.developer_id ? 'developer' : (listing.agent_id ? 'agent' : 'developer'),
+      listing: listing, // Pass full listing object so lister_id can be extracted
       messageType: 'direct_message'
     })
     
@@ -173,8 +166,7 @@ export default function EnhancedListingCard({ listing }) {
     analytics.trackMessageClick({
       contextType: 'listing',
       listingId: listing.id,
-      lister_id: listing.developer_id || listing.agent_id || listing.user_id,
-      lister_type: listing.developer_id ? 'developer' : (listing.agent_id ? 'agent' : 'developer'),
+      listing: listing, // Pass full listing object so lister_id can be extracted
       messageType: 'whatsapp'
     })
     
@@ -190,8 +182,7 @@ export default function EnhancedListingCard({ listing }) {
     analytics.trackAppointmentClick({
       contextType: 'listing',
       listingId: listing.id,
-      lister_id: listing.developer_id || listing.agent_id || listing.user_id,
-      lister_type: listing.developer_id ? 'developer' : (listing.agent_id ? 'agent' : 'developer'),
+      listing: listing, // Pass full listing object so lister_id can be extracted
       appointmentType: 'viewing'
     })
     

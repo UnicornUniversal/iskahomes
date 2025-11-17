@@ -107,7 +107,7 @@ export async function POST(request) {
       )
     }
 
-    // Update total_appointments count - increment by 1
+    // Update total_appointments count for property seeker - increment by 1
     const { data: currentSeeker, error: fetchError } = await supabase
       .from('property_seekers')
       .select('total_appointments')
@@ -125,6 +125,52 @@ export async function POST(request) {
       if (updateError) {
         console.error('Error updating appointments count:', updateError)
         // Don't fail the request, just log the error
+      }
+    }
+
+    // Update total_appointments in listings table - increment by 1
+    const { data: listing, error: listingError } = await supabase
+      .from('listings')
+      .select('id, user_id, account_type, total_appointments')
+      .eq('id', listing_id)
+      .single()
+
+    if (!listingError && listing) {
+      const newAppointmentsCount = (listing.total_appointments || 0) + 1
+      const { error: updateListingError } = await supabase
+        .from('listings')
+        .update({ 
+          total_appointments: newAppointmentsCount
+        })
+        .eq('id', listing_id)
+
+      if (updateListingError) {
+        console.error('Error updating listing appointments count:', updateListingError)
+        // Don't fail the request, just log the error
+      } else {
+        // If listing belongs to a developer, also update developers table
+        if (listing.account_type === 'developer' && listing.user_id) {
+          const { data: developer, error: devError } = await supabase
+            .from('developers')
+            .select('developer_id, total_appointments')
+            .eq('developer_id', listing.user_id)
+            .single()
+
+          if (!devError && developer) {
+            const newDevAppointmentsCount = (developer.total_appointments || 0) + 1
+            const { error: updateDevError } = await supabase
+              .from('developers')
+              .update({ 
+                total_appointments: newDevAppointmentsCount
+              })
+              .eq('developer_id', listing.user_id)
+
+            if (updateDevError) {
+              console.error('Error updating developer appointments count:', updateDevError)
+              // Don't fail the request, just log the error
+            }
+          }
+        }
       }
     }
 

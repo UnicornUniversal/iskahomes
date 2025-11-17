@@ -9,11 +9,6 @@ const TileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLaye
 const Marker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), { ssr: false })
 const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ssr: false })
 
-// Import leaflet CSS only on client side
-if (typeof window !== 'undefined') {
-  require('leaflet/dist/leaflet.css')
-}
-
 // Helper to resolve coordinates from a listing
 const resolveCoords = (listing) => {
   // Prefer explicit coordinates if present
@@ -48,9 +43,23 @@ const UserMap = () => {
   const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
 
-  // Check if we're on the client side
+  // Check if we're on the client side and load Leaflet CSS
   useEffect(() => {
     setIsClient(true);
+    
+    // Load Leaflet CSS only on client side via link tag to avoid HMR issues
+    if (typeof window !== 'undefined') {
+      const existingLink = document.getElementById('leaflet-css');
+      if (!existingLink) {
+        const link = document.createElement('link');
+        link.id = 'leaflet-css';
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+        link.crossOrigin = '';
+        document.head.appendChild(link);
+      }
+    }
   }, []);
 
   // Fetch listings for map markers

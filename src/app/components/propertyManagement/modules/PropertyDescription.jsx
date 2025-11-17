@@ -1,21 +1,72 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { cn } from '@/lib/utils'
+import SalesInformationModal from '../../ui/SalesInformationModal'
 
 const PropertyDescription = ({ formData, updateFormData, isEditMode }) => {
+  const [showSalesModal, setShowSalesModal] = useState(false)
+  const [pendingStatus, setPendingStatus] = useState(null)
+  const [previousStatus, setPreviousStatus] = useState(formData.status || '')
+
   const statusOptions = [
     'Available',
     'Unavailable',
     'Sold',
+    'Rented Out',
+    'Taken',
     'Under Maintenance / Renovation',
     'Coming Soon'
   ]
 
+  const isSoldRentedOrTaken = (status) => {
+    if (!status) return false
+    const statusLower = status.toLowerCase().trim()
+    return ['sold', 'rented out', 'taken'].includes(statusLower)
+  }
+
+  useEffect(() => {
+    // Track previous status
+    if (formData.status !== previousStatus) {
+      setPreviousStatus(formData.status || '')
+    }
+  }, [formData.status, previousStatus])
+
   const handleInputChange = (field, value) => {
-    updateFormData({
+    // If status is changing to sold/rented/taken, show modal
+    if (field === 'status' && isSoldRentedOrTaken(value) && !isSoldRentedOrTaken(formData.status)) {
+      setPendingStatus(value)
+      setShowSalesModal(true)
+    } else {
+      updateFormData({
         [field]: value
-    });
+      })
+    }
+  }
+
+  const handleSalesModalConfirm = (salesInfo) => {
+    // Determine sale type
+    const saleType = pendingStatus?.toLowerCase() === 'rented out' ? 'rented' : 'sold'
+    
+    // Update formData with status and sales info
+    updateFormData({
+      status: pendingStatus,
+      sales_info: salesInfo
+    })
+    
+    setShowSalesModal(false)
+    setPendingStatus(null)
+  }
+
+  const handleSalesModalClose = () => {
+    // If user closes modal without confirming, revert status
+    if (pendingStatus) {
+      updateFormData({
+        status: previousStatus
+      })
+    }
+    setShowSalesModal(false)
+    setPendingStatus(null)
   }
 
   return (
@@ -98,6 +149,15 @@ const PropertyDescription = ({ formData, updateFormData, isEditMode }) => {
 
 
       </div>
+      
+      {/* Sales Information Modal */}
+      <SalesInformationModal
+        isOpen={showSalesModal}
+        onClose={handleSalesModalClose}
+        onConfirm={handleSalesModalConfirm}
+        saleType={pendingStatus?.toLowerCase() === 'rented out' ? 'rented' : 'sold'}
+        isLoading={false}
+      />
     </div>
   )
 }

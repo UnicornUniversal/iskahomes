@@ -14,6 +14,7 @@ import { Building2, Eye, BarChart3, Home, DollarSign } from 'lucide-react'
 import LatestLeads from '@/app/components/developers/DataStats/LatestLeads'
 import RecentMessages from '@/app/components/developers/DataStats/RecentMessages'
 import RecentSales from '@/app/components/developers/DataStats/RecentSales'
+import PopularListings from '@/app/components/developers/DataStats/PopularListings'
 
 
 const page = () => {
@@ -108,24 +109,24 @@ const page = () => {
       <div className='w-full flex flex-col gap-4'>
         <StatisticsView />
 
-    
-
         <div className='w-full flex justify-between gap-4'>
-       
-          <RecentSales />
-          <RecentMessages />
-        </div>
-        
-       <div className='w-full justify-between flex gap-4'>
-       <LatestAppointments /> <LatestLeads />
-       </div>
-
-       <div className='w-full flex gap-4'>
           <PropertiesByCategories />
           <PropertiesBySubType />
           {/* <PropertiesByStatus /> */}
           <PropertiesByType />
         </div>
+
+        <div className='w-full flex justify-between gap-4'>
+       
+       
+          <RecentMessages />  <RecentSales />   <LatestAppointments />
+        </div>
+        <PopularListings limit={4} />
+       {/* <div className='w-full justify-between flex gap-4'> */}
+       <LatestLeads />   
+       {/* </div> */}
+
+ 
     
       </div>
     </div>

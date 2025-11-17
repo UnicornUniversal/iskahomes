@@ -64,10 +64,22 @@ const UnitCard = ({ unit, developerSlug }) => {
     }
   }
 
-  const handleCardClick = () => {
+  const handleCardClick = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
     // Navigate to single unit page with developer context
+    // Always use ID for the route - the page will handle it
     const slug = developerSlug || 'default'
-    router.push(`/developer/${slug}/units/${unit.id}`)
+    const unitId = unit.id
+    
+    if (!unitId) {
+      console.error('Unit ID is missing:', unit)
+      return
+    }
+    
+    console.log('Navigating to unit:', { slug, unitId, unit })
+    router.push(`/developer/${slug}/units/${unitId}`)
   }
 
   return (

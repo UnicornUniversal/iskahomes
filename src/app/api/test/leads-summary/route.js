@@ -1,167 +1,129 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { fetchEventsWithRetry } from '@/lib/posthogCron'
+import crypto from 'crypto'
 
 export async function GET(request) {
   try {
-    const { searchParams } = new URL(request.url)
-    const listingId = searchParams.get('listing_id') || null
-    const seekerId = searchParams.get('seeker_id') || null
-    const limit = parseInt(searchParams.get('limit') || '100')
+    // Fetch ALL lead events from PostHog (no time constraint, no filters)
+    // Use a very wide time range (10 years ago to now) to effectively get all events
+    const endTime = new Date()
+    const startTime = new Date(Date.now() - 10 * 365 * 24 * 60 * 60 * 1000) // 10 years ago
 
-    let query = supabaseAdmin
-      .from('leads')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(limit)
+    console.log(`📊 Fetching ALL lead events from PostHog (no filters, no time constraint): ${startTime.toISOString()} to ${endTime.toISOString()}`)
 
-    if (listingId) {
-      query = query.eq('listing_id', listingId)
-    }
-    if (seekerId) {
-      query = query.eq('seeker_id', seekerId)
-    }
+    // Fetch unified lead events from PostHog (including old format for backward compatibility)
+    const leadEventNames = ['lead', 'lead_phone', 'lead_message', 'lead_appointment'] // Unified + legacy events
+    
+    console.log(`📡 Fetching ALL lead events from PostHog...`)
+    const { success, events: allEvents, apiCalls, error } = await fetchEventsWithRetry(
+      startTime,
+      endTime,
+      leadEventNames // Filter by unified lead event name + legacy events
+    )
 
-    const { data: leads, error } = await query
-
-    if (error) {
-      console.error('Error fetching leads:', error)
+    if (!success || !allEvents) {
+      console.error('❌ Failed to fetch events from PostHog:', error)
       return NextResponse.json({
         success: false,
-        error: error.message
+        error: error?.message || 'Failed to fetch events from PostHog'
       }, { status: 500 })
     }
 
-    // Group by listing_id and aggregate
-    const summaryByListing = {}
-    const summaryBySeeker = {}
-    const allActions = []
+    console.log(`✅ Fetched ${allEvents.length} lead events from PostHog (${apiCalls || 1} API calls)`)
 
-    leads.forEach(lead => {
-      const listingId = lead.listing_id
-      const seekerId = lead.seeker_id
+    // Filter to only lead events (should already be filtered, but double-check)
+    
+    const leadEvents = Array.isArray(allEvents) 
+      ? allEvents.filter(e => leadEventNames.includes(e.event))
+      : []
 
-      // Group by listing
-      if (!summaryByListing[listingId]) {
-        summaryByListing[listingId] = {
-          listing_id: listingId,
-          lister_id: lead.lister_id,
-          lister_type: lead.lister_type,
-          total_lead_records: 0,
-          unique_seekers: new Set(),
-          total_actions: 0,
-          action_types: {},
-          date_range: {
-            earliest: lead.first_action_date,
-            latest: lead.last_action_date
-          },
-          status_breakdown: {},
-          leads: []
+    console.log(`✅ Found ${leadEvents.length} lead events from PostHog`)
+
+    // Process all lead events (no filtering)
+    const filteredEvents = leadEvents
+    console.log(`📊 Processing ${filteredEvents.length} lead events for aggregation`)
+
+    // Process all lead events - simple format, no complex grouping
+    const allLeads = filteredEvents.map(event => {
+      const { event: eventName, properties = {}, distinct_id, timestamp } = event
+      
+      // Extract lead_type from properties (unified lead event)
+      // Backward compatibility: derive from old event names if lead_type is missing
+      let leadType = properties.lead_type || properties.leadType
+      if (!leadType) {
+        if (eventName === 'lead_phone') {
+          leadType = 'phone'
+        } else if (eventName === 'lead_message') {
+          leadType = 'message'
+        } else if (eventName === 'lead_appointment') {
+          leadType = 'appointment'
+        } else {
+          leadType = 'unknown'
         }
       }
-
-      const listingSummary = summaryByListing[listingId]
-      listingSummary.total_lead_records++
-      listingSummary.unique_seekers.add(seekerId)
-      listingSummary.total_actions += lead.total_actions || 0
-      listingSummary.leads.push(lead)
-
-      // Update date range
-      if (lead.first_action_date && lead.first_action_date < listingSummary.date_range.earliest) {
-        listingSummary.date_range.earliest = lead.first_action_date
-      }
-      if (lead.last_action_date && lead.last_action_date > listingSummary.date_range.latest) {
-        listingSummary.date_range.latest = lead.last_action_date
-      }
-
-      // Count status
-      const status = lead.status || 'unknown'
-      listingSummary.status_breakdown[status] = (listingSummary.status_breakdown[status] || 0) + 1
-
-      // Count action types
-      if (lead.lead_actions && Array.isArray(lead.lead_actions)) {
-        lead.lead_actions.forEach(action => {
-          const actionType = action.action_type || 'unknown'
-          listingSummary.action_types[actionType] = (listingSummary.action_types[actionType] || 0) + 1
-          allActions.push({
-            ...action,
-            listing_id: listingId,
-            seeker_id: seekerId,
-            lister_id: lead.lister_id
-          })
-        })
-      }
-
-      // Group by seeker
-      if (!summaryBySeeker[seekerId]) {
-        summaryBySeeker[seekerId] = {
-          seeker_id: seekerId,
-          total_lead_records: 0,
-          unique_listings: new Set(),
-          total_actions: 0,
-          action_types: {},
-          leads: []
-        }
-      }
-
-      const seekerSummary = summaryBySeeker[seekerId]
-      seekerSummary.total_lead_records++
-      seekerSummary.unique_listings.add(listingId)
-      seekerSummary.total_actions += lead.total_actions || 0
-      seekerSummary.leads.push(lead)
-
-      if (lead.lead_actions && Array.isArray(lead.lead_actions)) {
-        lead.lead_actions.forEach(action => {
-          const actionType = action.action_type || 'unknown'
-          seekerSummary.action_types[actionType] = (seekerSummary.action_types[actionType] || 0) + 1
-        })
+      
+      // Extract all properties (handle both camelCase and snake_case)
+      return {
+        event: eventName, // Will be 'lead'
+        lead_type: leadType, // 'phone', 'message', or 'appointment'
+        timestamp: timestamp,
+        distinct_id: distinct_id,
+        listing_id: properties.listing_id || properties.listingId || properties.listing_uuid || properties.property_id || null,
+        lister_id: properties.lister_id || properties.listerId || properties.developer_id || properties.developerId || properties.agent_id || properties.agentId || null,
+        lister_type: properties.lister_type || properties.listerType || 
+          (properties.developer_id || properties.developerId ? 'developer' : null) ||
+          (properties.agent_id || properties.agentId ? 'agent' : null) || null,
+        seeker_id: properties.seeker_id || properties.seekerId || distinct_id || null,
+        context_type: properties.context_type || properties.contextType || null,
+        profile_id: properties.profile_id || properties.profileId || null,
+        action: properties.action || null,
+        message_type: properties.message_type || properties.messageType || null,
+        appointment_type: properties.appointment_type || properties.appointmentType || null,
+        phone_number: properties.phone_number || properties.phoneNumber || null,
+        // Include all other properties for debugging
+        all_properties: properties
       }
     })
 
-    // Convert Sets to arrays for JSON serialization
-    Object.values(summaryByListing).forEach(summary => {
-      summary.unique_seekers = summary.unique_seekers.size
-      summary.leads = summary.leads.slice(0, 10) // Limit for response size
-    })
+    // Simple aggregations by lead_type
+    const eventBreakdown = allLeads.reduce((acc, lead) => {
+      const key = `lead_${lead.lead_type}` // e.g., 'lead_phone', 'lead_message', 'lead_appointment'
+      acc[key] = (acc[key] || 0) + 1
+      return acc
+    }, {})
 
-    Object.values(summaryBySeeker).forEach(summary => {
-      summary.unique_listings = summary.unique_listings.size
-      summary.leads = summary.leads.slice(0, 10) // Limit for response size
-    })
+    const contextTypeBreakdown = allLeads.reduce((acc, lead) => {
+      const ctx = lead.context_type || 'unknown'
+      acc[ctx] = (acc[ctx] || 0) + 1
+      return acc
+    }, {})
+
+    const uniqueListings = new Set(allLeads.map(l => l.listing_id).filter(Boolean))
+    const uniqueSeekers = new Set(allLeads.map(l => l.seeker_id).filter(Boolean))
+    const uniqueListers = new Set(allLeads.map(l => l.lister_id).filter(Boolean))
 
     return NextResponse.json({
       success: true,
-      summary: {
-        total_lead_records: leads.length,
-        unique_listings: Object.keys(summaryByListing).length,
-        unique_seekers: Object.keys(summaryBySeeker).length,
-        total_actions: allActions.length,
-        filtered_by_listing_id: listingId || null,
-        filtered_by_seeker_id: seekerId || null
+      source: 'PostHog',
+      timeRange: {
+        start: startTime.toISOString(),
+        end: endTime.toISOString(),
+        note: 'All events (10 year range to fetch everything)'
       },
-      by_listing: Object.values(summaryByListing).map(summary => ({
-        listing_id: summary.listing_id,
-        lister_id: summary.lister_id,
-        lister_type: summary.lister_type,
-        total_lead_records: summary.total_lead_records,
-        unique_seekers: summary.unique_seekers,
-        total_actions: summary.total_actions,
-        action_types: summary.action_types,
-        status_breakdown: summary.status_breakdown,
-        date_range: summary.date_range,
-        sample_leads: summary.leads.slice(0, 5)
-      })),
-      by_seeker: Object.values(summaryBySeeker).map(summary => ({
-        seeker_id: summary.seeker_id,
-        total_lead_records: summary.total_lead_records,
-        unique_listings: summary.unique_listings,
-        total_actions: summary.total_actions,
-        action_types: summary.action_types,
-        sample_leads: summary.leads.slice(0, 5)
-      })),
-      recent_actions: allActions
-        .sort((a, b) => new Date(b.action_timestamp) - new Date(a.action_timestamp))
-        .slice(0, 20),
-      raw_data: (listingId || seekerId) ? leads.slice(0, 20) : [] // Only include raw data if filtered
+      summary: {
+        total_lead_events: allLeads.length,
+        unique_listings: uniqueListings.size,
+        unique_seekers: uniqueSeekers.size,
+        unique_listers: uniqueListers.size,
+        api_calls: apiCalls || 1,
+        event_breakdown: eventBreakdown,
+        context_type_breakdown: contextTypeBreakdown,
+        events_with_listing_id: allLeads.filter(l => l.listing_id).length,
+        events_without_listing_id: allLeads.filter(l => !l.listing_id).length,
+        events_with_seeker_id: allLeads.filter(l => l.seeker_id && l.seeker_id !== l.distinct_id).length,
+        events_with_distinct_id_only: allLeads.filter(l => !l.seeker_id || l.seeker_id === l.distinct_id).length
+      },
+      all_leads: allLeads.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)) // Most recent first
     })
 
   } catch (error) {
@@ -173,4 +135,3 @@ export async function GET(request) {
     }, { status: 500 })
   }
 }
-

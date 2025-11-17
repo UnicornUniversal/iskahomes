@@ -6,16 +6,20 @@ const page = () => {
   const [albums, setAlbums] = useState([])
   
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen  py-8 px-4 ocean-sunset_main_bg">
       <div className="max-w-7xl mx-auto">
-        <AlbumGallery 
+        <div className="ocean-sunset_secondary_bg w-[400px] h-[400px]"> 
+
+hello world
+        </div>
+        {/* <AlbumGallery 
           albums={albums}
           onAlbumsChange={setAlbums}
           mode="edit"
-        />
+        /> */}
         
         {/* Debug: Show albums data */}
-        {albums.length > 0 && (
+        {/* {albums.length > 0 && (
           <div className="mt-8 p-4 bg-white rounded-lg border">
             <h3 className="font-semibold mb-2">Debug: Albums Data</h3>
             <pre className="text-xs overflow-auto max-h-64">
@@ -27,7 +31,7 @@ const page = () => {
               }, 2)}
             </pre>
           </div>
-        )}
+        )} */}
       </div>
     </div>
   )

@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useAnalytics } from '@/hooks/useAnalytics'
 
-const ScheduleATour = ({ propertyId, propertyTitle, propertyType, developer }) => {
+const ScheduleATour = ({ propertyId, propertyTitle, propertyType, developer, listing }) => {
   const { user, propertySeekerToken } = useAuth()
   const router = useRouter()
   const analytics = useAnalytics()
@@ -33,18 +33,28 @@ const ScheduleATour = ({ propertyId, propertyTitle, propertyType, developer }) =
     }
   }, [user])
 
-  // Determine account type based on property type
+  // CRITICAL: Use listing.account_type and listing.user_id directly if listing is provided
+  // This avoids database lookups - every listing has these fields
   const getAccountType = () => {
-    return propertyType === 'unit' ? 'developer' : 'agent'
+    // If listing object is provided, use its account_type directly
+    if (listing?.account_type) {
+      return listing.account_type
+    }
+    // Fallback for profile-based appointments (developer/agent profile pages)
+    return propertyType === 'unit' || propertyType === 'developer' ? 'developer' : 'agent'
   }
 
-  // Get account ID based on property type
+  // Get account ID - use listing.user_id directly if available
   const getAccountId = () => {
-    if (propertyType === 'unit' && developer?.developer_id) {
-      return developer.developer_id
+    // CRITICAL: If listing object is provided, use listing.user_id directly
+    if (listing?.user_id) {
+      return listing.user_id
+    }
+    // Fallback for profile-based appointments
+    if (propertyType === 'unit' || propertyType === 'developer') {
+      return developer?.developer_id || 'unknown'
     }
     // For agents, you might need to fetch from a different source
-    // For now, we'll use the developer_id as a fallback
     return developer?.developer_id || 'unknown'
   }
 
@@ -123,13 +133,25 @@ const ScheduleATour = ({ propertyId, propertyTitle, propertyType, developer }) =
 
       if (result.success) {
         // Track appointment booking event
-        analytics.trackAppointmentClick({
-          contextType: 'listing',
-          listingId: propertyId,
-          lister_id: getAccountId(),
-          lister_type: getAccountType(),
-          appointmentType: mode === 'video' ? 'virtual' : 'in-person'
-        })
+        if (propertyType === 'development') {
+          // Track as development lead
+          analytics.trackDevelopmentLead(propertyId, 'appointment', {
+            lister_id: getAccountId(),
+            lister_type: getAccountType(),
+            appointmentType: mode === 'video' ? 'virtual' : 'in-person'
+          })
+        } else {
+          // Track as regular appointment lead (for listings/profiles)
+          analytics.trackAppointmentClick({
+            contextType: propertyType === 'listing' || propertyType === 'unit' ? 'listing' : 'profile',
+            listingId: propertyType === 'listing' || propertyType === 'unit' ? propertyId : undefined,
+            listing: listing, // Pass listing object if available (for listing-based appointments)
+            profileId: propertyType === 'developer' ? propertyId : undefined, // For profile-based appointments
+            lister_id: getAccountId(),
+            lister_type: getAccountType(),
+            appointmentType: mode === 'video' ? 'virtual' : 'in-person'
+          })
+        }
         
         toast.success('Appointment scheduled successfully! We\'ll contact you soon.')
         

@@ -5,7 +5,8 @@ import { verifyToken } from '@/lib/jwt';
 // GET single conversation
 export async function GET(request, { params }) {
   try {
-    const { id } = params;
+    // Next.js 15: params is a Promise, must await it
+    const { id } = await params;
 
     // Get token from Authorization header
     const authHeader = request.headers.get('authorization');
@@ -140,7 +141,8 @@ export async function GET(request, { params }) {
 // PUT - Update conversation (e.g., archive, close)
 export async function PUT(request, { params }) {
   try {
-    const { id } = params;
+    // Next.js 15: params is a Promise, must await it
+    const { id } = await params;
 
     // Get token from Authorization header
     const authHeader = request.headers.get('authorization');
@@ -227,7 +229,8 @@ export async function PUT(request, { params }) {
 // DELETE conversation
 export async function DELETE(request, { params }) {
   try {
-    const { id } = params;
+    // Next.js 15: params is a Promise, must await it
+    const { id } = await params;
 
     // Get token from Authorization header
     const authHeader = request.headers.get('authorization');

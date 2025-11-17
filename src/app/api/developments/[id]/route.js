@@ -5,7 +5,8 @@ import { verifyToken } from '@/lib/jwt'
 // GET - Fetch a specific development
 export async function GET(request, { params }) {
   try {
-    const { id } = params
+    const resolvedParams = params instanceof Promise ? await params : params
+    const { id } = resolvedParams
 
     // Get authorization header
     const authHeader = request.headers.get('authorization')
@@ -63,7 +64,8 @@ export async function GET(request, { params }) {
 // PUT - Update a development
 export async function PUT(request, { params }) {
   try {
-    const { id } = params
+    const resolvedParams = params instanceof Promise ? await params : params
+    const { id } = resolvedParams
     const body = await request.json()
 
     // Get authorization header
@@ -143,7 +145,8 @@ export async function PUT(request, { params }) {
 // DELETE - Delete a development
 export async function DELETE(request, { params }) {
   try {
-    const { id } = params
+    const resolvedParams = params instanceof Promise ? await params : params
+    const { id } = resolvedParams
 
     // Get authorization header
     const authHeader = request.headers.get('authorization')

@@ -1,56 +1,41 @@
 'use client'
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Building2, DollarSign, TrendingUp, Users } from 'lucide-react'
 
 const DevelopmentsBySale = ({ developerId }) => {
-  // Dummy data for developments by sale
-  const developmentsBySale = [
-    {
-      id: 1,
-      developmentName: "Premium Apartments East Legon",
-      coverImage: "/placeholder.png",
-      unitsSold: 28,
-      unitsLeft: 12,
-      totalUnits: 40,
-      revenue: 12600000,
-      status: "Under Construction"
-    },
-    {
-      id: 2,
-      developmentName: "Karl's Manet Ville",
-      coverImage: "/placeholder.png",
-      unitsSold: 15,
-      unitsLeft: 25,
-      totalUnits: 40,
-      revenue: 5700000,
-      status: "Pre-Construction"
-    },
-    {
-      id: 3,
-      developmentName: "Jojo Jones",
-      coverImage: "/placeholder.png",
-      unitsSold: 4,
-      unitsLeft: 6,
-      totalUnits: 10,
-      revenue: 1280000,
-      status: "Ready for Occupancy"
-    },
-    {
-      id: 4,
-      developmentName: "Peter's Apartments",
-      coverImage: "/placeholder.png",
-      unitsSold: 0,
-      unitsLeft: 241,
-      totalUnits: 241,
-      revenue: 0,
-      status: "Planning"
+  const [developmentsBySale, setDevelopmentsBySale] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch(`/api/sales/developments?slug=${developerId}`)
+        const result = await response.json()
+        
+        if (result.success && result.data) {
+          setDevelopmentsBySale(result.data)
+        } else {
+          setDevelopmentsBySale([])
+        }
+      } catch (error) {
+        console.error('Error fetching developments by sale:', error)
+        setDevelopmentsBySale([])
+      } finally {
+        setLoading(false)
+      }
     }
-  ]
+
+    if (developerId) {
+      fetchData()
+    }
+  }, [developerId])
 
   const getStatusColor = (status) => {
     switch (status) {
       case 'Ready for Occupancy':
+      case 'Completed':
         return 'bg-green-100 text-green-800'
       case 'Under Construction':
         return 'bg-blue-100 text-blue-800'
@@ -65,6 +50,30 @@ const DevelopmentsBySale = ({ developerId }) => {
 
   const calculateSoldPercentage = (sold, total) => {
     return total > 0 ? ((sold / total) * 100).toFixed(1) : 0
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">Developments by Sale</h3>
+          <p className="text-sm text-gray-600">Sales performance across all developments</p>
+        </div>
+        <div className="p-6 text-center text-gray-500">Loading...</div>
+      </div>
+    )
+  }
+
+  if (developmentsBySale.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">Developments by Sale</h3>
+          <p className="text-sm text-gray-600">Sales performance across all developments</p>
+        </div>
+        <div className="p-6 text-center text-gray-500">No developments data available</div>
+      </div>
+    )
   }
 
   return (
@@ -103,14 +112,25 @@ const DevelopmentsBySale = ({ developerId }) => {
               <tr key={development.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <Link 
-                    href={`/allDevelopments/${development.id}`}
+                    href={development.slug ? `/allDevelopments/${development.slug}` : '#'}
                     className="flex items-center space-x-3"
                   >
-                    <img
-                      src={development.coverImage}
-                      alt={development.developmentName}
-                      className="w-12 h-12 rounded object-cover border"
-                    />
+                    <div className="w-12 h-12 rounded overflow-hidden border border-gray-200 flex-shrink-0">
+                      {development.coverImage ? (
+                        <img
+                          src={development.coverImage}
+                          alt={development.developmentName}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.src = '/placeholder.png'
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                          <Building2 className="w-6 h-6 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
                     <div>
                       <div className="text-sm font-medium text-gray-900">
                         {development.developmentName}
@@ -127,28 +147,16 @@ const DevelopmentsBySale = ({ developerId }) => {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <div className="flex items-center">
-                    <Building2 className="w-4 h-4 text-blue-500 mr-1" />
-                    {development.unitsSold}
-                  </div>
+                  {development.unitsSold}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <div className="flex items-center">
-                    <Users className="w-4 h-4 text-gray-500 mr-1" />
-                    {development.unitsLeft}
-                  </div>
+                  {development.unitsLeft}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <div className="flex items-center">
-                    <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                    {calculateSoldPercentage(development.unitsSold, development.totalUnits)}%
-                  </div>
+                  {calculateSoldPercentage(development.unitsSold, development.totalUnits)}%
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <div className="flex items-center">
-                    <DollarSign className="w-4 h-4 text-green-500 mr-1" />
-                    ${development.revenue.toLocaleString()}
-                  </div>
+                  {development.currency || 'USD'}{development.revenue.toLocaleString()}
                 </td>
               </tr>
             ))}

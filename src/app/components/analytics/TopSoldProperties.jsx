@@ -1,64 +1,35 @@
 'use client'
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Eye, Heart, Calendar, DollarSign } from 'lucide-react'
+import { MapPin } from 'lucide-react'
 
 const TopSoldProperties = ({ listerId }) => {
-  // Dummy data for top sold properties
-  const topSoldProperties = [
-    {
-      id: 1,
-      propertyName: "Premium Apartments East Legon",
-      price: 450000,
-      dateListed: "2024-01-15",
-      dateSold: "2024-02-28",
-      revenue: 450000,
-      totalViews: 2847,
-      totalLeads: 156
-    },
-    {
-      id: 2,
-      propertyName: "Karl's Manet Ville",
-      price: 380000,
-      dateListed: "2024-01-20",
-      dateSold: "2024-03-15",
-      revenue: 380000,
-      totalViews: 1923,
-      totalLeads: 98
-    },
-    {
-      id: 3,
-      propertyName: "Jojo Jones",
-      price: 320000,
-      dateListed: "2024-02-01",
-      dateSold: "2024-03-20",
-      revenue: 320000,
-      totalViews: 1654,
-      totalLeads: 87
-    },
-    {
-      id: 4,
-      propertyName: "Peter's Apartments",
-      price: 280000,
-      dateListed: "2024-02-10",
-      dateSold: "2024-04-05",
-      revenue: 280000,
-      totalViews: 1234,
-      totalLeads: 65
-    },
-    {
-      id: 5,
-      propertyName: "Luxury Heights",
-      price: 520000,
-      dateListed: "2024-01-05",
-      dateSold: "2024-02-15",
-      revenue: 520000,
-      totalViews: 987,
-      totalLeads: 54
+  const [topSoldProperties, setTopSoldProperties] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch(`/api/sales/top-properties?slug=${listerId}&limit=10`)
+        const result = await response.json()
+        
+        if (result.success && result.data) {
+          setTopSoldProperties(result.data)
+        }
+      } catch (error) {
+        console.error('Error fetching top properties:', error)
+      } finally {
+        setLoading(false)
+      }
     }
-  ]
+
+    if (listerId) {
+      fetchData()
+    }
+  }, [listerId])
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A'
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -66,11 +37,28 @@ const TopSoldProperties = ({ listerId }) => {
     })
   }
 
-  const calculateDaysOnMarket = (listed, sold) => {
-    const listedDate = new Date(listed)
-    const soldDate = new Date(sold)
-    const diffTime = Math.abs(soldDate - listedDate)
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">Top Sold Properties</h3>
+          <p className="text-sm text-gray-600">Best performing properties by revenue</p>
+        </div>
+        <div className="p-6 text-center text-gray-500">Loading...</div>
+      </div>
+    )
+  }
+
+  if (topSoldProperties.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">Top Sold Properties</h3>
+          <p className="text-sm text-gray-600">Best performing properties by revenue</p>
+        </div>
+        <div className="p-6 text-center text-gray-500">No sales data available</div>
+      </div>
+    )
   }
 
   return (
@@ -85,7 +73,7 @@ const TopSoldProperties = ({ listerId }) => {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Property Name
+                Property
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Price
@@ -112,44 +100,63 @@ const TopSoldProperties = ({ listerId }) => {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {topSoldProperties.map((property) => (
-              <tr key={property.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <Link 
-                    href={`/property/sale/${property.id}`}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-800"
-                  >
-                    {property.propertyName}
-                  </Link>
+              <tr key={property.id || property.listingId} className="hover:bg-gray-50">
+                <td className="px-6 py-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-16 h-16 rounded overflow-hidden border border-gray-200 flex-shrink-0">
+                      {property.image ? (
+                        <img
+                          src={property.image}
+                          alt={property.propertyName}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.src = '/placeholder.png'
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                          <span className="text-gray-400 text-xs">No Image</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      {property.slug ? (
+                        <Link 
+                          href={`/property/${property.slug}`}
+                          className="text-sm font-medium text-blue-600 hover:text-blue-800 block"
+                        >
+                          {property.propertyName}
+                        </Link>
+                      ) : (
+                        <span className="text-sm font-medium text-gray-900 block">{property.propertyName}</span>
+                      )}
+                      <div className="flex items-center text-xs text-gray-500 mt-1">
+                        <MapPin className="w-3 h-3 text-gray-400 mr-1 flex-shrink-0" />
+                        <span className="truncate">{property.location}</span>
+                      </div>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  ${property.price.toLocaleString()}
+                  {property.currency || 'USD'}{property.price.toLocaleString()}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                   {formatDate(property.dateListed)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                   {formatDate(property.dateSold)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {calculateDaysOnMarket(property.dateListed, property.dateSold)} days
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {property.daysOnMarket !== null ? `${property.daysOnMarket} days` : 'N/A'}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <div className="flex items-center">
-                    <DollarSign className="w-4 h-4 text-green-500 mr-1" />
-                    ${property.revenue.toLocaleString()}
-                  </div>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {property.currency || 'USD'}{property.revenue.toLocaleString()}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <div className="flex items-center">
-                    <Eye className="w-4 h-4 text-blue-500 mr-1" />
-                    {property.totalViews.toLocaleString()}
-                  </div>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {property.totalViews.toLocaleString()}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <div className="flex items-center">
-                    <Heart className="w-4 h-4 text-red-500 mr-1" />
-                    {property.totalLeads}
-                  </div>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {property.totalLeads}
                 </td>
               </tr>
             ))}

@@ -252,149 +252,25 @@ async function processEvent(e) {
       break
     }
 
-    case 'lead_phone': {
-      if (!listingId || !seekerId) break
-      
-      // Use generic lister system with legacy fallback
-      let finalListerId = listerId
-      let finalListerType = listerType
-      
-      // Legacy fallback for backward compatibility
-      if (!finalListerId) {
-        if (properties.developer_id) {
-          finalListerId = properties.developer_id
-          finalListerType = 'developer'
-        } else if (properties.agent_id) {
-          finalListerId = properties.agent_id
-          finalListerType = 'agent'
-        }
-      }
-      
-      if (!finalListerId) break // Skip if no lister identified
-      
-      // Store user_type in Redis based on lister_type
-      if (finalListerId && finalListerType) {
-        const storeOp = storeUserTypeInRedis(finalListerId, finalListerType)
-        if (storeOp) ops.push(storeOp)
-      }
-      
-      // Create action data
-      const actionData = {
-        action_id: crypto.randomUUID(),
-        action_type: 'lead_phone',
-        action_date: day,
-        action_timestamp: timestamp,
-        action_metadata: {
-          action: properties.action || 'click',
-          context_type: properties.context_type || 'listing'
-        }
-      }
-      
-      // Add action to seeker's action array
-      ops.push(() => client.lPush(kLead(listingId, seekerId, 'actions'), JSON.stringify(actionData)))
-      ops.push(() => client.expire(kLead(listingId, seekerId, 'actions'), ANALYTICS_TTL))
-      
-      // Update metadata
-      const metadata = {
-        lister_id: finalListerId,
-        lister_type: finalListerType,
-        first_action_date: day,
-        last_action_date: day,
-        total_actions: 1,
-        last_action_type: 'lead_phone',
-        status: 'new'
-      }
-      ops.push(() => client.hSet(kLead(listingId, seekerId, 'metadata'), metadata))
-      ops.push(() => client.expire(kLead(listingId, seekerId, 'metadata'), ANALYTICS_TTL))
-      
-      // Update aggregation counters
-      ops.push(incrWithTTL(kLeadAgg(listingId, day, 'total_leads')))
-      ops.push(incrWithTTL(kLeadAgg(listingId, day, 'phone_leads')))
-      ops.push(pfAddWithTTL(kLeadAgg(listingId, day, 'unique_leads'), seekerId))
-      // Also store in Set for retrieval in cron job (HyperLogLog doesn't support member retrieval)
-      if (seekerId) {
-        ops.push(() => client.sAdd(kLeadAgg(listingId, day, 'seekers'), seekerId))
-        ops.push(() => client.expire(kLeadAgg(listingId, day, 'seekers'), ANALYTICS_TTL))
-      }
-      
-      // Keep existing listing analytics
-      ops.push(incrWithTTL(kListing(listingId, day, 'phone_leads')))
-      ops.push(incrWithTTL(kListing(listingId, day, 'total_leads')))
-      if (seekerId) ops.push(pfAddWithTTL(kListing(listingId, day, 'unique_leads'), seekerId))
-      break
-    }
-
-    case 'lead_message': {
-      if (!listingId || !seekerId) break
-      
-      // Use generic lister system with legacy fallback
-      let finalListerId = listerId
-      let finalListerType = listerType
-      
-      // Legacy fallback for backward compatibility
-      if (!finalListerId) {
-        if (properties.developer_id) {
-          finalListerId = properties.developer_id
-          finalListerType = 'developer'
-        } else if (properties.agent_id) {
-          finalListerId = properties.agent_id
-          finalListerType = 'agent'
-        }
-      }
-      
-      if (!finalListerId) break // Skip if no lister identified
-      
-      // Store user_type in Redis based on lister_type
-      if (finalListerId && finalListerType) {
-        const storeOp = storeUserTypeInRedis(finalListerId, finalListerType)
-        if (storeOp) ops.push(storeOp)
-      }
-      
-      // Create action data
-      const actionData = {
-        action_id: crypto.randomUUID(),
-        action_type: 'lead_message',
-        action_date: day,
-        action_timestamp: timestamp,
-        action_metadata: {
-          context_type: properties.context_type || 'listing',
-          message_type: properties.message_type || 'direct_message'
-        }
-      }
-      
-      // Add action to seeker's action array
-      ops.push(() => client.lPush(kLead(listingId, seekerId, 'actions'), JSON.stringify(actionData)))
-      ops.push(() => client.expire(kLead(listingId, seekerId, 'actions'), ANALYTICS_TTL))
-      
-      // Update metadata
-      const metadata = {
-        lister_id: finalListerId,
-        lister_type: finalListerType,
-        first_action_date: day,
-        last_action_date: day,
-        total_actions: 1,
-        last_action_type: 'lead_message',
-        status: 'new'
-      }
-      ops.push(() => client.hSet(kLead(listingId, seekerId, 'metadata'), metadata))
-      ops.push(() => client.expire(kLead(listingId, seekerId, 'metadata'), ANALYTICS_TTL))
-      
-      // Update aggregation counters
-      ops.push(incrWithTTL(kLeadAgg(listingId, day, 'total_leads')))
-      const mt = String(properties.message_type || '').toLowerCase()
-      if (mt === 'email') ops.push(incrWithTTL(kLeadAgg(listingId, day, 'email_leads')))
-      else ops.push(incrWithTTL(kLeadAgg(listingId, day, 'message_leads')))
-      ops.push(pfAddWithTTL(kLeadAgg(listingId, day, 'unique_leads'), seekerId))
-      
-      // Keep existing listing analytics
-      if (mt === 'email') ops.push(incrWithTTL(kListing(listingId, day, 'email_leads')))
-      else ops.push(incrWithTTL(kListing(listingId, day, 'message_leads')))
-      ops.push(incrWithTTL(kListing(listingId, day, 'total_leads')))
-      if (seekerId) ops.push(pfAddWithTTL(kListing(listingId, day, 'unique_leads'), seekerId))
-      break
-    }
-
+    case 'lead':
+    // Backward compatibility: handle old event names
+    case 'lead_phone':
+    case 'lead_message':
     case 'lead_appointment': {
+      // Unified lead event - extract lead_type from properties
+      // If event is old format (lead_phone, lead_message, lead_appointment), derive lead_type from event name
+      let leadType = properties.lead_type || properties.leadType
+      if (!leadType) {
+        // Backward compatibility: derive lead_type from old event names
+        if (event === 'lead_phone') {
+          leadType = 'phone'
+        } else if (event === 'lead_message') {
+          leadType = 'message'
+        } else if (event === 'lead_appointment') {
+          leadType = 'appointment'
+        }
+      }
+      
       if (!listingId || !seekerId) break
       
       // Use generic lister system with legacy fallback
@@ -420,15 +296,31 @@ async function processEvent(e) {
         if (storeOp) ops.push(storeOp)
       }
       
+      // Determine action_type based on lead_type
+      let actionType = 'lead'
+      let lastActionType = 'lead'
+      if (leadType === 'phone') {
+        actionType = 'lead_phone'
+        lastActionType = 'lead_phone'
+      } else if (leadType === 'message') {
+        actionType = 'lead_message'
+        lastActionType = 'lead_message'
+      } else if (leadType === 'appointment') {
+        actionType = 'lead_appointment'
+        lastActionType = 'lead_appointment'
+      }
+      
       // Create action data
       const actionData = {
         action_id: crypto.randomUUID(),
-        action_type: 'lead_appointment',
+        action_type: actionType,
         action_date: day,
         action_timestamp: timestamp,
         action_metadata: {
+          action: properties.action || null,
           context_type: properties.context_type || 'listing',
-          appointment_type: properties.appointment_type || 'viewing'
+          message_type: properties.message_type || properties.messageType || null,
+          appointment_type: properties.appointment_type || properties.appointmentType || null
         }
       }
       
@@ -443,21 +335,45 @@ async function processEvent(e) {
         first_action_date: day,
         last_action_date: day,
         total_actions: 1,
-        last_action_type: 'lead_appointment',
+        last_action_type: lastActionType,
         status: 'new'
       }
       ops.push(() => client.hSet(kLead(listingId, seekerId, 'metadata'), metadata))
       ops.push(() => client.expire(kLead(listingId, seekerId, 'metadata'), ANALYTICS_TTL))
       
-      // Update aggregation counters
+      // Update aggregation counters based on lead_type
       ops.push(incrWithTTL(kLeadAgg(listingId, day, 'total_leads')))
-      ops.push(incrWithTTL(kLeadAgg(listingId, day, 'appointment_leads')))
       ops.push(pfAddWithTTL(kLeadAgg(listingId, day, 'unique_leads'), seekerId))
       
-      // Keep existing listing analytics
-      ops.push(incrWithTTL(kListing(listingId, day, 'appointment_leads')))
-      ops.push(incrWithTTL(kListing(listingId, day, 'total_leads')))
-      if (seekerId) ops.push(pfAddWithTTL(kListing(listingId, day, 'unique_leads'), seekerId))
+      if (leadType === 'phone') {
+        ops.push(incrWithTTL(kLeadAgg(listingId, day, 'phone_leads')))
+        // Keep existing listing analytics
+        ops.push(incrWithTTL(kListing(listingId, day, 'phone_leads')))
+        ops.push(incrWithTTL(kListing(listingId, day, 'total_leads')))
+        if (seekerId) ops.push(pfAddWithTTL(kListing(listingId, day, 'unique_leads'), seekerId))
+        // Also store in Set for retrieval in cron job (HyperLogLog doesn't support member retrieval)
+        if (seekerId) {
+          ops.push(() => client.sAdd(kLeadAgg(listingId, day, 'seekers'), seekerId))
+          ops.push(() => client.expire(kLeadAgg(listingId, day, 'seekers'), ANALYTICS_TTL))
+        }
+      } else if (leadType === 'message') {
+        const mt = String(properties.message_type || properties.messageType || '').toLowerCase()
+        if (mt === 'email') {
+          ops.push(incrWithTTL(kLeadAgg(listingId, day, 'email_leads')))
+          ops.push(incrWithTTL(kListing(listingId, day, 'email_leads')))
+        } else {
+          ops.push(incrWithTTL(kLeadAgg(listingId, day, 'message_leads')))
+          ops.push(incrWithTTL(kListing(listingId, day, 'message_leads')))
+        }
+        ops.push(incrWithTTL(kListing(listingId, day, 'total_leads')))
+        if (seekerId) ops.push(pfAddWithTTL(kListing(listingId, day, 'unique_leads'), seekerId))
+      } else if (leadType === 'appointment') {
+        ops.push(incrWithTTL(kLeadAgg(listingId, day, 'appointment_leads')))
+        // Keep existing listing analytics
+        ops.push(incrWithTTL(kListing(listingId, day, 'appointment_leads')))
+        ops.push(incrWithTTL(kListing(listingId, day, 'total_leads')))
+        if (seekerId) ops.push(pfAddWithTTL(kListing(listingId, day, 'unique_leads'), seekerId))
+      }
       break
     }
 

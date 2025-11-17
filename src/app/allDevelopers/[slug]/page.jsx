@@ -125,7 +125,8 @@ const DeveloperPage = () => {
   const handleDevelopmentClick = (development) => {
     analytics.trackDevelopmentView(development.id, {
       viewedFrom: 'developer_profile',
-      developerId: developer?.developer_id,
+      lister_id: developer?.developer_id,
+      lister_type: 'developer',
       location: {
         city: development.city,
         state: development.state

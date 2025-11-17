@@ -21,7 +21,18 @@ const Chats = ({ onChatSelect, selectedChatId, onConversationDataChange }) => {
   useEffect(() => {
     if (!token || !user) return;
 
-    const fetchConversations = async () => {
+    let isFetching = false;
+    let fetchTimeout = null;
+    let pollInterval = null;
+
+    const fetchConversations = async (silent = false) => {
+      // Prevent multiple simultaneous fetches
+      if (isFetching) {
+        console.log('⏸️ Fetch already in progress, skipping...');
+        return;
+      }
+
+      isFetching = true;
       try {
         const response = await fetch('/api/conversations', {
           headers: {
@@ -34,49 +45,128 @@ const Chats = ({ onChatSelect, selectedChatId, onConversationDataChange }) => {
           const data = await response.json();
           setConversations(data.conversations || []);
         } else {
-          console.error('Failed to fetch conversations');
+          if (!silent) console.error('Failed to fetch conversations');
         }
       } catch (error) {
-        console.error('Error fetching conversations:', error);
+        if (!silent) console.error('Error fetching conversations:', error);
       } finally {
-        setLoading(false);
+        isFetching = false;
+        if (!silent) setLoading(false);
       }
+    };
+
+    // Debounced refresh function
+    const debouncedRefresh = () => {
+      if (fetchTimeout) {
+        clearTimeout(fetchTimeout);
+      }
+      fetchTimeout = setTimeout(() => {
+        fetchConversations(true); // Silent refresh
+      }, 1000); // Wait 1 second before refreshing
     };
 
     // Initial fetch
     fetchConversations();
 
-    // Subscribe to realtime conversation updates
-    const channel = supabase
-      .channel('conversations-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'conversations'
-        },
-        (payload) => {
-          console.log('💬 Realtime conversation event:', payload);
-          fetchConversations();
-        }
-      )
-      .subscribe((status) => {
-        console.log('📡 Conversations subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to conversations channel');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Conversations channel subscription error');
-        } else if (status === 'TIMED_OUT') {
-          console.error('⏰ Conversations channel subscription timed out');
-        } else if (status === 'CLOSED') {
-          console.log('🔒 Conversations channel subscription closed');
-        }
-      });
+    // Listen for manual refresh events (debounced)
+    const handleRefresh = () => {
+      console.log('🔄 Manual conversation refresh triggered (debounced)');
+      debouncedRefresh();
+    };
+    
+    window.addEventListener('refreshConversations', handleRefresh);
+
+    // Subscribe to realtime conversation updates with error handling
+    let channel = null;
+    try {
+      channel = supabase
+        .channel(`conversations-realtime-${user?.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT', // Only listen to new conversations
+            schema: 'public',
+            table: 'conversations'
+          },
+          (payload) => {
+            console.log('💬 New conversation created:', payload);
+            debouncedRefresh(); // Debounced refresh
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE', // Only listen to updates
+            schema: 'public',
+            table: 'conversations',
+            filter: `user1_id=eq.${user?.id} OR user2_id=eq.${user?.id}` // Only for user's conversations
+          },
+          (payload) => {
+            // Only refresh if last_message_at changed (new message) or unread count changed significantly
+            const oldData = payload.old;
+            const newData = payload.new;
+            
+            // Check if it's a meaningful update (new message or unread count change)
+            const hasNewMessage = newData.last_message_at !== oldData?.last_message_at;
+            const unreadChanged = (newData.user1_unread_count !== oldData?.user1_unread_count) ||
+                                 (newData.user2_unread_count !== oldData?.user2_unread_count);
+            
+            if (hasNewMessage || unreadChanged) {
+              console.log('💬 Conversation updated (new message or unread change):', payload);
+              debouncedRefresh(); // Debounced refresh
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log('📡 Conversations subscription status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Successfully subscribed to conversations channel');
+            // Clear any polling if realtime works
+            if (pollInterval) {
+              clearInterval(pollInterval);
+              pollInterval = null;
+            }
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.warn(`⚠️ Conversations channel ${status} - using fallback polling (30s)`);
+            // Fallback: Poll every 30 seconds (much less frequent) if realtime fails
+            if (!pollInterval) {
+              pollInterval = setInterval(() => {
+                fetchConversations(true); // Silent polling
+              }, 30000); // 30 seconds instead of 5
+            }
+          } else if (status === 'CLOSED') {
+            console.log('🔒 Conversations channel subscription closed');
+          }
+        });
+    } catch (error) {
+      console.error('Error setting up realtime subscription:', error);
+      // Fallback polling if subscription setup fails (30 seconds)
+      if (!pollInterval) {
+        pollInterval = setInterval(() => {
+          fetchConversations(true); // Silent polling
+        }, 30000); // 30 seconds
+      }
+      channel = { pollInterval };
+    }
 
     // Cleanup: unsubscribe when component unmounts
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener('refreshConversations', handleRefresh);
+      if (fetchTimeout) {
+        clearTimeout(fetchTimeout);
+      }
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+      if (channel) {
+        if (channel.pollInterval) {
+          clearInterval(channel.pollInterval);
+        }
+        if (channel.unsubscribe) {
+          channel.unsubscribe();
+        }
+        supabase.removeChannel(channel);
+      }
     };
   }, [token, user]);
 

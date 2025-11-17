@@ -1,11 +1,12 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 import PropertiesByCategories from '@/app/components/developers/DataStats/PropertiesByCategories'
 import PropertiesByType from '@/app/components/developers/DataStats/PropertiesByType'
 import PropertiesBySubType from '@/app/components/developers/DataStats/PropertiesBySubType'
 import DataCard from '@/app/components/developers/DataCard'
-
+import PopularListings from '@/app/components/developers/DataStats/PopularListings'
 
 import Link from 'next/link'
 import { 
@@ -32,6 +33,11 @@ import {
   Filler
 } from 'chart.js'
 import { Line } from 'react-chartjs-2'
+import StatisticsView from '@/app/components/developers/DataStats/StatisticsView'
+import ListingsByLocation from '@/app/components/developers/DataStats/ListingsByLocation'
+import DevelopmentStats from '@/app/components/developers/AddNewDevelopment/DevelopmentStats'
+import TopDevelopments from '@/app/components/developers/DataStats/TopDevelopments'
+
 
 ChartJS.register(
   CategoryScale,
@@ -46,6 +52,7 @@ ChartJS.register(
 
 const PropertyAnalytics = () => {
   const params = useParams()
+  const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [timeRange, setTimeRange] = useState('30d')
 
@@ -136,12 +143,15 @@ const PropertyAnalytics = () => {
     }
   }
 
-  const developerInfo = {
-    name: 'Premium Developers Ltd',
-    slug: params.slug
-  }
+  // Calculate conversion rate from real data
+  const totalViews = user?.profile?.total_views || 0
+  const totalLeads = user?.profile?.total_leads || 0
+  const conversionRate = totalViews > 0 ? ((totalLeads / totalViews) * 100).toFixed(1) : 0
 
-  // Using dummy data - no API calls needed
+  // Get real data from user profile
+  const totalUnits = user?.profile?.total_units || 0
+  const totalDevelopments = user?.profile?.total_developments || 0
+  const totalImpressions = user?.profile?.total_impressions || 0
 
   if (loading) {
     return (
@@ -188,43 +198,44 @@ const PropertyAnalytics = () => {
 
         {/* Overview Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-        <DataCard
+          <DataCard
             title="Total Units"
-            value={developerInfo?.total_units?.toLocaleString() || 0}
+            value={totalUnits.toLocaleString()}
             icon={Building2}
           />
           
           <DataCard
             title="Total Developments"
-            value={developerInfo?.total_developments?.toLocaleString() || 0}
+            value={totalDevelopments.toLocaleString()}
             icon={BarChart3}
           />
 
           <DataCard
             title="Total Views"
-            value={propertyData?.overview?.totalViews?.toLocaleString() || 0}
+            value={totalViews.toLocaleString()}
             icon={Eye}
           />
           
-        
-          
           <DataCard
             title="Total Impressions"
-            value={propertyData?.overview?.totalImpressions?.toLocaleString() || 0}
+            value={totalImpressions.toLocaleString()}
             icon={Share2}
           />
           
           <DataCard
             title="Conversion Rate"
-            value={`${propertyData?.overview?.conversionRate || 0}%`}
+            value={`${conversionRate}%`}
             icon={TrendingUp}
           />
         </div>
 
        
-
+{/* Statistics View */}
+        <StatisticsView />
+<ListingsByLocation />
+<DevelopmentStats />
         {/* Monthly Property Views (Chart) */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
+        {/* <div className="bg-white rounded-lg shadow p-6 mb-8">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Property Views</h3>
           <div className="h-72">
             <Line 
@@ -258,7 +269,7 @@ const PropertyAnalytics = () => {
 
       
 
-</div>
+</div> */}
 
 
 
@@ -272,196 +283,15 @@ const PropertyAnalytics = () => {
           <PropertiesBySubType />
         </div>
 
- {/* Top Performing Developments */}
- <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Top Performing Developments</h3>
-            <div className="text-sm text-gray-500">
-              Ranked by total engagement
-            </div>
-          </div>
-          
-          {/* Horizontal Scroll Container */}
-          <div className="overflow-x-auto">
-            <div className="min-w-[800px]">
-              <div className="grid grid-cols-1 gap-4">
-                {[
-                  {
-                    id: 1,
-                    name: "Premium Apartments East Legon",
-                    location: "East Legon, Accra",
-                    status: "Under Construction",
-                    views: 2847,
-                    impressions: 892,
-                    leads: 156,
-                    conversionRate: 5.5,
-                    trend: "up"
-                  },
-                  {
-                    id: 2,
-                    name: "Karl's Manet Ville",
-                    location: "Jonkobri, Accra",
-                    status: "Pre-Construction",
-                    views: 1923,
-                    impressions: 654,
-                    leads: 98,
-                    conversionRate: 5.1,
-                    trend: "up"
-                  },
-                  {
-                    id: 3,
-                    name: "Jojo Jones",
-                    location: "Bālā Bōkan, Afghanistan",
-                    status: "Ready for Occupancy",
-                    views: 1654,
-                    impressions: 432,
-                    leads: 87,
-                    conversionRate: 5.3,
-                    trend: "down"
-                  },
-                  {
-                    id: 4,
-                    name: "Peter's Apartments",
-                    location: "East Toorale, Australia",
-                    status: "Planning",
-                    views: 1234,
-                    impressions: 321,
-                    leads: 65,
-                    conversionRate: 5.3,
-                    trend: "up"
-                  },
-                  {
-                    id: 5,
-                    name: "Luxury Heights",
-                    location: "Cantonments, Accra",
-                    status: "Under Construction",
-                    views: 987,
-                    impressions: 298,
-                    leads: 54,
-                    conversionRate: 5.5,
-                    trend: "up"
-                  },
-                  {
-                    id: 6,
-                    name: "Garden City Residences",
-                    location: "Labone, Accra",
-                    status: "Ready for Occupancy",
-                    views: 876,
-                    impressions: 234,
-                    leads: 43,
-                    conversionRate: 4.9,
-                    trend: "down"
-                  },
-                  {
-                    id: 7,
-                    name: "Modern Living Complex",
-                    location: "Osu, Accra",
-                    status: "Under Construction",
-                    views: 765,
-                    impressions: 198,
-                    leads: 38,
-                    conversionRate: 5.0,
-                    trend: "up"
-                  },
-                  {
-                    id: 8,
-                    name: "Elite Towers",
-                    location: "Airport Residential, Accra",
-                    status: "Pre-Construction",
-                    views: 654,
-                    impressions: 167,
-                    leads: 32,
-                    conversionRate: 4.9,
-                    trend: "down"
-                  }
-                ].map((development, index) => (
-                  <div key={development.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex-shrink-0">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-semibold text-blue-600">#{index + 1}</span>
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-medium text-gray-900 truncate">
-                          {development.name}
-                        </h4>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <MapPin className="w-3 h-3 text-gray-400" />
-                          <p className="text-xs text-gray-500 truncate">{development.location}</p>
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            development.status === 'Ready for Occupancy' 
-                              ? 'bg-green-100 text-green-800'
-                              : development.status === 'Under Construction'
-                              ? 'bg-blue-100 text-blue-800'
-                              : development.status === 'Pre-Construction'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {development.status}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-6">
-                      {/* Views */}
-                      <div className="text-center">
-                        <div className="flex items-center space-x-1">
-                          <Eye className="w-4 h-4 text-blue-500" />
-                          <span className="text-sm font-semibold text-gray-900">{development.views.toLocaleString()}</span>
-                        </div>
-                        <p className="text-xs text-gray-500">Views</p>
-                      </div>
-                      
-                      {/* Impressions */}
-                      <div className="text-center">
-                        <div className="flex items-center space-x-1">
-                          <Share2 className="w-4 h-4 text-purple-500" />
-                          <span className="text-sm font-semibold text-gray-900">{development.impressions.toLocaleString()}</span>
-                        </div>
-                        <p className="text-xs text-gray-500">Impressions</p>
-                      </div>
-                      
-                      {/* Leads */}
-                      <div className="text-center">
-                        <div className="flex items-center space-x-1">
-                          <Heart className="w-4 h-4 text-green-500" />
-                          <span className="text-sm font-semibold text-gray-900">{development.leads}</span>
-                        </div>
-                        <p className="text-xs text-gray-500">Leads</p>
-                      </div>
-                      
-                      {/* Conversion Rate */}
-                      <div className="text-center">
-                        <div className="flex items-center space-x-1">
-                          {development.trend === 'up' ? (
-                            <TrendingUp className="w-4 h-4 text-green-500" />
-                          ) : (
-                            <TrendingDown className="w-4 h-4 text-red-500" />
-                          )}
-                          <span className="text-sm font-semibold text-gray-900">{development.conversionRate}%</span>
-                        </div>
-                        <p className="text-xs text-gray-500">Conversion</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          
-          {/* Show more indicator if there are more developments */}
-          <div className="mt-4 text-center">
-            <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">
-              View All Developments →
-            </button>
-          </div>
-        </div>
+
+        <PopularListings />
+        <TopDevelopments />
+
+
 
 
         {/* Properties Performance Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        {/* <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900">Property Performance</h3>
           </div>
@@ -539,7 +369,7 @@ const PropertyAnalytics = () => {
               </tbody>
             </table>
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   )

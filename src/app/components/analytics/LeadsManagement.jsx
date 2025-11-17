@@ -1,9 +1,11 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { FiMessageCircle, FiEdit3, FiTrash2, FiPlus, FiX, FiSend, FiUser, FiCalendar, FiPhone, FiMail } from 'react-icons/fi'
+import { FiMessageCircle, FiEdit3, FiTrash2, FiPlus, FiX, FiSend, FiUser, FiCalendar, FiPhone, FiMail, FiImage } from 'react-icons/fi'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function LeadsManagement({ listerId, listerType = 'developer', listingId = null, pageSize = 20 }) {
+  const { user } = useAuth()
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -17,99 +19,54 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
   const [editingNoteText, setEditingNoteText] = useState('')
   const [showChat, setShowChat] = useState(false)
   const [chatMessage, setChatMessage] = useState('')
+  const [sendingMessage, setSendingMessage] = useState(false)
 
   const offset = useMemo(() => page * pageSize, [page, pageSize])
 
-  // Dummy data builder (no API calls)
-  function buildDummyLeads(currentListerId, currentListerType, currentListingId) {
-    const base = [
-      {
-        id: 'ld_1',
-        listing_id: currentListingId || 'lst_1001',
-        listing_title: 'Premium Apartments East Legon',
-        lister_id: currentListerId,
-        lister_type: currentListerType,
-        seeker_id: 'seeker_001',
-        seeker_name: 'John Doe',
-        total_actions: 3,
-        lead_actions: [
-          { action_id: 'a1', action_type: 'lead_message', action_date: '2025-01-24', action_timestamp: '2025-01-24T09:00:00Z', action_metadata: { message_type: 'direct_message' } },
-          { action_id: 'a2', action_type: 'lead_phone', action_date: '2025-01-25', action_timestamp: '2025-01-25T10:00:00Z', action_metadata: { action: 'click' } },
-          { action_id: 'a3', action_type: 'lead_appointment', action_date: '2025-01-27', action_timestamp: '2025-01-27T14:00:00Z', action_metadata: { appointment_type: 'viewing' } }
-        ],
-        first_action_date: '2025-01-20',
-        last_action_date: '2025-01-27',
-        last_action_type: 'lead_message',
-        status: 'new',
-        notes: []
-      },
-      {
-        id: 'ld_2',
-        listing_id: currentListingId || 'lst_1002',
-        listing_title: 'Karl\'s Manet Ville',
-        lister_id: currentListerId,
-        lister_type: currentListerType,
-        seeker_id: 'seeker_002',
-        seeker_name: 'Sarah Wilson',
-        total_actions: 2,
-        lead_actions: [
-          { action_id: 'b1', action_type: 'lead_phone', action_date: '2025-01-22', action_timestamp: '2025-01-22T12:00:00Z', action_metadata: { action: 'click' } },
-          { action_id: 'b2', action_type: 'lead_message', action_date: '2025-01-26', action_timestamp: '2025-01-26T15:30:00Z', action_metadata: { message_type: 'email' } }
-        ],
-        first_action_date: '2025-01-22',
-        last_action_date: '2025-01-26',
-        last_action_type: 'lead_phone',
-        status: 'contacted',
-        notes: ['Called back']
-      },
-      {
-        id: 'ld_3',
-        listing_id: currentListingId || 'lst_1003',
-        listing_title: 'Jojo Jones',
-        lister_id: currentListerId,
-        lister_type: currentListerType,
-        seeker_id: 'seeker_003',
-        seeker_name: 'Mike Smith',
-        total_actions: 4,
-        lead_actions: [
-          { action_id: 'c1', action_type: 'lead_message', action_date: '2025-01-18', action_timestamp: '2025-01-18T08:30:00Z', action_metadata: { message_type: 'whatsapp' } },
-          { action_id: 'c2', action_type: 'lead_message', action_date: '2025-01-20', action_timestamp: '2025-01-20T09:15:00Z', action_metadata: { message_type: 'direct_message' } },
-          { action_id: 'c3', action_type: 'lead_phone', action_date: '2025-01-22', action_timestamp: '2025-01-22T10:45:00Z', action_metadata: { action: 'click' } },
-          { action_id: 'c4', action_type: 'lead_appointment', action_date: '2025-01-25', action_timestamp: '2025-01-25T11:00:00Z', action_metadata: { appointment_type: 'consultation' } }
-        ],
-        first_action_date: '2025-01-18',
-        last_action_date: '2025-01-25',
-        last_action_type: 'lead_appointment',
-        status: 'scheduled',
-        notes: []
-      }
-    ]
-    return base
-  }
-
-  function loadLeads() {
+  async function loadLeads() {
     if (!listerId) return
     setLoading(true)
     setError(null)
-    // Build, filter, paginate dummy data locally
-    let data = buildDummyLeads(listerId, listerType, listingId)
-    if (statusFilter) data = data.filter(d => (d.status || '').toLowerCase() === statusFilter.toLowerCase())
-    if (search) {
-      const q = search.toLowerCase()
-      data = data.filter(d =>
-        (d.seeker_name || '').toLowerCase().includes(q) ||
-        (d.listing_title || '').toLowerCase().includes(q) ||
-        (d.seeker_id || '').toLowerCase().includes(q)
-      )
-    }
-    const totalCount = data.length
-    const pageItems = data.slice(offset, offset + pageSize)
-    // Simulate network delay
-    setTimeout(() => {
-      setLeads(pageItems)
-      setTotal(totalCount)
+    
+    try {
+      const params = new URLSearchParams({
+        lister_id: listerId,
+        lister_type: listerType,
+        page: page.toString(),
+        page_size: pageSize.toString()
+      })
+      
+      if (listingId) {
+        params.append('listing_id', listingId)
+      }
+      
+      if (statusFilter) {
+        params.append('status', statusFilter)
+      }
+      
+      if (search) {
+        params.append('search', search)
+      }
+
+      const response = await fetch(`/api/leads?${params.toString()}`)
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        setLeads(result.data || [])
+        setTotal(result.total || 0)
+      } else {
+        setError(result.error || 'Failed to load leads')
+        setLeads([])
+        setTotal(0)
+      }
+    } catch (err) {
+      console.error('Error loading leads:', err)
+      setError('Failed to load leads')
+      setLeads([])
+      setTotal(0)
+    } finally {
       setLoading(false)
-    }, 150)
+    }
   }
 
   useEffect(() => {
@@ -117,38 +74,79 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listerId, listerType, listingId, statusFilter, search, page, pageSize])
 
-  function updateLeadStatus(leadId, newStatus) {
-    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus } : l))
-    setSelectedLead(prev => prev && prev.id === leadId ? { ...prev, status: newStatus } : prev)
+  async function updateLeadStatus(leadId, newStatus) {
+    try {
+      // Update locally first for instant feedback
+      setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus } : l))
+      setSelectedLead(prev => prev && prev.id === leadId ? { ...prev, status: newStatus } : prev)
+
+      // Update in database
+      const response = await fetch(`/api/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      })
+
+      if (!response.ok) {
+        // Revert on error
+        loadLeads()
+      }
+    } catch (err) {
+      console.error('Error updating lead status:', err)
+      loadLeads() // Reload on error
+    }
   }
 
-  function addLeadNote(leadId) {
-    const text = prompt('Add note (text only):')
-    if (!text || !text.trim()) return
-    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, notes: [...(Array.isArray(l.notes) ? l.notes : []), text.trim()] } : l))
+  async function sendMessage(lead) {
+    if (!chatMessage.trim() || !user || !lead.seeker_id) return
+
+    setSendingMessage(true)
+    try {
+      // Get token from localStorage or session
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+      
+      if (!token) {
+        alert('Please log in to send messages')
+        return
+      }
+
+      // Create or find conversation
+      const convResponse = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          otherUserId: lead.seeker_id,
+          otherUserType: 'property_seeker',
+          listingId: lead.listing_id || null,
+          conversationType: lead.listing_id ? 'listing_inquiry' : 'general_inquiry',
+          firstMessage: chatMessage.trim()
+        })
+      })
+
+      if (convResponse.ok) {
+        const convResult = await convResponse.json()
+        setChatMessage('')
+        setShowChat(false)
+        alert('Message sent successfully!')
+      } else {
+        const errorData = await convResponse.json()
+        alert(errorData.error || 'Failed to send message')
+      }
+    } catch (err) {
+      console.error('Error sending message:', err)
+      alert('Failed to send message. Please try again.')
+    } finally {
+      setSendingMessage(false)
+    }
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
-  // Filter leads based on search and status
-  const filteredLeads = useMemo(() => {
-    let filtered = leads
-    
-    if (statusFilter) {
-      filtered = filtered.filter(lead => (lead.status || '').toLowerCase() === statusFilter.toLowerCase())
-    }
-    
-    if (search) {
-      const query = search.toLowerCase()
-      filtered = filtered.filter(lead =>
-        (lead.seeker_name || '').toLowerCase().includes(query) ||
-        (lead.listing_title || '').toLowerCase().includes(query) ||
-        (lead.seeker_id || '').toLowerCase().includes(query)
-      )
-    }
-    
-    return filtered
-  }, [leads, statusFilter, search])
+  // Leads are already filtered by the API, so we use them directly
+  const filteredLeads = leads
 
   return (
     <div className="w-full space-y-6">
@@ -239,7 +237,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                   </td>
                 </tr>
               )}
-              {filteredLeads.slice(offset, offset + pageSize).map((lead) => (
+              {filteredLeads.map((lead) => (
                 <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -259,11 +257,41 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900 max-w-xs truncate">
-                      {lead.listing_title || lead.listing_id}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {lead.first_action_date}
+                    <div className="flex items-center gap-3">
+                      {lead.listing_image ? (
+                        <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 border border-gray-200">
+                          <img 
+                            src={lead.listing_image} 
+                            alt={lead.listing_title || 'Listing'} 
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.style.display = 'none'
+                              const placeholder = e.target.nextElementSibling
+                              if (placeholder) placeholder.style.display = 'flex'
+                            }}
+                          />
+                          <div className="absolute inset-0 w-16 h-16 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0 hidden">
+                            <FiImage className="w-6 h-6 text-gray-400" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-16 h-16 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0 border border-gray-300">
+                          <FiImage className="w-6 h-6 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm text-gray-900 max-w-xs truncate font-medium">
+                          {lead.listing_title || 'No listing'}
+                        </div>
+                        {lead.listing_location && (
+                          <div className="text-xs text-gray-500 truncate">
+                            {lead.listing_location}
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-400">
+                          {lead.first_action_date}
+                        </div>
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -300,7 +328,10 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                     <div className="flex items-center gap-2">
                       <button
                         className="text-blue-600 hover:text-blue-900 px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors flex items-center gap-1"
-                        onClick={() => alert('Open conversation UI')}
+                        onClick={() => {
+                          setSelectedLead(lead)
+                          setShowChat(true)
+                        }}
                       >
                         <FiMessageCircle className="w-4 h-4" />
                         Message
@@ -505,16 +536,12 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                         />
                         <div className="flex gap-2">
                           <button
-                            className="flex-1 px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center justify-center gap-2"
-                            onClick={() => {
-                              if (!chatMessage.trim()) return
-                              alert(`Message sent: "${chatMessage}"`)
-                              setChatMessage('')
-                              setShowChat(false)
-                            }}
+                            className="flex-1 px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={!chatMessage.trim() || sendingMessage}
+                            onClick={() => sendMessage(selectedLead)}
                           >
                             <FiSend className="w-4 h-4" />
-                            Send
+                            {sendingMessage ? 'Sending...' : 'Send'}
                           </button>
                           <button
                             className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"

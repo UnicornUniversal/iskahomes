@@ -3,6 +3,35 @@ import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 import { processCurrencyConversions } from '@/lib/currencyConversion'
 import { updateAdminAnalytics } from '@/lib/adminAnalytics'
+import { updateAdminListingsAnalytics, updateAdminSalesAnalytics } from '@/lib/adminAnalyticsHelpers'
+
+// Helper function to map status field to listing_status
+function mapStatusToListingStatus(status) {
+  if (!status) return null
+  
+  const statusLower = status.toLowerCase().trim()
+  
+  // Map "Sold", "Rented Out", or "Taken" to listing_status
+  if (statusLower === 'sold') {
+    return 'sold'
+  } else if (statusLower === 'rented out') {
+    return 'rented'
+  } else if (statusLower === 'taken') {
+    // "Taken" is a collective term - determine if it should be 'sold' or 'rented'
+    // For now, default to 'sold' but this could be made configurable
+    return 'sold'
+  }
+  
+  return null
+}
+
+// Helper function to check if status indicates sold/rented/taken
+function isStatusSoldRentedOrTaken(status) {
+  if (!status) return false
+  
+  const statusLower = status.toLowerCase().trim()
+  return ['sold', 'rented out', 'taken'].includes(statusLower)
+}
 
 // Helper function to calculate development stats from listings
 async function calculateDevelopmentStats(developmentId) {
@@ -390,7 +419,9 @@ async function updateDeveloperAfterListing(userId, operation = 'update') {
       .in('listing_status', ['sold', 'rented'])
 
     let totalRevenue = 0
+    let totalSales = 0
     if (!soldError && soldListings) {
+      totalSales = soldListings.length // Count of sold/rented listings
       soldListings.forEach(listing => {
         if (listing.estimated_revenue && typeof listing.estimated_revenue === 'object') {
           const revenueValue = listing.estimated_revenue.estimated_revenue || listing.estimated_revenue.price || 0
@@ -429,6 +460,7 @@ async function updateDeveloperAfterListing(userId, operation = 'update') {
       total_units: totalUnitsCount || 0,
       total_developments: totalDevelopmentsCount || 0,
       total_revenue: Math.round(totalRevenue),
+      total_sales: totalSales,
       estimated_revenue: Math.round(estimatedRevenue)
     }
 
@@ -527,62 +559,120 @@ async function checkListingAlreadySold(listingId) {
 // Helper function to update total_revenue for developer and development
 async function updateTotalRevenue(userId, developmentId, estimatedRevenue, operation = 'add') {
   try {
-    // Get primary currency
     const primaryCurrency = await getDeveloperPrimaryCurrency(userId)
     
-    // Extract estimated_revenue value (in primary currency)
+    // Get revenue value - use estimated_revenue.estimated_revenue (user's primary currency)
     const revenueValue = estimatedRevenue?.estimated_revenue || estimatedRevenue?.price || 0
+    const revenueValueNum = typeof revenueValue === 'string' ? parseFloat(revenueValue) : (typeof revenueValue === 'number' ? revenueValue : 0)
     
-    if (!revenueValue || revenueValue <= 0) {
-      console.log('No revenue value to update')
+    console.log('💰 updateTotalRevenue called:', {
+      userId,
+      developmentId,
+      operation,
+      primaryCurrency,
+      revenueValue: revenueValueNum,
+      estimatedRevenue: JSON.stringify(estimatedRevenue)
+    })
+    
+    if (!revenueValueNum || revenueValueNum <= 0) {
+      console.log('⚠️ No revenue value to update (value is 0 or invalid)')
       return
     }
 
-    // Update developer total_revenue
     if (userId) {
       const { data: developer, error: devError } = await supabaseAdmin
         .from('developers')
-        .select('total_revenue')
-        .eq('user_id', userId)
+        .select('total_revenue, total_sales, developer_id')
+        .eq('developer_id', userId)
         .single()
 
-      if (!devError && developer) {
-        const currentRevenue = developer.total_revenue || { currency: primaryCurrency, total_revenue: 0 }
-        let newTotalRevenue = currentRevenue.total_revenue || 0
+      if (devError) {
+        console.error('❌ Error fetching developer:', devError)
+        return
+      }
+
+      if (developer) {
+        // total_revenue is NUMERIC, handle both number and string
+        let currentRevenue = 0
+        if (developer.total_revenue !== null && developer.total_revenue !== undefined) {
+          if (typeof developer.total_revenue === 'number') {
+            currentRevenue = developer.total_revenue
+          } else if (typeof developer.total_revenue === 'string') {
+            currentRevenue = parseFloat(developer.total_revenue) || 0
+          } else if (typeof developer.total_revenue === 'object' && developer.total_revenue?.total_revenue) {
+            currentRevenue = parseFloat(developer.total_revenue.total_revenue) || 0
+          }
+        }
+        
+        let newTotalRevenue = currentRevenue || 0
         
         if (operation === 'add') {
-          newTotalRevenue = (newTotalRevenue || 0) + revenueValue
+          newTotalRevenue = (currentRevenue || 0) + revenueValueNum
         } else if (operation === 'subtract') {
-          newTotalRevenue = Math.max(0, (newTotalRevenue || 0) - revenueValue)
+          newTotalRevenue = Math.max(0, (currentRevenue || 0) - revenueValueNum)
         }
+
+        // Get current total_sales
+        const currentTotalSales = developer.total_sales || 0
+        let newTotalSales = currentTotalSales
+        
+        // Increment total_sales when adding revenue (new sale)
+        if (operation === 'add') {
+          newTotalSales = (currentTotalSales || 0) + 1
+        } else if (operation === 'subtract') {
+          // Decrement when removing revenue (sale reversed)
+          newTotalSales = Math.max(0, (currentTotalSales || 0) - 1)
+        }
+
+        console.log('📊 Updating developer revenue:', {
+          developer_id: developer.developer_id,
+          currentRevenue,
+          revenueValueNum,
+          newTotalRevenue,
+          currentTotalSales,
+          newTotalSales,
+          operation
+        })
 
         const { error: updateError } = await supabaseAdmin
           .from('developers')
           .update({
-            total_revenue: {
-              currency: primaryCurrency,
-              total_revenue: parseFloat(newTotalRevenue.toFixed(2))
-            }
+            total_revenue: newTotalRevenue, // NUMERIC field - keep as decimal
+            total_sales: newTotalSales
           })
-          .eq('user_id', userId)
+          .eq('developer_id', userId)
 
         if (updateError) {
-          console.error('Error updating developer total_revenue:', updateError)
+          console.error('❌ Error updating developer total_revenue and total_sales:', updateError)
+        } else {
+          console.log('✅ Successfully updated developer total_revenue:', {
+            developer_id: developer.developer_id,
+            total_revenue: newTotalRevenue,
+            total_sales: newTotalSales
+          })
         }
+      } else {
+        console.error('❌ Developer not found for userId:', userId)
       }
     }
 
-    // Update development total_revenue
+    // Update development total_revenue and units_sold
     if (developmentId) {
       const { data: development, error: devError } = await supabaseAdmin
         .from('developments')
-        .select('total_revenue')
+        .select('total_revenue, units_sold')
         .eq('id', developmentId)
         .single()
 
       if (!devError && development) {
-        const currentRevenue = development.total_revenue || { currency: primaryCurrency, total_revenue: 0 }
-        let newTotalRevenue = currentRevenue.total_revenue || 0
+        // total_revenue might be INTEGER or JSONB, handle both
+        const currentRevenue = typeof development.total_revenue === 'number'
+          ? development.total_revenue
+          : (typeof development.total_revenue === 'object' && development.total_revenue?.total_revenue
+              ? development.total_revenue.total_revenue
+              : 0)
+        
+        let newTotalRevenue = currentRevenue || 0
         
         if (operation === 'add') {
           newTotalRevenue = (newTotalRevenue || 0) + revenueValue
@@ -590,18 +680,42 @@ async function updateTotalRevenue(userId, developmentId, estimatedRevenue, opera
           newTotalRevenue = Math.max(0, (newTotalRevenue || 0) - revenueValue)
         }
 
+        // Update units_sold
+        const currentUnitsSold = development.units_sold || 0
+        let newUnitsSold = currentUnitsSold
+        
+        if (operation === 'add') {
+          newUnitsSold = (currentUnitsSold || 0) + 1
+        } else if (operation === 'subtract') {
+          newUnitsSold = Math.max(0, (currentUnitsSold || 0) - 1)
+        }
+
+        console.log('📊 Updating development revenue:', {
+          developmentId,
+          currentRevenue,
+          revenueValueNum,
+          newTotalRevenue,
+          currentUnitsSold,
+          newUnitsSold,
+          operation
+        })
+
         const { error: updateError } = await supabaseAdmin
           .from('developments')
           .update({
-            total_revenue: {
-              currency: primaryCurrency,
-              total_revenue: parseFloat(newTotalRevenue.toFixed(2))
-            }
+            total_revenue: newTotalRevenue, // NUMERIC field - keep as decimal
+            units_sold: newUnitsSold
           })
           .eq('id', developmentId)
 
         if (updateError) {
-          console.error('Error updating development total_revenue:', updateError)
+          console.error('❌ Error updating development total_revenue and units_sold:', updateError)
+        } else {
+          console.log('✅ Successfully updated development total_revenue:', {
+            developmentId,
+            total_revenue: newTotalRevenue,
+            units_sold: newUnitsSold
+          })
         }
       }
     }
@@ -611,7 +725,7 @@ async function updateTotalRevenue(userId, developmentId, estimatedRevenue, opera
 }
 
 // Helper function to create sales_listings entry
-async function createSalesListingEntry(listingId, userId, listingData, saleType) {
+async function createSalesListingEntry(listingId, userId, listingData, saleType, salesInfo = {}) {
   try {
     // Get primary currency
     const primaryCurrency = await getDeveloperPrimaryCurrency(userId)
@@ -633,10 +747,11 @@ async function createSalesListingEntry(listingId, userId, listingData, saleType)
       sale_type: saleType, // 'sold' or 'rented'
       sale_date: new Date().toISOString().split('T')[0], // Today's date
       sale_timestamp: new Date().toISOString(),
-      sale_source: 'platform', // Default value
+      sale_source: salesInfo.sale_source || 'Iska Homes', // From modal or default
+      buyer_name: salesInfo.buyer_name || null, // From modal
+      notes: salesInfo.notes || null, // From modal
       commission_rate: null, // Can be added later
-      commission_amount: null, // Can be added later
-      notes: null
+      commission_amount: null // Can be added later
     }
 
     const { data, error } = await supabaseAdmin
@@ -657,9 +772,15 @@ async function createSalesListingEntry(listingId, userId, listingData, saleType)
   }
 }
 
+// Helper function to check if a string is a valid UUID
+function isUUID(str) {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  return uuidRegex.test(str)
+}
+
 export async function GET(request, { params }) {
   try {
-    const { id } = params
+    const { id } = await params
 
     if (!id) {
       return NextResponse.json(
@@ -668,12 +789,21 @@ export async function GET(request, { params }) {
       )
     }
 
-    // Fetch the listing
-    const { data: listing, error } = await supabase
+    // Determine if id is a UUID or slug
+    const isIdUUID = isUUID(id)
+    
+    // Fetch the listing - try by ID first if it's a UUID, otherwise by slug
+    let query = supabase
       .from('listings')
       .select('*')
-      .eq('id', id)
-      .single()
+    
+    if (isIdUUID) {
+      query = query.eq('id', id)
+    } else {
+      query = query.eq('slug', id)
+    }
+    
+    const { data: listing, error } = await query.single()
 
     if (error) {
       console.error('Error fetching listing:', error)
@@ -818,7 +948,7 @@ async function uploadFile(file, folder, subfolder) {
 
 export async function PUT(request, { params }) {
   try {
-    const { id } = params
+    const { id } = await params
 
     if (!id) {
       return NextResponse.json(
@@ -849,13 +979,22 @@ export async function PUT(request, { params }) {
 
     const userId = decoded.user_id
 
+    // Determine if id is a UUID or slug
+    const isIdUUID = isUUID(id)
+    
     // Check if the listing exists and belongs to the user
-    const { data: existingListing, error: fetchError } = await supabase
+    let query = supabase
       .from('listings')
       .select('*')
-      .eq('id', id)
       .eq('user_id', userId)
-      .single()
+    
+    if (isIdUUID) {
+      query = query.eq('id', id)
+    } else {
+      query = query.eq('slug', id)
+    }
+    
+    const { data: existingListing, error: fetchError } = await query.single()
 
     if (fetchError || !existingListing) {
       return NextResponse.json(
@@ -863,6 +1002,9 @@ export async function PUT(request, { params }) {
         { status: 404 }
       )
     }
+    
+    // Use the actual listing ID (UUID) for all operations
+    const listingId = existingListing.id
 
     // Parse form data
     const formData = await request.formData()
@@ -1203,15 +1345,44 @@ export async function PUT(request, { params }) {
     const finalListingStatus = formData.get('final_listing_status') || updateData.listing_status || existingListing.listing_status
     const oldListingStatus = existingListing.listing_status || 'active'
     
-    // Handle status changes to 'sold' or 'rented'
-    const isSoldOrRented = ['sold', 'rented'].includes(finalListingStatus?.toLowerCase())
-    const wasSoldOrRented = ['sold', 'rented'].includes(oldListingStatus?.toLowerCase())
+    // Also check the status field for Sold, Rented Out, or Taken
+    const oldStatus = existingListing.status || ''
+    const newStatus = updateData.status || oldStatus
+    const oldStatusIndicatesSoldRentedOrTaken = isStatusSoldRentedOrTaken(oldStatus)
+    const newStatusIndicatesSoldRentedOrTaken = isStatusSoldRentedOrTaken(newStatus)
+    
+    // If status field indicates sold/rented/taken, map it to listing_status
+    // If status is NOT sold/rented/taken, reset listing_status to 'active' (if it was previously sold/rented)
+    let effectiveListingStatus = finalListingStatus
+    if (newStatusIndicatesSoldRentedOrTaken && !finalListingStatus) {
+      const mappedStatus = mapStatusToListingStatus(newStatus)
+      if (mappedStatus) {
+        updateData.listing_status = mappedStatus
+        effectiveListingStatus = mappedStatus
+      }
+    } else if (newStatusIndicatesSoldRentedOrTaken) {
+      // If status field indicates sold/rented/taken, use it to determine listing_status
+      effectiveListingStatus = mapStatusToListingStatus(newStatus) || finalListingStatus
+    } else if (oldStatusIndicatesSoldRentedOrTaken && !newStatusIndicatesSoldRentedOrTaken) {
+      // Status changed from sold/rented/taken to something else, reset to active
+      if (['sold', 'rented'].includes(oldListingStatus?.toLowerCase())) {
+        updateData.listing_status = 'active'
+        effectiveListingStatus = 'active'
+      }
+    }
+    
+    // Handle status changes to 'sold' or 'rented' or 'taken'
+    // Check both listing_status and status field
+    const isSoldOrRented = ['sold', 'rented'].includes(effectiveListingStatus?.toLowerCase()) || newStatusIndicatesSoldRentedOrTaken
+    const wasSoldOrRented = ['sold', 'rented'].includes(oldListingStatus?.toLowerCase()) || oldStatusIndicatesSoldRentedOrTaken
     const statusChangedToSoldOrRented = isSoldOrRented && !wasSoldOrRented
-    const statusChangedFromRentedToSold = oldListingStatus?.toLowerCase() === 'rented' && finalListingStatus?.toLowerCase() === 'sold'
+    const statusChangedFromSoldOrRentedToAvailable = wasSoldOrRented && !isSoldOrRented
+    const statusChangedFromRentedToSold = (oldListingStatus?.toLowerCase() === 'rented' || oldStatus?.toLowerCase() === 'rented out') && 
+                                         (effectiveListingStatus?.toLowerCase() === 'sold' || newStatus?.toLowerCase() === 'sold')
     
     // Check if listing is already sold when changing to sold/rented (but allow rented->sold transition)
     if (statusChangedToSoldOrRented) {
-      const alreadySold = await checkListingAlreadySold(id)
+      const alreadySold = await checkListingAlreadySold(listingId)
       
       if (alreadySold) {
         // Listing already has a sales entry - return error
@@ -1235,7 +1406,7 @@ export async function PUT(request, { params }) {
         upload_status: 'incomplete', // Mark as incomplete during update
         listing_status: finalListingStatus
       })
-      .eq('id', id)
+      .eq('id', listingId)
       .eq('user_id', userId)
       .select()
       .single()
@@ -1256,7 +1427,7 @@ export async function PUT(request, { params }) {
         upload_status: 'completed',
         listing_status: finalListingStatus
       })
-      .eq('id', id)
+      .eq('id', listingId)
       .select()
       .single()
 
@@ -1269,7 +1440,7 @@ export async function PUT(request, { params }) {
           listing_condition: 'updating',
           upload_status: 'incomplete'
         })
-        .eq('id', id)
+        .eq('id', listingId)
     }
 
     // Handle social amenities update if provided
@@ -1360,7 +1531,7 @@ export async function PUT(request, { params }) {
         
         // Prepare amenities payload
         const amenitiesPayload = {
-          listing_id: id,
+          listing_id: listingId,
           schools: processedAmenities.schools || [],
           hospitals: processedAmenities.hospitals || [],
           airports: processedAmenities.airports || [],
@@ -1373,7 +1544,7 @@ export async function PUT(request, { params }) {
         const { data: existingAmenities } = await supabaseAdmin
           .from('social_amenities')
           .select('id')
-          .eq('listing_id', id)
+          .eq('listing_id', listingId)
           .single()
 
         if (existingAmenities) {
@@ -1381,7 +1552,7 @@ export async function PUT(request, { params }) {
           const { error: updateAmenitiesError } = await supabaseAdmin
             .from('social_amenities')
             .update(amenitiesPayload)
-            .eq('listing_id', id)
+            .eq('listing_id', listingId)
 
           if (updateAmenitiesError) {
             console.error('Error updating social amenities:', updateAmenitiesError)
@@ -1409,52 +1580,83 @@ export async function PUT(request, { params }) {
       
       if (statusChangedToSoldOrRented) {
         // New sale/rent: Add revenue and create sales_listings entry
-        const saleType = finalListingStatus?.toLowerCase() === 'sold' ? 'sold' : 'rented'
-        await createSalesListingEntry(id, userId, updatedListing, saleType)
+        // Determine sale type from listing_status or status field
+        let saleType = 'sold' // default
+        if (effectiveListingStatus?.toLowerCase() === 'rented' || newStatus?.toLowerCase() === 'rented out') {
+          saleType = 'rented'
+        } else if (effectiveListingStatus?.toLowerCase() === 'sold' || newStatus?.toLowerCase() === 'sold') {
+          saleType = 'sold'
+        } else if (newStatus?.toLowerCase() === 'taken') {
+          // "Taken" defaults to 'sold' but could be made configurable
+          saleType = 'sold'
+        }
+        
+        // Get sales information from updateData if provided (from modal)
+        const salesInfo = updateData.sales_info || {}
+        await createSalesListingEntry(listingId, userId, updatedListing, saleType, salesInfo)
         
         // Add revenue to developer and development total_revenue
         if (revenueValue > 0) {
           await updateTotalRevenue(userId, updatedListing.development_id, estimatedRevenue, 'add')
         }
       } else if (statusChangedFromRentedToSold) {
-        // Changed from rented to sold: Update existing sales_listings entry
-        // First, get the existing sales entry
+        // Changed from Rented Out to Sold - only update status, no revenue recalculation
+        // Both statuses account for the same revenue, so we just update the sale_type
         const { data: existingSale } = await supabaseAdmin
           .from('sales_listings')
           .select('*')
-          .eq('listing_id', id)
+          .eq('listing_id', listingId)
           .eq('sale_type', 'rented')
           .maybeSingle()
         
         if (existingSale) {
-          const oldSalePrice = parseFloat(existingSale.sale_price || 0)
-          const newSalePrice = parseFloat(revenueValue.toFixed(2))
-          
-          // Update existing entry to 'sold' with new sale price
+          // Just update the sale_type from 'rented' to 'sold'
+          // No revenue recalculation needed since both account for the same thing
           await supabaseAdmin
             .from('sales_listings')
             .update({
               sale_type: 'sold',
-              sale_price: newSalePrice,
               updated_at: new Date().toISOString()
             })
             .eq('id', existingSale.id)
-          
-          // Adjust revenue: Subtract old rented revenue, add new sold revenue
-          if (oldSalePrice !== newSalePrice && revenueValue > 0) {
-            // Subtract old revenue
-            await updateTotalRevenue(userId, updatedListing.development_id, { estimated_revenue: oldSalePrice }, 'subtract')
-            // Add new revenue
-            await updateTotalRevenue(userId, updatedListing.development_id, estimatedRevenue, 'add')
-          }
-          // If prices are the same, no revenue change needed (already counted)
         } else {
-          // No existing entry, create new one
-          await createSalesListingEntry(id, userId, updatedListing, 'sold')
+          // No existing entry, create new one (shouldn't happen but handle it)
+          await createSalesListingEntry(listingId, userId, updatedListing, 'sold')
           if (revenueValue > 0) {
             await updateTotalRevenue(userId, updatedListing.development_id, estimatedRevenue, 'add')
           }
         }
+        
+        // Update admin_sales_analytics (to update sale type counts, but no revenue change)
+        await updateAdminSalesAnalytics(updatedListing, 'update')
+      } else if (statusChangedFromSoldOrRentedToAvailable) {
+        // Status changed FROM sold/rented/taken TO available or other status
+        // Need to subtract revenue and remove/update sales entry
+        const estimatedRevenue = existingListing.estimated_revenue || {}
+        const revenueValue = estimatedRevenue.estimated_revenue || estimatedRevenue.price || 0
+        
+        if (revenueValue > 0) {
+          // Find and remove the sales entry
+          const { data: existingSale } = await supabaseAdmin
+            .from('sales_listings')
+            .select('*')
+            .eq('listing_id', listingId)
+            .maybeSingle()
+          
+          if (existingSale) {
+            // Delete the sales entry
+            await supabaseAdmin
+              .from('sales_listings')
+              .delete()
+              .eq('id', existingSale.id)
+            
+            // Subtract revenue from developer and development
+            await updateTotalRevenue(userId, updatedListing.development_id, estimatedRevenue, 'subtract')
+          }
+        }
+        
+        // Update admin_sales_analytics when status changes from sold/rented to available
+        await updateAdminSalesAnalytics(updatedListing, 'update')
       }
     }
 
@@ -1514,6 +1716,40 @@ export async function PUT(request, { params }) {
       })
       // Don't fail the listing update if analytics fails
     }
+    
+    // Update new admin analytics tables when listing is finalized/published
+    const isCompleted = listingForAnalytics?.listing_condition === 'completed' && listingForAnalytics?.upload_status === 'completed'
+    const isPublished = isCompleted && listingForAnalytics?.listing_status === 'active'
+    
+    if (isPublished) {
+      try {
+        // Update admin_listings_analytics when listing is published
+        await updateAdminListingsAnalytics(listingForAnalytics)
+        console.log('✅ admin_listings_analytics updated successfully (listing published via PUT)')
+      } catch (listingsAnalyticsError) {
+        console.error('❌ Error updating admin_listings_analytics:', listingsAnalyticsError)
+      }
+      
+      try {
+        // Update admin_sales_analytics when listing is published (updates estimated_revenue)
+        await updateAdminSalesAnalytics(listingForAnalytics, 'update')
+        console.log('✅ admin_sales_analytics updated successfully (listing published via PUT)')
+      } catch (salesAnalyticsError) {
+        console.error('❌ Error updating admin_sales_analytics:', salesAnalyticsError)
+      }
+    }
+    
+    // Update admin_sales_analytics when status changes to sold/rented
+    // Reuse statusChangedToSoldOrRented from earlier in the function (line 1237)
+    // Note: statusChangedToSoldOrRented was already calculated using oldListingStatus and finalListingStatus
+    if (statusChangedToSoldOrRented) {
+      try {
+        await updateAdminSalesAnalytics(listingForAnalytics, 'update')
+        console.log('✅ admin_sales_analytics updated for status change to sold/rented')
+      } catch (salesAnalyticsError) {
+        console.error('❌ Error updating admin_sales_analytics for status change:', salesAnalyticsError)
+      }
+    }
 
     return NextResponse.json({ 
       success: true,
@@ -1532,7 +1768,7 @@ export async function PUT(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
-    const { id } = params
+    const { id } = await params
 
     if (!id) {
       return NextResponse.json(
@@ -1563,13 +1799,22 @@ export async function DELETE(request, { params }) {
 
     const userId = decoded.user_id
 
+    // Determine if id is a UUID or slug
+    const isIdUUID = isUUID(id)
+    
     // Check if the listing exists and belongs to the user
-    const { data: existingListing, error: fetchError } = await supabase
+    let query = supabase
       .from('listings')
       .select('*')
-      .eq('id', id)
       .eq('user_id', userId)
-      .single()
+    
+    if (isIdUUID) {
+      query = query.eq('id', id)
+    } else {
+      query = query.eq('slug', id)
+    }
+    
+    const { data: existingListing, error: fetchError } = await query.single()
 
     if (fetchError || !existingListing) {
       return NextResponse.json(
@@ -1578,11 +1823,14 @@ export async function DELETE(request, { params }) {
       )
     }
 
+    // Use the actual listing ID (UUID) for deletion operations
+    const listingId = existingListing.id
+
     // Delete social amenities first (cascade will handle this, but explicit is better)
     const { error: amenitiesDeleteError } = await supabaseAdmin
       .from('social_amenities')
       .delete()
-      .eq('listing_id', id)
+      .eq('listing_id', listingId)
 
     if (amenitiesDeleteError) {
       console.error('Error deleting social amenities:', amenitiesDeleteError)
@@ -1596,7 +1844,7 @@ export async function DELETE(request, { params }) {
     const { error: deleteError } = await supabase
       .from('listings')
       .delete()
-      .eq('id', id)
+      .eq('id', listingId)
       .eq('user_id', userId)
 
     if (deleteError) {
