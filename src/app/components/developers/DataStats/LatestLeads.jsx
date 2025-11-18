@@ -2,9 +2,16 @@
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { UserPlus, Calendar, Loader2, Image as ImageIcon, Phone, Mail, MessageSquare, ChevronRight } from 'lucide-react'
+import { UserPlus, Calendar, Loader2, Image as ImageIcon, Phone, Mail, MessageSquare, ChevronRight, Star } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
+
+// Helper function to get lead category from score
+function getLeadCategory(score) {
+  if (score >= 60) return { label: 'High', color: 'bg-green-100 text-green-800 border-green-200' }
+  if (score >= 25) return { label: 'Medium', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' }
+  return { label: 'Base', color: 'bg-gray-100 text-gray-800 border-gray-200' }
+}
 
 const LatestLeads = () => {
   const { user } = useAuth()
@@ -134,6 +141,9 @@ const LatestLeads = () => {
                     Actions
                   </th>
                   <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Score
+                  </th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -181,6 +191,22 @@ const LatestLeads = () => {
                       <span className="text-sm text-gray-600">
                         {lead.totalActions || 1}
                       </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1">
+                          <Star className="w-3 h-3 text-yellow-500" />
+                          <span className="text-sm font-semibold text-gray-900">{lead.leadScore || 0}</span>
+                        </div>
+                        {(() => {
+                          const category = getLeadCategory(lead.leadScore || 0)
+                          return (
+                            <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium border w-fit ${category.color}`}>
+                              {category.label}
+                            </span>
+                          )
+                        })()}
+                      </div>
                     </td>
                     <td className="py-3 px-4">
                       <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(lead.status)}`}>

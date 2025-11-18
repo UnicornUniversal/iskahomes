@@ -19,7 +19,8 @@ import {
   X, 
   Copy, 
   Check, 
-  Share2
+  Share2,
+  Instagram
 } from 'lucide-react'
 import { toast } from 'react-toastify'
 import { generateShareData, getSocialShareData } from '@/lib/shareUtils'
@@ -65,6 +66,21 @@ const ShareModal = ({ isOpen, onClose, property, propertyType = 'listing' }) => 
       lister_id: property.user_id || property.developer_id || property.developers?.developer_id || property.agent_id || property.developers?.agent_id,
       lister_type: property.account_type || (property.developer_id || property.developers?.developer_id ? 'developer' : (property.agent_id || property.developers?.agent_id ? 'agent' : 'developer'))
     })
+  }
+
+  const handleInstagramShare = async () => {
+    try {
+      // Instagram doesn't have a web share API, so we copy formatted text to clipboard
+      const instagramText = socialData.instagram.text
+      await navigator.clipboard.writeText(instagramText)
+      toast.success('Instagram text copied! Paste it in your Instagram post.')
+      
+      // Track Instagram share
+      handleSocialShare('instagram')
+    } catch (err) {
+      console.error('Failed to copy Instagram text:', err)
+      toast.error('Failed to copy Instagram text')
+    }
   }
 
 
@@ -274,6 +290,15 @@ const ShareModal = ({ isOpen, onClose, property, propertyType = 'listing' }) => 
                 <span>Email</span>
               </div>
             </EmailShareButton>
+
+            {/* Instagram */}
+            <button
+              onClick={handleInstagramShare}
+              className="w-full bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 hover:from-purple-700 hover:via-pink-700 hover:to-orange-600 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2 hover:shadow-lg"
+            >
+              <Instagram className="w-5 h-5" />
+              <span>Instagram</span>
+            </button>
           </div>
         </div>
 

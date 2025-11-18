@@ -40,12 +40,18 @@ const LeadAnalytics = () => {
 
     return {
       total_leads: leadsBreakdown?.total_leads || user.profile.total_leads || 0,
-      phone_leads: leadsBreakdown?.phone_leads?.total || 0,
-      message_leads: leadsBreakdown?.message_leads?.total || 0,
-      email_leads: leadsBreakdown?.email_leads?.total || 0,
-      appointment_leads: user.profile.total_appointments || leadsBreakdown?.appointment_leads?.total || 0,
-      website_leads: leadsBreakdown?.website_leads?.total || 0,
-      conversion_rate: conversionRate || 0
+      // Extract individual lead types from leads_breakdown
+      phone_leads: leadsBreakdown?.phone?.total || 0,
+      whatsapp_leads: leadsBreakdown?.whatsapp?.total || 0,
+      direct_message_leads: leadsBreakdown?.direct_message?.total || 0,
+      email_leads: leadsBreakdown?.email?.total || 0,
+      appointment_leads: user.profile.total_appointments || leadsBreakdown?.appointment?.total || 0,
+      website_leads: leadsBreakdown?.website?.total || 0,
+      // Keep message_leads as sum for backward compatibility (whatsapp + direct_message)
+      message_leads: (leadsBreakdown?.whatsapp?.total || 0) + (leadsBreakdown?.direct_message?.total || 0),
+      conversion_rate: conversionRate || 0,
+      // Pass the full breakdown for detailed analysis
+      leads_breakdown: leadsBreakdown
     }
   }
 

@@ -58,6 +58,11 @@ export const getSocialShareData = (property, currentUrl) => {
       url: baseData.url,
       subject: `Check out this property: ${baseData.title}`,
       body: `Hi,\n\nI found this amazing property and thought you might be interested:\n\n${baseData.title}\n${baseData.price}\n${baseData.location}\n\n${baseData.description}\n\nView it here: ${baseData.url}\n\nBest regards!`
+    },
+    instagram: {
+      url: baseData.url,
+      title: baseData.title,
+      text: `🏠 ${baseData.title}\n\n💰 ${baseData.price}\n📍 ${baseData.location}\n\n${baseData.description}\n\n🔗 ${baseData.url}\n\n${baseData.hashtags.map(tag => `#${tag}`).join(' ')}`
     }
   }
 }

@@ -7,6 +7,41 @@ function isUUID(str) {
   return uuidRegex.test(str)
 }
 
+// Calculate lead_score from lead_actions array
+// Scoring: Appointment=40, Phone=30, Direct Messaging=20, WhatsApp=15, Email=10
+function calculateLeadScore(leadActions) {
+  if (!Array.isArray(leadActions) || leadActions.length === 0) {
+    return 0
+  }
+
+  let score = 0
+
+  leadActions.forEach(action => {
+    const actionType = action?.action_type || ''
+    const metadata = action?.action_metadata || {}
+
+    if (actionType === 'lead_appointment') {
+      score += 40
+    } else if (actionType === 'lead_phone') {
+      score += 30
+    } else if (actionType === 'lead_message') {
+      // Check message_type in action_metadata
+      const messageType = String(metadata.message_type || metadata.messageType || 'direct_message').toLowerCase()
+      
+      if (messageType === 'email') {
+        score += 10
+      } else if (messageType === 'whatsapp') {
+        score += 15
+      } else {
+        // Default to direct messaging
+        score += 20
+      }
+    }
+  })
+
+  return score
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -83,31 +118,8 @@ export async function GET(request) {
       query = query.eq('status', status)
     }
 
-    // Get total count before pagination
-    let countQuery = supabase
-      .from('leads')
-      .select('*', { count: 'exact', head: true })
-      .eq('lister_id', finalListerId)
-      .eq('lister_type', listerType)
-      .not('seeker_id', 'is', null)
-
-    if (listingId) {
-      countQuery = countQuery.eq('listing_id', listingId)
-    } else {
-      countQuery = countQuery.not('listing_id', 'is', null)
-    }
-
-    if (status) {
-      countQuery = countQuery.eq('status', status)
-    }
-
-    const { count, error: countError } = await countQuery
-
-    if (countError) {
-      console.error('Error counting leads:', countError)
-    }
-
-    // Apply pagination - create a new query for the actual data
+    // Fetch ALL leads (no pagination yet - we'll group first)
+    // We need all records to properly group by (seeker_id, listing_id)
     let dataQuery = supabase
       .from('leads')
       .select(`
@@ -118,11 +130,13 @@ export async function GET(request) {
         seeker_id,
         lead_actions,
         total_actions,
+        lead_score,
         first_action_date,
         last_action_date,
         last_action_type,
         status,
         notes,
+        status_tracker,
         created_at,
         updated_at,
         context_type
@@ -141,10 +155,9 @@ export async function GET(request) {
       dataQuery = dataQuery.eq('status', status)
     }
 
-    const { data: leads, error: leadsError } = await dataQuery
+    const { data: allLeads, error: leadsError } = await dataQuery
       .order('last_action_date', { ascending: false })
       .order('created_at', { ascending: false })
-      .range(offset, offset + pageSize - 1)
 
     if (leadsError) {
       console.error('Error fetching leads:', leadsError)
@@ -154,7 +167,7 @@ export async function GET(request) {
       )
     }
 
-    if (!leads || leads.length === 0) {
+    if (!allLeads || allLeads.length === 0) {
       return NextResponse.json({
         success: true,
         data: [],
@@ -164,8 +177,109 @@ export async function GET(request) {
       })
     }
 
-    // Get listing IDs and fetch listings
-    const listingIds = leads.filter(l => l.listing_id).map(l => l.listing_id)
+    // Group leads by (seeker_id, listing_id)
+    // This merges multiple records for the same seeker+listing combination
+    const groupedLeadsMap = {}
+    allLeads.forEach(lead => {
+      // Create unique key: seeker_id + listing_id (or 'null' if listing_id is null)
+      const groupKey = `${lead.seeker_id}_${lead.listing_id || 'null'}`
+      if (!groupedLeadsMap[groupKey]) {
+        groupedLeadsMap[groupKey] = []
+      }
+      groupedLeadsMap[groupKey].push(lead)
+    })
+
+    // Merge each group into a single lead record
+    const mergedLeads = Object.values(groupedLeadsMap).map(group => {
+      // Sort group by last_action_date DESC (most recent first)
+      group.sort((a, b) => {
+        const dateA = new Date(a.last_action_date || a.created_at)
+        const dateB = new Date(b.last_action_date || b.created_at)
+        return dateB - dateA
+      })
+
+      const primary = group[0] // Most recent record
+      
+      // Merge all lead_actions from all records in the group
+      const allActions = group.flatMap(l => Array.isArray(l.lead_actions) ? l.lead_actions : [])
+      // Sort actions by timestamp
+      allActions.sort((a, b) => {
+        const tsA = new Date(a.action_timestamp || a.action_date || 0)
+        const tsB = new Date(b.action_timestamp || b.action_date || 0)
+        return tsA - tsB
+      })
+
+      // Calculate lead_score from merged actions
+      const mergedLeadScore = calculateLeadScore(allActions)
+
+      // Merge all notes from all records (deduplicate)
+      const allNotes = group.flatMap(l => Array.isArray(l.notes) ? l.notes : [])
+      const uniqueNotes = [...new Set(allNotes.map(n => String(n).trim()).filter(Boolean))]
+
+      // Merge status_tracker from all records
+      const allStatusTrackers = group.flatMap(l => Array.isArray(l.status_tracker) ? l.status_tracker : [])
+      const uniqueStatusHistory = [...new Set(allStatusTrackers.map(s => String(s).trim()).filter(Boolean))]
+
+      // Get earliest first_action_date and latest last_action_date
+      const firstActionDates = group.map(l => l.first_action_date).filter(Boolean).sort()
+      const lastActionDates = group.map(l => l.last_action_date).filter(Boolean).sort().reverse()
+      
+      // Sum total_actions from all records
+      const totalActionsSum = group.reduce((sum, l) => sum + (l.total_actions || 0), 0)
+
+      // Get most recently updated status (check updated_at)
+      const mostRecentRecord = group.reduce((latest, current) => {
+        const latestDate = new Date(latest.updated_at || latest.created_at || 0)
+        const currentDate = new Date(current.updated_at || current.created_at || 0)
+        return currentDate > latestDate ? current : latest
+      }, group[0])
+
+      return {
+        ...primary,
+        // Use primary record's ID (most recent)
+        id: primary.id,
+        // Merge arrays
+        lead_actions: allActions,
+        notes: uniqueNotes,
+        status_tracker: uniqueStatusHistory,
+        // Aggregate counts
+        total_actions: totalActionsSum,
+        lead_score: mergedLeadScore, // Recalculate score from merged actions
+        // Use earliest first_action_date and latest last_action_date
+        first_action_date: firstActionDates[0] || primary.first_action_date,
+        last_action_date: lastActionDates[0] || primary.last_action_date,
+        // Use most recently updated status
+        status: mostRecentRecord.status || primary.status,
+        // Keep track of how many records were merged (for debugging)
+        _merged_count: group.length
+      }
+    })
+
+    // Apply search filter if provided (before pagination)
+    let filteredLeads = mergedLeads
+    if (search) {
+      const searchLower = search.toLowerCase()
+      filteredLeads = mergedLeads.filter(lead =>
+        (lead.seeker_id || '').toLowerCase().includes(searchLower) ||
+        (lead.listing_id || '').toLowerCase().includes(searchLower)
+      )
+    }
+
+    // Sort merged leads by last_action_date DESC
+    filteredLeads.sort((a, b) => {
+      const dateA = new Date(a.last_action_date || a.created_at || 0)
+      const dateB = new Date(b.last_action_date || b.created_at || 0)
+      return dateB - dateA
+    })
+
+    // Get total count of unique groups (after filtering)
+    const totalUniqueLeads = filteredLeads.length
+
+    // Apply pagination to merged results
+    const paginatedLeads = filteredLeads.slice(offset, offset + pageSize)
+
+    // Get listing IDs from paginated leads and fetch listings
+    const listingIds = paginatedLeads.filter(l => l.listing_id).map(l => l.listing_id)
     let listingsMap = {}
     
     if (listingIds.length > 0) {
@@ -243,7 +357,7 @@ export async function GET(request) {
     }
 
     // Get seeker IDs and fetch seeker info
-    const seekerIds = [...new Set(leads.map(l => l.seeker_id).filter(Boolean))]
+    const seekerIds = [...new Set(paginatedLeads.map(l => l.seeker_id).filter(Boolean))]
     let seekersMap = {}
     
     if (seekerIds.length > 0) {
@@ -265,8 +379,8 @@ export async function GET(request) {
       }
     }
 
-    // Transform the data
-    let transformedLeads = leads.map(lead => {
+    // Transform the data (add listing and seeker info)
+    let transformedLeads = paginatedLeads.map(lead => {
       const listing = lead.listing_id ? listingsMap[lead.listing_id] || null : null
       const seeker = lead.seeker_id ? seekersMap[lead.seeker_id] || null : null
 
@@ -289,33 +403,25 @@ export async function GET(request) {
         seeker_name: seeker?.name || lead.seeker_id,
         seeker_email: seeker?.email || null,
         seeker_phone: seeker?.phone || null,
-        lead_actions: lead.lead_actions || [],
+        lead_actions: Array.isArray(lead.lead_actions) ? lead.lead_actions : [],
         total_actions: lead.total_actions || 0,
+        lead_score: lead.lead_score || 0,
         first_action_date: lead.first_action_date,
         last_action_date: lead.last_action_date,
         last_action_type: lead.last_action_type,
         status: lead.status || 'new',
         notes: Array.isArray(lead.notes) ? lead.notes : [],
+        status_tracker: Array.isArray(lead.status_tracker) ? lead.status_tracker : [],
         context_type: lead.context_type || 'listing',
         created_at: lead.created_at,
         updated_at: lead.updated_at
       }
     })
 
-    // Apply search filter if provided
-    if (search) {
-      const searchLower = search.toLowerCase()
-      transformedLeads = transformedLeads.filter(lead =>
-        (lead.seeker_name || '').toLowerCase().includes(searchLower) ||
-        (lead.listing_title || '').toLowerCase().includes(searchLower) ||
-        (lead.seeker_id || '').toLowerCase().includes(searchLower)
-      )
-    }
-
     return NextResponse.json({
       success: true,
       data: transformedLeads,
-      total: count || transformedLeads.length,
+      total: totalUniqueLeads,
       page,
       pageSize
     })

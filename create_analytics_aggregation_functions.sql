@@ -191,20 +191,23 @@ ON user_analytics(user_id);
 -- Function 7: Get cumulative leads breakdown for developers
 -- Aggregates all leads from leads table (expands lead_actions JSONB array) and calculates percentages in SQL
 -- Returns: JSONB-ready structure with totals and percentages per developer
+-- Now properly breaks down lead_message by message_type (direct_message, whatsapp, email)
 CREATE OR REPLACE FUNCTION get_developer_leads_breakdown(developer_ids UUID[])
 RETURNS TABLE (
   user_id UUID,
   total_leads BIGINT,
   phone_leads BIGINT,
   phone_percentage NUMERIC(5,2),
-  message_leads BIGINT,
-  message_percentage NUMERIC(5,2),
-  website_leads BIGINT,
-  website_percentage NUMERIC(5,2),
+  whatsapp_leads BIGINT,
+  whatsapp_percentage NUMERIC(5,2),
+  direct_message_leads BIGINT,
+  direct_message_percentage NUMERIC(5,2),
+  email_leads BIGINT,
+  email_percentage NUMERIC(5,2),
   appointment_leads BIGINT,
   appointment_percentage NUMERIC(5,2),
-  email_leads BIGINT,
-  email_percentage NUMERIC(5,2)
+  website_leads BIGINT,
+  website_percentage NUMERIC(5,2)
 ) AS $$
 BEGIN
   RETURN QUERY
@@ -219,9 +222,29 @@ BEGIN
   lead_types AS (
     SELECT
       lister_id,
+      -- Phone leads
       CASE WHEN (action->>'action_type') = 'lead_phone' THEN 1 ELSE 0 END AS is_phone,
-      CASE WHEN (action->>'action_type') = 'lead_message' THEN 1 ELSE 0 END AS is_message,
-      CASE WHEN (action->>'action_type') = 'lead_email' THEN 1 ELSE 0 END AS is_email,
+      -- Message leads - break down by message_type
+      CASE 
+        WHEN (action->>'action_type') = 'lead_message' 
+          AND LOWER(COALESCE(action->'action_metadata'->>'message_type', action->'action_metadata'->>'messageType', 'direct_message')) = 'whatsapp'
+        THEN 1 
+        ELSE 0 
+      END AS is_whatsapp,
+      CASE 
+        WHEN (action->>'action_type') = 'lead_message' 
+          AND LOWER(COALESCE(action->'action_metadata'->>'message_type', action->'action_metadata'->>'messageType', 'direct_message')) = 'email'
+        THEN 1 
+        ELSE 0 
+      END AS is_email_from_message,
+      CASE 
+        WHEN (action->>'action_type') = 'lead_message' 
+          AND LOWER(COALESCE(action->'action_metadata'->>'message_type', action->'action_metadata'->>'messageType', 'direct_message')) NOT IN ('whatsapp', 'email')
+        THEN 1 
+        ELSE 0 
+      END AS is_direct_message,
+      -- Other lead types
+      CASE WHEN (action->>'action_type') = 'lead_email' THEN 1 ELSE 0 END AS is_email_legacy,
       CASE WHEN (action->>'action_type') = 'lead_appointment' THEN 1 ELSE 0 END AS is_appointment,
       CASE WHEN (action->>'action_type') = 'lead_website' THEN 1 ELSE 0 END AS is_website
     FROM lead_actions_expanded
@@ -230,11 +253,13 @@ BEGIN
     SELECT
       lister_id,
       COALESCE(SUM(is_phone), 0)::BIGINT AS phone_leads,
-      COALESCE(SUM(is_message), 0)::BIGINT AS message_leads,
-      COALESCE(SUM(is_email), 0)::BIGINT AS email_leads,
+      COALESCE(SUM(is_whatsapp), 0)::BIGINT AS whatsapp_leads,
+      COALESCE(SUM(is_direct_message), 0)::BIGINT AS direct_message_leads,
+      -- Email can come from lead_message (message_type='email') OR legacy lead_email action
+      COALESCE(SUM(is_email_from_message + is_email_legacy), 0)::BIGINT AS email_leads,
       COALESCE(SUM(is_appointment), 0)::BIGINT AS appointment_leads,
       COALESCE(SUM(is_website), 0)::BIGINT AS website_leads,
-      COALESCE(SUM(is_phone + is_message + is_email + is_appointment + is_website), 0)::BIGINT AS total_actions
+      COALESCE(SUM(is_phone + is_whatsapp + is_direct_message + is_email_from_message + is_email_legacy + is_appointment + is_website), 0)::BIGINT AS total_actions
     FROM lead_types
     GROUP BY lister_id
   )
@@ -246,26 +271,31 @@ BEGIN
       WHEN a.total_actions = 0 THEN 0
       ELSE ROUND((a.phone_leads * 100.0 / a.total_actions), 2)
     END AS phone_percentage,
-    a.message_leads,
+    a.whatsapp_leads,
     CASE 
       WHEN a.total_actions = 0 THEN 0
-      ELSE ROUND((a.message_leads * 100.0 / a.total_actions), 2)
-    END AS message_percentage,
-    a.website_leads,
+      ELSE ROUND((a.whatsapp_leads * 100.0 / a.total_actions), 2)
+    END AS whatsapp_percentage,
+    a.direct_message_leads,
     CASE 
       WHEN a.total_actions = 0 THEN 0
-      ELSE ROUND((a.website_leads * 100.0 / a.total_actions), 2)
-    END AS website_percentage,
+      ELSE ROUND((a.direct_message_leads * 100.0 / a.total_actions), 2)
+    END AS direct_message_percentage,
+    a.email_leads,
+    CASE 
+      WHEN a.total_actions = 0 THEN 0
+      ELSE ROUND((a.email_leads * 100.0 / a.total_actions), 2)
+    END AS email_percentage,
     a.appointment_leads,
     CASE 
       WHEN a.total_actions = 0 THEN 0
       ELSE ROUND((a.appointment_leads * 100.0 / a.total_actions), 2)
     END AS appointment_percentage,
-    a.email_leads,
+    a.website_leads,
     CASE 
       WHEN a.total_actions = 0 THEN 0
-      ELSE ROUND((a.email_leads * 100.0 / a.total_actions), 2)
-    END AS email_percentage
+      ELSE ROUND((a.website_leads * 100.0 / a.total_actions), 2)
+    END AS website_percentage
   FROM aggregated a;
 END;
 $$ LANGUAGE plpgsql;

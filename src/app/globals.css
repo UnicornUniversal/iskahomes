@@ -160,6 +160,8 @@ body {
 }
   button{ 
     @apply text-[0.8em]; 
+
+ 
   }
 
   /* button{
@@ -233,6 +235,11 @@ body {
 
 .normal_div{
   @apply flex flex-col gap-4 md:flex-row ;
+}
+
+
+.box_holder{
+  @apply bg-white rounded-2xl shadow-xl p-2 text-primary_color shadow-sm;
 }
 
 /* Message bubble animations - only for messaging app */

@@ -101,6 +101,41 @@ async function aggregateEvents(events, chunkSize = 5000) {
   }
 }
 
+// Calculate lead_score from lead_actions array
+// Scoring: Appointment=40, Phone=30, Direct Messaging=20, WhatsApp=15, Email=10
+function calculateLeadScore(leadActions) {
+  if (!Array.isArray(leadActions) || leadActions.length === 0) {
+    return 0
+  }
+
+  let score = 0
+
+  leadActions.forEach(action => {
+    const actionType = action?.action_type || ''
+    const metadata = action?.action_metadata || {}
+
+    if (actionType === 'lead_appointment') {
+      score += 40
+    } else if (actionType === 'lead_phone') {
+      score += 30
+    } else if (actionType === 'lead_message') {
+      // Check message_type in action_metadata
+      const messageType = String(metadata.message_type || metadata.messageType || 'direct_message').toLowerCase()
+      
+      if (messageType === 'email') {
+        score += 10
+      } else if (messageType === 'whatsapp') {
+        score += 15
+      } else {
+        // Default to direct messaging
+        score += 20
+      }
+    }
+  })
+
+  return score
+}
+
 // Process a chunk of events
 async function processEventChunk(chunk, aggregates, offset = 0) {
   // Early exit if chunk is empty
@@ -189,12 +224,32 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
         impression_website_visit: 0,
         impression_share: 0,
         impression_saved_listing: 0,
+        // Share platform breakdown tracking
+        share_platforms: {
+          facebook: 0,
+          whatsapp: 0,
+          twitter: 0,
+          instagram: 0,
+          copy_link: 0,
+          email: 0,
+          linkedin: 0,
+          telegram: 0
+        },
         total_leads: 0,
         phone_leads: 0,
         message_leads: 0,
         email_leads: 0,
         appointment_leads: 0,
         website_leads: 0,
+        // Lead type breakdown tracking
+        lead_types: {
+          phone: 0,
+          whatsapp: 0,
+          direct_message: 0,
+          email: 0,
+          appointment: 0,
+          website: 0
+        },
         unique_leads: new Set(),
         unique_leads_count: 0 // Counter for unique leads
         // Note: total_sales removed - sales are tracked in sales_listings table, not via PostHog
@@ -343,6 +398,15 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
         if (listing) {
         listing.impression_share++
         listing.total_impressions++
+        
+        // Track platform breakdown
+        const platform = String(properties.platform || '').toLowerCase()
+        if (platform && listing.share_platforms.hasOwnProperty(platform)) {
+          listing.share_platforms[platform]++
+        } else if (platform === 'link') {
+          // Handle 'link' as 'copy_link' for consistency
+          listing.share_platforms.copy_link++
+        }
         }
         }
         break
@@ -499,6 +563,7 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
         // Process based on lead_type
         if (leadType === 'phone') {
         listing.phone_leads++
+        listing.lead_types.phone++
         listing.total_leads++
         if (seekerId) listing.unique_leads.add(seekerId)
           
@@ -554,11 +619,17 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
           }
 
         } else if (leadType === 'message') {
-        const messageType = String(properties.message_type || '').toLowerCase()
+        const messageType = String(properties.message_type || properties.messageType || '').toLowerCase()
         if (messageType === 'email') {
           listing.email_leads++
-        } else {
+          listing.lead_types.email++
+        } else if (messageType === 'whatsapp') {
           listing.message_leads++
+          listing.lead_types.whatsapp++
+        } else {
+          // Default to direct_message
+          listing.message_leads++
+          listing.lead_types.direct_message++
         }
         listing.total_leads++
         if (seekerId) listing.unique_leads.add(seekerId)
@@ -615,6 +686,7 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
 
         } else if (leadType === 'appointment') {
         listing.appointment_leads++
+        listing.lead_types.appointment++
         listing.total_leads++
         if (seekerId) listing.unique_leads.add(seekerId)
         
@@ -1300,12 +1372,20 @@ export async function POST(request) {
         impression_website_visit: 0,
         impression_share: 0,
         impression_saved_listing: 0,
+        share_platforms: {
+          facebook: 0, whatsapp: 0, twitter: 0, instagram: 0,
+          copy_link: 0, email: 0, linkedin: 0, telegram: 0
+        },
         total_leads: 0,
         phone_leads: 0,
         message_leads: 0,
         email_leads: 0,
         appointment_leads: 0,
         website_leads: 0,
+        lead_types: {
+          phone: 0, whatsapp: 0, direct_message: 0,
+          email: 0, appointment: 0, website: 0
+        },
         unique_leads: new Set()
         // Note: total_sales removed - sales are tracked in sales_listings table, not via PostHog
       }
@@ -1332,6 +1412,37 @@ export async function POST(request) {
       const unique_leads = listing.unique_leads instanceof Set ? listing.unique_leads.size : (listing.unique_leads || 0)
       // Note: total_sales and lead_to_sale_rate removed - sales are tracked in sales_listings table, not via PostHog
       const conversion_rate = total_views > 0 ? Number(((total_leads / total_views) * 100).toFixed(2)) : 0
+
+      // Build share_breakdown JSONB object
+      const totalShares = listing.impression_share || 0
+      const shareBreakdown = {}
+      const sharePlatforms = listing.share_platforms || {
+        facebook: 0, whatsapp: 0, twitter: 0, instagram: 0,
+        copy_link: 0, email: 0, linkedin: 0, telegram: 0
+      }
+      
+      for (const [platform, count] of Object.entries(sharePlatforms)) {
+        const percentage = totalShares > 0 ? Number(((count / totalShares) * 100).toFixed(2)) : 0
+        shareBreakdown[platform] = {
+          total: count,
+          percentage: percentage
+        }
+      }
+
+      // Build leads_breakdown JSONB object
+      const leadsBreakdown = {}
+      const leadTypes = listing.lead_types || {
+        phone: 0, whatsapp: 0, direct_message: 0,
+        email: 0, appointment: 0, website: 0
+      }
+      
+      for (const [leadType, count] of Object.entries(leadTypes)) {
+        const percentage = total_leads > 0 ? Number(((count / total_leads) * 100).toFixed(2)) : 0
+        leadsBreakdown[leadType] = {
+          total: count,
+          percentage: percentage
+        }
+      }
 
       // Calculate changes from previous period
       const previous = previousListingMap[listingId] || {}
@@ -1377,12 +1488,14 @@ export async function POST(request) {
         impression_website_visit: listing.impression_website_visit,
         impression_share: listing.impression_share,
         impression_saved_listing: listing.impression_saved_listing,
+        share_breakdown: shareBreakdown, // JSONB breakdown by platform
         total_leads,
         phone_leads: listing.phone_leads,
         message_leads: listing.message_leads,
         email_leads: listing.email_leads,
         appointment_leads: listing.appointment_leads,
         website_leads: listing.website_leads,
+        leads_breakdown: leadsBreakdown, // JSONB breakdown by lead type
         unique_leads,
         // Note: total_sales, lead_to_sale_rate, and avg_days_to_sale removed - sales are tracked in sales_listings table
         conversion_rate,
@@ -2121,6 +2234,9 @@ export async function POST(request) {
       const firstActionContext = sortedActions[0]?.action_metadata?.context_type
       let contextType = firstActionContext || (lead.listing_id ? 'listing' : 'profile')
       
+      // Calculate lead_score from sorted actions
+      const leadScore = calculateLeadScore(sortedActions)
+
       const leadRow = {
         listing_id: lead.listing_id,
         lister_id: finalListerId,
@@ -2131,10 +2247,12 @@ export async function POST(request) {
         hour: actionHour, // Add hour for hourly queries
         lead_actions: sortedActions, // All actions from this cron run
         total_actions: sortedActions.length,
+        lead_score: leadScore, // Calculate score from all actions
         first_action_date: firstActionDate,
         last_action_date: lastActionDate,
         last_action_type: sortedActions[sortedActions.length - 1]?.action_type || 'unknown',
         status: 'new',
+        status_tracker: ['new'], // Initialize status tracker with 'new' status
         notes: [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -2320,9 +2438,9 @@ export async function POST(request) {
       console.warn('  4. All leads were filtered out due to missing data')
     }
 
-    // 11. Update listings table with cumulative totals
+    // 11. Aggregate breakdowns and update listings table with cumulative totals
     // Only update listings that had events in this run
-    console.log(`🔄 Updating listings table with cumulative totals (only listings with events)...`)
+    console.log(`🔄 Aggregating breakdowns and updating listings table...`)
     let listingUpdatesData = {} // Store for response
     let developerUpdatesData = {} // Store for response
     try {
@@ -2333,6 +2451,86 @@ export async function POST(request) {
         console.log('ℹ️ No listings found in events to update')
       } else {
         console.log(`📊 Found ${listingIdsToUpdate.length} listings to update`)
+
+        // Aggregate share_breakdown and leads_breakdown from all listing_analytics records
+        console.log(`📊 Aggregating breakdowns for ${listingIdsToUpdate.length} listings...`)
+        const { data: allListingAnalytics, error: breakdownError } = await supabaseAdmin
+          .from('listing_analytics')
+          .select('listing_id, share_breakdown, leads_breakdown, impression_share, total_leads')
+          .in('listing_id', listingIdsToUpdate)
+
+        if (breakdownError) {
+          console.error('❌ Error fetching breakdowns:', breakdownError)
+        }
+
+        // Aggregate breakdowns per listing
+        const breakdownAggregates = {}
+        if (allListingAnalytics && allListingAnalytics.length > 0) {
+          for (const row of allListingAnalytics) {
+            const listingId = row.listing_id
+            if (!breakdownAggregates[listingId]) {
+              breakdownAggregates[listingId] = {
+                share_breakdown: {
+                  facebook: 0, whatsapp: 0, twitter: 0, instagram: 0,
+                  copy_link: 0, email: 0, linkedin: 0, telegram: 0
+                },
+                leads_breakdown: {
+                  phone: 0, whatsapp: 0, direct_message: 0,
+                  email: 0, appointment: 0, website: 0
+                },
+                total_shares: 0,
+                total_leads: 0
+              }
+            }
+
+            // Aggregate share breakdown
+            if (row.share_breakdown && typeof row.share_breakdown === 'object') {
+              for (const [platform, data] of Object.entries(row.share_breakdown)) {
+                if (data && typeof data === 'object' && data.total) {
+                  breakdownAggregates[listingId].share_breakdown[platform] = 
+                    (breakdownAggregates[listingId].share_breakdown[platform] || 0) + data.total
+                }
+              }
+            }
+            breakdownAggregates[listingId].total_shares += row.impression_share || 0
+
+            // Aggregate leads breakdown
+            if (row.leads_breakdown && typeof row.leads_breakdown === 'object') {
+              for (const [leadType, data] of Object.entries(row.leads_breakdown)) {
+                if (data && typeof data === 'object' && data.total) {
+                  breakdownAggregates[listingId].leads_breakdown[leadType] = 
+                    (breakdownAggregates[listingId].leads_breakdown[leadType] || 0) + data.total
+                }
+              }
+            }
+            breakdownAggregates[listingId].total_leads += row.total_leads || 0
+          }
+        }
+
+        // Calculate percentages and build final breakdown objects
+        const finalBreakdowns = {}
+        for (const listingId in breakdownAggregates) {
+          const agg = breakdownAggregates[listingId]
+          
+          // Build share breakdown with percentages
+          const shareBreakdown = {}
+          for (const [platform, total] of Object.entries(agg.share_breakdown)) {
+            const percentage = agg.total_shares > 0 ? Number(((total / agg.total_shares) * 100).toFixed(2)) : 0
+            shareBreakdown[platform] = { total, percentage }
+          }
+
+          // Build leads breakdown with percentages
+          const leadsBreakdown = {}
+          for (const [leadType, total] of Object.entries(agg.leads_breakdown)) {
+            const percentage = agg.total_leads > 0 ? Number(((total / agg.total_leads) * 100).toFixed(2)) : 0
+            leadsBreakdown[leadType] = { total, percentage }
+          }
+
+          finalBreakdowns[listingId] = {
+            listing_share_breakdown: shareBreakdown,
+            listing_leads_breakdown: leadsBreakdown
+          }
+        }
 
         // OPTIMIZATION: Use SQL aggregation function instead of batch fetching (replaces 200+ queries with 1 query)
         const listingTotals = {}
@@ -2358,21 +2556,29 @@ export async function POST(request) {
           console.error('❌ Exception calling get_cumulative_listing_analytics:', err)
         }
         
-        if (Object.keys(listingTotals).length > 0) {
+        if (Object.keys(listingTotals).length > 0 || Object.keys(finalBreakdowns).length > 0) {
 
           // Batch update listings
           const listingUpdates = []
           for (const listingId in listingTotals) {
             const totals = listingTotals[listingId]
+            const breakdowns = finalBreakdowns[listingId] || {
+              listing_share_breakdown: {},
+              listing_leads_breakdown: {}
+            }
             listingUpdates.push({
               id: listingId,
               total_views: totals.total_views,
-              total_leads: totals.total_leads
+              total_leads: totals.total_leads,
+              listing_share_breakdown: breakdowns.listing_share_breakdown,
+              listing_leads_breakdown: breakdowns.listing_leads_breakdown
             })
             // Store for response
             listingUpdatesData[listingId] = {
               total_views: totals.total_views,
-              total_leads: totals.total_leads
+              total_leads: totals.total_leads,
+              share_breakdown: breakdowns.listing_share_breakdown,
+              leads_breakdown: breakdowns.listing_leads_breakdown
             }
           }
 
@@ -2395,7 +2601,9 @@ export async function POST(request) {
                 .from('listings')
                 .update({
                   total_views: update.total_views,
-                  total_leads: update.total_leads
+                  total_leads: update.total_leads,
+                  listing_share_breakdown: update.listing_share_breakdown,
+                  listing_leads_breakdown: update.listing_leads_breakdown
                 })
                 .eq('id', update.id)
                   .then(({ error }) => ({ id: update.id, error }))
@@ -2410,7 +2618,7 @@ export async function POST(request) {
               updateResults = listingUpdates.map(u => ({ id: u.id, error: null }))
               successCount = listingUpdates.length
               errorCount = 0
-              console.log(`✅ Batch upserted ${listingUpdates.length} listings`)
+              console.log(`✅ Batch upserted ${listingUpdates.length} listings with breakdowns`)
             }
           } catch (err) {
             console.error('❌ Exception batch upserting listings:', err)
@@ -2422,7 +2630,7 @@ export async function POST(request) {
             const errors = updateResults.filter(r => r.error)
             console.error(`❌ Errors updating ${errorCount} listings:`, errors.slice(0, 5)) // Log first 5 errors
             }
-            console.log(`✅ Updated ${successCount} listings (${errorCount} errors)`)
+            console.log(`✅ Updated ${successCount} listings with breakdowns (${errorCount} errors)`)
           }
         }
       }
@@ -2495,6 +2703,13 @@ export async function POST(request) {
             // Fallback: set empty breakdowns for all developers
             for (const devId of developerIdsArray) {
               leadsBreakdownMap[devId] = {
+                phone: { total: 0, percentage: 0 },
+                whatsapp: { total: 0, percentage: 0 },
+                direct_message: { total: 0, percentage: 0 },
+                email: { total: 0, percentage: 0 },
+                appointment: { total: 0, percentage: 0 },
+                website: { total: 0, percentage: 0 },
+                // Backward compatibility
                 phone_leads: { total: 0, percentage: 0 },
                 message_leads: { total: 0, percentage: 0 },
                 website_leads: { total: 0, percentage: 0 },
@@ -2504,16 +2719,45 @@ export async function POST(request) {
               }
             }
           } else if (leadsBreakdownData && leadsBreakdownData.length > 0) {
-            // Convert SQL results to JSONB structure
+            // Convert SQL results to JSONB structure with proper message type breakdown
             for (const row of leadsBreakdownData) {
+              const whatsappTotal = Number(row.whatsapp_leads) || 0
+              const directMessageTotal = Number(row.direct_message_leads) || 0
+              const messageTotal = whatsappTotal + directMessageTotal // Sum for backward compatibility
+              
               leadsBreakdownMap[row.user_id] = {
+                phone: {
+                  total: Number(row.phone_leads) || 0,
+                  percentage: Number(row.phone_percentage) || 0
+                },
+                whatsapp: {
+                  total: whatsappTotal,
+                  percentage: Number(row.whatsapp_percentage) || 0
+                },
+                direct_message: {
+                  total: directMessageTotal,
+                  percentage: Number(row.direct_message_percentage) || 0
+                },
+                email: {
+                  total: Number(row.email_leads) || 0,
+                  percentage: Number(row.email_percentage) || 0
+                },
+                appointment: {
+                  total: Number(row.appointment_leads) || 0,
+                  percentage: Number(row.appointment_percentage) || 0
+                },
+                website: {
+                  total: Number(row.website_leads) || 0,
+                  percentage: Number(row.website_percentage) || 0
+                },
+                // Backward compatibility fields
                 phone_leads: {
                   total: Number(row.phone_leads) || 0,
                   percentage: Number(row.phone_percentage) || 0
                 },
                 message_leads: {
-                  total: Number(row.message_leads) || 0,
-                  percentage: Number(row.message_percentage) || 0
+                  total: messageTotal,
+                  percentage: row.total_leads > 0 ? Number(((messageTotal / row.total_leads) * 100).toFixed(2)) : 0
                 },
                 website_leads: {
                   total: Number(row.website_leads) || 0,
@@ -2535,6 +2779,13 @@ export async function POST(request) {
             // No data found - set empty breakdowns
             for (const devId of developerIdsArray) {
               leadsBreakdownMap[devId] = {
+                phone: { total: 0, percentage: 0 },
+                whatsapp: { total: 0, percentage: 0 },
+                direct_message: { total: 0, percentage: 0 },
+                email: { total: 0, percentage: 0 },
+                appointment: { total: 0, percentage: 0 },
+                website: { total: 0, percentage: 0 },
+                // Backward compatibility
                 phone_leads: { total: 0, percentage: 0 },
                 message_leads: { total: 0, percentage: 0 },
                 website_leads: { total: 0, percentage: 0 },
@@ -2549,6 +2800,13 @@ export async function POST(request) {
           // Fallback: set empty breakdowns
           for (const devId of developerIdsArray) {
             leadsBreakdownMap[devId] = {
+              phone: { total: 0, percentage: 0 },
+              whatsapp: { total: 0, percentage: 0 },
+              direct_message: { total: 0, percentage: 0 },
+              email: { total: 0, percentage: 0 },
+              appointment: { total: 0, percentage: 0 },
+              website: { total: 0, percentage: 0 },
+              // Backward compatibility
               phone_leads: { total: 0, percentage: 0 },
               message_leads: { total: 0, percentage: 0 },
               website_leads: { total: 0, percentage: 0 },

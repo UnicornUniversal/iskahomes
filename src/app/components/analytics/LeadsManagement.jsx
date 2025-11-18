@@ -1,8 +1,15 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { FiMessageCircle, FiEdit3, FiTrash2, FiPlus, FiX, FiSend, FiUser, FiCalendar, FiPhone, FiMail, FiImage } from 'react-icons/fi'
+import { FiMessageCircle, FiEdit3, FiTrash2, FiPlus, FiX, FiSend, FiUser, FiCalendar, FiPhone, FiMail, FiImage, FiStar } from 'react-icons/fi'
 import { useAuth } from '@/contexts/AuthContext'
+
+// Helper function to get lead category from score
+function getLeadCategory(score) {
+  if (score >= 60) return { label: 'High', color: 'bg-green-100 text-green-800 border-green-200' }
+  if (score >= 25) return { label: 'Medium', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' }
+  return { label: 'Base', color: 'bg-gray-100 text-gray-800 border-gray-200' }
+}
 
 export default function LeadsManagement({ listerId, listerType = 'developer', listingId = null, pageSize = 20 }) {
   const { user } = useAuth()
@@ -199,6 +206,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Seeker</th>
                 <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Listing</th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
                 <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Manage</th>
@@ -207,7 +215,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
             <tbody className="bg-white divide-y divide-gray-200">
               {loading && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
+                  <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                       <span className="ml-2 text-gray-600">Loading leads...</span>
@@ -217,7 +225,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
               )}
               {error && !loading && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-red-600">
+                  <td colSpan={6} className="px-6 py-12 text-center text-red-600">
                     <div className="flex items-center justify-center">
                       <span className="text-red-600">{error}</span>
                     </div>
@@ -226,7 +234,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
               )}
               {!loading && !error && filteredLeads.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
+                  <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center">
                       <FiUser className="h-12 w-12 text-gray-400 mb-4" />
                       <h3 className="text-sm font-medium text-gray-900 mb-1">No leads found</h3>
@@ -292,6 +300,22 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                           {lead.first_action_date}
                         </div>
                       </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <FiStar className="w-4 h-4 text-yellow-500" />
+                        <span className="text-sm font-semibold text-gray-900">{lead.lead_score || 0}</span>
+                      </div>
+                      {(() => {
+                        const category = getLeadCategory(lead.lead_score || 0)
+                        return (
+                          <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium border ${category.color}`}>
+                            {category.label}
+                          </span>
+                        )
+                      })()}
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -433,6 +457,36 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                         <span className="text-sm text-gray-500">Actions:</span>
                         <span className="text-sm text-gray-700">{selectedLead.total_actions || 0}</span>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <FiStar className="w-4 h-4 text-yellow-500" />
+                        <span className="text-sm text-gray-500">Lead Score:</span>
+                        <span className="text-sm font-semibold text-gray-900">{selectedLead.lead_score || 0}</span>
+                        {(() => {
+                          const category = getLeadCategory(selectedLead.lead_score || 0)
+                          return (
+                            <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium border ml-2 ${category.color}`}>
+                              {category.label}
+                            </span>
+                          )
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status History */}
+                  <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                    <h4 className="text-base font-semibold text-gray-900 mb-3">Status History</h4>
+                    <div className="space-y-2">
+                      {(Array.isArray(selectedLead.status_tracker) && selectedLead.status_tracker.length > 0) ? (
+                        selectedLead.status_tracker.map((status, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                            <span className="text-sm text-gray-700 capitalize">{status}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-sm text-gray-500">No status history yet</div>
+                      )}
                     </div>
                   </div>
 
