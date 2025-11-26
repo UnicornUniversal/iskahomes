@@ -1,6 +1,6 @@
 // This route handles new listing steps
 // It calls the main step handler with id='new'
-import { handleStepUpdate } from '../../[id]/step/[stepName]/route'
+import { handleStepUpdate } from '@/lib/listingsStepHandler'
 
 export async function PUT(request, { params }) {
   const { stepName } = await params

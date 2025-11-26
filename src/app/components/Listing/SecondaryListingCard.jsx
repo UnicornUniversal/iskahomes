@@ -215,15 +215,26 @@ const SecondaryListingCard = ({ listing, imageConfig = null }) => {
   }
 
   // Get image classes from config or use default
-  const imageSectionClasses = imageConfig?.imageClasses || 'max-w-full max-h-64'
-  const imageContainerClasses = imageConfig?.containerClasses || 'w-full'
+  // Extract only height classes from imageClasses, always use w-full for width
+  const getImageHeightClasses = () => {
+    if (!imageConfig?.imageClasses) return 'h-[220px] md:h-[240px] lg:h-[260px]'
+    
+    // Extract only height classes (h-*) from the imageClasses string
+    const classes = imageConfig.imageClasses.split(' ')
+    const heightClasses = classes.filter(cls => cls.startsWith('h-'))
+    
+    return heightClasses.length > 0 ? heightClasses.join(' ') : 'h-[220px] md:h-[240px] lg:h-[260px]'
+  }
+  
+  const imageHeightClasses = getImageHeightClasses()
+  const containerClasses = imageConfig?.containerClasses || 'w-full'
 
   return (
     <Link href={`/property/${listing_type}/${slug}/${id}`} onClick={handleCardClick} className="block">
-      <div className="bg-white/70 backdrop-blur-sm shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer group flex flex-col">
+      <div className={` overflow-hidden hover:shadow-xl transition-all duration-300  transform hover:-translate-y-1 cursor-pointer group flex flex-col ${containerClasses}`}>
         {/* Image Section */}
         <div className={`relative overflow-hidden w-full`}>
-          <div className={`${imageSectionClasses} w-full`}>
+          <div className={`w-full ${imageHeightClasses}`}>
             {mainImage ? (
               <img
                 src={mainImage}

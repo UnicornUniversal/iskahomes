@@ -15,12 +15,13 @@ export async function GET(request) {
     }
 
     let finalUserId = userId
+    let primaryCurrency = 'USD' // Default fallback
 
     // If slug provided, get user_id from developers table
     if (slug && !userId) {
       const { data: developer, error: devError } = await supabaseAdmin
         .from('developers')
-        .select('developer_id, total_revenue, total_sales, estimated_revenue')
+        .select('developer_id, total_revenue, total_sales, estimated_revenue, company_locations, default_currency')
         .eq('slug', slug)
         .single()
 
@@ -32,16 +33,82 @@ export async function GET(request) {
       }
 
       finalUserId = developer.developer_id
+      
+      // Get primary currency from company_locations
+      if (developer.company_locations && Array.isArray(developer.company_locations)) {
+        const primaryLocation = developer.company_locations.find(
+          loc => loc.primary_location === true || loc.primary_location === 'true'
+        )
+        if (primaryLocation?.currency) {
+          primaryCurrency = primaryLocation.currency
+        }
+      }
+      
+      // Fallback to default_currency if primary location currency not found
+      if (primaryCurrency === 'USD' && developer.default_currency) {
+        let defaultCurrency = developer.default_currency
+        if (typeof defaultCurrency === 'string') {
+          try {
+            defaultCurrency = JSON.parse(defaultCurrency)
+          } catch (e) {
+            // Ignore parse error
+          }
+        }
+        if (defaultCurrency?.code) {
+          primaryCurrency = defaultCurrency.code
+        }
+      }
     } else if (userId) {
       // Fetch developer data
       const { data: developer } = await supabaseAdmin
         .from('developers')
-        .select('total_revenue, total_sales, estimated_revenue')
+        .select('total_revenue, total_sales, estimated_revenue, company_locations, default_currency')
         .eq('developer_id', userId)
         .single()
+      
+      if (developer) {
+        // Get primary currency from company_locations
+        if (developer.company_locations && Array.isArray(developer.company_locations)) {
+          const primaryLocation = developer.company_locations.find(
+            loc => loc.primary_location === true || loc.primary_location === 'true'
+          )
+          if (primaryLocation?.currency) {
+            primaryCurrency = primaryLocation.currency
+          }
+        }
+        
+        // Fallback to default_currency if primary location currency not found
+        if (primaryCurrency === 'USD' && developer.default_currency) {
+          let defaultCurrency = developer.default_currency
+          if (typeof defaultCurrency === 'string') {
+            try {
+              defaultCurrency = JSON.parse(defaultCurrency)
+            } catch (e) {
+              // Ignore parse error
+            }
+          }
+          if (defaultCurrency?.code) {
+            primaryCurrency = defaultCurrency.code
+          }
+        }
+      }
     }
 
-    // Fetch sales for calculations
+    // Use SQL SUM aggregation to get total revenue from sales_listings
+    const { data: revenueResult, error: revenueError } = await supabaseAdmin
+      .rpc('get_sales_revenue_summary', { p_user_id: finalUserId })
+
+    let totalRevenue = 0
+    if (revenueError) {
+      console.error('Error calling RPC function for revenue:', revenueError)
+      // Fallback to 0 if function doesn't exist
+      totalRevenue = 0
+    } else {
+      // RPC function returns aggregated result with SQL SUM
+      totalRevenue = revenueResult?.[0]?.total_revenue || revenueResult?.total_revenue || 0
+    }
+
+    // Fetch sales for other calculations
     const { data: sales, error: salesError } = await supabaseAdmin
       .from('sales_listings')
       .select('sale_price, sale_date, sale_timestamp, listing_id')
@@ -64,8 +131,6 @@ export async function GET(request) {
       .in('listing_status', ['active', 'draft'])
       .eq('upload_status', 'completed')
 
-    // Calculate metrics
-    const totalRevenue = sales?.reduce((sum, sale) => sum + (sale.sale_price || 0), 0) || 0
     const totalUnitsSold = sales?.length || 0
 
     // Expected revenue from active listings (use user's currency)
@@ -162,11 +227,12 @@ export async function GET(request) {
       .single()
 
     const overview = {
-      totalRevenue: developer?.total_revenue || totalRevenue,
+      totalRevenue: totalRevenue, // Use calculated SUM instead of developer.total_revenue
       totalUnitsSold: developer?.total_sales || totalUnitsSold,
       expectedRevenue: developer?.estimated_revenue || expectedRevenue,
       averageSalesTime: averageSalesTime,
-      leadsToSales: Math.round(leadsToSales * 100) / 100 // Round to 2 decimal places
+      leadsToSales: Math.round(leadsToSales * 100) / 100, // Round to 2 decimal places
+      currency: primaryCurrency // Include currency in response
     }
 
     return NextResponse.json({

@@ -76,6 +76,15 @@ export async function PUT(request) {
     const contentType = request.headers.get('content-type')
     let profileData
 
+    // Fetch existing developer data to compare gallery images for deletion
+    const { data: existingDeveloper } = await supabaseAdmin
+      .from('developers')
+      .select('company_gallery')
+      .eq('developer_id', decoded.user_id)
+      .single()
+
+    const existingGallery = existingDeveloper?.company_gallery || []
+
     if (contentType && contentType.includes('multipart/form-data')) {
       // Handle file uploads
       const formData = await request.formData()
@@ -207,9 +216,199 @@ export async function PUT(request) {
           }
         }
       }
+
+      // Handle company gallery images upload
+      const galleryImages = formData.getAll('galleryImages')
+      const existingNonFileImages = Array.isArray(existingGallery) 
+        ? existingGallery.filter(img => img && typeof img === 'object' && (img.path || img.url))
+        : []
+      
+      // Get the final gallery array from formData (after user removals)
+      // Only count actual image objects (with path or url), exclude File objects and any invalid entries
+      const finalGalleryFromForm = Array.isArray(profileData.company_gallery) 
+        ? profileData.company_gallery.filter(img => {
+            // Exclude File objects
+            if (img instanceof File) return false
+            // Only include objects with path or url (actual saved images)
+            return img && typeof img === 'object' && (img.path || img.url)
+          })
+        : []
+      
+      // Find images that were removed (exist in existingNonFileImages but not in finalGalleryFromForm)
+      const removedImages = existingNonFileImages.filter(existingImg => {
+        const existingPath = existingImg.path || existingImg.url
+        return !finalGalleryFromForm.some(finalImg => {
+          const finalPath = finalImg.path || finalImg.url
+          return finalPath === existingPath
+        })
+      })
+
+      // Delete removed images from Supabase storage
+      if (removedImages.length > 0) {
+        try {
+          const deletePromises = removedImages.map(async (img) => {
+            if (img.path) {
+              // Extract just the path part if it's a full path
+              const pathToDelete = img.path.startsWith('profile/gallery/') || img.path.startsWith('company-gallery/') 
+                ? img.path 
+                : `profile/gallery/${decoded.user_id}/${img.path.split('/').pop()}`
+              
+              const { error: deleteError } = await supabaseAdmin.storage
+                .from('iskaHomes')
+                .remove([pathToDelete])
+              
+              if (deleteError) {
+                console.error('Error deleting gallery image:', deleteError, 'Path:', pathToDelete)
+                // Don't fail the request if deletion fails, just log it
+              }
+            }
+          })
+          await Promise.all(deletePromises)
+        } catch (error) {
+          console.error('Error deleting removed gallery images:', error)
+          // Continue with the update even if deletion fails
+        }
+      }
+
+      if (galleryImages && galleryImages.length > 0) {
+        const fileUploads = galleryImages.filter(file => file instanceof File)
+        const maxImages = 7
+        const maxSize = 300 * 1024 // 300 KB
+
+        // Validate file sizes
+        const oversizedFiles = fileUploads.filter(file => file.size > maxSize)
+        if (oversizedFiles.length > 0) {
+          return NextResponse.json({ 
+            error: `Some images exceed 300KB limit: ${oversizedFiles.map(f => f.name).join(', ')}` 
+          }, { status: 400 })
+        }
+
+        // Check total count (only count actual saved images + new uploads)
+        // finalGalleryFromForm already excludes File objects and only includes saved images
+        const totalCount = finalGalleryFromForm.length + fileUploads.length
+        if (totalCount > maxImages) {
+          return NextResponse.json({ 
+            error: `Maximum ${maxImages} images allowed in gallery. You currently have ${finalGalleryFromForm.length} images and are trying to add ${fileUploads.length} more.` 
+          }, { status: 400 })
+        }
+
+        if (fileUploads.length > 0) {
+          try {
+            const uploadPromises = fileUploads.map(async (file) => {
+              // Sanitize filename - remove special characters and use only safe characters
+              const timestamp = Date.now()
+              const randomString = Math.random().toString(36).substring(2, 15)
+              const fileExtension = file.name.split('.').pop() || 'jpg'
+              // Use only timestamp and random string, not original filename to avoid special characters
+              const fileName = `gallery-${timestamp}-${randomString}.${fileExtension}`
+              const filePath = `profile/gallery/${decoded.user_id}/${fileName}`
+
+              // Convert file to buffer (required for Supabase storage)
+              const fileBuffer = await file.arrayBuffer()
+
+              // Upload to Supabase Storage
+              const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+                .from('iskaHomes')
+                .upload(filePath, fileBuffer, {
+                  contentType: file.type,
+                  cacheControl: '3600',
+                  upsert: false
+                })
+
+              if (uploadError) {
+                console.error('Gallery image upload error:', uploadError)
+                throw uploadError
+              }
+
+              // Get public URL
+              const { data: urlData } = supabaseAdmin.storage
+                .from('iskaHomes')
+                .getPublicUrl(filePath)
+
+              return {
+                id: uploadData.id,
+                url: urlData.publicUrl,
+                name: file.name,
+                path: uploadData.path,
+                size: file.size,
+                type: file.type,
+                uploaded_at: new Date().toISOString()
+              }
+            })
+
+            const newImages = await Promise.all(uploadPromises)
+            // Merge final gallery (after removals) with newly uploaded images
+            profileData.company_gallery = [...finalGalleryFromForm, ...newImages]
+          } catch (error) {
+            console.error('Gallery images upload error:', error)
+            return NextResponse.json({ 
+              error: 'Failed to upload gallery images', 
+              details: error.message 
+            }, { status: 500 })
+          }
+        } else {
+          // No new file uploads, use the final gallery array (after removals)
+          profileData.company_gallery = finalGalleryFromForm
+        }
+      } else {
+        // No new uploads, use the final gallery array (after removals)
+        profileData.company_gallery = finalGalleryFromForm
+      }
     } else {
       // Handle JSON data
       profileData = await request.json()
+      
+      // For JSON requests, also handle gallery deletions
+      // Only count actual image objects (with path or url), exclude File objects and any invalid entries
+      const finalGalleryFromForm = Array.isArray(profileData.company_gallery) 
+        ? profileData.company_gallery.filter(img => {
+            // Exclude File objects (shouldn't be in JSON, but just in case)
+            if (img instanceof File) return false
+            // Only include objects with path or url (actual saved images)
+            return img && typeof img === 'object' && (img.path || img.url)
+          })
+        : []
+      
+      const existingNonFileImages = Array.isArray(existingGallery) 
+        ? existingGallery.filter(img => img && typeof img === 'object' && (img.path || img.url))
+        : []
+      
+      // Find images that were removed
+      const removedImages = existingNonFileImages.filter(existingImg => {
+        const existingPath = existingImg.path || existingImg.url
+        return !finalGalleryFromForm.some(finalImg => {
+          const finalPath = finalImg.path || finalImg.url
+          return finalPath === existingPath
+        })
+      })
+
+      // Delete removed images from Supabase storage
+      if (removedImages.length > 0) {
+        try {
+          const deletePromises = removedImages.map(async (img) => {
+            if (img.path) {
+              // Extract just the path part if it's a full path
+              const pathToDelete = img.path.startsWith('profile/gallery/') || img.path.startsWith('company-gallery/') 
+                ? img.path 
+                : `profile/gallery/${decoded.user_id}/${img.path.split('/').pop()}`
+              
+              const { error: deleteError } = await supabaseAdmin.storage
+                .from('iskaHomes')
+                .remove([pathToDelete])
+              
+              if (deleteError) {
+                console.error('Error deleting gallery image:', deleteError, 'Path:', pathToDelete)
+              }
+            }
+          })
+          await Promise.all(deletePromises)
+        } catch (error) {
+          console.error('Error deleting removed gallery images:', error)
+        }
+      }
+      
+      // Update gallery to final array
+      profileData.company_gallery = finalGalleryFromForm
     }
 
     // Extract and process locations array
@@ -231,6 +430,29 @@ export async function PUT(request) {
     // Store company_statistics as JSONB
     if (Array.isArray(profileData.company_statistics)) {
       updateData.company_statistics = profileData.company_statistics
+    }
+
+    // Store company_gallery as JSONB array (ensure it's always an array, not an object)
+    if (Array.isArray(profileData.company_gallery)) {
+      updateData.company_gallery = profileData.company_gallery
+    } else if (profileData.company_gallery && typeof profileData.company_gallery === 'object') {
+      // If it's an object, convert to array
+      updateData.company_gallery = Object.values(profileData.company_gallery)
+    } else {
+      updateData.company_gallery = []
+    }
+
+    // Store specialization as JSONB - normalize to store actual values (strings) instead of IDs
+    if (profileData.specialization) {
+      const normalizedSpecialization = {
+        database: Array.isArray(profileData.specialization.database)
+          ? profileData.specialization.database.map(s => typeof s === 'string' ? s : (s.name || s))
+          : [],
+        custom: Array.isArray(profileData.specialization.custom)
+          ? profileData.specialization.custom.map(s => typeof s === 'string' ? s : (s.name || s))
+          : []
+      }
+      updateData.specialization = normalizedSpecialization
     }
 
     // If primary location exists, update main location fields

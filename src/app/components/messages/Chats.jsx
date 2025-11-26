@@ -18,8 +18,10 @@ const Chats = ({ onChatSelect, selectedChatId, onConversationDataChange }) => {
 
 
   // Fetch conversations and subscribe to realtime updates
+  const currentUserId = user?.id ?? user?.profile?.developer_id ?? null;
+
   useEffect(() => {
-    if (!token || !user) return;
+    if (!token || !user || !currentUserId) return;
 
     let isFetching = false;
     let fetchTimeout = null;
@@ -43,7 +45,13 @@ const Chats = ({ onChatSelect, selectedChatId, onConversationDataChange }) => {
 
         if (response.ok) {
           const data = await response.json();
-          setConversations(data.conversations || []);
+          // Sort conversations by last_message_at to ensure proper order
+          const sortedConversations = (data.conversations || []).sort((a, b) => {
+            const timeA = new Date(a.last_message_at || a.created_at || 0).getTime();
+            const timeB = new Date(b.last_message_at || b.created_at || 0).getTime();
+            return timeB - timeA; // Newest first
+          });
+          setConversations(sortedConversations);
         } else {
           if (!silent) console.error('Failed to fetch conversations');
         }
@@ -62,7 +70,7 @@ const Chats = ({ onChatSelect, selectedChatId, onConversationDataChange }) => {
       }
       fetchTimeout = setTimeout(() => {
         fetchConversations(true); // Silent refresh
-      }, 1000); // Wait 1 second before refreshing
+      }, 500); // Wait 500ms before refreshing (faster updates)
     };
 
     // Initial fetch
@@ -79,65 +87,80 @@ const Chats = ({ onChatSelect, selectedChatId, onConversationDataChange }) => {
     // Subscribe to realtime conversation updates with error handling
     let channel = null;
     try {
-      channel = supabase
-        .channel(`conversations-realtime-${user?.id}`)
-        .on(
+      const channelName = `conversations-realtime-${currentUserId}`;
+      console.log(`📡 Setting up realtime channel: ${channelName}`);
+
+      const handleConversationChange = (payload, type) => {
+        console.log(`💬 Conversation ${type}:`, payload);
+        debouncedRefresh();
+      };
+
+      const handleMessageInsert = (payload, direction) => {
+        console.log(`📨 Message ${direction} current user:`, payload);
+        debouncedRefresh();
+      };
+
+      channel = supabase.channel(channelName);
+
+      const conversationEvents = [
+        { event: 'INSERT', filter: `user1_id=eq.${currentUserId}`, label: 'insert (user1)' },
+        { event: 'INSERT', filter: `user2_id=eq.${currentUserId}`, label: 'insert (user2)' },
+        { event: 'UPDATE', filter: `user1_id=eq.${currentUserId}`, label: 'update (user1)' },
+        { event: 'UPDATE', filter: `user2_id=eq.${currentUserId}`, label: 'update (user2)' }
+      ];
+
+      conversationEvents.forEach(({ event, filter, label }) => {
+        channel = channel.on(
           'postgres_changes',
           {
-            event: 'INSERT', // Only listen to new conversations
-            schema: 'public',
-            table: 'conversations'
-          },
-          (payload) => {
-            console.log('💬 New conversation created:', payload);
-            debouncedRefresh(); // Debounced refresh
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE', // Only listen to updates
+            event,
             schema: 'public',
             table: 'conversations',
-            filter: `user1_id=eq.${user?.id} OR user2_id=eq.${user?.id}` // Only for user's conversations
+            filter
           },
-          (payload) => {
-            // Only refresh if last_message_at changed (new message) or unread count changed significantly
-            const oldData = payload.old;
-            const newData = payload.new;
-            
-            // Check if it's a meaningful update (new message or unread count change)
-            const hasNewMessage = newData.last_message_at !== oldData?.last_message_at;
-            const unreadChanged = (newData.user1_unread_count !== oldData?.user1_unread_count) ||
-                                 (newData.user2_unread_count !== oldData?.user2_unread_count);
-            
-            if (hasNewMessage || unreadChanged) {
-              console.log('💬 Conversation updated (new message or unread change):', payload);
-              debouncedRefresh(); // Debounced refresh
-            }
+          (payload) => handleConversationChange(payload, label)
+        );
+      });
+
+      const messageEvents = [
+        { filter: `sender_id=eq.${currentUserId}`, label: ' sent by' },
+        { filter: `receiver_id=eq.${currentUserId}`, label: ' received by' }
+      ];
+
+      messageEvents.forEach(({ filter, label }) => {
+        channel = channel.on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter
+          },
+          (payload) => handleMessageInsert(payload, label)
+        );
+      });
+
+      channel = channel.subscribe((status) => {
+        console.log('📡 Conversations subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Successfully subscribed to conversations channel');
+          // Clear any polling if realtime works
+          if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
           }
-        )
-        .subscribe((status) => {
-          console.log('📡 Conversations subscription status:', status);
-          if (status === 'SUBSCRIBED') {
-            console.log('✅ Successfully subscribed to conversations channel');
-            // Clear any polling if realtime works
-            if (pollInterval) {
-              clearInterval(pollInterval);
-              pollInterval = null;
-            }
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.warn(`⚠️ Conversations channel ${status} - using fallback polling (30s)`);
-            // Fallback: Poll every 30 seconds (much less frequent) if realtime fails
-            if (!pollInterval) {
-              pollInterval = setInterval(() => {
-                fetchConversations(true); // Silent polling
-              }, 30000); // 30 seconds instead of 5
-            }
-          } else if (status === 'CLOSED') {
-            console.log('🔒 Conversations channel subscription closed');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn(`⚠️ Conversations channel ${status} - using fallback polling (30s)`);
+          // Fallback: Poll every 30 seconds (much less frequent) if realtime fails
+          if (!pollInterval) {
+            pollInterval = setInterval(() => {
+              fetchConversations(true); // Silent polling
+            }, 30000); // 30 seconds instead of 5
           }
-        });
+        } else if (status === 'CLOSED') {
+          console.log('🔒 Conversations channel subscription closed');
+        }
+      });
     } catch (error) {
       console.error('Error setting up realtime subscription:', error);
       // Fallback polling if subscription setup fails (30 seconds)
@@ -168,21 +191,28 @@ const Chats = ({ onChatSelect, selectedChatId, onConversationDataChange }) => {
         supabase.removeChannel(channel);
       }
     };
-  }, [token, user]);
+  }, [token, user, currentUserId]);
 
-  const filteredChats = conversations.filter(conv => {
-    // If no search query, show all conversations
-    if (!searchQuery) return true;
-    
-    // Use other_user from SQL function (snake_case from database)
-    const otherUser = conv.other_user || conv.otherUser;
-    
-    // If otherUser or name doesn't exist, don't filter it out (show it)
-    if (!otherUser || !otherUser.name) return true;
-    
-    // Filter by name
-    return otherUser.name.toLowerCase().includes(searchQuery.toLowerCase());
-  });
+  const filteredChats = conversations
+    .filter(conv => {
+      // If no search query, show all conversations
+      if (!searchQuery) return true;
+      
+      // Use other_user from SQL function (snake_case from database)
+      const otherUser = conv.other_user || conv.otherUser;
+      
+      // If otherUser or name doesn't exist, don't filter it out (show it)
+      if (!otherUser || !otherUser.name) return true;
+      
+      // Filter by name
+      return otherUser.name.toLowerCase().includes(searchQuery.toLowerCase());
+    })
+    .sort((a, b) => {
+      // Sort by last_message_at in descending order (newest first)
+      const timeA = new Date(a.last_message_at || a.created_at || 0).getTime();
+      const timeB = new Date(b.last_message_at || b.created_at || 0).getTime();
+      return timeB - timeA;
+    });
 
   // Helper function to format timestamp
   const formatTimestamp = (timestamp) => {

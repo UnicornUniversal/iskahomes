@@ -275,10 +275,10 @@ const SocialAmenities = React.memo(({ formData, updateFormData, isEditMode }) =>
           overflow: hidden;
         }
       `}</style>
-    <div className="p-4 sm:p-6 bg-white rounded-lg shadow-sm">
+    <div className="secondary_bg !p-[1.5em]">
       <div className="mb-4 sm:mb-6">
         <div className="flex justify-between items-center mb-2">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Social Amenities</h2>
+          <h4 className="">Find Beautiful Places Nearby</h4>
           {formData.location?.coordinates?.latitude && formData.location?.coordinates?.longitude && (
             <button
               onClick={handleRefresh}
@@ -288,9 +288,9 @@ const SocialAmenities = React.memo(({ formData, updateFormData, isEditMode }) =>
             </button>
           )}
         </div>
-        <p className="text-sm sm:text-base text-gray-600">
+        {/* <p className="text-sm sm:text-base text-gray-600">
           {isEditMode ? 'Nearby social amenities and facilities' : 'Discover nearby social amenities and facilities'}
-        </p>
+        </p> */}
       </div>
 
       {!formData.location?.coordinates?.latitude ? (

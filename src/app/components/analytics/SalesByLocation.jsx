@@ -6,6 +6,7 @@ import { Swiper, SwiperSlide } from 'swiper/react'
 import { Navigation } from 'swiper/modules'
 import 'swiper/css'
 import 'swiper/css/navigation'
+import { formatCurrency } from '@/lib/utils'
 
 // Custom styles for Swiper navigation buttons
 const swiperStyles = `
@@ -128,7 +129,7 @@ const SalesByLocation = ({ listerId }) => {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="default_bg rounded-lg shadow p-6">
         <div className="text-center text-gray-500">Loading location data...</div>
       </div>
     )
@@ -136,7 +137,7 @@ const SalesByLocation = ({ listerId }) => {
 
   if (data.locations.length === 0 && data.byCountry.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="default_bg rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Sales by Location</h3>
         <p className="text-sm text-gray-600 mb-4">Geographic distribution of sales</p>
         <div className="text-center text-gray-500 py-8">No sales location data available</div>
@@ -185,7 +186,7 @@ const SalesByLocation = ({ listerId }) => {
   const defaultZoom = 2 // Zoomed out to show entire globe
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
+    <div className="default_bg rounded-lg shadow overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
     <div>
@@ -254,7 +255,7 @@ const SalesByLocation = ({ listerId }) => {
                             <span>{location.sales_count} sales</span>
                           </div>
                           <div className="flex items-center text-xs">
-                            <span>{currency}{location.revenue.toLocaleString()}</span>
+                            <span>{formatCurrency(location.revenue, currency)}</span>
                           </div>
                         </div>
                       </div>
@@ -267,7 +268,7 @@ const SalesByLocation = ({ listerId }) => {
 
           {/* Left Sidebar - Absolutely Positioned (Desktop Only) */}
           <div className="absolute left-6 top-6 w-80 z-10 hidden lg:block">
-            <div className="bg-white/90 backdrop-blur-md rounded-lg shadow-xl p-6 border border-white/20">
+            <div className="default_bg backdrop-blur-md rounded-lg shadow-xl p-6 border border-white/20">
               <div className="space-y-2">
                 <button
                   onClick={() => setSelectedCategory('country')}
@@ -283,7 +284,7 @@ const SalesByLocation = ({ listerId }) => {
                   </div>
                   <div className="text-sm opacity-90">
                     <div>{countryTotal.sales_count} sales</div>
-                    <div className="font-medium">{currency}{countryTotal.revenue.toLocaleString()}</div>
+                    <div className="font-medium">{formatCurrency(countryTotal.revenue, currency)}</div>
                   </div>
                 </button>
 
@@ -301,7 +302,7 @@ const SalesByLocation = ({ listerId }) => {
                   </div>
                   <div className="text-sm opacity-90">
                     <div>{stateTotal.sales_count} sales</div>
-                    <div className="font-medium">{currency}{stateTotal.revenue.toLocaleString()}</div>
+                    <div className="font-medium">{formatCurrency(stateTotal.revenue, currency)}</div>
                   </div>
                 </button>
 
@@ -319,7 +320,7 @@ const SalesByLocation = ({ listerId }) => {
                   </div>
                   <div className="text-sm opacity-90">
                     <div>{cityTotal.sales_count} sales</div>
-                    <div className="font-medium">{currency}{cityTotal.revenue.toLocaleString()}</div>
+                    <div className="font-medium">{formatCurrency(cityTotal.revenue, currency)}</div>
                   </div>
                 </button>
 
@@ -337,7 +338,7 @@ const SalesByLocation = ({ listerId }) => {
                   </div>
                   <div className="text-sm opacity-90">
                     <div>{townTotal.sales_count} sales</div>
-                    <div className="font-medium">{currency}{townTotal.revenue.toLocaleString()}</div>
+                    <div className="font-medium">{formatCurrency(townTotal.revenue, currency)}</div>
                   </div>
                 </button>
               </div>
@@ -346,7 +347,7 @@ const SalesByLocation = ({ listerId }) => {
 
           {/* Right Side - Breakdown List (Absolutely Positioned) */}
           <div className="absolute right-6 top-6 w-96 max-w-[calc(100%-20rem)] z-10 hidden lg:block">
-            <div className="bg-white/90 backdrop-blur-md rounded-lg shadow-xl p-6 border border-white/20 max-h-[550px] overflow-hidden flex flex-col">
+            <div className="default_bg backdrop-blur-md rounded-lg shadow-xl p-6 border border-white/20 max-h-[550px] overflow-hidden flex flex-col">
               <div className="mb-4 flex-shrink-0">
                 <h4 className="text-lg font-semibold text-gray-900 capitalize">
                   {selectedCategory === 'country' ? 'Countries' : selectedCategory === 'state' ? 'States' : selectedCategory === 'city' ? 'Cities' : 'Towns'}
@@ -384,7 +385,7 @@ const SalesByLocation = ({ listerId }) => {
                                 <span>{item.sales_count} sales</span>
                               </div>
                               <div className="text-lg font-bold text-gray-900">
-                                {currency}{item.revenue.toLocaleString()}
+                                {formatCurrency(item.revenue, currency)}
                               </div>
                             </div>
                           </div>
@@ -399,7 +400,7 @@ const SalesByLocation = ({ listerId }) => {
 
           {/* Mobile: Categories Swiper at Top */}
           <div className="lg:hidden absolute top-6 left-6 right-6 z-10">
-            <div className="bg-white/90 backdrop-blur-md rounded-lg shadow-xl p-4 border border-white/20">
+            <div className="default_bg backdrop-blur-md rounded-lg shadow-xl p-4 border border-white/20">
               <Swiper
                 modules={[Navigation]}
                 spaceBetween={12}
@@ -422,7 +423,7 @@ const SalesByLocation = ({ listerId }) => {
                     </div>
                     <div className="text-xs opacity-90">
                       <div>{countryTotal.sales_count} sales</div>
-                      <div className="font-medium">{currency}{countryTotal.revenue.toLocaleString()}</div>
+                      <div className="font-medium">{formatCurrency(countryTotal.revenue, currency)}</div>
                     </div>
                   </button>
                 </SwiperSlide>
@@ -441,7 +442,7 @@ const SalesByLocation = ({ listerId }) => {
                     </div>
                     <div className="text-xs opacity-90">
                       <div>{stateTotal.sales_count} sales</div>
-                      <div className="font-medium">{currency}{stateTotal.revenue.toLocaleString()}</div>
+                      <div className="font-medium">{formatCurrency(stateTotal.revenue, currency)}</div>
                     </div>
                   </button>
                 </SwiperSlide>
@@ -460,7 +461,7 @@ const SalesByLocation = ({ listerId }) => {
                     </div>
                     <div className="text-xs opacity-90">
                       <div>{cityTotal.sales_count} sales</div>
-                      <div className="font-medium">{currency}{cityTotal.revenue.toLocaleString()}</div>
+                      <div className="font-medium">{formatCurrency(cityTotal.revenue, currency)}</div>
                     </div>
                   </button>
                 </SwiperSlide>
@@ -479,7 +480,7 @@ const SalesByLocation = ({ listerId }) => {
                     </div>
                     <div className="text-xs opacity-90">
                       <div>{townTotal.sales_count} sales</div>
-                      <div className="font-medium">{currency}{townTotal.revenue.toLocaleString()}</div>
+                      <div className="font-medium">{formatCurrency(townTotal.revenue, currency)}</div>
                     </div>
                   </button>
                 </SwiperSlide>
@@ -489,7 +490,7 @@ const SalesByLocation = ({ listerId }) => {
 
           {/* Mobile: Breakdown Swiper at Bottom */}
           <div className="lg:hidden absolute bottom-6 left-6 right-6 z-10">
-            <div className="bg-white/90 backdrop-blur-md rounded-lg shadow-xl p-4 border border-white/20">
+            <div className="default_bg backdrop-blur-md rounded-lg shadow-xl p-4 border border-white/20">
               <div className="mb-3">
                 <h4 className="text-base font-semibold text-gray-900 capitalize">
                   {selectedCategory === 'country' ? 'Countries' : selectedCategory === 'state' ? 'States' : selectedCategory === 'city' ? 'Cities' : 'Towns'}
@@ -571,7 +572,7 @@ const SalesByLocation = ({ listerId }) => {
                   </div>
                   <div className="text-xs">
                     <div>{countryTotal.sales_count} sales</div>
-                    <div className="font-medium">{currency}{countryTotal.revenue.toLocaleString()}</div>
+                    <div className="font-medium">{formatCurrency(countryTotal.revenue, currency)}</div>
                   </div>
                 </button>
               </SwiperSlide>
@@ -590,7 +591,7 @@ const SalesByLocation = ({ listerId }) => {
                   </div>
                   <div className="text-xs">
                     <div>{stateTotal.sales_count} sales</div>
-                    <div className="font-medium">{currency}{stateTotal.revenue.toLocaleString()}</div>
+                    <div className="font-medium">{formatCurrency(stateTotal.revenue, currency)}</div>
                   </div>
                 </button>
               </SwiperSlide>
@@ -609,7 +610,7 @@ const SalesByLocation = ({ listerId }) => {
                   </div>
                   <div className="text-xs">
                     <div>{cityTotal.sales_count} sales</div>
-                    <div className="font-medium">{currency}{cityTotal.revenue.toLocaleString()}</div>
+                    <div className="font-medium">{formatCurrency(cityTotal.revenue, currency)}</div>
                   </div>
                 </button>
               </SwiperSlide>
@@ -628,7 +629,7 @@ const SalesByLocation = ({ listerId }) => {
                   </div>
                   <div className="text-xs">
                     <div>{townTotal.sales_count} sales</div>
-                    <div className="font-medium">{currency}{townTotal.revenue.toLocaleString()}</div>
+                    <div className="font-medium">{formatCurrency(townTotal.revenue, currency)}</div>
                   </div>
                 </button>
               </SwiperSlide>
@@ -653,7 +654,7 @@ const SalesByLocation = ({ listerId }) => {
                   </div>
                   <div className="text-sm opacity-90">
                     <div>{countryTotal.sales_count} sales</div>
-                    <div className="font-medium">{currency}{countryTotal.revenue.toLocaleString()}</div>
+                    <div className="font-medium">{formatCurrency(countryTotal.revenue, currency)}</div>
                   </div>
                 </button>
 
@@ -671,7 +672,7 @@ const SalesByLocation = ({ listerId }) => {
                   </div>
                   <div className="text-sm opacity-90">
                     <div>{stateTotal.sales_count} sales</div>
-                    <div className="font-medium">{currency}{stateTotal.revenue.toLocaleString()}</div>
+                    <div className="font-medium">{formatCurrency(stateTotal.revenue, currency)}</div>
                   </div>
                 </button>
 
@@ -689,7 +690,7 @@ const SalesByLocation = ({ listerId }) => {
                   </div>
                   <div className="text-sm opacity-90">
                     <div>{cityTotal.sales_count} sales</div>
-                    <div className="font-medium">{currency}{cityTotal.revenue.toLocaleString()}</div>
+                    <div className="font-medium">{formatCurrency(cityTotal.revenue, currency)}</div>
                   </div>
                 </button>
 
@@ -707,7 +708,7 @@ const SalesByLocation = ({ listerId }) => {
                   </div>
                   <div className="text-sm opacity-90">
                     <div>{townTotal.sales_count} sales</div>
-                    <div className="font-medium">{currency}{townTotal.revenue.toLocaleString()}</div>
+                    <div className="font-medium">{formatCurrency(townTotal.revenue, currency)}</div>
                   </div>
                 </button>
               </div>
@@ -759,7 +760,7 @@ const SalesByLocation = ({ listerId }) => {
                           <div className="flex-shrink-0 ml-4">
                             <div className="text-right">
                               <div className="text-lg font-bold text-gray-900">
-                                {currency}{item.revenue.toLocaleString()}
+                                {formatCurrency(item.revenue, currency)}
                               </div>
                               <div className="text-xs text-gray-500">
                                 {item.sales_count} {item.sales_count === 1 ? 'sale' : 'sales'}
@@ -816,7 +817,7 @@ const SalesByLocation = ({ listerId }) => {
                                 <span>{item.sales_count} sales</span>
                               </div>
                               <div className="text-lg font-bold text-gray-900">
-                                {currency}{item.revenue.toLocaleString()}
+                                {formatCurrency(item.revenue, currency)}
                               </div>
                             </div>
                           </div>

@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useCallback, memo } from 'react'
+import React, { useState, useCallback, memo, useMemo } from 'react'
 import AlbumGallery from '@/app/components/propertyManagement/modules/AlbumGallery'
 
 const TestPage = memo(() => {
@@ -27,6 +27,63 @@ const TestPage = memo(() => {
   const [leadsSummaryLoading, setLeadsSummaryLoading] = useState(false)
   const [leadsSummaryResult, setLeadsSummaryResult] = useState(null)
   const [leadsListingIdFilter, setLeadsListingIdFilter] = useState('')
+
+  const [comparisonLoading, setComparisonLoading] = useState(false)
+  const [comparisonResult, setComparisonResult] = useState(null)
+  const [comparisonUserId, setComparisonUserId] = useState('')
+  const [comparisonUserType, setComparisonUserType] = useState('developer')
+  const [comparisonStartDate, setComparisonStartDate] = useState(() => {
+    const date = new Date()
+    date.setUTCDate(date.getUTCDate() - 7)
+    return date.toISOString().split('T')[0]
+  })
+  const [comparisonEndDate, setComparisonEndDate] = useState(() => {
+    return new Date().toISOString().split('T')[0]
+  })
+
+  const defaultUTC = useMemo(() => {
+    const now = new Date()
+    return {
+      year: now.getUTCFullYear(),
+      month: now.getUTCMonth() + 1,
+    }
+  }, [])
+
+  const [timeSeriesYear, setTimeSeriesYear] = useState(() => String(defaultUTC.year))
+  const [timeSeriesMonth, setTimeSeriesMonth] = useState(() => String(defaultUTC.month))
+  const [timeSeriesIgnoreLastRun, setTimeSeriesIgnoreLastRun] = useState(false)
+  const [timeSeriesLoading, setTimeSeriesLoading] = useState(false)
+  const [timeSeriesProgress, setTimeSeriesProgress] = useState([])
+  const [timeSeriesResult, setTimeSeriesResult] = useState(null)
+
+  const resolvedTimeSeriesYear = Number(timeSeriesYear) || defaultUTC.year
+  const resolvedTimeSeriesMonth = Math.min(12, Math.max(1, Number(timeSeriesMonth) || defaultUTC.month))
+
+  const runAnalyticsCron = useCallback(async (queryParams = {}) => {
+    const params = new URLSearchParams()
+    Object.entries(queryParams).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') return
+      params.append(key, String(value))
+    })
+    const queryString = params.toString() ? `?${params.toString()}` : ''
+
+    const response = await fetch(`/api/cron/analytics${queryString}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
+    })
+
+    let data = null
+    try {
+      data = await response.json()
+    } catch (error) {
+      data = { error: 'Unable to parse response JSON' }
+    }
+
+    return { ok: response.ok, data }
+  }, [])
 
 
   const handleTestPostHog = async () => {
@@ -159,18 +216,12 @@ const TestPage = memo(() => {
     setCronResult(null)
 
     try {
-      // Use testMode=true and ignoreLastRun=true to fetch last 24 hours and ignore previous runs
-      const response = await fetch('/api/cron/analytics?testMode=true&ignoreLastRun=true', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({})
+      const { ok, data } = await runAnalyticsCron({
+        testMode: 'true',
+        ignoreLastRun: 'true'
       })
 
-      const data = await response.json()
-
-      if (response.ok) {
+      if (ok) {
         setCronResult({
           success: true,
           message: 'Analytics cron job executed successfully!',
@@ -193,6 +244,107 @@ const TestPage = memo(() => {
       setCronLoading(false)
     }
   }
+
+  const buildTimeSeriesQuery = useCallback(() => {
+    return {
+      testTimeSeries: 'true',
+      testYear: String(resolvedTimeSeriesYear),
+      testMonth: String(resolvedTimeSeriesMonth),
+      ignoreLastRun: timeSeriesIgnoreLastRun ? 'true' : 'false'
+    }
+  }, [
+    resolvedTimeSeriesYear,
+    resolvedTimeSeriesMonth,
+    timeSeriesIgnoreLastRun
+  ])
+
+  const formatCronRunEntry = useCallback((response, index) => {
+    return {
+      index,
+      ok: response.ok,
+      runId: response.data?.run_id,
+      date: response.data?.date ?? response.data?.target_date ?? null,
+      hour: response.data?.hour ?? response.data?.target_hour ?? null,
+      message: response.data?.message || response.data?.status_message || response.data?.error || null,
+      completed: response.data?.completed || false,
+      data: response.data || null
+    }
+  }, [])
+
+  const handleTimeSeriesSingleRun = useCallback(async () => {
+    const query = buildTimeSeriesQuery()
+    setTimeSeriesLoading(true)
+    setTimeSeriesProgress([])
+    setTimeSeriesResult(null)
+
+    try {
+      const response = await runAnalyticsCron(query)
+      const entry = formatCronRunEntry(response, 1)
+      setTimeSeriesProgress([entry])
+      setTimeSeriesResult({
+        success: response.ok,
+        runs: [entry],
+        completed: entry.completed
+      })
+    } catch (error) {
+      setTimeSeriesResult({
+        success: false,
+        runs: [],
+        error: error.message
+      })
+    } finally {
+      setTimeSeriesLoading(false)
+    }
+  }, [buildTimeSeriesQuery, formatCronRunEntry, runAnalyticsCron])
+
+  const handleTimeSeriesBatchRun = useCallback(async () => {
+    const query = buildTimeSeriesQuery()
+    setTimeSeriesLoading(true)
+    setTimeSeriesProgress([])
+    setTimeSeriesResult(null)
+
+    const runs = []
+    let runCount = 0
+    const maxRuns = 1000 // Safety limit to prevent infinite loops
+
+    try {
+      while (runCount < maxRuns) {
+        runCount++
+        const response = await runAnalyticsCron(query)
+        const entry = formatCronRunEntry(response, runCount)
+        runs.push(entry)
+        setTimeSeriesProgress(prev => [...prev, entry])
+
+        // Stop if there's an error or if the cron reports completion
+        if (!response.ok || entry.completed) {
+          break
+        }
+      }
+
+      if (runCount >= maxRuns) {
+        console.warn(`Reached safety limit of ${maxRuns} runs`)
+      }
+
+      setTimeSeriesResult({
+        success: runs.length > 0 && runs.every(run => run.ok),
+        runs,
+        completed: runs.some(run => run.completed),
+        totalRuns: runs.length
+      })
+    } catch (error) {
+      setTimeSeriesResult({
+        success: false,
+        runs,
+        error: error.message
+      })
+    } finally {
+      setTimeSeriesLoading(false)
+    }
+  }, [
+    buildTimeSeriesQuery,
+    formatCronRunEntry,
+    runAnalyticsCron
+  ])
 
   const handleTestPostHogEvents = async () => {
     // Prevent multiple simultaneous calls
@@ -320,6 +472,52 @@ const TestPage = memo(() => {
     }
   }
 
+  const handleComparison = async () => {
+    if (comparisonLoading || !comparisonUserId) {
+      return
+    }
+
+    setComparisonLoading(true)
+    setComparisonResult(null)
+
+    try {
+      const params = new URLSearchParams({
+        userId: comparisonUserId,
+        userType: comparisonUserType,
+        startDate: comparisonStartDate,
+        endDate: comparisonEndDate
+      })
+
+      const response = await fetch(`/api/test/comparison?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      setComparisonResult({
+        success: true,
+        message: `Comparison complete: ${data.summary?.matchRate || 0}% match rate`,
+        data: data
+      })
+    } catch (error) {
+      setComparisonResult({
+        success: false,
+        message: `Error: ${error.message}`,
+        data: null
+      })
+    } finally {
+      setComparisonLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className=" mx-auto">
@@ -382,6 +580,128 @@ const TestPage = memo(() => {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Time-Series Simulation Section */}
+          <div className="mb-8">
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-indigo-900 mb-2">Time-Series Simulation</h2>
+              <p className="text-sm text-indigo-700 mb-4">
+                Process all available days automatically. Each day will be fully processed (all hours with events).
+                The simulation will continue until all days are processed or no more events are found.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-indigo-900 mb-1">Start Year (UTC)</label>
+                  <input
+                    type="number"
+                    min="2000"
+                    value={timeSeriesYear}
+                    onChange={(e) => setTimeSeriesYear(e.target.value)}
+                    className="w-full px-3 py-2 border border-indigo-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <p className="text-xs text-indigo-700 mt-1">Processing starts from this year</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-indigo-900 mb-1">Start Month (1-12)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    value={timeSeriesMonth}
+                    onChange={(e) => setTimeSeriesMonth(e.target.value)}
+                    className="w-full px-3 py-2 border border-indigo-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <p className="text-xs text-indigo-700 mt-1">Processing starts from day 1 of this month</p>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center gap-3">
+                <input
+                  id="timeSeriesIgnore"
+                  type="checkbox"
+                  className="h-4 w-4 text-indigo-600 border-indigo-300 rounded"
+                  checked={timeSeriesIgnoreLastRun}
+                  onChange={(e) => setTimeSeriesIgnoreLastRun(e.target.checked)}
+                />
+                <label htmlFor="timeSeriesIgnore" className="text-sm text-indigo-900">
+                  Ignore last run (restart from the start date)
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                <button
+                  onClick={handleTimeSeriesSingleRun}
+                  disabled={timeSeriesLoading}
+                  className="w-full bg-indigo-600 text-white py-3 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+                >
+                  {timeSeriesLoading ? 'Processing Day...' : 'Process Next Day'}
+                </button>
+                <button
+                  onClick={handleTimeSeriesBatchRun}
+                  disabled={timeSeriesLoading}
+                  className="w-full bg-purple-600 text-white py-3 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+                >
+                  {timeSeriesLoading
+                    ? 'Processing All Days...'
+                    : 'Process All Available Days'}
+                </button>
+              </div>
+
+              {timeSeriesProgress.length > 0 && (
+                <div className="mt-6 bg-white border border-indigo-100 rounded-lg p-4 max-h-72 overflow-y-auto">
+                  <h3 className="text-sm font-semibold text-indigo-900 mb-3">Run Progress</h3>
+                  <div className="space-y-2">
+                    {timeSeriesProgress.map((entry) => (
+                      <div
+                        key={`${entry.index}-${entry.runId || entry.date || entry.message || 'run'}`}
+                        className={`p-3 rounded-md border ${
+                          entry.ok ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-medium">
+                            Run {entry.index}: {entry.ok ? '✅ Success' : '❌ Error'}
+                          </span>
+                          <span className="text-xs text-gray-600">
+                            {entry.runId ? entry.runId.substring(0, 8) : '—'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-700 mt-1">
+                          Date: {entry.date || 'N/A'} | Hour: {entry.hour ?? '—'}
+                        </div>
+                        {entry.message && (
+                          <div className="text-xs text-gray-600 mt-1">Note: {entry.message}</div>
+                        )}
+                        {entry.completed && (
+                          <div className="text-xs text-indigo-700 mt-1 font-semibold">
+                            Simulation reported completion for the configured range.
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {timeSeriesResult?.error && (
+                <div className="mt-4 p-3 rounded-md bg-red-50 border border-red-200 text-sm text-red-700">
+                  Error: {timeSeriesResult.error}
+                </div>
+              )}
+
+              {timeSeriesResult?.runs?.length > 0 && (
+                <div className="mt-4 text-sm text-indigo-900">
+                  <p>
+                    Completed {timeSeriesResult.totalRuns || timeSeriesResult.runs.length} day(s).{' '}
+                    {timeSeriesResult.completed
+                      ? 'All available days have been processed. The simulation is complete.'
+                      : 'You can continue running to process more days.'}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Cache Test Section */}
@@ -613,6 +933,109 @@ const TestPage = memo(() => {
                               <div><span className="font-medium">End:</span> {new Date(cronResult.data.timeRange.end).toLocaleString()}</div>
                               <div><span className="font-medium">Duration:</span> {cronResult.data.timeRange.hours} hours</div>
                             </div>
+                          </div>
+                        )}
+
+                        {/* Errors and Warnings */}
+                        {cronResult.data.errors && (
+                          <div className={`border-t border-gray-200 pt-4 mt-4 ${cronResult.data.errors.total_errors > 0 || cronResult.data.errors.total_warnings > 0 ? 'border-red-200' : 'border-green-200'}`}>
+                            <h5 className={`font-semibold mb-2 ${cronResult.data.errors.total_errors > 0 ? 'text-red-900' : cronResult.data.errors.total_warnings > 0 ? 'text-yellow-900' : 'text-green-900'}`}>
+                              Errors & Warnings
+                            </h5>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
+                              <div>
+                                <div className="text-gray-600">Total Errors</div>
+                                <div className={`text-lg font-bold ${cronResult.data.errors.total_errors > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                  {cronResult.data.errors.total_errors || 0}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-gray-600">Total Warnings</div>
+                                <div className={`text-lg font-bold ${cronResult.data.errors.total_warnings > 0 ? 'text-yellow-600' : 'text-green-600'}`}>
+                                  {cronResult.data.errors.total_warnings || 0}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-gray-600">Error Categories</div>
+                                <div className="text-lg font-bold text-blue-600">
+                                  {Object.keys(cronResult.data.errors.errors_by_category || {}).length}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-gray-600">Status</div>
+                                <div className={`text-sm font-bold ${cronResult.data.errors.total_errors > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                  {cronResult.data.errors.total_errors > 0 ? '⚠️ Has Errors' : '✅ Clean'}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Errors by Category */}
+                            {cronResult.data.errors.errors_by_category && Object.keys(cronResult.data.errors.errors_by_category).length > 0 && (
+                              <div className="mb-3">
+                                <div className="text-xs font-medium text-gray-700 mb-2">Errors by Category:</div>
+                                <div className="flex flex-wrap gap-2">
+                                  {Object.entries(cronResult.data.errors.errors_by_category).map(([category, count]) => (
+                                    <div key={category} className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">
+                                      {category}: {count}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Error Details */}
+                            {cronResult.data.errors.errors && cronResult.data.errors.errors.length > 0 && (
+                              <details className="mt-3">
+                                <summary className="cursor-pointer text-sm font-medium text-red-700 hover:text-red-800">
+                                  View {cronResult.data.errors.errors.length} Error(s)
+                                </summary>
+                                <div className="mt-2 space-y-2 max-h-64 overflow-y-auto">
+                                  {cronResult.data.errors.errors.map((error, idx) => (
+                                    <div key={idx} className="bg-red-50 border border-red-200 rounded p-2 text-xs">
+                                      <div className="font-semibold text-red-900">{error.category}: {error.message}</div>
+                                      <div className="text-red-700 mt-1">
+                                        <div className="text-gray-600">Time: {new Date(error.timestamp).toLocaleString()}</div>
+                                        {error.details && Object.keys(error.details).length > 0 && (
+                                          <details className="mt-1">
+                                            <summary className="cursor-pointer text-red-600">Details</summary>
+                                            <pre className="mt-1 text-xs bg-red-100 p-2 rounded overflow-auto">
+                                              {JSON.stringify(error.details, null, 2)}
+                                            </pre>
+                                          </details>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
+                            )}
+
+                            {/* Warning Details */}
+                            {cronResult.data.errors.warnings && cronResult.data.errors.warnings.length > 0 && (
+                              <details className="mt-3">
+                                <summary className="cursor-pointer text-sm font-medium text-yellow-700 hover:text-yellow-800">
+                                  View {cronResult.data.errors.warnings.length} Warning(s)
+                                </summary>
+                                <div className="mt-2 space-y-2 max-h-64 overflow-y-auto">
+                                  {cronResult.data.errors.warnings.map((warning, idx) => (
+                                    <div key={idx} className="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs">
+                                      <div className="font-semibold text-yellow-900">{warning.category}: {warning.message}</div>
+                                      <div className="text-yellow-700 mt-1">
+                                        <div className="text-gray-600">Time: {new Date(warning.timestamp).toLocaleString()}</div>
+                                        {warning.details && Object.keys(warning.details).length > 0 && (
+                                          <details className="mt-1">
+                                            <summary className="cursor-pointer text-yellow-600">Details</summary>
+                                            <pre className="mt-1 text-xs bg-yellow-100 p-2 rounded overflow-auto">
+                                              {JSON.stringify(warning.details, null, 2)}
+                                            </pre>
+                                          </details>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
+                            )}
                           </div>
                         )}
                       </div>
@@ -924,6 +1347,24 @@ const TestPage = memo(() => {
                       <pre className="text-xs bg-gray-100 p-2 rounded mt-2 overflow-auto max-h-64">
                           {JSON.stringify(cronResult.data, null, 2)}
                         </pre>
+                      {/* Show errors if available */}
+                      {cronResult.data.errors && (
+                        <div className="mt-4">
+                          <p className="text-sm text-red-700 font-medium mb-2">Tracked Errors:</p>
+                          <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {cronResult.data.errors.errors?.map((error, idx) => (
+                              <div key={idx} className="bg-red-50 border border-red-200 rounded p-2 text-xs">
+                                <div className="font-semibold text-red-900">{error.category}: {error.message}</div>
+                                {error.details && (
+                                  <pre className="mt-1 text-xs bg-red-100 p-2 rounded overflow-auto">
+                                    {JSON.stringify(error.details, null, 2)}
+                                  </pre>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       </div>
                     )}
                 </div>
@@ -1433,6 +1874,305 @@ const TestPage = memo(() => {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Data Consistency Comparison Section */}
+          <div className="mb-8">
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-lg p-6">
+              <h2 className="text-2xl font-bold text-purple-900 mb-2">🔍 Data Consistency Comparison</h2>
+              <p className="text-sm text-purple-700 mb-6">
+                Compare PostHog analytics data with database records to ensure consistency.
+                This is your final validation test to verify that all metrics match between sources.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-purple-900 mb-1">User ID *</label>
+                  <input
+                    type="text"
+                    value={comparisonUserId}
+                    onChange={(e) => setComparisonUserId(e.target.value)}
+                    placeholder="Enter user UUID"
+                    className="w-full px-3 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-purple-900 mb-1">User Type</label>
+                  <select
+                    value={comparisonUserType}
+                    onChange={(e) => setComparisonUserType(e.target.value)}
+                    className="w-full px-3 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="developer">Developer</option>
+                    <option value="agent">Agent</option>
+                    <option value="agency">Agency</option>
+                    <option value="property_seeker">Property Seeker</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-purple-900 mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    value={comparisonStartDate}
+                    onChange={(e) => setComparisonStartDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-purple-900 mb-1">End Date</label>
+                  <input
+                    type="date"
+                    value={comparisonEndDate}
+                    onChange={(e) => setComparisonEndDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={handleComparison}
+                disabled={comparisonLoading || !comparisonUserId}
+                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 px-4 rounded-md hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors mb-4"
+              >
+                {comparisonLoading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Comparing Data...
+                  </span>
+                ) : (
+                  '🔍 Run Comparison'
+                )}
+              </button>
+
+              {/* Comparison Result Display */}
+              {comparisonResult && comparisonResult.data && (
+                <div className={`p-4 rounded-lg ${comparisonResult.success ? 'bg-white border-2 border-purple-200' : 'bg-red-50 border-2 border-red-200'}`}>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className={`text-lg font-bold ${comparisonResult.success ? 'text-purple-800' : 'text-red-800'}`}>
+                        {comparisonResult.success ? '✅ Comparison Complete' : '❌ Comparison Error'}
+                      </h3>
+                      <p className={`mt-1 text-sm ${comparisonResult.success ? 'text-purple-700' : 'text-red-700'}`}>
+                        {comparisonResult.message}
+                      </p>
+                    </div>
+
+                    {comparisonResult.success && (
+                      <>
+                        {/* Summary Stats */}
+                        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
+                          <h4 className="font-bold text-purple-900 mb-3">📊 Summary Statistics</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                            <div>
+                              <div className="text-purple-600 font-medium">Match Rate</div>
+                              <div className={`text-2xl font-bold ${comparisonResult.data.summary?.matchRate === 100 ? 'text-green-600' : comparisonResult.data.summary?.matchRate >= 90 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                {comparisonResult.data.summary?.matchRate || 0}%
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-purple-600 font-medium">Matches</div>
+                              <div className="text-2xl font-bold text-green-600">{comparisonResult.data.summary?.matches || 0}</div>
+                            </div>
+                            <div>
+                              <div className="text-purple-600 font-medium">Major Diffs</div>
+                              <div className="text-2xl font-bold text-red-600">{comparisonResult.data.summary?.majorDiffs || 0}</div>
+                            </div>
+                            <div>
+                              <div className="text-purple-600 font-medium">Minor Diffs</div>
+                              <div className="text-2xl font-bold text-yellow-600">{comparisonResult.data.summary?.minorDiffs || 0}</div>
+                            </div>
+                            <div>
+                              <div className="text-purple-600 font-medium">Total Fields</div>
+                              <div className="text-2xl font-bold text-blue-600">{comparisonResult.data.summary?.totalFields || 0}</div>
+                            </div>
+                          </div>
+                          <div className="mt-3 grid grid-cols-2 gap-4 text-xs text-purple-700">
+                            <div>
+                              <span className="font-medium">PostHog Events:</span> {comparisonResult.data.summary?.totalEventsFromPostHog || 0}
+                            </div>
+                            <div>
+                              <span className="font-medium">Database Rows:</span> {comparisonResult.data.summary?.totalRowsFromDatabase || 0}
+                            </div>
+                            <div>
+                              <span className="font-medium">PostHog Days:</span> {comparisonResult.data.summary?.posthogDaysCount || 0}
+                            </div>
+                            <div>
+                              <span className="font-medium">Database Days:</span> {comparisonResult.data.summary?.databaseDaysCount || 0}
+                            </div>
+                          </div>
+                          {(comparisonResult.data.summary?.missingDays?.length > 0 || comparisonResult.data.summary?.extraDays?.length > 0) && (
+                            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                              {comparisonResult.data.summary?.missingDays?.length > 0 && (
+                                <div className="text-xs text-red-700 mb-2">
+                                  <span className="font-bold">⚠️ Missing Days in Database ({comparisonResult.data.summary.missingDays.length}):</span>
+                                  <div className="mt-1 font-mono">
+                                    {comparisonResult.data.summary.missingDays.join(', ')}
+                                  </div>
+                                  <div className="mt-1 text-yellow-700">
+                                    These days have PostHog events but no database entries. The cron job may not have processed these days yet.
+                                  </div>
+                                </div>
+                              )}
+                              {comparisonResult.data.summary?.extraDays?.length > 0 && (
+                                <div className="text-xs text-blue-700">
+                                  <span className="font-bold">ℹ️ Extra Days in Database ({comparisonResult.data.summary.extraDays.length}):</span>
+                                  <div className="mt-1 font-mono">
+                                    {comparisonResult.data.summary.extraDays.join(', ')}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {comparisonResult.data.summary?.hourlyBreakdown && comparisonResult.data.summary.hourlyBreakdown.length > 0 && (
+                            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                              <div className="text-xs font-bold text-blue-900 mb-2">📅 Hourly Breakdown (Database)</div>
+                              <div className="space-y-1 text-xs text-blue-700">
+                                {comparisonResult.data.summary.hourlyBreakdown.map((day, idx) => (
+                                  <div key={idx} className="flex justify-between">
+                                    <span className="font-mono">{day.date}:</span>
+                                    <span>{day.total_hours} hourly entries</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {comparisonResult.data.summary?.hourlyComparison && comparisonResult.data.summary.hourlyComparison.length > 0 && (
+                            <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded">
+                              <div className="text-xs font-bold text-orange-900 mb-2">
+                                ⚠️ Hourly Comparison
+                                {comparisonResult.data.summary.missingHours > 0 && (
+                                  <span className="ml-2 text-red-600">
+                                    ({comparisonResult.data.summary.missingHours} missing hours)
+                                  </span>
+                                )}
+                              </div>
+                              <div className="max-h-64 overflow-y-auto space-y-1 text-xs">
+                                {comparisonResult.data.summary.hourlyComparison
+                                  .filter(h => h.posthog_events > 0 || h.database_exists)
+                                  .map((hour, idx) => (
+                                    <div key={idx} className={`p-2 rounded ${hour.posthog_events > 0 && !hour.database_exists ? 'bg-red-100 border border-red-300' : hour.database_exists && hour.posthog_events === 0 ? 'bg-yellow-100 border border-yellow-300' : 'bg-green-100 border border-green-300'}`}>
+                                      <div className="flex justify-between items-center">
+                                        <span className="font-mono font-medium">
+                                          {hour.date} {hour.hour}:00
+                                        </span>
+                                        <div className="flex gap-3">
+                                          <span className={hour.posthog_events > 0 ? 'text-green-700 font-bold' : 'text-gray-500'}>
+                                            PostHog: {hour.posthog_events} events
+                                          </span>
+                                          <span className={hour.database_exists ? 'text-blue-700 font-bold' : 'text-gray-500'}>
+                                            DB: {hour.database_exists ? '✓' : '✗'}
+                                          </span>
+                                          {hour.database_exists && (
+                                            <span className="text-purple-700">
+                                              Views: {hour.database_total_views} | Leads: {hour.database_total_leads}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Totals Comparison */}
+                        {comparisonResult.data.totals && (
+                          <div className="bg-white rounded-lg p-4 border border-gray-200">
+                            <h4 className="font-bold text-gray-900 mb-3">📈 Totals Comparison</h4>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="bg-gray-50">
+                                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Metric</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-green-700">PostHog</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-blue-700">Database</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-gray-700">Difference</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-gray-700">Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {Object.values(comparisonResult.data.totals.comparisons || {}).map((comp) => (
+                                    <tr key={comp.field} className={`border-b ${comp.match ? 'bg-green-50' : comp.status === 'major_diff' ? 'bg-red-50' : 'bg-yellow-50'}`}>
+                                      <td className="px-3 py-2 font-medium text-gray-900">{comp.field.replace(/_/g, ' ')}</td>
+                                      <td className="px-3 py-2 text-right text-green-700">{comp.posthog.toLocaleString()}</td>
+                                      <td className="px-3 py-2 text-right text-blue-700">{comp.database.toLocaleString()}</td>
+                                      <td className={`px-3 py-2 text-right font-medium ${comp.difference === 0 ? 'text-gray-600' : comp.difference > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {comp.difference > 0 ? '+' : ''}{comp.difference.toLocaleString()} ({comp.differencePercent > 0 ? '+' : ''}{comp.differencePercent}%)
+                                      </td>
+                                      <td className="px-3 py-2 text-right">
+                                        {comp.match ? (
+                                          <span className="text-green-600 font-bold">✓ Match</span>
+                                        ) : comp.status === 'major_diff' ? (
+                                          <span className="text-red-600 font-bold">⚠ Major</span>
+                                        ) : (
+                                          <span className="text-yellow-600 font-bold">~ Minor</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Daily Comparison */}
+                        {comparisonResult.data.daily && comparisonResult.data.daily.comparisons && comparisonResult.data.daily.comparisons.length > 0 && (
+                          <div className="bg-white rounded-lg p-4 border border-gray-200">
+                            <h4 className="font-bold text-gray-900 mb-3">📅 Daily Comparison</h4>
+                            <div className="space-y-3 max-h-96 overflow-y-auto">
+                              {comparisonResult.data.daily.comparisons.map((day, idx) => {
+                                const hasMismatch = Object.values(day).some(val => typeof val === 'object' && val && !val.match && val.field)
+                                return (
+                                  <div key={idx} className={`border rounded-lg p-3 ${hasMismatch ? 'bg-yellow-50 border-yellow-300' : 'bg-green-50 border-green-300'}`}>
+                                    <div className="flex justify-between items-center mb-2">
+                                      <div className="font-semibold text-gray-900">{day.date}</div>
+                                      {day.database_hours_count !== undefined && (
+                                        <div className="text-xs text-gray-600">
+                                          {day.database_hours_count > 0 ? (
+                                            <span className="text-blue-600">📊 {day.database_hours_count} hourly entries</span>
+                                          ) : (
+                                            <span className="text-red-600">⚠️ No database entries</span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                                      {Object.entries(day).filter(([key]) => key !== 'date' && key !== 'database_hours_count').map(([key, comp]) => {
+                                        if (typeof comp !== 'object' || !comp) return null
+                                        return (
+                                          <div key={key} className={`p-2 rounded ${comp.match ? 'bg-green-100' : 'bg-red-100'}`}>
+                                            <div className="font-medium text-gray-700 mb-1">{key.replace(/_/g, ' ')}</div>
+                                            <div className="flex justify-between">
+                                              <span className="text-green-700">{comp.posthog}</span>
+                                              <span className="text-gray-500">vs</span>
+                                              <span className="text-blue-700">{comp.database}</span>
+                                            </div>
+                                            {!comp.match && (
+                                              <div className="text-red-600 font-bold text-xs mt-1">
+                                                Diff: {comp.difference > 0 ? '+' : ''}{comp.difference}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* COMMENTED OUT: Redis Test Section (migrated to PostHog-only approach) */}

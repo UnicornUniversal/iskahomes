@@ -5,6 +5,12 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Eye, TrendingUp, Loader2, Image as ImageIcon, MapPin } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { formatCurrency as formatCurrencyUtil } from '@/lib/utils'
+import { Swiper, SwiperSlide } from 'swiper/react'
+import { Navigation, Pagination } from 'swiper/modules'
+import 'swiper/css'
+import 'swiper/css/navigation'
+import 'swiper/css/pagination'
 
 const PopularListings = ({ limit = 7 }) => {
   const { user } = useAuth()
@@ -46,7 +52,7 @@ const PopularListings = ({ limit = 7 }) => {
 
   const formatCurrency = (amount, currencyCode = 'GHS') => {
     if (amount === null || amount === undefined || amount === 0) return 'Price on request'
-    return `${currencyCode} ${Number(amount).toLocaleString('en-US')}`
+    return formatCurrencyUtil(amount, currencyCode)
   }
 
   const formatLocation = (listing) => {
@@ -56,105 +62,121 @@ const PopularListings = ({ limit = 7 }) => {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+      <div className=" -lg shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
-          <span className="text-gray-600">Loading popular listings...</span>
+          <Loader2 className="w-6 h-6 animate-spin mr-2" />
+          <span>Loading popular listings...</span>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-blue-600" />
-            <h5 className="text-lg font-semibold text-gray-900">Popular Listings</h5>
+    <div className=" overflow-hidden">
+      <div className="px-6 pt-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 -full bg-primary_color/10 flex items-center justify-center">
+            <TrendingUp className="w-5 h-5" />
           </div>
-          <span className="text-sm text-gray-500">Top {limit} by views</span>
+          <div>
+            <h5 className="text-xl font-semibold">Popular Listings</h5>
+            <p className="text-xs uppercase tracking-widest">Top {limit} this period</p>
+          </div>
         </div>
+        <span className="text-sm font-medium">{listings.length} showing</span>
       </div>
 
-      {/* Listings */}
       <div className="p-6">
         {listings.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <Eye className="w-12 h-12 text-gray-300 mb-3" />
-            <p className="text-gray-500 font-medium">No popular listings yet</p>
-            <p className="text-sm text-gray-400 mt-1">Listings will appear here as they gain views</p>
+            <Eye className="w-12 h-12 mb-3" />
+            <p className="font-medium">No popular listings yet</p>
+            <p className="text-sm mt-1">Listings will appear here as they gain views</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <Swiper
+            modules={[Navigation, Pagination]}
+            navigation
+            pagination={{ clickable: true }}
+            spaceBetween={16}
+            slidesPerView={1}
+            breakpoints={{
+              640: { slidesPerView: 1.2 },
+              768: { slidesPerView: 1.5 },
+              1024: { slidesPerView: 2.2 },
+              1440: { slidesPerView: 3 },
+            }}
+            className="popular-listings-swiper"
+          >
             {listings.map((listing, index) => (
-              <Link
-                key={listing.id}
-                href={listing.slug ? `/property/${listing.listing_type}/${listing.slug}/${listing.id}` : '#'}
-                className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-sm transition-all group"
-              >
-                {/* Rank Badge */}
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
-                  {index + 1}
-                </div>
+              <SwiperSlide key={listing.id}>
+                <Link
+                  href={listing.slug ? `/property/${listing.listing_type}/${listing.slug}/${listing.id}` : '#'}
+                  className="block h-full"
+                >
+                  <div className="h-full flex flex-col -2xl ">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 -full bg-primary_color/10 flex items-center justify-center font-bold text-sm">
+                          {index + 1}
+                        </div>
+                        <span className="text-xs uppercase tracking-wide">Top Listing</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs">
+                        <Eye className="w-3 h-3" />
+                        <span>{listing.total_views?.toLocaleString() || 0} views</span>
+                      </div>
+                    </div>
 
-                {/* Image */}
-                {listing.image ? (
-                  <div className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
-                    <Image
-                      src={listing.image}
-                      alt={listing.title}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform"
-                    />
-                  </div>
-                ) : (
-                  <div className="w-20 h-20 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                    <ImageIcon className="w-8 h-8 text-gray-400" />
-                  </div>
-                )}
+                    <div className="relative w-full h-[15em] -xl overflow-hidden mb-4">
+                      {listing.image ? (
+                        <Image
+                          src={listing.image}
+                          alt={listing.title}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                          <ImageIcon className="w-10 h-10" />
+                        </div>
+                      )}
+                    </div>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <h6 className="font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
-                    {listing.title}
-                  </h6>
-                  <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
-                    <MapPin className="w-3 h-3 flex-shrink-0" />
-                    <span className="truncate">{formatLocation(listing)}</span>
-                  </div>
-                  <div className="flex items-center gap-3 mt-2">
-                    <span className="text-sm font-medium text-gray-900">
-                      {formatCurrency(listing.price, listing.currency)}
-                    </span>
-                    <span className="text-gray-300">•</span>
-                    <div className="flex items-center gap-1 text-xs text-gray-500">
-                      <Eye className="w-3 h-3" />
-                      <span className="font-medium">{listing.total_views?.toLocaleString() || 0} views</span>
+                    <div className="flex-1 flex flex-col">
+                      <h6 className="text-lg font-semibold leading-tight line-clamp-2 mb-2">
+                        {listing.title}
+                      </h6>
+                      <div className="flex items-center gap-2 text-sm mb-3">
+                        <MapPin className="w-3 h-3" />
+                        <span className="truncate">{formatLocation(listing)}</span>
+                      </div>
+
+                      <div className="mt-auto">
+                        <div className="flex items-baseline gap-3">
+                          <span className="text-xl font-semibold">
+                            {formatCurrency(listing.price, listing.currency)}
+                          </span>
+                          <span className="text-xs uppercase tracking-wide">
+                            {listing.listing_type?.replace(/_/g, ' ') || 'Listing'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                {/* Arrow */}
-                <div className="flex-shrink-0 text-gray-400 group-hover:text-blue-600 transition-colors">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </Link>
+                </Link>
+              </SwiperSlide>
             ))}
-          </div>
+          </Swiper>
         )}
       </div>
 
-      {/* Footer */}
       {listings.length > 0 && (
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="px-6 py-4 border-t border-white/40">
           <div className="text-center">
             <Link
               href={`/developer/${user?.profile?.slug || user?.profile?.id}/analytics/properties`}
-              className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+              className="font-medium text-sm"
             >
               View All Properties →
             </Link>

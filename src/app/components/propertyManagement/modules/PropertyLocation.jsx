@@ -132,16 +132,6 @@ const GoogleMapViewer = React.memo(({ center, zoom, coordinates, onMapClick }) =
 GoogleMapViewer.displayName = 'GoogleMapViewer'
 
 const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocations = [] }) => {
-  // Get unique countries from company_locations
-  const availableCountries = useMemo(() => {
-    const countries = new Set()
-    companyLocations.forEach(loc => {
-      if (loc.country) {
-        countries.add(loc.country)
-      }
-    })
-    return Array.from(countries).sort()
-  }, [companyLocations])
   const [locationData, setLocationData] = useState({
     country: '',
     countryCode: '', // ISO country code for currency lookup
@@ -365,28 +355,11 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
     }
 
     try {
-      // Limit autocomplete to company_locations countries
-      // Get country codes from company_locations if available
-      const countryCodes = availableCountries.length > 0 
-        ? availableCountries.map(c => {
-            // Simple country code mapping
-            const countryCodeMap = {
-              'Ghana': 'gh',
-              'United Kingdom': 'gb',
-              'United States': 'us',
-              'Nigeria': 'ng',
-              'Kenya': 'ke',
-              'South Africa': 'za'
-            }
-            return countryCodeMap[c] || (c ? c.substring(0, 2).toLowerCase() : null)
-          }).filter(Boolean)
-        : undefined // No restriction if no company locations
-      
       // Simplified autocomplete search with better performance
+      // No country restrictions - search everywhere
       autocompleteService.getPlacePredictions(
         { 
-          input: query,
-          componentRestrictions: countryCodes && countryCodes.length > 0 ? { country: countryCodes } : undefined
+          input: query
         }, 
         (predictions, status) => {
           if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
@@ -403,7 +376,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
       setAutocompleteSuggestions([])
       setShowSuggestions(false)
     }
-  }, [autocompleteService, availableCountries])
+  }, [autocompleteService])
 
   // Google Places API functions - defined first to avoid circular dependency
   const handlePlaceSelect = useCallback((place) => {
@@ -591,21 +564,21 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
   }, [scheduleParentUpdate, mapCenter])
 
   return (
-    <div className="p-4 sm:p-6 bg-white rounded-lg shadow-sm">
-      <div className="mb-4 sm:mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Property Location</h2>
-        <p className="text-sm sm:text-base text-gray-600">
+    <div className=" secondary_bg">
+      {/* <div className="mb-4 sm:mb-6">
+        <h2 className="text-xl sm:text-2xl font-bold  mb-2">Property Location</h2>
+        <p className="text-sm sm:text-base ">
           {isEditMode ? 'Update the location details' : 'Specify the location details of your property'}
         </p>
-      </div>
+      </div> */}
 
       <div className="space-y-4 sm:space-y-6">
         {/* Google Places Autocomplete Search */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
-          <label className="block text-sm font-medium text-blue-900 mb-2">
+          <label className="block text-sm font-medium  mb-2">
             Search Location
           </label>
-          <p className="text-blue-700 text-sm mb-4">
+          <p className=" text-sm mb-4">
             Start typing an address to see suggestions and automatically fill in location details
           </p>
           
@@ -621,7 +594,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
                     className="w-full"
                     disabled={true}
                   />
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2  text-sm">
                     Loading...
                   </div>
                 </div>
@@ -660,17 +633,17 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
                       >
                         <div className="flex items-start space-x-3">
                           <div className="flex-shrink-0 mt-1">
-                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 " fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">
+                            <p className="text-sm font-medium  truncate">
                               {prediction.structured_formatting?.main_text || prediction.description}
                             </p>
                             {prediction.structured_formatting?.secondary_text && (
-                              <p className="text-xs text-gray-500 truncate">
+                              <p className="text-xs  truncate">
                                 {prediction.structured_formatting.secondary_text}
                               </p>
                             )}
@@ -683,7 +656,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
                 
                 {/* Loading indicator */}
                 {!isGoogleMapsLoaded && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2  text-sm">
                     Loading...
                   </div>
                 )}
@@ -711,7 +684,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
                 // Fallback to OpenStreetMap if Google Maps fails
                 return (
                   <div>
-                    <div className="text-xs text-orange-600 p-2 bg-orange-50 mb-2 rounded">
+                    <div className="text-xs  p-2 bg-orange-50 mb-2 rounded">
                       Google Maps unavailable. Using OpenStreetMap as fallback.
                     </div>
                     <MapComponent
@@ -739,7 +712,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
           {locationData.coordinates.latitude && locationData.coordinates.longitude && (
             <div className="mt-3 p-3 bg-white rounded-md border border-teal-200">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Current Location:</span>
+                <span className="">Current Location:</span>
                 <span className="font-mono text-teal-700">
                   {parseFloat(locationData.coordinates.latitude).toFixed(6)}, {parseFloat(locationData.coordinates.longitude).toFixed(6)}
                 </span>
@@ -751,21 +724,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
         {/* Manual Location Fields */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div>
-            <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">Country</label>
-            {availableCountries.length > 0 ? (
-              <select
-                suppressHydrationWarning
-                id="country"
-                value={locationData.country}
-                onChange={(e) => handleChange('country', e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="">Select country</option>
-                {availableCountries.map(country => (
-                  <option key={country} value={country}>{country}</option>
-                ))}
-              </select>
-            ) : (
+            <label htmlFor="country" className="block text-sm font-medium  mb-2">Country</label>
               <Input
                 id="country"
                 type="text"
@@ -774,10 +733,9 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
                 onChange={(e) => handleChange('country', e.target.value)}
                 className="w-full"
               />
-            )}
           </div>
           <div>
-            <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-2">State/Region</label>
+            <label htmlFor="state" className="block text-sm font-medium  mb-2">State/Region</label>
             <Input
               id="state"
               type="text"
@@ -788,7 +746,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
             />
           </div>
           <div>
-            <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-2">City</label>
+            <label htmlFor="city" className="block text-sm font-medium  mb-2">City</label>
             <Input
               id="city"
               type="text"
@@ -799,7 +757,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
             />
           </div>
           <div>
-            <label htmlFor="town" className="block text-sm font-medium text-gray-700 mb-2">Town/Area</label>
+            <label htmlFor="town" className="block text-sm font-medium  mb-2">Town/Area</label>
             <Input
               id="town"
               type="text"
@@ -813,7 +771,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
 
         {/* Address */}
         <div>
-          <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">Full Address</label>
+          <label htmlFor="address" className="block text-sm font-medium  mb-2">Full Address</label>
           <textarea
             id="address"
             rows={3}
@@ -826,13 +784,13 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
 
         {/* Coordinates - Manual Entry (Optional) */}
         <div className="bg-gradient-to-r from-gray-50 to-slate-50 p-4 rounded-lg border border-gray-200">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Manual Coordinates Entry</label>
-          <p className="text-xs text-gray-500 mb-3">
+          <label className="block text-sm font-medium  mb-2">Manual Coordinates Entry</label>
+          <p className="text-xs  mb-3">
             You can manually enter coordinates here, or use the map above to set them automatically
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="latitude" className="block text-xs text-gray-600 mb-1">Latitude</label>
+              <label htmlFor="latitude" className="block text-xs  mb-1">Latitude</label>
               <Input
                 id="latitude"
                 type="number"
@@ -844,7 +802,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
               />
             </div>
             <div>
-              <label htmlFor="longitude" className="block text-xs text-gray-600 mb-1">Longitude</label>
+              <label htmlFor="longitude" className="block text-xs  mb-1">Longitude</label>
               <Input
                 id="longitude"
                 type="number"
@@ -860,7 +818,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
 
         {/* Additional Information */}
         <div>
-          <label htmlFor="additionalInformation" className="block text-sm font-medium text-gray-700 mb-2">Additional Location Information</label>
+          <label htmlFor="additionalInformation" className="block text-sm font-medium  mb-2">Additional Location Information</label>
           <textarea
             id="additionalInformation"
             rows={4}

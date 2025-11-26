@@ -377,31 +377,33 @@ async function updateDeveloperAfterListing(userId, operation = 'create') {
     }
 
     // Recalculate total_developments from actual count
+    // Note: developments.developer_id stores developers.developer_id (not developers.id)
     const { count: totalDevelopmentsCount, error: devsError } = await supabaseAdmin
       .from('developments')
       .select('*', { count: 'exact', head: true })
-      .eq('developer_id', developer.id)
+      .eq('developer_id', developer.developer_id)
 
     if (devsError) {
       console.error('Error counting developments:', devsError)
     }
 
-    // Recalculate total_revenue from sold/rented listings
-    const { data: soldListings, error: soldError } = await supabaseAdmin
-      .from('listings')
-      .select('estimated_revenue')
+    // Recalculate total_revenue and total_sales from sales_listings table
+    // This is the source of truth for actual sales
+    const { data: salesListings, error: salesError } = await supabaseAdmin
+      .from('sales_listings')
+      .select('sale_price')
       .eq('user_id', userId)
-      .eq('account_type', 'developer')
-      .in('listing_status', ['sold', 'rented'])
 
     let totalRevenue = 0
-    if (!soldError && soldListings) {
-      soldListings.forEach(listing => {
-        if (listing.estimated_revenue && typeof listing.estimated_revenue === 'object') {
-          const revenueValue = listing.estimated_revenue.estimated_revenue || listing.estimated_revenue.price || 0
-          if (typeof revenueValue === 'number' && revenueValue > 0) {
-            totalRevenue += revenueValue
-          }
+    let totalSales = 0
+    if (!salesError && salesListings) {
+      totalSales = salesListings.length // Count of actual sales
+      salesListings.forEach(sale => {
+        const salePrice = typeof sale.sale_price === 'string' 
+          ? parseFloat(sale.sale_price) 
+          : (sale.sale_price || 0)
+        if (typeof salePrice === 'number' && salePrice > 0) {
+          totalRevenue += salePrice
         }
       })
     }
@@ -434,6 +436,7 @@ async function updateDeveloperAfterListing(userId, operation = 'create') {
       total_units: totalUnitsCount || 0,
       total_developments: totalDevelopmentsCount || 0,
       total_revenue: Math.round(totalRevenue),
+      total_sales: totalSales,
       estimated_revenue: Math.round(estimatedRevenue)
     }
 

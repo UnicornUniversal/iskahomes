@@ -13,7 +13,7 @@ const DeveloperHeader = () => {
 
   return (
     <>
-      <div className='shadow w-full border border-white/40 p-[1em] md:p-[2em] rounded-lg flex flex-col relative justify-between items-start'>
+      <div className='design1  p-[1em] md:p-[2em] flex flex-col relative justify-between items-start'>
         <div className='w-full flex items-center gap-2 flex-wrap  '>
         <div>
             <h5 className='text-sm md:text-base'>Welcome,</h5>

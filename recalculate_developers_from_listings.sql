@@ -22,10 +22,11 @@ SET
     ),
     
     -- Total developments (count of developments)
+    -- Note: developments.developer_id stores developers.developer_id (not developers.id)
     total_developments = COALESCE(
         (SELECT COUNT(*) 
          FROM developments dev 
-         WHERE dev.developer_id = d.id),
+         WHERE dev.developer_id = d.developer_id),
         0
     ),
     

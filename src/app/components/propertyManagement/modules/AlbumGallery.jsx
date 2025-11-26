@@ -500,14 +500,14 @@ const AlbumGallery = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Image Albums</h3>
-          <p className="text-sm text-gray-600">Organize your images into albums</p>
+          <h3 className="text-lg font-semibold">Image Albums</h3>
+          <p className="text-sm">Organize your images into albums</p>
         </div>
         {mode === 'edit' && (
           <button
             type="button"
             onClick={() => setShowCreateAlbumModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
+            className=" transition-colors text-sm font-medium secondary_button flex items-center gap-2"
             suppressHydrationWarning
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -524,15 +524,15 @@ const AlbumGallery = ({
           {localAlbums.map((album) => (
             <div
               key={album.id}
-              className="border border-gray-200 rounded-lg p-4 bg-white w-full"
+              className="border border-gray-200 rounded-lg p-4  w-full"
               style={{ width: '100%', maxWidth: '100%', overflow: 'hidden' }}
             >
               {/* Album Header */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-lg font-semibold text-gray-900">{album.name}</h4>
+                  <h4 className="text-lg font-semibold">{album.name}</h4>
                   {album.name === GENERAL_ALBUM_NAME && (
-                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                    <span className="px-2 py-0.5 bg-blue-100 text-xs font-medium rounded">
                       Default
                     </span>
                   )}
@@ -546,7 +546,7 @@ const AlbumGallery = ({
                         <button
                           type="button"
                           onClick={() => handleRenameAlbum(album.id)}
-                          className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm font-medium flex items-center gap-1.5"
+                          className="primary_button flex items-center gap-1.5"
                           title="Edit album name"
                           suppressHydrationWarning
                         >
@@ -559,7 +559,7 @@ const AlbumGallery = ({
                         <button
                           type="button"
                           onClick={() => handleDeleteAlbum(album.id)}
-                          className="px-3 py-1.5 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors text-sm font-medium flex items-center gap-1.5"
+                          className="tertiary_button flex items-center gap-1.5"
                           title="Delete album"
                           suppressHydrationWarning
                         >
@@ -587,7 +587,7 @@ const AlbumGallery = ({
                         const input = fileInputRefs.current[album.id]
                         if (input) input.click()
                       }}
-                      className="px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-1.5"
+                      className="primary_button transition-colors text-sm font-medium flex items-center gap-1.5"
                       title="Add new images"
                       suppressHydrationWarning
                     >
@@ -699,7 +699,7 @@ const AlbumGallery = ({
                                   }}
                                 />
                               ) : (
-                                <div className="absolute inset-0 bg-gray-300 flex items-center justify-center text-gray-500 text-xs">
+                                <div className="absolute inset-0 bg-gray-300 flex items-center justify-center text-xs">
                                   No Image
                                 </div>
                               )}
@@ -731,7 +731,7 @@ const AlbumGallery = ({
                                           }
                                         }, 0)
                                       }}
-                                      className="p-2 bg-blue-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-700 z-10"
+                                      className="primary_button flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
                                       title="Replace image"
                                       suppressHydrationWarning
                                     >
@@ -754,7 +754,7 @@ const AlbumGallery = ({
                                           variant: 'danger'
                                         })
                                       }}
-                                      className="p-2 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-10"
+                                      className="tertiary_button flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
                                       title="Delete image"
                                       suppressHydrationWarning
                                     >
@@ -769,7 +769,7 @@ const AlbumGallery = ({
                             
                             {/* Image name displayed under the image */}
                             {image.name && (
-                              <div className="text-xs text-gray-600 truncate px-1" style={{ width: '200px' }} title={image.name}>
+                              <div className="text-xs truncate px-1" style={{ width: '200px' }} title={image.name}>
                                 {image.name}
                               </div>
                             )}
@@ -781,12 +781,12 @@ const AlbumGallery = ({
                 </div>
               ) : (
                 <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-                  <svg className="w-12 h-12 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <p className="text-gray-600 text-sm">No images in this album yet</p>
+                  <p className="text-sm">No images in this album yet</p>
                   {mode === 'edit' && (
-                    <p className="text-xs text-gray-500 mt-1">Click "Add Images" to get started</p>
+                    <p className="text-xs mt-1">Click "Add Images" to get started</p>
                   )}
                 </div>
               )}
@@ -795,15 +795,15 @@ const AlbumGallery = ({
         </div>
       ) : (
         <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-          <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
-          <p className="text-gray-600 mb-4">No albums yet</p>
+          <p className="mb-4">No albums yet</p>
           {mode === 'edit' && (
             <button
               type="button"
               onClick={() => setShowCreateAlbumModal(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
               suppressHydrationWarning
             >
               Create New Album
@@ -814,10 +814,10 @@ const AlbumGallery = ({
 
       {/* Create Album Modal - Small and Compact */}
       {showCreateAlbumModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-5">
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+          <div className=" rounded-lg shadow-xl max-w-sm w-full p-5 bg-white">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Create New Album</h3>
+              <h3 className="text-lg font-semibold">Create New Album</h3>
               <button
                 type="button"
                 onClick={() => {
@@ -825,7 +825,6 @@ const AlbumGallery = ({
                   setSelectedPredefinedName('')
                   setCustomAlbumName('')
                 }}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
                 suppressHydrationWarning
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -836,7 +835,7 @@ const AlbumGallery = ({
             
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="block text-sm font-medium mb-1.5">
                   Select Album Name
                 </label>
                 <select
@@ -858,7 +857,7 @@ const AlbumGallery = ({
 
               {selectedPredefinedName === 'Other' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="block text-sm font-medium mb-1.5">
                     Enter Custom Album Name
                   </label>
                   <input
@@ -886,7 +885,7 @@ const AlbumGallery = ({
                   setSelectedPredefinedName('')
                   setCustomAlbumName('')
                 }}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors text-sm"
+                className="px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors text-sm"
                 suppressHydrationWarning
               >
                 Cancel
@@ -895,7 +894,7 @@ const AlbumGallery = ({
                 type="button"
                 onClick={handleCreateAlbum}
                 disabled={!selectedPredefinedName || (selectedPredefinedName === 'Other' && !customAlbumName.trim())}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-blue-600 rounded-md hover:bg-blue-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 suppressHydrationWarning
               >
                 Create

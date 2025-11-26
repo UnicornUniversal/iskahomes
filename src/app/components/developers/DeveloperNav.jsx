@@ -81,6 +81,11 @@ const DeveloperNav = () => {
             icon: FiCalendar
         },
         {
+            label: 'Leads',
+            href: `/developer/${developerSlug}/leads`,
+            icon: FiUsers
+        },
+        {
             label: 'Analytics',
             href: `/developer/${developerSlug}/analytics`,
             icon: FiBarChart2,
@@ -268,13 +273,13 @@ const DeveloperNav = () => {
             {/* Only render after client-side hydration to prevent hydration mismatches */}
             {!isClient ? (
                 <div className="fixed rounded-sm border-primary_color lg:fixed flex flex-col bg-gradient-to-b from-white to-gray-50 h-auto lg:max-h-[calc(100vh-7rem)] py-4 pb-8 px-[1em] shadow-lg border border-gray-100 z-50 w-[85vw] max-w-[300px] lg:w-[300px] top-16 bottom-2 lg:top-28 left-2 overflow-x-hidden overflow-y-auto">
-                    <div className="mb-4 flex items-center justify-between">
+                    {/* <div className="mb-4 flex items-center justify-between">
                         <div>
                             <h5 className="mb-2">Developer </h5>
                             <h3 className="mb-2">Dashboard</h3>
                             <div className="w-12 h-1 bg-primary_color rounded-full"></div>
                         </div>
-                    </div>
+                    </div> */}
                     <div className="flex-1 flex items-center justify-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary_color"></div>
                     </div>

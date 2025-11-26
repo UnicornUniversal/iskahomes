@@ -283,13 +283,13 @@ const Model3DViewer = ({
       </Canvas>
       
       {/* Controls Info */}
-      {showControls && (
+      {/* {showControls && (
         <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 text-white text-xs p-2 rounded">
           <div>🖱️ Left click + drag: Rotate</div>
           <div>🖱️ Right click + drag: Pan</div>
           <div>🖱️ Scroll: Zoom</div>
         </div>
-      )}
+      )} */}
       
       {/* Error Display */}
       {error && (

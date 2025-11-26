@@ -1,6 +1,5 @@
 "use client"
 import React, { useState, useEffect } from 'react'
-import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { cn } from '@/lib/utils'
 
@@ -356,10 +355,10 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
   };
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow-sm">
+    <div className="w-full">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Development Categories</h2>
-        <p className="text-gray-600">
+        <h2 className="mb-2">Development Categories</h2>
+        <p>
           {isEditMode ? 'Update the development categories' : 'Select the appropriate categories for your development'}
         </p>
       </div>
@@ -371,11 +370,11 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
             <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
               <span className="text-white text-sm font-bold">1</span>
             </div>
-            <label className="text-lg font-semibold text-blue-900">
+            <label className="text-lg font-semibold ">
               Development Purpose *
             </label>
           </div>
-          <p className="text-blue-700 text-sm mb-4">Select the primary purpose(s) for your development project</p>
+          <p className="text-sm mb-4">Select the primary purpose(s) for your development project</p>
           
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
             {loading.purposes ? (
@@ -387,9 +386,9 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
                     type="checkbox"
                     checked={formData.purposes.includes(purpose.id)}
                     onChange={() => handleCategoryToggle('purposes', purpose)}
-                    className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-blue-300  focus:ring-blue-500"
                   />
-                  <span className="text-sm text-blue-800 font-medium">{purpose.name}</span>
+                  <span className="text-sm font-medium">{purpose.name}</span>
                 </label>
               ))
             )}
@@ -398,18 +397,18 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
           {/* Selected Purposes */}
           {formData.purposes.length > 0 && (
             <div className="mt-4 p-3 bg-blue-100 rounded-lg">
-              <h4 className="text-sm font-semibold text-blue-800 mb-2">Selected Purposes:</h4>
+              <h4 className="text-sm font-semibold  mb-2">Selected Purposes:</h4>
               <div className="flex flex-wrap gap-2">
                 {getSelectedItems('purposes').map(purpose => (
                   <span
                     key={purpose.id}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-200 text-blue-900 border border-blue-300"
+                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-200 border border-blue-300"
                   >
                     {purpose.name}
                     <button
                       type="button"
                       onClick={() => handleRemoveCategory('purposes', purpose.id)}
-                      className="ml-2 text-blue-700 hover:text-blue-900 font-bold"
+                      className="ml-2 font-bold"
                     >
                       ×
                     </button>
@@ -426,11 +425,11 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
             <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mr-3">
               <span className="text-white text-sm font-bold">2</span>
             </div>
-            <label className="text-lg font-semibold text-green-900">
+            <label className="text-lg font-semibold ">
               Property Types *
             </label>
           </div>
-          <p className="text-green-700 text-sm mb-4">Choose the type(s) of properties in your development (you can select multiple)</p>
+          <p className="text-sm mb-4">Choose the type(s) of properties in your development (you can select multiple)</p>
           
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
             {loading.types ? (
@@ -442,9 +441,9 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
                     type="checkbox"
                     checked={formData.types.includes(type.id)}
                     onChange={() => handlePropertyTypeToggle(type)}
-                    className="rounded border-green-300 text-green-600 focus:ring-green-500"
+                    className="rounded border-green-300 focus:ring-green-500"
                   />
-                  <span className="text-sm text-green-800 font-medium">{type.name}</span>
+                  <span className="text-sm font-medium">{type.name}</span>
                 </label>
               ))
             )}
@@ -453,18 +452,18 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
           {/* Selected Types */}
           {formData.types.length > 0 && (
             <div className="mt-4 p-3 bg-green-100 rounded-lg">
-              <h4 className="text-sm font-semibold text-green-800 mb-2">Selected Types:</h4>
+              <h4 className="text-sm font-semibold  mb-2">Selected Types:</h4>
               <div className="flex flex-wrap gap-2">
                 {getSelectedItems('types').map(type => (
                   <span
                     key={type.id}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-200 text-green-900 border border-green-300"
+                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-200 border border-green-300"
                   >
                     {type.name}
                     <button
                       type="button"
                       onClick={() => handleRemoveCategory('types', type.id)}
-                      className="ml-2 text-green-700 hover:text-green-900 font-bold"
+                      className="ml-2 font-bold"
                     >
                       ×
                     </button>
@@ -481,12 +480,12 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
             <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center mr-3">
               <span className="text-white text-sm font-bold">3</span>
             </div>
-            <label className="text-lg font-semibold text-purple-900">
+            <label className="text-lg font-semibold ">
               Property Categories
             </label>
-            <span className="text-sm text-purple-600 ml-2 bg-purple-200 px-2 py-1 rounded-full">Auto-populated</span>
+            <span className="text-sm ml-2 bg-purple-200 px-2 py-1 rounded-full">Auto-populated</span>
           </div>
-          <p className="text-purple-700 text-sm mb-4">Categories are automatically selected based on your chosen property types</p>
+          <p className="text-sm mb-4">Categories are automatically selected based on your chosen property types</p>
           
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
             {loading.categories ? (
@@ -498,13 +497,13 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
                     type="checkbox"
                     checked={formData.categories.includes(category.id)}
                     onChange={() => handleCategoryToggle('categories', category)}
-                    className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
+                    className="rounded border-purple-300 focus:ring-purple-500"
                   />
-                  <span className="text-sm text-purple-800 font-medium">{category.name}</span>
+                  <span className="text-sm font-medium">{category.name}</span>
                 </label>
               ))
             ) : (
-              <div className="col-span-full text-center py-6 text-purple-600 bg-purple-100 rounded-lg">
+              <div className="col-span-full text-center py-6 bg-purple-100 rounded-lg">
                 <div className="text-lg mb-2">🏗️</div>
                 <p>Please select property types to see categories</p>
               </div>
@@ -514,18 +513,18 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
           {/* Selected Categories */}
           {formData.categories.length > 0 && (
             <div className="mt-4 p-3 bg-purple-100 rounded-lg">
-              <h4 className="text-sm font-semibold text-purple-800 mb-2">Selected Categories:</h4>
+              <h4 className="text-sm font-semibold  mb-2">Selected Categories:</h4>
               <div className="flex flex-wrap gap-2">
                 {getSelectedItems('categories').map(category => (
                   <span
                     key={category.id}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-200 text-purple-900 border border-purple-300"
+                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-200 border border-purple-300"
                   >
                     {category.name}
                     <button
                       type="button"
                       onClick={() => handleRemoveCategory('categories', category.id)}
-                      className="ml-2 text-purple-700 hover:text-purple-900 font-bold"
+                      className="ml-2 font-bold"
                     >
                       ×
                     </button>
@@ -542,19 +541,19 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
             <div className="w-6 h-6 sm:w-8 sm:h-8 bg-orange-500 rounded-full flex items-center justify-center mr-2 sm:mr-3">
               <span className="text-white text-xs sm:text-sm font-bold">4</span>
             </div>
-            <label className="text-base sm:text-lg font-semibold text-orange-900">
+            <label className="text-base sm:text-lg font-semibold ">
               Unit Types *
             </label>
           </div>
-          <p className="text-orange-700 text-xs sm:text-sm mb-4">Select unit types from project categories or add custom types</p>
+          <p className=" text-xs sm:text-sm mb-4">Select unit types from project categories or add custom types</p>
           
           {/* Database Unit Types from Property Types */}
           {formData.types.length > 0 ? (
             <div className="mb-4">
-              <h4 className="text-sm font-semibold text-orange-800 mb-2">Available Unit Types from Database:</h4>
-              <div className="max-h-48 overflow-y-auto border border-orange-200 rounded-lg p-2 sm:p-3 bg-white">
+              <h4 className="text-sm font-semibold  mb-2">Available Unit Types from Database:</h4>
+              <div className="max-h-48 overflow-y-auto border border-orange-200 rounded-lg p-2 sm:p-3">
                 {loading.subtypes ? (
-                  <div className="text-center py-4 text-orange-600 text-sm">Loading unit types...</div>
+                  <div className="text-center py-4 text-sm">Loading unit types...</div>
                 ) : categoriesData.subtypes.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                     {categoriesData.subtypes.map(subtype => (
@@ -568,20 +567,20 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
                             );
                           })()}
                           onChange={() => handleUnitTypeToggle(subtype)}
-                          className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                          className="rounded border-orange-300 focus:ring-orange-500"
                         />
-                        <span className="text-xs sm:text-sm text-orange-800 font-medium">{subtype.name}</span>
+                        <span className="text-xs sm:text-sm font-medium">{subtype.name}</span>
                       </label>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-orange-600 text-xs sm:text-sm italic">No unit types available for selected property types</p>
+                  <p className="text-xs sm:text-sm italic">No unit types available for selected property types</p>
                 )}
               </div>
             </div>
           ) : (
             <div className="mb-4 p-3 bg-orange-100 rounded-lg">
-              <p className="text-orange-700 text-sm">
+              <p className="text-sm">
                 <span className="font-semibold">Note:</span> Please select property types first to see available unit types from the database.
               </p>
             </div>
@@ -590,32 +589,28 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
           {/* Custom Unit Types Section */}
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <h4 className="text-sm font-semibold text-orange-800">Custom Unit Types:</h4>
+              <h4 className="text-sm font-semibold ">Custom Unit Types:</h4>
               <div className="flex flex-col sm:flex-row gap-2">
-                <Button
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
                   onClick={handleCustomOptionClick}
-                  className="border-orange-300 text-orange-700 hover:bg-orange-50 text-xs sm:text-sm"
+                  className="secondary_button text-xs sm:text-sm"
                 >
                   Add Custom
-                </Button>
-                <Button
+                </button>
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
                   onClick={() => setShowBuiltInTypes(!showBuiltInTypes)}
-                  className="border-orange-300 text-orange-700 hover:bg-orange-50 text-xs sm:text-sm"
+                  className="secondary_button text-xs sm:text-sm"
                 >
                   {showBuiltInTypes ? 'Hide' : 'Show'} Built-in Types
-                </Button>
+                </button>
               </div>
             </div>
 
             {/* Built-in Types Modal */}
             {showBuiltInTypes && (
-              <div className="border border-orange-200 rounded-lg p-4 bg-white">
+              <div className="border border-orange-200 rounded-lg p-4">
                 <div className="mb-3">
                   <Input
                     type="text"
@@ -644,13 +639,13 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
                             disabled={isSelected}
                             className={`text-left p-2 rounded-lg transition-colors text-xs sm:text-sm ${
                               isSelected 
-                                ? 'bg-orange-200 text-orange-600 cursor-not-allowed opacity-60' 
-                                : 'hover:bg-orange-100 text-orange-800'
+                                ? 'bg-orange-200  cursor-not-allowed opacity-60' 
+                                : 'hover:bg-orange-100 '
                             }`}
                           >
                             <div className="flex items-center justify-between">
                               <span>{unitType}</span>
-                              {isSelected && <span className="text-orange-600">✓</span>}
+                              {isSelected && <span className="">✓</span>}
                             </div>
                           </button>
                         );
@@ -663,7 +658,7 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
             {/* Custom Unit Type Input */}
             {showCustomInput && (
               <div className="p-3 sm:p-4 bg-orange-100 rounded-lg border border-orange-200">
-                <h4 className="text-sm font-semibold text-orange-800 mb-2">Add Custom Unit Type</h4>
+                <h4 className="text-sm font-semibold  mb-2">Add Custom Unit Type</h4>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <Input
                     type="text"
@@ -673,24 +668,23 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
                     className="flex-1 text-sm"
                   />
                   <div className="flex gap-2">
-                    <Button
+                    <button
                       type="button"
                       onClick={handleCustomUnitTypeSubmit}
-                      className="bg-orange-600 hover:bg-orange-700 text-white text-xs sm:text-sm"
+                      className="primary_button text-xs sm:text-sm"
                     >
                       Add
-                    </Button>
-                    <Button
+                    </button>
+                    <button
                       type="button"
-                      variant="outline"
                       onClick={() => {
                         setShowCustomInput(false);
                         setCustomUnitType('');
                       }}
-                      className="border-orange-300 text-orange-700 hover:bg-orange-50 text-xs sm:text-sm"
+                      className="secondary_button text-xs sm:text-sm"
                     >
                       Cancel
-                    </Button>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -705,7 +699,7 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
                    unitTypes.custom.length > 0;
           })() && (
             <div className="mt-4 p-3 bg-orange-100 rounded-lg">
-              <h4 className="text-sm font-semibold text-orange-800 mb-2">Selected Unit Types:</h4>
+              <h4 className="text-sm font-semibold  mb-2">Selected Unit Types:</h4>
               <div className="flex flex-wrap gap-2">
                 {(() => {
                   const unitTypes = formData.unit_types || { database: [], inbuilt: [], custom: [] };
@@ -718,13 +712,13 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
                         return (
                           <span
                             key={`db-${unitTypeId}`}
-                            className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs font-medium bg-blue-200 text-blue-900 border border-blue-300"
+                            className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs font-medium bg-blue-200  border border-blue-300"
                           >
                             <span className="truncate max-w-[150px] sm:max-w-none">{unitTypeName}</span>
                             <button
                               type="button"
                               onClick={() => removeUnitType(unitType, 'database')}
-                              className="ml-1 sm:ml-2 text-blue-700 hover:text-blue-900 font-bold flex-shrink-0"
+                              className="ml-1 sm:ml-2 font-bold flex-shrink-0"
                             >
                               ×
                             </button>
@@ -736,13 +730,13 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
                       {unitTypes.inbuilt.map(unitType => (
                         <span
                           key={`inbuilt-${unitType}`}
-                          className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs font-medium bg-green-200 text-green-900 border border-green-300"
+                          className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs font-medium bg-green-200  border border-green-300"
                         >
                           <span className="truncate max-w-[150px] sm:max-w-none">{unitType}</span>
                           <button
                             type="button"
                             onClick={() => removeUnitType(unitType, 'inbuilt')}
-                            className="ml-1 sm:ml-2 text-green-700 hover:text-green-900 font-bold flex-shrink-0"
+                            className="ml-1 sm:ml-2 font-bold flex-shrink-0"
                           >
                             ×
                           </button>
@@ -753,13 +747,13 @@ const DevelopmentCategories = ({ formData, updateFormData, isEditMode }) => {
                       {unitTypes.custom.map(unitType => (
                         <span
                           key={`custom-${unitType}`}
-                          className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs font-medium bg-purple-200 text-purple-900 border border-purple-300"
+                          className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs font-medium bg-purple-200  border border-purple-300"
                         >
                           <span className="truncate max-w-[150px] sm:max-w-none">{unitType}</span>
                           <button
                             type="button"
                             onClick={() => removeUnitType(unitType, 'custom')}
-                            className="ml-1 sm:ml-2 text-purple-700 hover:text-purple-900 font-bold flex-shrink-0"
+                            className="ml-1 sm:ml-2 font-bold flex-shrink-0"
                           >
                             ×
                           </button>

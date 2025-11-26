@@ -8,7 +8,7 @@ const DeveloperSlugPage = () => {
   const developerId = params.slug
 
   return (
-    <div className='normal_div'>
+    <div className='normal_div template_body_bg'>
       <DeveloperNav active={0} />
       <div className='w-full flex flex-col gap-4 p-6'>
         <div className="text-center py-12">

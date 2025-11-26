@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { cn } from '@/lib/utils'
 
@@ -173,10 +172,10 @@ const DevelopmentMedia = ({ formData, updateFormData, isEditMode }) => {
   }
 
   return (
-    <div className=" p-6 bg-white rounded-lg shadow-sm">
+    <div className="w-full">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Development Media</h2>
-        <p className="text-gray-600">
+        <h2 className="mb-2">Development Media</h2>
+        <p>
           {isEditMode ? 'Update media files and links for your development' : 'Upload media files and links for your development project'}
         </p>
       </div>
@@ -184,7 +183,7 @@ const DevelopmentMedia = ({ formData, updateFormData, isEditMode }) => {
       <div className="space-y-6">
         {/* Banner Upload */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium  mb-2">
             Development Banner *
           </label>
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
@@ -199,28 +198,28 @@ const DevelopmentMedia = ({ formData, updateFormData, isEditMode }) => {
                   <button
                     type="button"
                     onClick={() => removeFile(0, 'banner')}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                    className="absolute -top-2 -right-2 tertiary_button rounded-full w-6 h-6 flex items-center justify-center text-xs"
                   >
                     ×
                   </button>
                 </div>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm ">
                   {localMediaData.banner instanceof File ? localMediaData.banner.name : localMediaData.banner.name}
                 </p>
               </div>
             ) : (
               <div>
-                <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="mx-auto h-12 w-12  mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <p className="text-sm text-gray-600 mb-2">Click to upload banner image</p>
-                <Button
+                <p className="text-sm  mb-2">Click to upload banner image</p>
+                <button
                   type="button"
-                  variant="outline"
                   onClick={() => bannerInputRef.current?.click()}
+                  className="primary_button"
                 >
                   Choose Banner Image
-                </Button>
+                </button>
               </div>
             )}
             <input
@@ -235,7 +234,7 @@ const DevelopmentMedia = ({ formData, updateFormData, isEditMode }) => {
 
         {/* Video Upload */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium  mb-2">
             Video Upload (Max 10MB)
           </label>
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
@@ -250,28 +249,28 @@ const DevelopmentMedia = ({ formData, updateFormData, isEditMode }) => {
                   <button
                     type="button"
                     onClick={() => removeFile(0, 'video')}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                    className="absolute -top-2 -right-2 tertiary_button rounded-full w-6 h-6 flex items-center justify-center text-xs"
                   >
                     ×
                   </button>
                 </div>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm ">
                   {localMediaData.video.name} ({localMediaData.video instanceof File ? formatFileSize(localMediaData.video.size) : formatFileSize(localMediaData.video.size)})
                 </p>
               </div>
             ) : (
               <div>
-                <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="mx-auto h-12 w-12  mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
-                <p className="text-sm text-gray-600 mb-2">Click to upload video file</p>
-                <Button
+                <p className="text-sm  mb-2">Click to upload video file</p>
+                <button
                   type="button"
-                  variant="outline"
                   onClick={() => videoInputRef.current?.click()}
+                  className="primary_button"
                 >
                   Choose Video File
-                </Button>
+                </button>
               </div>
             )}
             <input
@@ -286,7 +285,7 @@ const DevelopmentMedia = ({ formData, updateFormData, isEditMode }) => {
 
         {/* YouTube URL */}
         <div>
-          <label htmlFor="youtubeUrl" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="youtubeUrl" className="block text-sm font-medium  mb-2">
             YouTube Video URL
           </label>
           <Input
@@ -301,48 +300,22 @@ const DevelopmentMedia = ({ formData, updateFormData, isEditMode }) => {
 
         {/* Virtual Tour Section */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Virtual Tour
+          <label htmlFor="virtualTourUrl" className="block text-sm font-medium mb-2">
+            Virtual Tour URL
           </label>
-          <div className="space-y-4">
-            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700">Virtual Tour URL</h4>
-                  <p className="text-xs text-gray-500 mt-1">Currently disabled - request a virtual tour instead</p>
-                </div>
-                <div className="text-gray-400">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                </div>
-              </div>
-              <Input
-                id="virtualTourUrl"
-                type="url"
-                placeholder="https://..."
-                value={localMediaData.virtualTourUrl}
-                onChange={(e) => handleInputChange('virtualTourUrl', e.target.value)}
-                className="w-full mt-2"
-                disabled
-              />
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-              Request a virtual tour for this project
-            </Button>
-          </div>
+          <Input
+            id="virtualTourUrl"
+            type="url"
+            placeholder="https://..."
+            value={localMediaData.virtualTourUrl}
+            onChange={(e) => handleInputChange('virtualTourUrl', e.target.value)}
+            className="w-full"
+          />
         </div>
 
         {/* Additional Media Files */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium  mb-2">
             Additional Media Files
           </label>
           <div
@@ -355,17 +328,17 @@ const DevelopmentMedia = ({ formData, updateFormData, isEditMode }) => {
             onDragOver={handleDrag}
             onDrop={handleDrop}
           >
-            <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="mx-auto h-12 w-12  mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            <p className="text-sm text-gray-600 mb-2">Drag and drop files here, or click to select</p>
-            <Button
+            <p className="text-sm  mb-2">Drag and drop files here, or click to select</p>
+            <button
               type="button"
-              variant="outline"
               onClick={() => fileInputRef.current?.click()}
+              className="primary_button"
             >
               Choose Files
-            </Button>
+            </button>
             <input
               ref={fileInputRef}
               type="file"
@@ -380,7 +353,7 @@ const DevelopmentMedia = ({ formData, updateFormData, isEditMode }) => {
         {/* Media Files List */}
         {localMediaData.mediaFiles.length > 0 && (
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">Uploaded Media Files</h3>
+            <h3 className="text-lg font-semibold  mb-3">Uploaded Media Files</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {localMediaData.mediaFiles.map((file, index) => (
                 <div key={index} className="relative border rounded-lg p-3">
@@ -396,12 +369,12 @@ const DevelopmentMedia = ({ formData, updateFormData, isEditMode }) => {
                       className="w-full h-32 object-cover rounded mb-2"
                     />
                   )}
-                  <p className="text-sm text-gray-600 truncate">{file.name}</p>
-                  <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                  <p className="text-sm  truncate">{file.name}</p>
+                  <p className="text-xs ">{formatFileSize(file.size)}</p>
                   <button
                     type="button"
                     onClick={() => removeFile(index, 'media')}
-                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                    className="absolute top-2 right-2 tertiary_button rounded-full w-6 h-6 flex items-center justify-center text-xs"
                   >
                     ×
                   </button>

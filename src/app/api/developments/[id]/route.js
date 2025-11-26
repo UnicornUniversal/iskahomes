@@ -1,6 +1,52 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+
+// Helper function to update developer's total_developments count
+async function updateDeveloperTotalDevelopments(developerIdFromRequest) {
+  try {
+    // Get developer record by developer_id (which matches the developer_id in developments table)
+    const { data: developer, error: devError } = await supabaseAdmin
+      .from('developers')
+      .select('id, developer_id')
+      .eq('developer_id', developerIdFromRequest)
+      .single()
+
+    if (devError || !developer) {
+      console.error('Error fetching developer for total_developments update:', devError)
+      return
+    }
+
+    // Count developments where developer_id matches the developer_id from request
+    // Note: developments.developer_id stores developers.developer_id (not developers.id)
+    const { count: totalDevelopmentsCount, error: countError } = await supabaseAdmin
+      .from('developments')
+      .select('*', { count: 'exact', head: true })
+      .eq('developer_id', developerIdFromRequest)
+
+    if (countError) {
+      console.error('Error counting developments:', countError)
+      return
+    }
+
+    // Update developer's total_developments
+    const { error: updateError } = await supabaseAdmin
+      .from('developers')
+      .update({ total_developments: totalDevelopmentsCount || 0 })
+      .eq('id', developer.id)
+
+    if (updateError) {
+      console.error('Error updating developer total_developments:', updateError)
+    } else {
+      console.log('✅ Developer total_developments updated:', {
+        developer_id: developerIdFromRequest,
+        total_developments: totalDevelopmentsCount || 0
+      })
+    }
+  } catch (error) {
+    console.error('Error in updateDeveloperTotalDevelopments:', error)
+  }
+}
 
 // GET - Fetch a specific development
 export async function GET(request, { params }) {
@@ -188,6 +234,9 @@ export async function DELETE(request, { params }) {
       )
     }
 
+    // Store developer_id before deletion for updating total_developments
+    const developerIdToUpdate = existingDevelopment.developer_id
+
     // Delete the development
     const { error } = await supabase
       .from('developments')
@@ -201,6 +250,9 @@ export async function DELETE(request, { params }) {
         { status: 500 }
       )
     }
+
+    // Update developer's total_developments count
+    await updateDeveloperTotalDevelopments(developerIdToUpdate)
 
     return NextResponse.json({ 
       success: true,

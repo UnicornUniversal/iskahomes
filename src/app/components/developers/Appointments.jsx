@@ -189,18 +189,18 @@ const Appointments = () => {
 
   return (
     <div className="flex min-h-screen">
-      <DeveloperNav />
+      {/* <DeveloperNav /> */}
       
       <div className="flex-1 p-6 overflow-hidden">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Appointments</h1>
-          <p className="text-gray-600">Manage and track all property viewing appointments</p>
+          <h1 className="">Appointments</h1>
+          <p className="">Manage and track all property viewing appointments</p>
         </div>
 
         {/* View Toggle */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-2 bg-white/50 rounded-xl p-1 shadow-sm border border-gray-100">
             <button
               onClick={() => setViewMode('list')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
@@ -227,7 +227,7 @@ const Appointments = () => {
         </div>
 
         {/* Filters and Search */}
-        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm border border-gray-100">
+        <div className="bg-white/50 rounded-2xl p-6 mb-6 shadow-sm border border-gray-100">
           <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
             <div className="relative flex-1 max-w-md">
               <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -265,7 +265,7 @@ const Appointments = () => {
             { label: 'Confirmed', value: appointments.filter(a => a.status === 'confirmed').length, color: 'bg-green-500' },
             { label: 'Completed', value: appointments.filter(a => a.status === 'completed').length, color: 'bg-purple-500' }
           ].map((stat, index) => (
-            <div key={index} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div key={index} className="bg-white/50 rounded-2xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-600 text-sm font-medium">{stat.label}</p>

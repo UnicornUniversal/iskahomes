@@ -401,33 +401,33 @@ async function updateDeveloperAfterListing(userId, operation = 'update') {
     }
 
     // Recalculate total_developments from actual count
+    // Note: developments.developer_id stores developers.developer_id (not developers.id)
     const { count: totalDevelopmentsCount, error: devsError } = await supabaseAdmin
       .from('developments')
       .select('*', { count: 'exact', head: true })
-      .eq('developer_id', developer.id)
+      .eq('developer_id', developer.developer_id)
 
     if (devsError) {
       console.error('Error counting developments:', devsError)
     }
 
-    // Recalculate total_revenue from sold/rented listings
-    const { data: soldListings, error: soldError } = await supabaseAdmin
-      .from('listings')
-      .select('estimated_revenue')
+    // Recalculate total_revenue and total_sales from sales_listings table
+    // This is the source of truth for actual sales
+    const { data: salesListings, error: salesError } = await supabaseAdmin
+      .from('sales_listings')
+      .select('sale_price')
       .eq('user_id', userId)
-      .eq('account_type', 'developer')
-      .in('listing_status', ['sold', 'rented'])
 
     let totalRevenue = 0
     let totalSales = 0
-    if (!soldError && soldListings) {
-      totalSales = soldListings.length // Count of sold/rented listings
-      soldListings.forEach(listing => {
-        if (listing.estimated_revenue && typeof listing.estimated_revenue === 'object') {
-          const revenueValue = listing.estimated_revenue.estimated_revenue || listing.estimated_revenue.price || 0
-          if (typeof revenueValue === 'number' && revenueValue > 0) {
-            totalRevenue += revenueValue
-          }
+    if (!salesError && salesListings) {
+      totalSales = salesListings.length // Count of actual sales
+      salesListings.forEach(sale => {
+        const salePrice = typeof sale.sale_price === 'string' 
+          ? parseFloat(sale.sale_price) 
+          : (sale.sale_price || 0)
+        if (typeof salePrice === 'number' && salePrice > 0) {
+          totalRevenue += salePrice
         }
       })
     }
@@ -1006,18 +1006,43 @@ export async function PUT(request, { params }) {
     // Use the actual listing ID (UUID) for all operations
     const listingId = existingListing.id
 
-    // Parse form data
-    const formData = await request.formData()
+    // Check content type to handle both JSON and FormData
+    const contentType = request.headers.get('content-type') || ''
+    let formData
+    let jsonData = null
+    let isJsonOnlyRequest = false
     
-    // Handle file uploads
+    if (contentType.includes('application/json')) {
+      // Handle JSON-only requests (e.g., finalization)
+      isJsonOnlyRequest = true
+      jsonData = await request.json()
+      // Create a minimal FormData-like object for compatibility
+      formData = new FormData()
+      if (jsonData.listing_status) formData.append('listing_status', jsonData.listing_status)
+      if (jsonData.listing_condition) formData.append('listing_condition', jsonData.listing_condition)
+      if (jsonData.upload_status) formData.append('upload_status', jsonData.upload_status)
+      if (jsonData.final_listing_status) formData.append('final_listing_status', jsonData.final_listing_status)
+    } else {
+      // Handle FormData requests (normal updates with files)
+      formData = await request.formData()
+    }
+    
+    // Handle file uploads (skip for JSON-only requests)
     const uploadedFiles = {
       mediaFiles: [],
       additionalFiles: [],
       model3d: null
     }
 
+    // Skip file uploads for JSON-only requests (finalization)
+    let newMediaFiles = []
+    let newAdditionalFiles = []
+    let newModel3dData = null
+    let newVideoData = null
+    let albumFilesMap = {}
+    
+    if (!isJsonOnlyRequest) {
     // Upload new media files
-    const newMediaFiles = []
     // Handle old format: mediaFile_0, mediaFile_1, etc.
     for (let i = 0; i < 20; i++) {
       const mediaFile = formData.get(`mediaFile_${i}`)
@@ -1037,7 +1062,7 @@ export async function PUT(request, { params }) {
     
     // Handle new album format: album_0_image_0, album_0_image_1, etc.
     // Track which files belong to which albums
-    const albumFilesMap = {} // { albumIndex: [uploadedFiles] }
+      albumFilesMap = {} // { albumIndex: [uploadedFiles] }
     for (let albumIndex = 0; albumIndex < 20; albumIndex++) {
       albumFilesMap[albumIndex] = []
       for (let imageIndex = 0; imageIndex < 50; imageIndex++) {
@@ -1059,7 +1084,6 @@ export async function PUT(request, { params }) {
     }
 
     // Upload new additional files
-    const newAdditionalFiles = []
     for (let i = 0; i < 10; i++) { // Check up to 10 additional files
       const additionalFile = formData.get(`additionalFile_${i}`)
       if (additionalFile && additionalFile instanceof File) {
@@ -1077,7 +1101,6 @@ export async function PUT(request, { params }) {
     }
 
     // Upload new 3D model for developers
-    let newModel3dData = null
     const model3dFile = formData.get('model3d')
     if (model3dFile && model3dFile instanceof File && existingListing.account_type === 'developer') {
       try {
@@ -1093,7 +1116,6 @@ export async function PUT(request, { params }) {
     }
     
     // Upload video file
-    let newVideoData = null
     const videoFile = formData.get('video')
     if (videoFile && videoFile instanceof File) {
       try {
@@ -1105,11 +1127,22 @@ export async function PUT(request, { params }) {
           { error: `Failed to upload video: ${error.message}` },
           { status: 500 }
         )
+        }
       }
     }
     
     // Extract updated listing data
-    const updateData = {
+    // For JSON-only requests (finalization), only update status fields
+    let updateData
+    if (isJsonOnlyRequest) {
+      updateData = {
+        listing_status: jsonData.listing_status || existingListing.listing_status,
+        listing_condition: jsonData.listing_condition || 'completed',
+        upload_status: jsonData.upload_status || 'completed',
+        last_modified_by: userId
+      }
+    } else {
+      updateData = {
       title: formData.get('title') || existingListing.title,
       description: formData.get('description') || existingListing.description,
       size: formData.get('size') || existingListing.size,
@@ -1311,6 +1344,7 @@ export async function PUT(request, { params }) {
       meta_keywords: formData.get('meta_keywords') || existingListing.meta_keywords,
       seo_title: formData.get('seo_title') || existingListing.seo_title,
       slug: formData.get('slug') || existingListing.slug
+      }
     }
 
     // Handle 3D model for developers
@@ -1342,7 +1376,9 @@ export async function PUT(request, { params }) {
     }
 
     // Set state for update operation
-    const finalListingStatus = formData.get('final_listing_status') || updateData.listing_status || existingListing.listing_status
+    const finalListingStatus = isJsonOnlyRequest 
+      ? (jsonData.listing_status || jsonData.final_listing_status || updateData.listing_status || existingListing.listing_status)
+      : (formData.get('final_listing_status') || updateData.listing_status || existingListing.listing_status)
     const oldListingStatus = existingListing.listing_status || 'active'
     
     // Also check the status field for Sold, Rented Out, or Taken
@@ -1443,8 +1479,8 @@ export async function PUT(request, { params }) {
         .eq('id', listingId)
     }
 
-    // Handle social amenities update if provided
-    const socialAmenitiesData = formData.get('social_amenities')
+    // Handle social amenities update if provided (skip for JSON-only requests)
+    const socialAmenitiesData = !isJsonOnlyRequest ? formData.get('social_amenities') : null
     if (socialAmenitiesData) {
       try {
         const amenities = JSON.parse(socialAmenitiesData)

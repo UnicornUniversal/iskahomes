@@ -214,9 +214,16 @@ export async function GET(request) {
     // Categorize actions by type
     const phoneActions = allActions.filter(a => a.action_type === 'lead_phone')
     const messageActions = allActions.filter(a => a.action_type === 'lead_message')
+    const whatsappActions = messageActions.filter(a => 
+      String(a.action_metadata?.message_type || a.action_metadata?.messageType || '').toLowerCase() === 'whatsapp'
+    )
+    const directMessageActions = messageActions.filter(a => {
+      const msgType = String(a.action_metadata?.message_type || a.action_metadata?.messageType || '').toLowerCase()
+      return msgType !== 'whatsapp' && msgType !== 'email'
+    })
     const emailActions = allActions.filter(a => 
       a.action_type === 'lead_message' && 
-      a.action_metadata?.message_type === 'email'
+      String(a.action_metadata?.message_type || a.action_metadata?.messageType || '').toLowerCase() === 'email'
     )
     const appointmentActions = allActions.filter(a => a.action_type === 'lead_appointment')
     const websiteActions = allActions.filter(a => a.action_type === 'lead_website')
@@ -307,6 +314,8 @@ export async function GET(request) {
     let totalLeads = allActions.length
     let phoneLeads = phoneActions.length
     let messageLeads = messageActions.length
+    let whatsappLeads = whatsappActions.length
+    let directMessageLeads = directMessageActions.length
     let emailLeads = emailActions.length
     let appointmentLeads = appointmentActions.length
     let websiteLeads = websiteActions.length
@@ -328,12 +337,36 @@ export async function GET(request) {
 
       // Use breakdown data if available (more accurate)
       if (leadsBreakdown) {
-        totalLeads = leadsBreakdown.total_leads || totalLeads
-        phoneLeads = leadsBreakdown.phone_leads?.total || phoneLeads
-        messageLeads = leadsBreakdown.message_leads?.total || messageLeads
-        emailLeads = leadsBreakdown.email_leads?.total || emailLeads
-        appointmentLeads = leadsBreakdown.appointment_leads?.total || (developerData.total_appointments || appointmentLeads)
-        websiteLeads = leadsBreakdown.website_leads?.total || websiteLeads
+        totalLeads = leadsBreakdown.total_leads ?? totalLeads
+        phoneLeads =
+          leadsBreakdown.phone?.total ??
+          leadsBreakdown.phone_leads?.total ??
+          phoneLeads
+        messageLeads =
+          leadsBreakdown.messaging?.total ??
+          leadsBreakdown.message_leads?.total ??
+          messageLeads
+        whatsappLeads =
+          leadsBreakdown.messaging?.whatsapp?.total ??
+          leadsBreakdown.whatsapp?.total ??
+          whatsappLeads
+        directMessageLeads =
+          leadsBreakdown.messaging?.direct_message?.total ??
+          leadsBreakdown.direct_message?.total ??
+          directMessageLeads
+        emailLeads =
+          leadsBreakdown.email?.total ??
+          leadsBreakdown.email_leads?.total ??
+          emailLeads
+        appointmentLeads =
+          leadsBreakdown.appointment?.total ??
+          leadsBreakdown.appointment_leads?.total ??
+          developerData.total_appointments ??
+          appointmentLeads
+        websiteLeads =
+          leadsBreakdown.website?.total ??
+          leadsBreakdown.website_leads?.total ??
+          websiteLeads
       } else {
         // Fallback to developer totals
         totalLeads = developerData.total_leads || totalLeads
@@ -370,6 +403,20 @@ export async function GET(request) {
       console.log('🎯 Final conversionRate:', conversionRate)
     }
 
+    // Create nested messaging structure
+    const messagingData = {
+      total: messageLeads,
+      percentage: totalLeads > 0 ? parseFloat(((messageLeads / totalLeads) * 100).toFixed(2)) : 0,
+      direct_message: {
+        total: directMessageLeads,
+        percentage: messageLeads > 0 ? parseFloat(((directMessageLeads / messageLeads) * 100).toFixed(2)) : 0
+      },
+      whatsapp: {
+        total: whatsappLeads,
+        percentage: messageLeads > 0 ? parseFloat(((whatsappLeads / messageLeads) * 100).toFixed(2)) : 0
+      }
+    }
+
     // For now, we'll set change percentages to 0 (would need previous period data to calculate)
     // In a real implementation, you'd fetch previous period data and compare
 
@@ -380,6 +427,7 @@ export async function GET(request) {
           totalLeads,
           phoneLeads,
           messageLeads,
+          messaging: messagingData, // Nested messaging structure
           emailLeads,
           appointmentLeads,
           websiteLeads,

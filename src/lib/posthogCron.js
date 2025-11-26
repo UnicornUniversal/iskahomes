@@ -7,7 +7,179 @@ function isPostHogConfigured() {
 }
 
 /**
+ * Fetch events from PostHog Query API using where clause (Method 5 - Recommended)
+ * @param {Date} startTime - Start timestamp
+ * @param {Date} endTime - End timestamp
+ * @param {string[]} eventNames - Array of event names to fetch (optional, fetches all if not provided)
+ * @param {number} offset - Pagination offset
+ * @returns {Promise<{events: Array, hasMore: boolean, offset: number}>}
+ */
+export async function fetchPostHogEventsByQueryAPI(startTime, endTime, eventNames = [], offset = 0) {
+  try {
+    if (!isPostHogConfigured()) {
+      console.warn('⚠️ PostHog not configured')
+      return { events: [], hasMore: false, offset: 0 }
+    }
+
+    // Build where clause - PostHog uses HogQL syntax
+    const whereClauses = []
+    
+    // Filter out auto-capture events (events starting with $)
+    whereClauses.push("event NOT LIKE '$%'")
+    
+    // Also filter to only our custom events if provided
+    if (eventNames.length > 0) {
+      // Use IN clause for multiple events
+      const eventList = eventNames.map(e => `'${e}'`).join(', ')
+      whereClauses.push(`event IN (${eventList})`)
+    }
+
+    const queryBody = {
+      kind: 'EventsQuery',
+      select: ['*'], // Use '*' to get all fields including event, timestamp, properties, distinct_id
+      orderBy: ['timestamp DESC'],
+      // Use ISO timestamps - PostHog Query API format
+      after: startTime.toISOString(),
+      before: endTime.toISOString(),
+      limit: 1000,
+      offset: offset,
+      where: whereClauses
+    }
+
+    const url = `${POSTHOG_HOST}/api/projects/${POSTHOG_PROJECT_ID}/query/`
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${POSTHOG_PERSONAL_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ query: queryBody })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`❌ PostHog Query API error: ${response.status} - ${errorText}`)
+      
+      if (response.status === 429) {
+        throw new Error('PostHog rate limit exceeded')
+      }
+      
+      throw new Error(`PostHog Query API error: ${response.status} - ${errorText}`)
+    }
+
+    const data = await response.json()
+    
+    // Check for errors
+    if (data.error) {
+      throw new Error(`PostHog Query API error: ${data.error}`)
+    }
+
+    // PostHog Query API returns results as array of arrays (rows)
+    // Each row is an array matching the columns order
+    // When selecting '*', the result is a tuple: [uuid, event, properties, timestamp, team_id, distinct_id, elements_chain, created_at, person_mode]
+    let events = []
+    if (Array.isArray(data.results) && data.results.length > 0) {
+      const columns = data.columns || []
+      const starIndex = columns.indexOf('*')
+      
+      // Helper function to safely parse properties
+      const parseProperties = (props) => {
+        if (!props) return {}
+        if (typeof props === 'object' && !Array.isArray(props)) {
+          return props // Already an object
+        }
+        if (typeof props === 'string') {
+          try {
+            return JSON.parse(props) // JSON string
+          } catch (e) {
+            console.warn('⚠️ Failed to parse properties JSON:', e.message)
+            return {}
+          }
+        }
+        if (Array.isArray(props)) {
+          // If it's an array, it's likely a parsing error - return empty object
+          console.warn('⚠️ Properties is an array (unexpected), returning empty object')
+          return {}
+        }
+        return {}
+      }
+      
+      // Convert array of arrays to array of objects
+      events = data.results.map((row, rowIndex) => {
+        // When selecting '*', row[0] is the tuple
+        if (starIndex !== -1 && Array.isArray(row[starIndex])) {
+          const tuple = row[starIndex]
+          // Tuple structure: [uuid, event, properties, timestamp, team_id, distinct_id, elements_chain, created_at, person_mode]
+          return {
+            uuid: tuple[0],
+            event: tuple[1] || '',
+            properties: parseProperties(tuple[2]) || {},
+            timestamp: tuple[3] || new Date().toISOString(),
+            team_id: tuple[4],
+            distinct_id: tuple[5] || 'anonymous',
+            elements_chain: tuple[6],
+            created_at: tuple[7],
+            person_mode: tuple[8]
+          }
+        } else if (starIndex !== -1 && row[starIndex]) {
+          // Fallback: if '*' is not an array, try to use it directly
+          const starValue = row[starIndex]
+          return {
+            event: starValue.event || '',
+            properties: parseProperties(starValue.properties) || {},
+            timestamp: starValue.timestamp || new Date().toISOString(),
+            distinct_id: starValue.distinct_id || 'anonymous',
+            uuid: starValue.uuid,
+            team_id: starValue.team_id,
+            elements_chain: starValue.elements_chain,
+            created_at: starValue.created_at,
+            person_mode: starValue.person_mode
+          }
+        } else {
+          // Last resort: map columns to values
+          const eventObj = {}
+          columns.forEach((col, index) => {
+            if (col === 'properties') {
+              eventObj[col] = parseProperties(row[index])
+            } else {
+              eventObj[col] = row[index]
+            }
+          })
+          
+          return {
+            event: eventObj.event || '',
+            properties: eventObj.properties || {},
+            timestamp: eventObj.timestamp || new Date().toISOString(),
+            distinct_id: eventObj.distinct_id || 'anonymous',
+            uuid: eventObj.uuid,
+            team_id: eventObj.team_id,
+            elements_chain: eventObj.elements_chain,
+            created_at: eventObj.created_at,
+            person_mode: eventObj.person_mode
+          }
+        }
+      })
+    }
+
+    // Check if there are more results
+    const hasMore = data.hasMore === true || (events.length === 1000 && data.results?.length === 1000)
+    const nextOffset = hasMore ? offset + events.length : offset
+
+    return {
+      events: events,
+      hasMore: hasMore,
+      offset: nextOffset
+    }
+  } catch (error) {
+    console.error('❌ Error fetching PostHog events via Query API:', error)
+    throw error
+  }
+}
+
+/**
  * Fetch events from PostHog Events API within a time range with pagination support
+ * @deprecated Use fetchPostHogEventsByQueryAPI instead (Method 5 - Query API with where clause)
  * @param {Date} startTime - Start timestamp
  * @param {Date} endTime - End timestamp
  * @param {string[]} eventNames - Array of event names to fetch (optional, fetches all if not provided)
@@ -218,7 +390,7 @@ export async function fetchPostHogEventsByTimeRange(startTime, endTime, eventNam
 }
 
 /**
- * Fetch ALL events from PostHog with pagination support
+ * Fetch ALL events from PostHog using Query API with where clause (Method 5)
  * @param {Date} startTime - Start timestamp
  * @param {Date} endTime - End timestamp
  * @param {string[]} eventNames - Array of event names to fetch
@@ -227,40 +399,35 @@ export async function fetchPostHogEventsByTimeRange(startTime, endTime, eventNam
 export async function fetchAllPostHogEvents(startTime, endTime, eventNames = []) {
   try {
     const eventFilter = eventNames.length > 0 ? eventNames.join(', ') : 'all events'
-    console.log(`📡 Fetching ALL events from PostHog with pagination (filter: ${eventFilter})...`)
+    console.log(`📡 Fetching ALL events from PostHog Query API (Method 5 - where clause) (filter: ${eventFilter})...`)
     
     let allEvents = []
     let apiCalls = 0
     let hasMore = true
-    let cursor = null
+    let offset = 0
 
-    // Track how many matching events we've found
-    let matchingEventsCount = 0
     const maxPages = 100 // Safety limit
     
+    // Use Query API with where clause (Method 5) - filters out auto-capture events and custom events at API level
     while (hasMore && apiCalls < maxPages) {
-      const { events, nextCursor } = await fetchPostHogEventsByTimeRange(
+      const { events, hasMore: moreResults, offset: nextOffset } = await fetchPostHogEventsByQueryAPI(
         startTime, 
         endTime, 
-        [], // Don't filter on PostHog side - filter client-side instead
-        cursor
+        eventNames, // Filter custom events at API level
+        offset
       )
       
       allEvents = allEvents.concat(events)
       apiCalls++
-      cursor = nextCursor
+      offset = nextOffset
+      hasMore = moreResults
       
-      // Count matching events in this page
+      // Log progress
       if (eventNames.length > 0) {
-        const pageMatching = events.filter(e => eventNames.includes(e.event)).length
-        matchingEventsCount += pageMatching
-        console.log(`📄 Page ${apiCalls}: fetched ${events.length} events (${pageMatching} matching, ${matchingEventsCount} total matching so far), nextCursor: ${nextCursor ? 'yes' : 'no'}`)
+        console.log(`📄 Page ${apiCalls}: fetched ${events.length} custom events (${eventNames.join(', ')}), hasMore: ${hasMore}`)
       } else {
-        console.log(`📄 Page ${apiCalls}: fetched ${events.length} events (total so far: ${allEvents.length}), nextCursor: ${nextCursor ? 'yes' : 'no'}`)
+        console.log(`📄 Page ${apiCalls}: fetched ${events.length} events (total so far: ${allEvents.length}), hasMore: ${hasMore}`)
       }
-      
-      // Continue only if we have a next cursor
-      hasMore = !!nextCursor
       
       // Add a small delay to avoid rate limiting before next request
       if (hasMore) {
@@ -268,38 +435,33 @@ export async function fetchAllPostHogEvents(startTime, endTime, eventNames = [])
       }
     }
 
-    // Filter events client-side if eventNames were specified (PostHog's event__in filter may not work correctly)
-    let filteredEvents = allEvents
+    // Double-check that all events match (safety check)
     if (eventNames.length > 0) {
-      filteredEvents = allEvents.filter(e => eventNames.includes(e.event))
-      console.log(`🔍 Client-side filtering: ${allEvents.length} total events → ${filteredEvents.length} matching events (${eventNames.join(', ')})`)
-      
-      // Log sample of non-matching events to debug
       const nonMatching = allEvents.filter(e => !eventNames.includes(e.event))
       if (nonMatching.length > 0) {
-        const sampleNonMatching = nonMatching.slice(0, 10).map(e => e.event)
-        const uniqueNonMatching = [...new Set(sampleNonMatching)]
-        console.log(`⚠️ Found ${nonMatching.length} non-matching events. Sample event types:`, uniqueNonMatching)
+        console.warn(`⚠️ WARNING: PostHog returned ${nonMatching.length} non-matching events despite filtering. This shouldn't happen.`)
+        const uniqueNonMatching = [...new Set(nonMatching.map(e => e.event))]
+        console.warn(`   Non-matching event types:`, uniqueNonMatching)
       }
     }
     
-    console.log(`✅ Received ${allEvents.length} total events from PostHog in ${apiCalls} API calls`)
+    console.log(`✅ Received ${allEvents.length} custom events from PostHog in ${apiCalls} API calls`)
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
-    console.log(`📊 TOTAL RESPONSE FROM POSTHOG IS: ${allEvents.length} EVENTS`)
-    console.log(`📊 FILTERED TO: ${filteredEvents.length} EVENTS (${eventNames.length > 0 ? eventNames.join(', ') : 'all'})`)
+    console.log(`📊 TOTAL CUSTOM EVENTS FROM POSTHOG: ${allEvents.length} EVENTS`)
+    console.log(`📊 Event filter applied: ${eventNames.length > 0 ? eventNames.join(', ') : 'all events'}`)
+    console.log(`📊 Method: PostHog Query API (where clause) - filters out auto-capture events`)
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
-    console.log(`   Event breakdown:`, eventNames.length > 0 ? 
-      eventNames.reduce((acc, name) => {
-        acc[name] = filteredEvents.filter(e => e.event === name).length
+    if (eventNames.length > 0) {
+      console.log(`   Event breakdown:`, eventNames.reduce((acc, name) => {
+        acc[name] = allEvents.filter(e => e.event === name).length
         return acc
-      }, {}) : 
-      'all events'
-    )
+      }, {}))
+    }
     console.log(`   Time range: ${startTime.toISOString()} to ${endTime.toISOString()}`)
     console.log(`   API calls made: ${apiCalls}`)
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
 
-    return { events: filteredEvents, apiCalls }
+    return { events: allEvents, apiCalls }
   } catch (error) {
     console.error('Error fetching PostHog events:', error)
     throw error

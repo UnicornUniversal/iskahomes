@@ -113,7 +113,7 @@ const AppointmentsList = ({
         const locationString = getLocationString(listing)
         
         return (
-          <div key={appointment.id} className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200 overflow-hidden">
+          <div key={appointment.id} className="secondary_bg rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200 overflow-hidden">
             <div className="flex flex-col lg:flex-row">
               {/* Row 1: Property Details */}
               <div className="flex flex-col sm:flex-row lg:flex-col lg:w-80 xl:w-96 flex-shrink-0 border-b lg:border-b-0 lg:border-r border-gray-100">

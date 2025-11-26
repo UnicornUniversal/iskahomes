@@ -12,7 +12,7 @@ import {
 } from '@/lib/StaticData'
 import { FaSearch, FaTimes } from 'react-icons/fa'
 
-const PropertyAmenities = ({ formData, updateFormData, mode }) => {
+const   PropertyAmenities = ({ formData, updateFormData, mode }) => {
   const [newCustomAmenity, setNewCustomAmenity] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [showGeneralAmenities, setShowGeneralAmenities] = useState(true)
@@ -142,8 +142,8 @@ const PropertyAmenities = ({ formData, updateFormData, mode }) => {
   const totalAmenities = selectedInbuiltAmenityIds.length + customAmenities.length;
 
   return (
-    <div className="w-full p-6 bg-white rounded-lg shadow-sm">
-      <div className="mb-6">
+    <div className="w-full ">
+      {/* <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Property Amenities</h2>
         <p className="text-gray-600">
           {mode === 'edit' ? 'Update the amenities available for this property' : 'Select the amenities available for this property'}
@@ -155,7 +155,7 @@ const PropertyAmenities = ({ formData, updateFormData, mode }) => {
             </p>
           </div>
         )}
-      </div>
+      </div> */}
 
       <div className="space-y-8">
         {/* Search Bar */}

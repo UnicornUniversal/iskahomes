@@ -107,7 +107,7 @@ export default function LeadsTrend({ listerId, listerType = 'developer', listing
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="default_bg rounded-lg shadow p-6">
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
             <span className="text-gray-600">Loading leads trend data...</span>
@@ -120,7 +120,7 @@ export default function LeadsTrend({ listerId, listerType = 'developer', listing
   if (error) {
     return (
       <div className="space-y-6">
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="default_bg rounded-lg shadow p-6">
           <div className="flex items-center justify-center py-12">
             <span className="text-red-600">{error}</span>
           </div>
@@ -174,7 +174,7 @@ export default function LeadsTrend({ listerId, listerType = 'developer', listing
   return (
     <div className="space-y-6">
       {/* Leads chart with per-type series */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="default_bg rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Leads Trend</h3>
           <div className="flex space-x-2">

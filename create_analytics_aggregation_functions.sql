@@ -192,6 +192,8 @@ ON user_analytics(user_id);
 -- Aggregates all leads from leads table (expands lead_actions JSONB array) and calculates percentages in SQL
 -- Returns: JSONB-ready structure with totals and percentages per developer
 -- Now properly breaks down lead_message by message_type (direct_message, whatsapp, email)
+-- Drop the old function first since we're changing the return type
+DROP FUNCTION IF EXISTS get_developer_leads_breakdown(uuid[]);
 CREATE OR REPLACE FUNCTION get_developer_leads_breakdown(developer_ids UUID[])
 RETURNS TABLE (
   user_id UUID,

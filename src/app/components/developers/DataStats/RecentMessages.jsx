@@ -70,25 +70,25 @@ const RecentMessages = () => {
 
   if (loading) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-6 flex-1">
+      <div className=" border border-gray-200 rounded-lg p-6 flex-1">
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-5 h-5 animate-spin text-primary_color" />
+          <Loader2 className="w-5 h-5 animate-spin" />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6 flex-1">
+    <div className=" secondary_bg border border-gray-200 rounded-lg p-6 flex-1">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary_color/10 flex items-center justify-center">
-            <MessageSquare className="w-4 h-4 text-primary_color" />
+            <MessageSquare className="w-4 h-4" />
           </div>
-          <h3 className="text-base font-semibold text-gray-900">Unread Messages</h3>
+          <h3 className="text-base font-semibold">Unread Messages</h3>
         </div>
         {messages.length > 0 && (
-          <span className="text-xs text-gray-500">{messages.length}</span>
+          <span className="text-xs">{messages.length}</span>
         )}
       </div>
 
@@ -110,26 +110,26 @@ const RecentMessages = () => {
               </div>
             ) : (
               <div className="w-12 h-12 rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
-                <ImageIcon className="w-4 h-4 text-gray-400" />
+                <ImageIcon className="w-4 h-4" />
               </div>
             )}
             
             <div className="flex-1 min-w-0">
-              <div className="font-medium text-sm text-gray-900 truncate mb-0.5">
+              <div className="font-medium text-sm truncate mb-0.5">
                 {message.listing?.title || message.subject || 'General Inquiry'}
               </div>
-              <div className="text-xs text-gray-500 truncate">
-                {message.isSender && <span className="text-gray-400">You: </span>}
+              <div className="text-xs truncate">
+                {message.isSender && <span>You: </span>}
                 {truncateText(message.lastMessage, 40)}
               </div>
             </div>
             
             <div className="flex items-center gap-2 flex-shrink-0">
-              <div className="flex items-center text-xs text-gray-400">
+              <div className="flex items-center text-xs">
                 <Clock className="w-3 h-3 mr-1" />
                 <span>{formatTimeAgo(message.lastMessageAt)}</span>
               </div>
-              <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-primary_color transition-colors" />
+              <ChevronRight className="w-4 h-4 transition-colors" />
             </div>
           </Link>
         ))}
@@ -138,9 +138,9 @@ const RecentMessages = () => {
       {messages.length === 0 && (
         <div className="text-center py-12">
           <div className="w-16 h-16 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-3">
-            <MessageSquare className="w-6 h-6 text-gray-300" />
+            <MessageSquare className="w-6 h-6" />
           </div>
-          <p className="text-sm text-gray-500">No unread messages</p>
+          <p className="text-sm">No unread messages</p>
         </div>
       )}
 
@@ -148,7 +148,7 @@ const RecentMessages = () => {
         <div className="mt-6 pt-4 border-t border-gray-100">
           <Link
             href={`/developer/${user.slug}/messages`}
-            className="flex items-center justify-center gap-1 text-sm font-medium text-primary_color hover:text-primary_color/80 transition-colors"
+            className="flex items-center justify-center gap-1 text-sm font-medium transition-colors"
           >
             View All Messages
             <ChevronRight className="w-4 h-4" />

@@ -51,16 +51,16 @@ const ImmersiveExperience = ({ formData, updateFormData, mode, accountType = 'de
   }
 
   return (
-    <div className='bg-white rounded-xl shadow-sm border border-gray-100 p-6'>
-      <h3 className='text-lg font-semibold text-primary_color mb-6'>Immersive Experience</h3>
+    <div className='p-6'>
+     
       
       <div className="space-y-8">
         {/* 3D Model Section - Only for developers */}
         {accountType === 'developer' && (
           <div>
             <div className="mb-4">
-              <h4 className="text-base font-semibold text-gray-900 mb-2">3D Model</h4>
-              <p className="text-sm text-gray-600">
+              <h4 className="mb-2">3D Model</h4>
+              <p className="">
                 Upload a 3D model file (GLB, GLTF) to provide an immersive 3D view of your property
               </p>
             </div>

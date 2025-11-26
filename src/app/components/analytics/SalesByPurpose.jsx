@@ -59,7 +59,7 @@ const SalesByPurpose = ({ listerId }) => {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-6 bg-white rounded-2xl shadow-xl flex items-center justify-center" style={{ minHeight: '300px' }}>
+      <div className="p-4 sm:p-6 default_bg shadow-xl flex items-center justify-center" style={{ minHeight: '300px' }}>
         <div className="text-gray-500">Loading...</div>
       </div>
     )
@@ -67,7 +67,7 @@ const SalesByPurpose = ({ listerId }) => {
 
   if (salesByPurposeData.length === 0) {
     return (
-      <div className="p-4 sm:p-6 bg-white rounded-2xl shadow-xl flex items-center justify-center" style={{ minHeight: '300px' }}>
+      <div className="p-4 sm:p-6 default_bg  shadow-xl flex items-center justify-center" style={{ minHeight: '300px' }}>
         <div className="text-gray-500">No sales data available</div>
       </div>
     )
@@ -121,7 +121,7 @@ const SalesByPurpose = ({ listerId }) => {
   }
 
   return (
-    <div className="p-4 sm:p-6 bg-white rounded-2xl shadow-xl flex flex-col items-center" style={{ fontFamily: 'Poppins, sans-serif' }}>
+    <div className="p-4 sm:p-6 default_bg rounded-2xl shadow-xl flex flex-col items-center" style={{ fontFamily: 'Poppins, sans-serif' }}>
       <div className="w-full max-w-sm flex flex-col items-center">
         <div className="relative w-full flex justify-center">
           <Pie data={chartData} options={chartOptions} style={{ maxHeight: '200px', width: '200px' }} />

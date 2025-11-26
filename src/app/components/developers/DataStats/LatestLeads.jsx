@@ -8,9 +8,9 @@ import Link from 'next/link'
 
 // Helper function to get lead category from score
 function getLeadCategory(score) {
-  if (score >= 60) return { label: 'High', color: 'bg-green-100 text-green-800 border-green-200' }
-  if (score >= 25) return { label: 'Medium', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' }
-  return { label: 'Base', color: 'bg-gray-100 text-gray-800 border-gray-200' }
+  if (score >= 60) return { label: 'High', color: 'bg-green-100 border-green-200' }
+  if (score >= 25) return { label: 'Medium', color: 'bg-yellow-100 border-yellow-200' }
+  return { label: 'Base', color: 'bg-gray-100 border-gray-200' }
 }
 
 const LatestLeads = () => {
@@ -80,50 +80,50 @@ const LatestLeads = () => {
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'new':
-        return 'bg-primary_color/10 text-primary_color border-primary_color/20'
+        return 'bg-primary_color/10 border-primary_color/20'
       case 'contacted':
-        return 'bg-secondary_color/10 text-secondary_color border-secondary_color/20'
+        return 'bg-secondary_color/10 border-secondary_color/20'
       case 'qualified':
-        return 'bg-primary_color/10 text-primary_color border-primary_color/20'
+        return 'bg-primary_color/10 border-primary_color/20'
       case 'converted':
-        return 'bg-primary_color/10 text-primary_color border-primary_color/20'
+        return 'bg-primary_color/10 border-primary_color/20'
       case 'lost':
-        return 'bg-gray-100 text-gray-600 border-gray-200'
+        return 'bg-gray-100 border-gray-200'
       default:
-        return 'bg-gray-100 text-gray-600 border-gray-200'
+        return 'bg-gray-100 border-gray-200'
     }
   }
 
   if (loading) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-6 flex-1">
+      <div className=" border border-gray-200 rounded-lg p-6 flex-1">
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-5 h-5 animate-spin text-primary_color" />
+          <Loader2 className="w-5 h-5 animate-spin" />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6 flex-1">
+    <div className=" border border-gray-200  text-primary_color rounded-lg p-6 flex-1">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary_color/10 flex items-center justify-center">
-            <UserPlus className="w-4 h-4 text-primary_color" />
+            <UserPlus className="w-4 h-4" />
           </div>
-          <h3 className="text-base font-semibold text-gray-900">Latest Leads</h3>
+          <h3 className="text-base font-semibold">Latest Leads</h3>
         </div>
         {leads.length > 0 && (
-          <span className="text-xs text-gray-500">{leads.length}</span>
+          <span className="text-xs">{leads.length}</span>
         )}
       </div>
 
       {leads.length === 0 ? (
         <div className="text-center py-12">
           <div className="w-16 h-16 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-3">
-            <UserPlus className="w-6 h-6 text-gray-300" />
+            <UserPlus className="w-6 h-6" />
           </div>
-          <p className="text-sm text-gray-500">No leads yet</p>
+          <p className="text-sm">No leads yet</p>
         </div>
       ) : (
         <>
@@ -131,22 +131,22 @@ const LatestLeads = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wider">
                     Property
                   </th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wider">
                     Action Type
                   </th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wider">
                     Actions
                   </th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wider">
                     Score
                   </th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wider">
                     Date
                   </th>
                 </tr>
@@ -173,30 +173,30 @@ const LatestLeads = () => {
                           </div>
                         ) : (
                           <div className="w-10 h-10 rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
-                            <ImageIcon className="w-3.5 h-3.5 text-gray-400" />
+                            <ImageIcon className="w-3.5 h-3.5" />
                           </div>
                         )}
-                        <span className="text-sm font-medium text-gray-900 group-hover:text-primary_color transition-colors">
+                        <span className="text-sm font-medium transition-colors">
                           {lead.listing?.title || (lead.isProfileLead ? 'Profile Lead' : 'Unknown Property')}
                         </span>
                       </Link>
                     </td>
                     <td className="py-3 px-4">
-                      <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                      <div className="flex items-center gap-1.5 text-sm">
                         {getActionIcon(lead.lastActionType)}
                         <span>{getActionLabel(lead.lastActionType)}</span>
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm">
                         {lead.totalActions || 1}
                       </span>
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-1">
-                          <Star className="w-3 h-3 text-yellow-500" />
-                          <span className="text-sm font-semibold text-gray-900">{lead.leadScore || 0}</span>
+                          <Star className="w-3 h-3" />
+                          <span className="text-sm font-semibold">{lead.leadScore || 0}</span>
                         </div>
                         {(() => {
                           const category = getLeadCategory(lead.leadScore || 0)
@@ -214,8 +214,8 @@ const LatestLeads = () => {
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                        <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                      <div className="flex items-center gap-1.5 text-sm">
+                        <Calendar className="w-3.5 h-3.5" />
                         <span>{formatDate(lead.lastActionDate)}</span>
                       </div>
                     </td>
@@ -228,7 +228,7 @@ const LatestLeads = () => {
           <div className="mt-6 pt-4 border-t border-gray-100">
             <Link
               href={`/developer/${user?.profile?.slug || user?.profile?.id}/leads`}
-              className="flex items-center justify-center gap-1 text-sm font-medium text-primary_color hover:text-primary_color/80 transition-colors"
+              className="flex items-center justify-center gap-1 text-sm font-medium transition-colors"
             >
               View All Leads
               <ChevronRight className="w-4 h-4" />

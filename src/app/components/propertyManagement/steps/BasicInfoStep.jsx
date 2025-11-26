@@ -8,13 +8,13 @@ const BasicInfoStep = ({ formData, updateFormData, mode, accountType, developmen
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Basic Information</h2>
-        <p className="text-sm text-gray-600">Enter the basic details about your property</p>
+        <h2 className="">Basic Information</h2>
+        <p className="text-sm t">Enter the basic details about your property</p>
       </div>
 
       {/* Development Selection - Only for developers */}
       {accountType === 'developer' && (
-        <div className="p-4 bg-gray-50 rounded-lg">
+        <div className="p-4 secondary_bg">
           <label className="block text-sm font-medium text-gray-700 mb-3">
             Select Development *
           </label>

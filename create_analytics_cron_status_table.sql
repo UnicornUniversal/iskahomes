@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS analytics_cron_status (
   
   -- Constraints
   CONSTRAINT valid_status CHECK (status IN ('running', 'completed', 'failed', 'partial', 'cancelled')),
-  CONSTRAINT valid_run_type CHECK (run_type IN ('scheduled', 'manual', 'recovery', 'retry'))
+  CONSTRAINT valid_run_type CHECK (run_type IN ('scheduled', 'manual', 'recovery', 'retry', 'test_time_series'))
 );
 
 -- Indexes for efficient querying

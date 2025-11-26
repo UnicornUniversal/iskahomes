@@ -24,7 +24,7 @@ ChartJS.register(
   Filler
 )
 
-const SalesTrendChart = ({ listerId }) => {
+const SalesTrendChart = ({ listerId, currency: propCurrency = 'USD' }) => {
   const [timeRange, setTimeRange] = useState('month')
   const [chartData, setChartData] = useState({
     labels: [],
@@ -32,6 +32,7 @@ const SalesTrendChart = ({ listerId }) => {
     revenue: []
   })
   const [loading, setLoading] = useState(true)
+  const [currency, setCurrency] = useState(propCurrency)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -57,6 +58,13 @@ const SalesTrendChart = ({ listerId }) => {
       fetchData()
     }
   }, [listerId, timeRange])
+  
+  // Update currency when prop changes
+  useEffect(() => {
+    if (propCurrency) {
+      setCurrency(propCurrency)
+    }
+  }, [propCurrency])
 
   const chartDataConfig = {
     labels: chartData.labels.length > 0 ? chartData.labels : ['No data'],
@@ -71,7 +79,7 @@ const SalesTrendChart = ({ listerId }) => {
         yAxisID: 'y',
       },
       {
-        label: 'Revenue ($)',
+        label: `Revenue (${currency})`,
         data: chartData.revenue.length > 0 ? chartData.revenue : [0],
         borderColor: 'rgb(34, 197, 94)',
         backgroundColor: 'rgba(34, 197, 94, 0.1)',
@@ -138,7 +146,7 @@ const SalesTrendChart = ({ listerId }) => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="default_bg rounded-lg shadow p-6">
       <div className="flex items-center flex-wrap justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-900">Sales Trend</h3>
         <div className="flex space-x-2">
@@ -146,7 +154,7 @@ const SalesTrendChart = ({ listerId }) => {
             <button
               key={range}
               onClick={() => setTimeRange(range)}
-              className={`px-3 py-1.5 rounded-lg !text-sm font-medium capitalize ${
+              className={` primary_button ${
                 timeRange === range
                   ? 'bg-primary_color text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'

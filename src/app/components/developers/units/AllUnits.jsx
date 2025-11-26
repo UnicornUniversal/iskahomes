@@ -73,13 +73,14 @@ const AllUnits = () => {
     return (
       <div className="w-full p-6">
         <div className="flex justify-between items-center mb-6">
-          <h1 className=" font-bold text-gray-900">All Units</h1>
+          <h1 className=" font-bold ">All Units</h1>
           <button 
             onClick={handleAddUnit}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            className="primary_button flex items-center gap-2"
           >
-            <Plus className="w-4 h-4" />
+           
             Add New Unit
+            <Plus className="w-4 h-4" />
           </button>
         </div>
         
@@ -97,7 +98,7 @@ const AllUnits = () => {
     return (
       <div className="w-full p-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">All Units</h2>
+          <h1 className="">All Units</h1>
           <button 
             onClick={handleAddUnit}
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
@@ -130,14 +131,16 @@ const AllUnits = () => {
     <div className="w-full p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">All Units</h2>
-          <p className="text-gray-600 mt-1">
+          <p>Manage all your</p>
+          <h1 className="text-[4em]">Listings Units</h1>
+
+          <p className=" mt-1 ">
             {units.length} {units.length === 1 ? 'unit' : 'units'} found
           </p>
         </div>
         <button 
           onClick={handleAddUnit}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          className=" primary_button transition-colors flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           Add New Unit
@@ -161,13 +164,14 @@ const AllUnits = () => {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="columns-1 md:columns-2 xl:columns-3 gap-6 space-y-6 items-center justify-center">
           {units.map((unit) => (
-            <UnitCard 
-              key={unit.id} 
-              unit={unit}
-              developerSlug={user?.profile?.slug}
-            />
+            <div key={unit.id} className="break-inside-avoid">
+              <UnitCard 
+                unit={unit}
+                developerSlug={user?.profile?.slug}
+              />
+            </div>
           ))}
         </div>
       )}

@@ -5,9 +5,11 @@ import PropertyCategories from '../modules/PropertyCategories'
 const CategoriesStep = ({ formData, updateFormData, mode }) => {
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Categories</h2>
-        <p className="text-sm text-gray-600">Select the categories, purposes, and types for your property</p>
+   <div className="mb-4 sm:mb-6">
+        <h2 className="2">Property Categories</h2>
+        <p className="">
+          {mode === 'edit' ? 'Update the property categories' : 'Select the appropriate categories for your property'}
+        </p>
       </div>
 
       <PropertyCategories 

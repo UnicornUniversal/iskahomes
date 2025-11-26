@@ -39,8 +39,8 @@ const PropertiesByCategories = () => {
   if (!purposes || purposes.length === 0) {
     return (
       <div className="p-6 bg-white rounded-2xl shadow-xl flex flex-col items-center justify-center">
-        <div className="text-gray-400 text-4xl mb-3">📊</div>
-        <p className="text-gray-500 text-center">No property purposes data available</p>
+        <div className="text-primary_color text-4xl mb-3">📊</div>
+        <p className="text-primary_color text-center">No property purposes data available</p>
       </div>
     )
   }
@@ -74,7 +74,7 @@ const PropertiesByCategories = () => {
         display: true,
         text: 'Properties by Purposes',
         font: { size: 13, family: 'Poppins, sans-serif' },
-        color: '#222',
+        color: '#17637C',
         padding: { bottom: 20 },
       },
       tooltip: {
@@ -93,14 +93,14 @@ const PropertiesByCategories = () => {
   }
 
   return (
-    <div className="p-6 bg-white rounded-2xl shadow-xl flex flex-col items-center" style={{ fontFamily: 'Poppins, sans-serif' }}>
+    <div className="p-6 secondary_bg text-primary_color rounded-2xl shadow-xl flex flex-col items-center" style={{ fontFamily: 'Poppins, sans-serif' }}>
       <div className="w-full max-w-sm flex flex-col items-center">
         <div className="relative w-full flex justify-center">
           <Pie data={chartData} options={chartOptions} style={{ maxHeight: 260 }} />
           {/* Centered total count */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-            <span className="text-[3em] font-bold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif', fontSize: '0.85rem' }}>{total}</span>
-            <span className="text-xs text-gray-500 font-medium" style={{ fontFamily: 'Poppins, sans-serif', fontSize: '0.7rem' }}>Total</span>
+            <span className="text-[3em] font-bold text-primary_color" style={{ fontFamily: 'Poppins, sans-serif', fontSize: '0.85rem' }}>{total}</span>
+            <span className="text-xs font-medium text-primary_color" style={{ fontFamily: 'Poppins, sans-serif', fontSize: '0.7rem' }}>Total</span>
           </div>
         </div>
         {/* Summary/Legend */}
@@ -111,7 +111,7 @@ const PropertiesByCategories = () => {
                 className="inline-block rounded-full"
                 style={{ width: 12, height: 12, background: pieColors[i], boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}
               ></span>
-              <span className="text-xs font-semibold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>{label}</span>
+              <span className="text-xs font-semibold text-primary_color" style={{ fontFamily: 'Poppins, sans-serif' }}>{label}</span>
               <span className="ml-auto text-xs font-bold" style={{ color: pieColors[i], fontFamily: 'Poppins, sans-serif' }}>{percentages[i]}%</span>
             </div>
           ))}

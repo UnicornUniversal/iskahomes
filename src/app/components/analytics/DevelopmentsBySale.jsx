@@ -2,10 +2,12 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Building2, DollarSign, TrendingUp, Users } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
 
-const DevelopmentsBySale = ({ developerId }) => {
+const DevelopmentsBySale = ({ developerId, currency: propCurrency }) => {
   const [developmentsBySale, setDevelopmentsBySale] = useState([])
   const [loading, setLoading] = useState(true)
+  const [currency, setCurrency] = useState(propCurrency || 'USD')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -16,6 +18,12 @@ const DevelopmentsBySale = ({ developerId }) => {
         
         if (result.success && result.data) {
           setDevelopmentsBySale(result.data)
+          // Get currency from first development if available, or use prop currency
+          if (result.data.length > 0 && result.data[0].currency) {
+            setCurrency(result.data[0].currency)
+          } else if (propCurrency) {
+            setCurrency(propCurrency)
+          }
         } else {
           setDevelopmentsBySale([])
         }
@@ -30,7 +38,14 @@ const DevelopmentsBySale = ({ developerId }) => {
     if (developerId) {
       fetchData()
     }
-  }, [developerId])
+  }, [developerId, propCurrency])
+  
+  // Update currency when prop changes
+  useEffect(() => {
+    if (propCurrency) {
+      setCurrency(propCurrency)
+    }
+  }, [propCurrency])
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -156,7 +171,7 @@ const DevelopmentsBySale = ({ developerId }) => {
                   {calculateSoldPercentage(development.unitsSold, development.totalUnits)}%
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {development.currency || 'USD'}{development.revenue.toLocaleString()}
+                  {formatCurrency(development.revenue, development.currency || currency)}
                 </td>
               </tr>
             ))}

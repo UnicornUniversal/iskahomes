@@ -50,6 +50,9 @@ export async function GET(request) {
     const listingId = searchParams.get('listing_id')
     const status = searchParams.get('status')
     const search = searchParams.get('search')
+    const actionType = searchParams.get('action_type')
+    const dateFrom = searchParams.get('date_from')
+    const dateTo = searchParams.get('date_to')
     const page = parseInt(searchParams.get('page') || '0', 10)
     const pageSize = parseInt(searchParams.get('page_size') || '20', 10)
     const offset = page * pageSize
@@ -234,6 +237,9 @@ export async function GET(request) {
         return currentDate > latestDate ? current : latest
       }, group[0])
 
+      // Create grouped_lead_key for fetching reminders
+      const groupedLeadKey = `${primary.seeker_id}_${primary.listing_id || 'null'}`
+
       return {
         ...primary,
         // Use primary record's ID (most recent)
@@ -250,19 +256,62 @@ export async function GET(request) {
         last_action_date: lastActionDates[0] || primary.last_action_date,
         // Use most recently updated status
         status: mostRecentRecord.status || primary.status,
+        // Add grouped_lead_key for reminders
+        grouped_lead_key: groupedLeadKey,
         // Keep track of how many records were merged (for debugging)
         _merged_count: group.length
       }
     })
 
-    // Apply search filter if provided (before pagination)
+    // Apply filters if provided (before pagination)
     let filteredLeads = mergedLeads
+    
+    // Search filter - search in available fields (listing_title and seeker_name are added later in transformation)
     if (search) {
       const searchLower = search.toLowerCase()
-      filteredLeads = mergedLeads.filter(lead =>
+      filteredLeads = filteredLeads.filter(lead =>
         (lead.seeker_id || '').toLowerCase().includes(searchLower) ||
         (lead.listing_id || '').toLowerCase().includes(searchLower)
       )
+    }
+
+    // Action type filter - check if any action in lead_actions matches the action_type
+    if (actionType) {
+      filteredLeads = filteredLeads.filter(lead => {
+        if (!Array.isArray(lead.lead_actions) || lead.lead_actions.length === 0) {
+          return false
+        }
+        return lead.lead_actions.some(action => 
+          action?.action_type === actionType
+        )
+      })
+    }
+
+    // Date range filter - filter by first_action_date or last_action_date
+    if (dateFrom || dateTo) {
+      filteredLeads = filteredLeads.filter(lead => {
+        // Use first_action_date as primary, fallback to last_action_date or created_at
+        const actionDate = lead.first_action_date || lead.last_action_date || lead.created_at
+        if (!actionDate) return false
+
+        // Parse dates for comparison
+        const leadDate = new Date(actionDate)
+        leadDate.setHours(0, 0, 0, 0) // Reset time to start of day for comparison
+
+        if (dateFrom) {
+          const fromDate = new Date(dateFrom)
+          fromDate.setHours(0, 0, 0, 0)
+          if (leadDate < fromDate) return false
+        }
+
+        if (dateTo) {
+          const toDate = new Date(dateTo)
+          toDate.setHours(23, 59, 59, 999) // End of day
+          if (leadDate > toDate) return false
+        }
+
+        return true
+      })
     }
 
     // Sort merged leads by last_action_date DESC
@@ -278,14 +327,57 @@ export async function GET(request) {
     // Apply pagination to merged results
     const paginatedLeads = filteredLeads.slice(offset, offset + pageSize)
 
-    // Get listing IDs from paginated leads and fetch listings
-    const listingIds = paginatedLeads.filter(l => l.listing_id).map(l => l.listing_id)
+    // Fetch reminders for all paginated leads
+    const groupedLeadKeys = paginatedLeads.map(lead => lead.grouped_lead_key).filter(Boolean)
+    let remindersMap = {}
+    
+    if (groupedLeadKeys.length > 0) {
+      const { data: allReminders, error: remindersError } = await supabaseAdmin
+        .from('reminders')
+        .select('*')
+        .in('grouped_lead_key', groupedLeadKeys)
+        .order('reminder_date', { ascending: true })
+        .order('reminder_time', { ascending: true, nullsFirst: false })
+
+      if (!remindersError && allReminders) {
+        // Group reminders by grouped_lead_key
+        allReminders.forEach(reminder => {
+          if (!remindersMap[reminder.grouped_lead_key]) {
+            remindersMap[reminder.grouped_lead_key] = []
+          }
+          // Calculate overdue status
+          const now = new Date()
+          if (reminder.status === 'incomplete' && reminder.reminder_date) {
+            const reminderDate = new Date(reminder.reminder_date)
+            if (reminder.reminder_time) {
+              const [hours, minutes] = reminder.reminder_time.split(':')
+              reminderDate.setHours(parseInt(hours), parseInt(minutes), 0, 0)
+            } else {
+              reminderDate.setHours(23, 59, 59, 999)
+            }
+            reminder.is_overdue = reminderDate < now
+          } else {
+            reminder.is_overdue = false
+          }
+          remindersMap[reminder.grouped_lead_key].push(reminder)
+        })
+      }
+    }
+
+    // Attach reminders to each lead
+    const leadsWithReminders = paginatedLeads.map(lead => ({
+      ...lead,
+      reminders: remindersMap[lead.grouped_lead_key] || []
+    }))
+
+    // Get listing IDs from leads with reminders and fetch listings
+    const listingIds = leadsWithReminders.filter(l => l.listing_id).map(l => l.listing_id)
     let listingsMap = {}
     
     if (listingIds.length > 0) {
       const { data: listings, error: listingsError } = await supabase
         .from('listings')
-        .select('id, title, slug, listing_status, media, city, state, country, town, full_address')
+        .select('id, title, slug, listing_type, listing_status, media, city, state, country, town, full_address')
         .in('id', listingIds)
 
       if (!listingsError && listings) {
@@ -357,7 +449,7 @@ export async function GET(request) {
     }
 
     // Get seeker IDs and fetch seeker info
-    const seekerIds = [...new Set(paginatedLeads.map(l => l.seeker_id).filter(Boolean))]
+    const seekerIds = [...new Set(leadsWithReminders.map(l => l.seeker_id).filter(Boolean))]
     let seekersMap = {}
     
     if (seekerIds.length > 0) {
@@ -380,7 +472,7 @@ export async function GET(request) {
     }
 
     // Transform the data (add listing and seeker info)
-    let transformedLeads = paginatedLeads.map(lead => {
+    let transformedLeads = leadsWithReminders.map(lead => {
       const listing = lead.listing_id ? listingsMap[lead.listing_id] || null : null
       const seeker = lead.seeker_id ? seekersMap[lead.seeker_id] || null : null
 
@@ -389,6 +481,7 @@ export async function GET(request) {
         listing_id: lead.listing_id,
         listing_title: listing?.title || null,
         listing_slug: listing?.slug || null,
+        listing_type: listing?.listing_type || null,
         listing_status: listing?.status || null,
         listing_image: listing?.image || null,
         listing_location: listing ? [listing.town, listing.city, listing.state, listing.country].filter(Boolean).join(', ') : null,
@@ -412,6 +505,8 @@ export async function GET(request) {
         status: lead.status || 'new',
         notes: Array.isArray(lead.notes) ? lead.notes : [],
         status_tracker: Array.isArray(lead.status_tracker) ? lead.status_tracker : [],
+        reminders: lead.reminders || [],
+        grouped_lead_key: lead.grouped_lead_key,
         context_type: lead.context_type || 'listing',
         created_at: lead.created_at,
         updated_at: lead.updated_at

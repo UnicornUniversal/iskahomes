@@ -6,8 +6,8 @@ const SocialAmenitiesStep = ({ formData, updateFormData, mode }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Social Amenities</h2>
-        <p className="text-sm text-gray-600">Add nearby social amenities like schools, hospitals, parks, etc.</p>
+        <h2 className="">Social Amenities</h2>
+        <p className="">{mode === 'edit' ? 'Update the social amenities available in your property' : 'Add nearby social amenities like schools, hospitals, parks, etc.'}</p>
       </div>
 
       <SocialAmenities 

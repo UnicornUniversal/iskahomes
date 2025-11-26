@@ -19,13 +19,13 @@ const PropertyAdditionalInfo = ({ formData, updateFormData, mode }) => {
   };
 
   return (
-    <div className="w-full p-4 sm:p-6 bg-white rounded-lg shadow-sm">
-      <div className="mb-4 sm:mb-6">
+    <div className="w-full py-4 ">
+      {/* <div className="mb-4 sm:mb-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Additional Information</h2>
         <p className="text-sm sm:text-base text-gray-600">
           {mode === 'edit' ? 'Update any additional information about this property' : 'Add any additional information that potential buyers/renters should know about this property'}
         </p>
-      </div>
+      </div> */}
 
       <div className="space-y-4 sm:space-y-6">
         {/* Additional Information Textarea */}

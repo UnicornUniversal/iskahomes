@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import Model3DViewer from './Model3DViewer'
 
-const Property3DViewer = ({ modelData, unitTitle = "Unit" }) => {
+const Property3DViewer = ({ modelData, unitTitle = "Unit", hideTitle = false, hideControls = false }) => {
   const [modelUrl, setModelUrl] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -59,46 +59,49 @@ const Property3DViewer = ({ modelData, unitTitle = "Unit" }) => {
   }
 
   return (
-    <div className="w-full">
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          3D Model: {unitTitle}
-        </h3>
-        {modelData.format && (
-          <div className="text-sm text-gray-600">
-            Format: {modelData.format.toUpperCase()}
-          </div>
-        )}
-      </div>
+    <div className="w-full h-full">
+      {!hideTitle && (
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            3D Model: {unitTitle}
+          </h3>
+          {modelData.format && (
+            <div className="text-sm text-gray-600">
+              Format: {modelData.format.toUpperCase()}
+            </div>
+          )}
+        </div>
+      )}
       
       <Model3DViewer
         modelUrl={modelUrl}
         modelFormat={modelData.format || 'gltf'}
         width="100%"
-        height="600px"
+        height={hideTitle ? "100%" : "600px"}
         showControls={true}
         autoRotate={true}
-        className="border rounded-lg"
+        className={hideTitle ? "" : "border rounded-lg"}
       />
       
-      {/* Controls Info */}
-      <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-        <h4 className="text-sm font-semibold text-gray-700 mb-2">3D Viewer Controls</h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-gray-600">
-          <div className="flex items-center">
-            <span className="mr-2">🖱️</span>
-            <span>Left click + drag: Rotate</span>
-          </div>
-          <div className="flex items-center">
-            <span className="mr-2">🖱️</span>
-            <span>Right click + drag: Pan</span>
-          </div>
-          <div className="flex items-center">
-            <span className="mr-2">🖱️</span>
-            <span>Scroll wheel: Zoom</span>
+      {!hideControls && (
+        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+          <h4 className="text-sm font-semibold text-gray-700 mb-2">3D Viewer Controls</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-gray-600">
+            <div className="flex items-center">
+              <span className="mr-2">🖱️</span>
+              <span>Left click + drag: Rotate</span>
+            </div>
+            <div className="flex items-center">
+              <span className="mr-2">🖱️</span>
+              <span>Right click + drag: Pan</span>
+            </div>
+            <div className="flex items-center">
+              <span className="mr-2">🖱️</span>
+              <span>Scroll wheel: Zoom</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

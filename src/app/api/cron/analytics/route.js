@@ -13,6 +13,60 @@ import {
 import { getAllActiveEntities } from '@/lib/cronScheduler'
 import crypto from 'crypto'
 
+// Error Tracker - Collects all errors during cron execution
+class ErrorTracker {
+  constructor() {
+    this.errors = []
+    this.warnings = []
+  }
+
+  addError(category, message, details = {}) {
+    const error = {
+      category,
+      message,
+      details,
+      timestamp: new Date().toISOString()
+    }
+    this.errors.push(error)
+    // Only log errors to console
+    console.error(`[ERROR] ${category}: ${message}`, details)
+    return error
+  }
+
+  addWarning(category, message, details = {}) {
+    const warning = {
+      category,
+      message,
+      details,
+      timestamp: new Date().toISOString()
+}
+    this.warnings.push(warning)
+    return warning
+  }
+
+  getSummary() {
+    return {
+      total_errors: this.errors.length,
+      total_warnings: this.warnings.length,
+      errors: this.errors,
+      warnings: this.warnings,
+      errors_by_category: this.errors.reduce((acc, err) => {
+        acc[err.category] = (acc[err.category] || 0) + 1
+        return acc
+      }, {})
+    }
+  }
+
+  hasErrors() {
+    return this.errors.length > 0
+  }
+}
+
+// Only log successful operations (brief messages, no full data)
+function logSuccess(message) {
+  console.log(`✅ ${message}`)
+}
+
 // Helper functions
 function parseDate(input) {
   const d = input ? new Date(input) : new Date()
@@ -77,28 +131,29 @@ function trackUnique(uniqueSet, uniqueCount, id, maxSetSize = 10000) {
 }
 
 // Aggregate events in-memory with optimizations
-async function aggregateEvents(events, chunkSize = 5000) {
+async function aggregateEvents(events, chunkSize = 5000, errorTracker = null) {
   // Early exit if no events
   if (!events || events.length === 0) {
-    console.log('ℹ️ No events to process')
     return createAggregateStructure()
   }
 
   const aggregates = createAggregateStructure()
   
-  // Process events in chunks to manage memory
+  // PERFORMANCE OPTIMIZATION: Skip chunking for small datasets (< 10k events)
+  if (events.length < 10000) {
+    await processEventChunk(events, aggregates, 0, errorTracker)
+  } else {
   for (let i = 0; i < events.length; i += chunkSize) {
     const chunk = events.slice(i, i + chunkSize)
-    await processEventChunk(chunk, aggregates, i)
+      if (chunk.length > 0) {
+    await processEventChunk(chunk, aggregates, i, errorTracker)
+  }
+    }
   }
 
-  // Convert Maps to objects for compatibility with existing code
-  return {
-    listings: Object.fromEntries(aggregates.listings),
-    users: Object.fromEntries(aggregates.users),
-    developments: Object.fromEntries(aggregates.developments),
-    leads: Object.fromEntries(aggregates.leads)
-  }
+  // PERFORMANCE OPTIMIZATION: Keep Maps, only convert when necessary
+  // Return Maps directly - convert to objects only when needed for JSON serialization
+  return aggregates
 }
 
 // Calculate lead_score from lead_actions array
@@ -137,7 +192,7 @@ function calculateLeadScore(leadActions) {
 }
 
 // Process a chunk of events
-async function processEventChunk(chunk, aggregates, offset = 0) {
+async function processEventChunk(chunk, aggregates, offset = 0, errorTracker = null) {
   // Early exit if chunk is empty
   if (!chunk || chunk.length === 0) return
 
@@ -158,7 +213,6 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
   const listingToListerMap = {}
   if (listingIdsNeedingListerId.size > 0) {
     const uniqueListingIds = Array.from(listingIdsNeedingListerId)
-    console.log(`🔍 [AGGREGATE] Pre-fetching lister_id for ${uniqueListingIds.length} listings missing lister_id in events`)
     
     const { data: listingsData, error: listingsError } = await supabaseAdmin
       .from('listings')
@@ -172,15 +226,31 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
           lister_type: listing.account_type || 'developer'
         }
       }
-      console.log(`✅ [AGGREGATE] Pre-fetched lister_id for ${Object.keys(listingToListerMap).length} listings`)
     } else if (listingsError) {
-      console.error(`❌ [AGGREGATE] Error pre-fetching lister_ids:`, listingsError)
+      errorTracker.addError('AGGREGATE', 'Error pre-fetching lister_ids', { error: listingsError })
     }
   }
 
   for (const event of chunk) {
+    try {
     const { event: eventName, properties = {}, distinct_id, timestamp } = event
+      
+      // Validate event structure
+      if (!eventName || !timestamp) {
+        if (errorTracker) {
+          errorTracker.addError('EVENT_PROCESSING', 'Event missing required fields', { event: JSON.stringify(event).substring(0, 200) })
+        }
+        continue
+      }
+      
     const eventDate = new Date(timestamp)
+      if (isNaN(eventDate.getTime())) {
+        if (errorTracker) {
+          errorTracker.addError('EVENT_PROCESSING', 'Invalid event timestamp', { eventName, timestamp, distinct_id })
+        }
+        continue
+      }
+      
     const dayKey = formatDayKey(eventDate)
     const eventHour = eventDate.getUTCHours() // Get hour (0-23) for hourly tracking
     
@@ -194,7 +264,6 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
     if (!listerId && listingId && listingToListerMap[listingId]) {
       listerId = listingToListerMap[listingId].lister_id
       listerType = listingToListerMap[listingId].lister_type
-      console.log(`✅ [LISTER_ID_FALLBACK] Derived lister_id=${listerId} (${listerType}) from listing_id=${listingId}`)
     }
     
     // CRITICAL: Always provide seeker_id - default to "anonymous" if not available
@@ -254,9 +323,6 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
         unique_leads_count: 0 // Counter for unique leads
         // Note: total_sales removed - sales are tracked in sales_listings table, not via PostHog
       })
-      if (aggregates.listings.size <= 5) {
-        console.log(`✅ Initialized listing aggregate for ${listingId}`)
-      }
     }
 
     // Process events
@@ -267,18 +333,45 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
         // This is separate from property_view - it tracks impressions, NOT views
         // Views are tracked separately via property_view event
         if (!listingId) {
-          console.log(`⚠️ Skipping listing_impression: missing listingId`, { properties: Object.keys(properties) })
           break
         }
         const listing = aggregates.listings.get(listingId)
         if (!listing) {
-          console.error(`❌ CRITICAL: listing ${listingId} not initialized in aggregates for listing_impression!`)
+          if (errorTracker) {
+            errorTracker.addError('AGGREGATE', `Listing ${listingId} not initialized for listing_impression`, { listingId, eventName })
+          }
           break
         }
         // Only increment impressions, NOT views (views are tracked via property_view)
         listing.total_impressions++
         // Note: We don't increment total_views here to avoid double-counting
         // property_view already tracks views, listing_impression tracks impressions/engagement
+        
+        // CRITICAL FIX: Ensure lister is tracked in aggregates.users for user_analytics
+        // This ensures users with only listing events (no profile events) are still processed
+        if (listerId && listerType) {
+          if (!aggregates.users.has(listerId)) {
+            aggregates.users.set(listerId, {
+              user_type: listerType || 'unknown',
+              profile_views: 0,
+              unique_profile_viewers: new Set(),
+              profile_views_from_home: 0,
+              profile_views_from_listings: 0,
+              profile_views_from_search: 0,
+              searches_performed: 0,
+              properties_viewed: 0,
+              unique_properties_viewed: new Set(),
+              properties_saved: 0,
+              leads_initiated: 0,
+              appointments_booked: 0,
+              profile_leads: 0,
+              profile_impressions: 0,
+              profile_impression_social_media: 0,
+              profile_impression_website_visit: 0,
+              profile_impression_share: 0
+            })
+          }
+        }
         break
       }
 
@@ -468,29 +561,18 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
         let finalListingId = listingId
         if (!finalListingId && properties.context_type === 'listing' && properties.listing_uuid) {
           finalListingId = properties.listing_uuid
-          console.log(`🔍 [LEAD_DEBUG] Found listing_id from listing_uuid: ${finalListingId}`)
         }
         
         if (!finalListingId && !seekerId) {
-          console.log(`⚠️ [LEAD_DEBUG] Skipping lead (${leadType}): No listingId AND no seekerId`, {
-            properties: Object.keys(properties),
-            distinct_id,
-            has_listing_id: !!properties.listing_id,
-            has_listing_uuid: !!properties.listing_uuid,
-            has_seeker_id: !!properties.seeker_id,
-            context_type: properties.context_type,
-            profile_id: properties.profile_id,
-            lead_type: leadType
-          })
           break
         }
         
-        // If no listingId but we have seekerId and listerId, we can still track the lead
-        // but we need to skip listing aggregation
+        // If no listingId but we have seekerId and listerId, this is a PROFILE LEAD
+        // Profile leads: user went to developer/agent profile and sent message/copied number
+        // CRITICAL: Track for BOTH property_seekers AND developers/agents (lister)
         if (!finalListingId) {
-          console.warn(`⚠️ [LEAD_DEBUG] lead (${leadType}) event missing listing_id but has seekerId=${seekerId}, listerId=${listerId}`)
-          console.warn(`⚠️ [LEAD_DEBUG] This lead will be tracked for user analytics but NOT for listing analytics`)
-          // Still track for user analytics but skip listing aggregation
+          
+          // Track for property_seekers
           if (seekerId) {
             if (!aggregates.users.has(seekerId)) {
               aggregates.users.set(seekerId, {
@@ -517,18 +599,72 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
               }
             }
           }
+          
+          // CRITICAL FIX: Track profile leads for developers/agents (lister) in aggregates.users
+          // This ensures profile leads are included in user_analytics.total_leads
+          if (listerId && listerType) {
+            if (!aggregates.users.has(listerId)) {
+              aggregates.users.set(listerId, {
+                user_type: listerType, // 'developer' or 'agent'
+                profile_views: 0,
+                unique_profile_viewers: new Set(),
+                profile_views_from_home: 0,
+                profile_views_from_listings: 0,
+                profile_views_from_search: 0,
+                searches_performed: 0,
+                properties_viewed: 0,
+                unique_properties_viewed: new Set(),
+                properties_saved: 0,
+                leads_initiated: 0,
+                appointments_booked: 0,
+                // Profile-specific metrics for developers/agents
+                profile_leads: 0, // Track profile leads separately
+                profile_impressions: 0,
+                profile_impression_social_media: 0,
+                profile_impression_website_visit: 0,
+                profile_impression_share: 0
+              })
+            }
+            const listerUser = aggregates.users.get(listerId)
+            if (listerUser) {
+              // Track profile leads for the lister (developer/agent)
+              // This will be used in user_analytics.total_leads calculation
+              if (!listerUser.profile_leads) listerUser.profile_leads = 0
+              listerUser.profile_leads++
+            }
+          }
+          
+          // Still create lead record in leadsMap for leads table (with listing_id = null)
+          // This ensures profile leads are stored in the leads table
+          const leadKey = `profile_${listerId}_${seekerId}`
+          if (!aggregates.leads.has(leadKey)) {
+            aggregates.leads.set(leadKey, {
+              listing_id: null, // Explicitly null for profile leads
+              lister_id: listerId,
+              lister_type: listerType,
+              seeker_id: seekerId,
+              context_type: 'profile',
+              actions: []
+            })
+          }
+          const lead = aggregates.leads.get(leadKey)
+          if (lead) {
+            const action = {
+              action_id: crypto.randomUUID(),
+              action_type: `lead_${leadType}`,
+              action_date: dayKey,
+              action_hour: eventHour,
+              action_timestamp: timestamp,
+              action_metadata: {
+                context_type: 'profile',
+                lead_type: leadType
+              }
+            }
+            lead.actions.push(action)
+          }
+          
           break
         }
-        
-        console.log(`✅ [LEAD_DEBUG] Processing lead (${leadType}) event:`, {
-          listingId: finalListingId,
-          seekerId,
-          listerId,
-          listerType,
-          dayKey,
-          timestamp,
-          lead_type: leadType
-        })
         
         // Initialize listing aggregate if needed
         if (finalListingId && !aggregates.listings.has(finalListingId)) {
@@ -599,7 +735,6 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
             seeker_id: seekerId,
             actions: []
           })
-            console.log(`📝 [LEAD_DEBUG] Created new lead aggregate for ${leadKey}:`, aggregates.leads.get(leadKey))
         }
           const action = {
           action_id: crypto.randomUUID(),
@@ -615,7 +750,6 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
           const lead = aggregates.leads.get(leadKey)
           if (lead) {
             lead.actions.push(action)
-            console.log(`✅ [LEAD_DEBUG] Added action to lead ${leadKey}. Total actions: ${lead.actions.length}`)
           }
 
         } else if (leadType === 'message') {
@@ -665,7 +799,6 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
             seeker_id: seekerId,
             actions: []
           })
-            console.log(`📝 [LEAD_DEBUG] Created new lead aggregate for ${leadKey}`)
         }
           const action = {
           action_id: crypto.randomUUID(),
@@ -681,7 +814,6 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
           const lead = aggregates.leads.get(leadKey)
           if (lead) {
             lead.actions.push(action)
-            console.log(`✅ [LEAD_DEBUG] Added action to lead ${leadKey}. Total actions: ${lead.actions.length}`)
           }
 
         } else if (leadType === 'appointment') {
@@ -724,7 +856,6 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
             seeker_id: seekerId,
             actions: []
           })
-            console.log(`📝 [LEAD_DEBUG] Created new lead aggregate for ${leadKey}`)
         }
           const action = {
           action_id: crypto.randomUUID(),
@@ -740,10 +871,7 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
           const lead = aggregates.leads.get(leadKey)
           if (lead) {
             lead.actions.push(action)
-            console.log(`✅ [LEAD_DEBUG] Added action to lead ${leadKey}. Total actions: ${lead.actions.length}`)
           }
-        } else {
-          console.warn(`⚠️ [LEAD_DEBUG] Unknown lead_type: ${leadType}, skipping`)
         }
         break
       }
@@ -845,12 +973,13 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
         }
         // Continue with existing listing aggregation logic
         if (!listingId) {
-          console.log(`⚠️ Skipping property_view: missing listingId`, { properties: Object.keys(properties) })
           break
         }
         const listing = aggregates.listings.get(listingId)
         if (!listing) {
-          console.error(`❌ CRITICAL: listing ${listingId} not initialized in aggregates!`)
+          if (errorTracker) {
+            errorTracker.addError('AGGREGATE', `Listing ${listingId} not initialized in aggregates`, { listingId, eventName })
+          }
           break
         }
         listing.total_views++
@@ -860,6 +989,32 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
         if (viewedFrom) {
           const key = `views_from_${String(viewedFrom).toLowerCase()}`
           if (listing[key] !== undefined) listing[key]++
+        }
+        
+        // CRITICAL FIX: Ensure lister is tracked in aggregates.users for user_analytics
+        // This ensures users with only listing events (no profile events) are still processed
+        if (listerId && listerType) {
+          if (!aggregates.users.has(listerId)) {
+            aggregates.users.set(listerId, {
+              user_type: listerType || 'unknown',
+              profile_views: 0,
+              unique_profile_viewers: new Set(),
+              profile_views_from_home: 0,
+              profile_views_from_listings: 0,
+              profile_views_from_search: 0,
+              searches_performed: 0,
+              properties_viewed: 0,
+              unique_properties_viewed: new Set(),
+              properties_saved: 0,
+              leads_initiated: 0,
+              appointments_booked: 0,
+              profile_leads: 0,
+              profile_impressions: 0,
+              profile_impression_social_media: 0,
+              profile_impression_website_visit: 0,
+              profile_impression_share: 0
+            })
+          }
         }
         break
       }
@@ -999,6 +1154,30 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
         if (seekerId) dev.unique_leads.add(seekerId)
         break
       }
+      
+      default: {
+        // Unknown event type - track but don't error
+        if (errorTracker && eventName && !eventName.startsWith('$')) {
+          // Only track non-auto-capture events
+          errorTracker.addWarning('EVENT_PROCESSING', `Unknown event type: ${eventName}`, { eventName, timestamp, distinct_id })
+        }
+        break
+      }
+    }
+    } catch (eventError) {
+      // Track events that fail to process
+      if (errorTracker) {
+        errorTracker.addError('EVENT_PROCESSING', `Failed to process event: ${eventName || 'unknown'}`, {
+          error: eventError.message,
+          stack: eventError.stack,
+          eventName: eventName || 'unknown',
+          timestamp: timestamp || 'unknown',
+          distinct_id: distinct_id || 'unknown',
+          eventPreview: JSON.stringify(event).substring(0, 300)
+        })
+      }
+      // Continue processing other events
+      continue
     }
   }
 
@@ -1009,14 +1188,37 @@ async function processEventChunk(chunk, aggregates, offset = 0) {
 export async function POST(request) {
   const runId = crypto.randomUUID()
   let runRecord = null
+  const errorTracker = new ErrorTracker()
 
   try {
+    // PERFORMANCE OPTIMIZATION: Early exit check - skip if last run was recent
+    const { searchParams } = new URL(request.url)
+    const forceRun = searchParams.get('forceRun') === 'true'
+    const ignoreLastRun = searchParams.get('ignoreLastRun') === 'true'
+    const testMode = searchParams.get('testMode') === 'true'
+    const testTimeSeries = searchParams.get('testTimeSeries') === 'true'
+    
+    if (!forceRun && !testMode && !testTimeSeries && !ignoreLastRun) {
+      const lastRun = await getLastSuccessfulRun()
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+      
+      if (lastRun && new Date(lastRun.end_time) > oneHourAgo) {
+        return NextResponse.json({
+          success: true,
+          message: 'Skipped: Last run was less than 1 hour ago',
+          skipped: true,
+          lastRunTime: lastRun.end_time,
+          errors: errorTracker.getSummary()
+        })
+      }
+    }
+
     // 1. Check for incomplete/stuck runs
     const incompleteRuns = await getIncompleteRuns()
     const stuckRuns = await getStuckRuns()
     
     if (incompleteRuns.length > 0 || stuckRuns.length > 0) {
-      console.log(`⚠️ Found ${incompleteRuns.length} incomplete and ${stuckRuns.length} stuck runs`)
+      errorTracker.addWarning('CRON_STATUS', `Found ${incompleteRuns.length} incomplete and ${stuckRuns.length} stuck runs`, { incompleteRuns: incompleteRuns.length, stuckRuns: stuckRuns.length })
       // OPTIMIZATION: Mark stuck runs as failed in parallel
       if (stuckRuns.length > 0) {
         await Promise.all(
@@ -1028,10 +1230,67 @@ export async function POST(request) {
     }
 
     // 2. Get last successful run to determine start time
-    // Check if we should ignore last run (for testing - add ?ignoreLastRun=true to URL)
-    const { searchParams } = new URL(request.url)
-    const ignoreLastRun = searchParams.get('ignoreLastRun') === 'true'
-    const testMode = searchParams.get('testMode') === 'true' // Fetch last 24 hours for testing
+    
+    // TIME SERIES TEST MODE: Process days from Nov 1-21, group events by hour
+    let simulatedDate = null
+    let simulatedHour = null
+    let simulatedEndTime = null
+    let simulationStartDate = null
+    
+    if (testTimeSeries) {
+      // Start date: November 1, 2025
+      const testYear = 2025
+      const testMonth = 11 // November
+      const startDay = 1
+      const baseDate = new Date(Date.UTC(testYear, testMonth - 1, startDay, 0, 0, 0, 0))
+      
+      // End date: Today (or allow query params to override)
+      const testYearEnd = Number(searchParams.get('testYearEnd')) || new Date().getUTCFullYear()
+      const testMonthEnd = Number(searchParams.get('testMonthEnd')) || new Date().getUTCMonth() + 1
+      const testDayEnd = Number(searchParams.get('testDayEnd')) || new Date().getUTCDate()
+      const endDate = new Date(Date.UTC(testYearEnd, testMonthEnd - 1, testDayEnd, 23, 59, 59, 999))
+      
+      
+      // Get last successful test_time_series run to determine which day to process next
+      let lastRunForTest = null
+      if (!ignoreLastRun) {
+        const { data: testRuns } = await supabaseAdmin
+          .from('analytics_cron_status')
+          .select('*')
+          .eq('status', 'completed')
+          .eq('run_type', 'test_time_series')
+          .order('completed_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        
+        lastRunForTest = testRuns || null
+      }
+      
+      // Extract last processed date from metadata or start from base date
+      let currentDateObj
+      if (lastRunForTest && lastRunForTest.metadata?.lastProcessedDate) {
+        currentDateObj = new Date(lastRunForTest.metadata.lastProcessedDate)
+        // Move to next day
+        currentDateObj.setUTCDate(currentDateObj.getUTCDate() + 1)
+      } else {
+        currentDateObj = new Date(baseDate)
+      }
+      
+      // Check if we've reached or passed the end date
+      if (currentDateObj > endDate) {
+        return NextResponse.json({
+          success: true,
+          message: `Time series test complete. Reached end date ${endDate.toISOString().split('T')[0]}`,
+          testMode: true,
+          completed: true
+        })
+      }
+      
+      // Set the simulated date for this run
+      simulationStartDate = baseDate
+      simulatedDate = `${currentDateObj.getUTCFullYear()}-${String(currentDateObj.getUTCMonth() + 1).padStart(2, '0')}-${String(currentDateObj.getUTCDate()).padStart(2, '0')}`
+      
+    }
     
     const lastRun = ignoreLastRun ? null : await getLastSuccessfulRun()
     
@@ -1048,66 +1307,78 @@ export async function POST(request) {
       failedRunsSinceLastSuccess = failedRuns || []
     }
     
-    console.log('🔍 Last successful run:', lastRun ? {
-      run_id: lastRun.run_id,
-      end_time: lastRun.end_time,
-      completed_at: lastRun.completed_at
-    } : 'None found (or ignored)')
-    
-    if (failedRunsSinceLastSuccess.length > 0) {
-      console.log(`⚠️ Found ${failedRunsSinceLastSuccess.length} failed run(s) since last success. Will retry those periods.`)
-      failedRunsSinceLastSuccess.forEach(fr => {
-        console.log(`  - Failed run ${fr.run_id}: ${fr.start_time} to ${fr.end_time} (${fr.last_error || 'unknown error'})`)
-      })
-    }
     
     let startTime
-    if (testMode) {
+    let endTimeForFetch // Separate variable for fetching events vs inserting data
+    let endTime // End time for inserting data (used for calendar parts)
+    
+    if (testTimeSeries) {
+      // Time series test: fetch ALL events for the entire day from PostHog
+      // Then group by hour and create entries only for hours with events
+      const actualDateObj = new Date(simulatedDate + 'T00:00:00Z')
+      // Fetch the entire day (00:00:00 to 23:59:59)
+      startTime = new Date(actualDateObj)
+      startTime.setUTCHours(0, 0, 0, 0)
+      endTimeForFetch = new Date(actualDateObj)
+      endTimeForFetch.setUTCHours(23, 59, 59, 999) // End of the day
+      // Set endTime to the end of the day for testTimeSeries
+      endTime = new Date(endTimeForFetch)
+    } else if (testMode) {
       // Test mode: fetch last 24 hours
       startTime = new Date(Date.now() - 24 * 60 * 60 * 1000)
-      console.log('🧪 TEST MODE: Fetching last 24 hours')
+      endTimeForFetch = new Date()
+      endTime = new Date() // Use current time for test mode
             } else {
-      // Always fetch from 1 year ago to capture all historical data
-      // Using UPSERT ensures we update existing records instead of creating duplicates
-      const oneYearAgo = 365 * 24 * 60 * 60 * 1000 // 1 year in milliseconds
-      startTime = new Date(Date.now() - oneYearAgo)
-      console.log(`📅 Fetching all events from 1 year ago (${startTime.toISOString()})`)
-      console.log(`   ↳ This ensures we capture all historical data`)
-      if (lastRun) {
-        console.log(`   ↳ Last successful run was at ${lastRun.end_time}, but fetching from 1 year ago to ensure completeness`)
+      // PERFORMANCE OPTIMIZATION: Fetch only since last run or 24 hours max (not 1 year!)
+      // This dramatically reduces PostHog API calls and processing time
+      if (lastRun && !ignoreLastRun) {
+        startTime = new Date(lastRun.end_time)
+      } else {
+        // Default to 24 hours for first run or when ignoring last run
+        const twentyFourHoursAgo = 24 * 60 * 60 * 1000
+        startTime = new Date(Date.now() - twentyFourHoursAgo)
       }
-        if (failedRunsSinceLastSuccess.length > 0) {
-        console.log(`   ↳ Will also retry ${failedRunsSinceLastSuccess.length} failed period(s) using UPSERT (updates existing records)`)
-      }
+      endTimeForFetch = new Date()
+      endTime = new Date() // Use current time for normal mode
+      
     }
     
-    const endTime = new Date()
-    const targetDate = formatDayKey(endTime)
-    const cal = calendarParts(endTime)
+    // Use simulated date/hour for time series test, otherwise use actual current time
+    let targetDate, cal
+    if (testTimeSeries) {
+      // Create calendar parts from simulated date (use start of day for initial calendar parts)
+      const simulatedDateObj = new Date(simulatedDate + 'T00:00:00Z')
+      targetDate = formatDayKey(simulatedDateObj)
+      cal = calendarParts(simulatedDateObj)
+      cal.date = simulatedDate
+      // Hour will be set per hour during processing
+    } else {
+      targetDate = formatDayKey(endTime)
+      cal = calendarParts(endTime)
+    }
 
-    console.log('⏰ Time range calculation:', {
-      hasLastRun: !!lastRun,
-      startTime: startTime.toISOString(),
-      endTime: endTime.toISOString(),
-      timeRangeHours: (endTime - startTime) / (1000 * 60 * 60),
-      targetDate,
-      currentDate: cal.date,
-      currentHour: cal.hour, // Hourly tracking: current hour (0-23)
-      currentTime: new Date().toISOString()
-    })
+    // PRODUCTION MODE: Always fetch the full UTC day for the target date (00:00 → 23:59)
+    // This ensures user_analytics rows represent the entire day, not just a single hour
+    if (!testTimeSeries) {
+      const dayStart = new Date(`${cal.date}T00:00:00.000Z`)
+      const dayEnd = new Date(dayStart)
+      dayEnd.setUTCHours(23, 59, 59, 999)
+      startTime = dayStart
+      endTimeForFetch = dayEnd
+    }
+
 
     // 3. Create run record
+    // For time series test: end_time tracks the full period fetched (Nov 1-15), but target_date/hour track what we're inserting
     runRecord = await createRunRecord({
       run_id: runId,
       start_time: startTime.toISOString(),
-      end_time: endTime.toISOString(),
-      target_date: cal.date,
-      target_hour: cal.hour, // Add target hour for hourly tracking (0-23)
-      run_type: 'scheduled'
+      end_time: endTimeForFetch.toISOString(), // Use endTimeForFetch to track the full period fetched
+      target_date: cal.date, // Simulated date for inserting data
+      target_hour: cal.hour, // Simulated hour for inserting data (0-23, or 0-14 for time series test)
+      run_type: testTimeSeries ? 'test_time_series' : 'scheduled'
     })
 
-    console.log(`📊 Starting analytics cron run ${runId} from ${startTime.toISOString()} to ${endTime.toISOString()}`)
-    console.log(`🕐 Hourly tracking: Processing data for date ${cal.date}, hour ${cal.hour} (0-23)`)
 
     // 4. Fetch events from PostHog
     // Define the custom events we care about
@@ -1133,30 +1404,69 @@ export async function POST(request) {
       // Note: 'listing_sold' removed - sales are tracked in sales_listings table, not via PostHog
     ]
 
-    console.log('📡 Fetching events from PostHog:', {
-      eventNames: customEventNames.length,
-      startTime: startTime.toISOString(),
-      endTime: endTime.toISOString(),
-      eventList: customEventNames,
-      timeRangeMinutes: (endTime - startTime) / (1000 * 60)
-    })
 
     // Fetch only our custom events from PostHog (filter at API level to reduce payload)
     // This excludes auto-capture events like $pageview, $autocapture, etc.
+    // Use endTimeForFetch for fetching events (covers full period), but endTime for inserting (simulated for time series)
     const { success, events: allEvents, apiCalls, error } = await fetchEventsWithRetry(
       startTime,
-      endTime,
+      endTimeForFetch, // Use endTimeForFetch to get all events in the period
       customEventNames // Pass custom event names to filter at PostHog API level
     )
 
     if (!success || !allEvents) {
       const errorMessage = error?.message || 'Unknown error'
-      console.error(`❌ Failed to fetch events from PostHog: ${errorMessage}`)
+      errorTracker.addError('POSTHOG', `Failed to fetch events from PostHog`, { error: errorMessage })
       throw new Error(`Failed to fetch events from PostHog: ${errorMessage}`)
     }
 
     // Filter to only our custom events
-    const events = Array.isArray(allEvents) ? allEvents.filter(e => customEventNames.includes(e.event)) : []
+    let events = Array.isArray(allEvents) ? allEvents.filter(e => customEventNames.includes(e.event)) : []
+    
+    // In testTimeSeries mode, filter events to match the simulated date (entire day)
+    // Then group by hour - we'll process each hour separately
+    let eventsByHour = new Map() // Map<hour, events[]>
+    if (testTimeSeries && simulatedDate) {
+      const simulatedDateObj = new Date(simulatedDate + 'T00:00:00Z')
+      const dayStart = new Date(simulatedDateObj)
+      dayStart.setUTCHours(0, 0, 0, 0)
+      const dayEnd = new Date(simulatedDateObj)
+      dayEnd.setUTCHours(23, 59, 59, 999)
+      
+      const beforeFilter = events.length
+      events = events.filter(e => {
+        const eventTimestamp = new Date(e.timestamp)
+        return eventTimestamp >= dayStart && eventTimestamp <= dayEnd
+      })
+      
+      
+      // Group events by hour (0-23)
+      for (const event of events) {
+        const eventTimestamp = new Date(event.timestamp)
+        const hour = eventTimestamp.getUTCHours()
+        if (!eventsByHour.has(hour)) {
+          eventsByHour.set(hour, [])
+        }
+        eventsByHour.get(hour).push(event)
+      }
+      
+      const hoursWithEvents = Array.from(eventsByHour.keys()).sort((a, b) => a - b)
+      
+      // If no events, exit early
+      if (hoursWithEvents.length === 0) {
+        await completeRun(runId, {
+          events_processed: 0,
+          metadata: { lastProcessedDate: simulatedDate }
+        })
+        return NextResponse.json({
+          success: true,
+          message: `No events found for day ${simulatedDate}`,
+          testMode: true,
+          dayProcessed: simulatedDate,
+          hoursProcessed: 0
+        })
+      }
+    }
     
     // Detailed event breakdown by type
     const allEventsBreakdown = allEvents.reduce((acc, e) => {
@@ -1169,172 +1479,292 @@ export async function POST(request) {
       return acc
     }, {})
     
-    // Log sample lead events to see their properties (including unified 'lead' event and legacy events)
-    const leadEvents = events.filter(e => ['lead', 'lead_phone', 'lead_message', 'lead_appointment'].includes(e.event))
-    if (leadEvents.length > 0) {
-      console.log('🔍 [LEAD_DEBUG] Sample lead events from PostHog:')
-      leadEvents.slice(0, 3).forEach((event, idx) => {
-        console.log(`  Lead event ${idx + 1} (${event.event}):`, {
-          event: event.event,
-          distinct_id: event.distinct_id,
-          properties_keys: Object.keys(event.properties || {}),
-          listing_id: event.properties?.listing_id,
-          listingId: event.properties?.listingId,
-          listing_uuid: event.properties?.listing_uuid,
-          property_id: event.properties?.property_id,
-          seeker_id: event.properties?.seeker_id,
-          seekerId: event.properties?.seekerId,
-          lister_id: event.properties?.lister_id,
-          listerId: event.properties?.listerId,
-          context_type: event.properties?.context_type,
-          profile_id: event.properties?.profile_id,
-          full_properties: JSON.stringify(event.properties, null, 2)
-        })
-      })
+    // CRITICAL: Detect days/hours with events but potentially missing from database
+    // Group events by date and hour to identify what should be processed
+    const eventsByDateHour = new Map()
+    for (const event of allEvents) {
+      try {
+        const eventDate = new Date(event.timestamp)
+        if (isNaN(eventDate.getTime())) continue
+        
+        const dateKey = formatDayKey(eventDate)
+        const hour = eventDate.getUTCHours()
+        const key = `${dateKey}_${hour}`
+        
+        if (!eventsByDateHour.has(key)) {
+          eventsByDateHour.set(key, {
+            date: dateKey,
+            hour: hour,
+            count: 0,
+            eventTypes: {}
+          })
+        }
+        const entry = eventsByDateHour.get(key)
+        entry.count++
+        entry.eventTypes[event.event] = (entry.eventTypes[event.event] || 0) + 1
+      } catch (err) {
+        errorTracker.addError('EVENT_GROUPING', 'Error grouping event by date/hour', { error: err.message, event: JSON.stringify(event).substring(0, 200) })
+      }
     }
     
-    console.log('🔍 Event filtering:', {
-      totalEventsFetched: allEvents.length,
-      customEventsFound: events.length,
-      allEventsBreakdown: allEventsBreakdown,
-      customEventsBreakdown: customEventsBreakdown
-    })
-    
-    // Detailed logging for each event type we care about
-    console.log('📊 [EVENT_COUNT_DEBUG] Detailed event counts by type:')
-    for (const eventName of customEventNames) {
-      const count = customEventsBreakdown[eventName] || 0
-      const percentage = events.length > 0 ? ((count / events.length) * 100).toFixed(2) : 0
-      console.log(`  ${eventName}: ${count} events (${percentage}% of custom events)`)
+    // Check which date/hour combinations have events but might be missing from database
+    if (eventsByDateHour.size > 0) {
+      const dateHourKeys = Array.from(eventsByDateHour.keys())
+      const dateHourParts = dateHourKeys.map(key => {
+        const [date, hour] = key.split('_')
+        return { date, hour: parseInt(hour) }
+      })
+      
+      // Check database for existing entries
+      const datesToCheck = [...new Set(dateHourParts.map(d => d.date))]
+      
+      for (const date of datesToCheck) {
+        const hoursForDate = dateHourParts.filter(d => d.date === date).map(d => d.hour)
+        const { data: existingEntries, error: checkError } = await supabaseAdmin
+          .from('listing_analytics')
+          .select('date, hour')
+          .eq('date', date)
+          .in('hour', hoursForDate)
+          .limit(1000)
+        
+        if (checkError) {
+          errorTracker.addWarning('MISSING_DATA_CHECK', `Error checking database for date ${date}`, { error: checkError.message, date })
+        } else {
+          const existingHours = new Set((existingEntries || []).map(e => e.hour))
+          const missingHours = hoursForDate.filter(h => !existingHours.has(h))
+          
+          if (missingHours.length > 0) {
+            const missingHoursData = missingHours.map(h => {
+              const key = `${date}_${h}`
+              const eventData = eventsByDateHour.get(key)
+              return {
+                hour: h,
+                eventCount: eventData?.count || 0,
+                eventTypes: eventData?.eventTypes || {}
+              }
+            })
+            
+            errorTracker.addError('MISSING_DATA', `Date ${date} has ${missingHours.length} hours with events but no database entries`, {
+              date,
+              missingHours: missingHours.length,
+              totalHoursWithEvents: hoursForDate.length,
+              hoursWithData: existingHours.size,
+              missingHoursDetails: missingHoursData
+            })
+          }
+        }
+      }
     }
     
     // Special focus on lead events (include unified 'lead' event and legacy events)
     const leadEventNames = ['lead', 'lead_phone', 'lead_message', 'lead_appointment']
     const totalLeadEvents = leadEventNames.reduce((sum, name) => sum + (customEventsBreakdown[name] || 0), 0)
-    console.log('🎯 [LEAD_EVENT_DEBUG] Lead events summary:', {
-      lead: customEventsBreakdown['lead'] || 0, // Unified lead event
-      lead_phone: customEventsBreakdown['lead_phone'] || 0,
-      lead_message: customEventsBreakdown['lead_message'] || 0,
-      lead_appointment: customEventsBreakdown['lead_appointment'] || 0,
-      total_lead_events: totalLeadEvents,
-      percentage_of_all_events: events.length > 0 ? ((totalLeadEvents / events.length) * 100).toFixed(2) + '%' : '0%'
-    })
-    
-    if (totalLeadEvents === 0) {
-      console.warn('⚠️ [LEAD_EVENT_DEBUG] WARNING: No lead events found in PostHog!')
-      console.warn('⚠️ [LEAD_EVENT_DEBUG] This means leads table will be empty.')
-      console.warn('⚠️ [LEAD_EVENT_DEBUG] Check if lead (unified) or lead_phone, lead_message, lead_appointment events are being sent to PostHog.')
-    }
 
-    console.log('📡 PostHog API response:', {
-      success,
-      totalEventsFetched: allEvents?.length || 0,
-      customEventsFound: events?.length || 0,
-      apiCalls: apiCalls || 0,
-      error: error?.message || null,
-      customEventsBreakdown: customEventsBreakdown,
-      sampleCustomEvents: events?.slice(0, 3).map(e => ({
-        event: e.event,
-        timestamp: e.timestamp,
-        listing_id: e.properties?.listing_id,
-        seeker_id: e.properties?.seeker_id,
-        distinct_id: e.distinct_id
-      })) || []
-    })
 
     await updateRunProgress(runId, {
       events_fetched: allEvents.length, // Total events fetched
       posthog_api_calls: apiCalls || 0
     })
-
-    console.log(`✅ Fetched ${allEvents.length} total events, ${events.length} custom events from PostHog (${apiCalls} API calls)`)
-    
-    // Summary of what we got from PostHog
-    console.log('📈 [POSTHOG_DATA_SUMMARY] What PostHog returned:')
-    console.log(`  Total events fetched: ${allEvents.length}`)
-    console.log(`  Custom events found: ${events.length}`)
-    console.log(`  Lead events: ${totalLeadEvents}`)
-    console.log(`  Property views: ${customEventsBreakdown['property_view'] || 0}`)
-    console.log(`  Profile views: ${customEventsBreakdown['profile_view'] || 0}`)
-    console.log(`  Impressions: ${(customEventsBreakdown['impression_social_media'] || 0) + (customEventsBreakdown['impression_website_visit'] || 0) + (customEventsBreakdown['impression_share'] || 0) + (customEventsBreakdown['impression_saved_listing'] || 0)}`)
     
     if (events.length === 0) {
-      console.warn('⚠️ WARNING: No custom events found! This might indicate:')
-      console.warn(`  1. No custom events in the time range (found ${allEvents.length} total events, but none match our custom event names)`)
-      console.warn('  2. Events are being sent with different names')
-      console.warn('  3. Time range is too narrow')
-      console.warn(`  4. All events in PostHog: ${JSON.stringify(Object.keys(allEventsBreakdown))}`)
+      errorTracker.addWarning('POSTHOG', 'No custom events found in PostHog', {
+        totalEvents: allEvents.length,
+        allEventTypes: Object.keys(allEventsBreakdown)
+      })
     }
     
     if (totalLeadEvents === 0 && events.length > 0) {
-      console.warn('⚠️ WARNING: Custom events found but NO lead events!')
-      console.warn('⚠️ This means PostHog has data, but lead events are missing.')
-      console.warn('⚠️ Check if lead (unified) or lead_phone, lead_message, lead_appointment events are being tracked.')
+      errorTracker.addWarning('POSTHOG', 'Custom events found but NO lead events in PostHog', { totalCustomEvents: events.length })
     }
 
-    // 5. Aggregate events in-memory
-    console.log(`🔄 Aggregating ${events.length} custom events...`)
-    console.log('📋 Sample events before aggregation:', events.slice(0, 3).map(e => ({
-      event: e.event,
-      listing_id: e.properties?.listing_id || e.properties?.listingId,
-      lister_id: e.properties?.lister_id || e.properties?.listerId,
-      seeker_id: e.properties?.seeker_id || e.properties?.seekerId
-    })))
+    // 5. Process events - in testTimeSeries mode, process each hour separately
+    // For non-testTimeSeries, group events by hour and process each hour separately
+    // CRITICAL FIX: Process ALL hours that have events, not just the current hour
+    let hoursToProcess = []
+    if (testTimeSeries && eventsByHour.size > 0) {
+      hoursToProcess = Array.from(eventsByHour.keys()).sort((a, b) => a - b)
+    } else {
+      // Normal mode: Group events by hour and process each hour
+      // This ensures we process all hours that have events, not just the current hour
+      const normalModeEventsByHour = new Map()
+      for (const event of events) {
+        try {
+          const eventDate = new Date(event.timestamp)
+          if (isNaN(eventDate.getTime())) continue
+          const hour = eventDate.getUTCHours()
+          if (!normalModeEventsByHour.has(hour)) {
+            normalModeEventsByHour.set(hour, [])
+          }
+          normalModeEventsByHour.get(hour).push(event)
+        } catch (err) {
+          errorTracker.addError('EVENT_GROUPING', 'Error grouping event by hour in normal mode', { error: err.message })
+        }
+      }
+      
+      if (normalModeEventsByHour.size > 0) {
+        hoursToProcess = Array.from(normalModeEventsByHour.keys()).sort((a, b) => a - b)
+        // Store for use in processing loop
+        eventsByHour = normalModeEventsByHour
+        errorTracker.addWarning('PROCESSING', `Processing ${hoursToProcess.length} hours with events (normal mode)`, {
+          hours: hoursToProcess,
+          totalEvents: events.length
+        })
+      } else {
+        // Fallback to current hour if no events found
+        hoursToProcess = [cal.hour]
+        errorTracker.addWarning('PROCESSING', 'No events found to group by hour, using current hour only', { currentHour: cal.hour })
+      }
+    }
     
-    const aggregates = await aggregateEvents(events)
     
-    console.log('📊 Aggregation results:', {
-      listingsWithEvents: Object.keys(aggregates.listings).length,
-      usersWithEvents: Object.keys(aggregates.users).length,
-      developmentsWithEvents: Object.keys(aggregates.developments).length,
-      leadsWithEvents: Object.keys(aggregates.leads).length,
-      sampleListingIds: Object.keys(aggregates.listings).slice(0, 5),
-      sampleListingData: Object.entries(aggregates.listings).slice(0, 3).map(([id, data]) => ({
-        listing_id: id,
-        total_views: data.total_views,
-        total_impressions: data.total_impressions,
-        total_leads: data.total_leads
-      })),
-      leadDetails: Object.entries(aggregates.leads).map(([key, lead]) => ({
-        key,
-        listing_id: lead.listing_id,
-        seeker_id: lead.seeker_id,
-        actions_count: lead.actions.length,
-        lister_id: lead.lister_id,
-        lister_type: lead.lister_type
-      }))
-    })
+    // Store all rows to insert (will be batched at the end)
+    const allListingRows = []
+    const allUserRows = []
+    const allDevelopmentRows = []
+    const allLeadRows = []
+    let totalEventsProcessed = 0
     
-    // Detailed leads debugging
-    console.log('🔍 [LEAD_DEBUG] Detailed leads aggregation:', {
-      totalLeads: Object.keys(aggregates.leads).length,
-      leadsBreakdown: Object.entries(aggregates.leads).map(([key, lead]) => ({
-        leadKey: key,
-        listing_id: lead.listing_id,
-        seeker_id: lead.seeker_id,
-        lister_id: lead.lister_id,
-        lister_type: lead.lister_type,
-        actionsCount: lead.actions.length,
-        actionTypes: lead.actions.map(a => a.action_type),
-        firstActionDate: lead.actions[0]?.action_date,
-        lastActionDate: lead.actions[lead.actions.length - 1]?.action_date
-      }))
-    })
+    // Accumulate data across all hours for final updates
+    const allListingIdsSet = new Set() // For updating listings table
+    const allUserIdsSet = new Set() // For updating developers/agents table
+    const allDeveloperTotals = {} // Accumulate developer totals across all hours
+    
+    // CRITICAL: Fetch leads data BEFORE the hour loop (used inside the loop)
+    // Get leads data for ALL hours of the date (not just current hour)
+    // Similar to listing_analytics, we aggregate all hours to get complete daily metrics
+    // The leads table has `date` and `hour` fields that represent when the event happened,
+    // NOT `created_at` which is when the cron created the record
+    // This ensures we get leads for the correct date, aggregating across all hours
+    const { data: currentDateLeads } = await supabaseAdmin
+      .from('leads')
+      .select('seeker_id, lister_id, lister_type, listing_id, lead_actions, date, hour')
+      .eq('date', cal.date)
+      // REMOVED: .eq('hour', cal.hour) - Now aggregate ALL hours for the date (like listing_analytics)
+    
+    // Aggregate leads by seeker_id (for property_seekers - all hours aggregated)
+    // NOTE: leadsByLister is now built inside the hour loop (per-hour) to match total_listing_leads
+    const leadsBySeeker = {}
+    if (currentDateLeads) {
+      for (const lead of currentDateLeads) {
+        // For property_seekers (aggregate all hours)
+        if (lead.seeker_id) {
+          if (!leadsBySeeker[lead.seeker_id]) {
+            leadsBySeeker[lead.seeker_id] = {
+              leads_initiated: 0,
+              appointments_booked: 0
+            }
+          }
+          leadsBySeeker[lead.seeker_id].leads_initiated++
+          const hasAppointment = lead.lead_actions?.some(action => action.action_type === 'lead_appointment')
+          if (hasAppointment) {
+            leadsBySeeker[lead.seeker_id].appointments_booked++
+          }
+        }
+      }
+    }
+    
+    // Process each hour separately (or just once for normal mode)
+    for (const processHour of hoursToProcess) {
+      // Get events for this hour
+      const hourEvents = eventsByHour.get(processHour) || []
+      
+      if (hourEvents.length === 0) {
+        errorTracker.addWarning('PROCESSING', `No events found for hour ${processHour} on date ${cal.date}`, {
+          hour: processHour,
+          date: cal.date
+        })
+        continue
+      }
+      
+      // Update calendar parts for this hour
+      if (testTimeSeries) {
+        const simulatedDateObj = new Date(simulatedDate + 'T00:00:00Z')
+        simulatedDateObj.setUTCHours(processHour, 0, 0, 0)
+        targetDate = formatDayKey(simulatedDateObj)
+        cal = calendarParts(simulatedDateObj)
+        cal.hour = processHour
+        cal.date = simulatedDate
+      } else {
+        // For normal mode, ensure cal.hour is set to processHour
+        cal.hour = processHour
+      }
+      
+      // CRITICAL FIX: Build leadsByLister and profileLeadsByLister for CURRENT HOUR ONLY
+      // This ensures consistency with total_listing_leads which is per-hour (from PostHog events)
+      // Filter currentDateLeads (fetched once outside loop) by the current hour
+      const leadsByLister = {}
+      const profileLeadsByLister = {}
+      if (currentDateLeads) {
+        for (const lead of currentDateLeads) {
+          // Only process leads for the current hour being processed
+          if (lead.hour === cal.hour && lead.lister_id) {
+            const key = `${lead.lister_id}_${lead.lister_type}`
+            if (!leadsByLister[key]) {
+              leadsByLister[key] = {
+                total_leads: 0,
+                phone_leads: 0,
+                message_leads: 0,
+                website_leads: 0
+              }
+            }
+            leadsByLister[key].total_leads++
+            const phoneAction = lead.lead_actions?.some(action => action.action_type === 'lead_phone')
+            const messageAction = lead.lead_actions?.some(action => action.action_type === 'lead_message')
+            const websiteAction = lead.lead_actions?.some(action => action.action_type === 'lead_website')
+            if (phoneAction) leadsByLister[key].phone_leads++
+            if (messageAction) leadsByLister[key].message_leads++
+            if (websiteAction) leadsByLister[key].website_leads++
+            
+            // Track profile leads separately (listing_id IS NULL) - FOR CURRENT HOUR ONLY
+            if (!lead.listing_id) {
+              if (!profileLeadsByLister[key]) {
+                profileLeadsByLister[key] = 0
+              }
+              profileLeadsByLister[key]++
+            }
+          }
+        }
+      }
+      
+      // Aggregate events for this hour
+    
+      const aggregates = await aggregateEvents(hourEvents, 5000, errorTracker)
+      totalEventsProcessed += hourEvents.length
+    
+    // PERFORMANCE OPTIMIZATION: Convert Maps to objects only for logging
+    const listingsMap = aggregates.listings instanceof Map ? aggregates.listings : new Map(Object.entries(aggregates.listings))
+    const usersMap = aggregates.users instanceof Map ? aggregates.users : new Map(Object.entries(aggregates.users))
+    const developmentsMap = aggregates.developments instanceof Map ? aggregates.developments : new Map(Object.entries(aggregates.developments))
+    const leadsMap = aggregates.leads instanceof Map ? aggregates.leads : new Map(Object.entries(aggregates.leads))
+    
+    // CRITICAL FIX: Extract all lister_ids from events to ensure they're processed
+    // This is a safety net in case lister wasn't added to aggregates.users during event processing
+    for (const event of hourEvents) {
+      const props = event.properties || {}
+      const listerId = props.lister_id || props.listerId || props.developer_id || props.developerId || props.agent_id || props.agentId
+      if (listerId) {
+        allUserIdsSet.add(listerId)
+      }
+    }
+    
+    // Accumulate IDs across all hours for final updates
+    for (const listingId of listingsMap.keys()) {
+      allListingIdsSet.add(listingId)
+    }
+    for (const userId of usersMap.keys()) {
+      allUserIdsSet.add(userId)
+    }
+    
     
     // Get active entities
     const { listing_ids, user_ids, development_ids } = await getAllActiveEntities()
 
-    console.log('📋 Active entities from database:', {
-      activeListings: listing_ids.length,
-      activeUsers: user_ids.length,
-      activeDevelopments: development_ids.length
-    })
 
+    // PERFORMANCE OPTIMIZATION: Maps already created above, reuse them here
     // 6. Build listing analytics rows
     // IMPORTANT: Create rows for BOTH active listings AND listings with events
     // This ensures we capture all activity, even if a listing is temporarily inactive
-    const allListingIds = new Set([...listing_ids, ...Object.keys(aggregates.listings)])
-    console.log(`📝 Building rows for ${allListingIds.size} listings (${listing_ids.length} active + ${Object.keys(aggregates.listings).length} with events)`)
+    const allListingIds = new Set([...listing_ids, ...Array.from(listingsMap.keys())])
     
     // Get previous period's listing_analytics for change calculations
     // For hourly tracking: get previous hour (or same day previous hour, or previous day if hour 0)
@@ -1354,11 +1784,12 @@ export async function POST(request) {
       }
     }
     
-    const listingRows = []
+    const listingRows = [] // Will push to allListingRows at end of hour processing
     const listingTotals = {} // For updating listings table
     
     for (const listingId of allListingIds) {
-      const listing = aggregates.listings[listingId] || {
+      // PERFORMANCE: Use Map.get() instead of object access (Map already created above)
+      const listing = listingsMap.get(listingId) || {
         total_views: 0,
         unique_views: new Set(),
         logged_in_views: 0,
@@ -1429,18 +1860,57 @@ export async function POST(request) {
         }
       }
 
-      // Build leads_breakdown JSONB object
-      const leadsBreakdown = {}
+      // Build leads_breakdown JSONB object with nested messaging structure
       const leadTypes = listing.lead_types || {
         phone: 0, whatsapp: 0, direct_message: 0,
         email: 0, appointment: 0, website: 0
       }
       
-      for (const [leadType, count] of Object.entries(leadTypes)) {
-        const percentage = total_leads > 0 ? Number(((count / total_leads) * 100).toFixed(2)) : 0
-        leadsBreakdown[leadType] = {
-          total: count,
-          percentage: percentage
+      const whatsappTotal = leadTypes.whatsapp || 0
+      const directMessageTotal = leadTypes.direct_message || 0
+      const messageTotal = whatsappTotal + directMessageTotal
+      
+      const leadsBreakdown = {
+        phone: {
+          total: leadTypes.phone || 0,
+          percentage: total_leads > 0 ? Number(((leadTypes.phone || 0) / total_leads) * 100).toFixed(2) : 0
+        },
+        messaging: {
+          total: messageTotal,
+          percentage: total_leads > 0 ? Number(((messageTotal / total_leads) * 100).toFixed(2)) : 0,
+          direct_message: {
+            total: directMessageTotal,
+            percentage: messageTotal > 0 ? Number(((directMessageTotal / messageTotal) * 100).toFixed(2)) : 0
+          },
+          whatsapp: {
+            total: whatsappTotal,
+            percentage: messageTotal > 0 ? Number(((whatsappTotal / messageTotal) * 100).toFixed(2)) : 0
+          }
+        },
+        whatsapp: {
+          total: whatsappTotal,
+          percentage: total_leads > 0 ? Number(((whatsappTotal / total_leads) * 100).toFixed(2)) : 0
+        },
+        direct_message: {
+          total: directMessageTotal,
+          percentage: total_leads > 0 ? Number(((directMessageTotal / total_leads) * 100).toFixed(2)) : 0
+        },
+        email: {
+          total: leadTypes.email || 0,
+          percentage: total_leads > 0 ? Number(((leadTypes.email || 0) / total_leads) * 100).toFixed(2) : 0
+        },
+        appointment: {
+          total: leadTypes.appointment || 0,
+          percentage: total_leads > 0 ? Number(((leadTypes.appointment || 0) / total_leads) * 100).toFixed(2) : 0
+        },
+        website: {
+          total: leadTypes.website || 0,
+          percentage: total_leads > 0 ? Number(((leadTypes.website || 0) / total_leads) * 100).toFixed(2) : 0
+        },
+        // Backward compatibility
+        message_leads: {
+          total: messageTotal,
+          percentage: total_leads > 0 ? Number(((messageTotal / total_leads) * 100).toFixed(2)) : 0
         }
       }
 
@@ -1467,38 +1937,41 @@ export async function POST(request) {
         ? Number((((conversion_rate - prevConversion) / prevConversion) * 100).toFixed(2))
         : (conversion_rate > 0 ? 100 : 0)
 
+      // CRITICAL: All metrics here are for THIS SPECIFIC HOUR ONLY
+      // This creates a time series where each hour has its own independent data point
       listingRows.push({
         listing_id: listingId,
         date: cal.date,
-        hour: cal.hour, // Add hour for hourly tracking
+        hour: cal.hour, // HOUR-SPECIFIC: This hour's data (0-23)
         week: cal.week,
         month: cal.month,
         quarter: cal.quarter,
         year: cal.year,
-        total_views,
-        unique_views,
-        logged_in_views: listing.logged_in_views,
-        anonymous_views: listing.anonymous_views,
-        views_from_home: listing.views_from_home,
-        views_from_explore: listing.views_from_explore,
-        views_from_search: listing.views_from_search,
-        views_from_direct: listing.views_from_direct,
-        total_impressions: listing.total_impressions,
-        impression_social_media: listing.impression_social_media,
-        impression_website_visit: listing.impression_website_visit,
-        impression_share: listing.impression_share,
-        impression_saved_listing: listing.impression_saved_listing,
-        share_breakdown: shareBreakdown, // JSONB breakdown by platform
-        total_leads,
-        phone_leads: listing.phone_leads,
-        message_leads: listing.message_leads,
-        email_leads: listing.email_leads,
-        appointment_leads: listing.appointment_leads,
-        website_leads: listing.website_leads,
-        leads_breakdown: leadsBreakdown, // JSONB breakdown by lead type
-        unique_leads,
+        // HOUR-SPECIFIC METRICS: All values are for this hour only
+        total_views, // Views in this hour
+        unique_views, // Unique viewers in this hour
+        logged_in_views: listing.logged_in_views, // Logged-in views in this hour
+        anonymous_views: listing.anonymous_views, // Anonymous views in this hour
+        views_from_home: listing.views_from_home, // Views from home in this hour
+        views_from_explore: listing.views_from_explore, // Views from explore in this hour
+        views_from_search: listing.views_from_search, // Views from search in this hour
+        views_from_direct: listing.views_from_direct, // Direct views in this hour
+        total_impressions: listing.total_impressions, // Impressions in this hour
+        impression_social_media: listing.impression_social_media, // Social media impressions in this hour
+        impression_website_visit: listing.impression_website_visit, // Website visits in this hour
+        impression_share: listing.impression_share, // Shares in this hour
+        impression_saved_listing: listing.impression_saved_listing, // Saves in this hour
+        share_breakdown: shareBreakdown, // JSONB breakdown by platform for this hour
+        total_leads, // Leads in this hour
+        phone_leads: listing.phone_leads, // Phone leads in this hour
+        message_leads: listing.message_leads, // Message leads in this hour
+        email_leads: listing.email_leads, // Email leads in this hour
+        appointment_leads: listing.appointment_leads, // Appointment leads in this hour
+        website_leads: listing.website_leads, // Website leads in this hour
+        leads_breakdown: leadsBreakdown, // JSONB breakdown by lead type for this hour
+        unique_leads, // Unique leads in this hour
         // Note: total_sales, lead_to_sale_rate, and avg_days_to_sale removed - sales are tracked in sales_listings table
-        conversion_rate,
+        conversion_rate, // Conversion rate for THIS HOUR: (total_leads / total_views) * 100
         views_change: {
           previous: prevViews,
           current: total_views,
@@ -1533,19 +2006,13 @@ export async function POST(request) {
       }
     }
     
-    console.log(`📊 Listing rows summary:`, {
-      totalRows: listingRows.length,
-      rowsWithData: listingRows.filter(r => r.total_views > 0 || r.total_impressions > 0 || r.total_leads > 0).length,
-      rowsWithViews: listingRows.filter(r => r.total_views > 0).length,
-      rowsWithImpressions: listingRows.filter(r => r.total_impressions > 0).length,
-      rowsWithLeads: listingRows.filter(r => r.total_leads > 0).length,
-      sampleRow: listingRows.find(r => r.total_views > 0) || listingRows[0]
-    })
 
     // 7. Build user analytics rows
     const userRows = []
-    const developerTotals = {} // For updating developers table
-    const allUserIds = new Set([...user_ids, ...Object.keys(aggregates.users)])
+    // Note: developerTotals is now accumulated in allDeveloperTotals (outside the hour loop)
+    // PERFORMANCE: Use Map.keys() instead of Object.keys()
+    // CRITICAL FIX: Include allUserIdsSet (which now includes lister_ids from events) to ensure users with listing events are processed
+    const allUserIds = new Set([...user_ids, ...Array.from(usersMap.keys()), ...Array.from(allUserIdsSet)])
     
     // Get previous period's user_analytics for change calculations
     // For hourly tracking: get previous hour (or same day previous hour, or previous day if hour 0)
@@ -1566,83 +2033,11 @@ export async function POST(request) {
       }
     }
     
-    // Get leads data for the current hour only (not entire day)
-    // Filter by created_at timestamp to get only leads from this hour
-    const currentHourStart = new Date(Date.UTC(
-      parseInt(cal.date.split('-')[0]),
-      parseInt(cal.date.split('-')[1]) - 1,
-      parseInt(cal.date.split('-')[2]),
-      cal.hour,
-      0,
-      0
-    ))
-    const currentHourEnd = new Date(currentHourStart)
-    currentHourEnd.setUTCHours(currentHourEnd.getUTCHours() + 1)
-    
-    const { data: currentDateLeads } = await supabaseAdmin
-      .from('leads')
-      .select('seeker_id, lister_id, lister_type, listing_id, lead_actions, created_at')
-      .gte('created_at', currentHourStart.toISOString())
-      .lt('created_at', currentHourEnd.toISOString())
-    
-    // Aggregate leads by seeker_id and lister_id
-    const leadsBySeeker = {}
-    const leadsByLister = {}
-    const profileLeadsByLister = {} // Profile leads (listing_id IS NULL) by lister_id
-    if (currentDateLeads) {
-      for (const lead of currentDateLeads) {
-        // For property_seekers
-        if (lead.seeker_id) {
-          if (!leadsBySeeker[lead.seeker_id]) {
-            leadsBySeeker[lead.seeker_id] = {
-              leads_initiated: 0,
-              appointments_booked: 0
-            }
-          }
-          leadsBySeeker[lead.seeker_id].leads_initiated++
-          const hasAppointment = lead.lead_actions?.some(action => action.action_type === 'lead_appointment')
-          if (hasAppointment) {
-            leadsBySeeker[lead.seeker_id].appointments_booked++
-          }
-        }
-        
-        // For developers/agents (leads generated)
-        if (lead.lister_id) {
-          const key = `${lead.lister_id}_${lead.lister_type}`
-          if (!leadsByLister[key]) {
-            leadsByLister[key] = {
-              total_leads: 0,
-              phone_leads: 0,
-              message_leads: 0,
-              website_leads: 0
-            }
-          }
-          leadsByLister[key].total_leads++
-          const phoneAction = lead.lead_actions?.some(action => action.action_type === 'lead_phone')
-          const messageAction = lead.lead_actions?.some(action => action.action_type === 'lead_message')
-          const websiteAction = lead.lead_actions?.some(action => action.action_type === 'lead_website')
-          if (phoneAction) leadsByLister[key].phone_leads++
-          if (messageAction) leadsByLister[key].message_leads++
-          if (websiteAction) leadsByLister[key].website_leads++
-          
-          // Track profile leads separately (listing_id IS NULL)
-          if (!lead.listing_id) {
-            if (!profileLeadsByLister[key]) {
-              profileLeadsByLister[key] = 0
-            }
-            profileLeadsByLister[key]++
-          }
-        }
-      }
-    }
-    
-    // REMOVED: cumulativeLeadsByLister query - no longer needed since we use hourly data only
-    // We now use leadsByLister which contains only current hour's leads
-    
     // OPTIMIZATION: Batch fetch all listings for developers/agents at once (fixes N+1 query issue)
     const listerUserIds = []
     for (const userId of allUserIds) {
-      const user = aggregates.users[userId]
+      // PERFORMANCE: Use Map.get() instead of object access (Map already created above)
+      const user = usersMap.get(userId)
       if (user && (user.user_type === 'developer' || user.user_type === 'agent')) {
         listerUserIds.push(userId)
       }
@@ -1671,22 +2066,140 @@ export async function POST(request) {
       }
     }
     
+    // NOTE: This section fetches listing_analytics from database for validation/comparison
+    // However, user_analytics now calculates DIRECTLY from PostHog events (listingsMap)
+    // This makes user_analytics independent and more reliable
     // Batch fetch all listing analytics for all listings in one query
-    // For user_analytics: we need current hour's data only
-    let listingAnalyticsByListingId = {}
+    // CRITICAL FIX: Aggregate ALL hours for the date (not just current hour)
+    // This ensures total_listing_views reflects all views for the day, not just one hour
+    let listingAnalyticsByListingId = {} // Used for validation/comparison, not for user_analytics calculation
+    let listingAnalyticsFromPostHog = {} // Fallback: calculate from PostHog events if listing_analytics is missing
+    
     if (allListerListingIds.length > 0) {
-      const { data: allListingAnalytics } = await supabaseAdmin
+      // Fetch ALL hours for the current date and aggregate them
+      const { data: allListingAnalytics, error: listingAnalyticsError } = await supabaseAdmin
         .from('listing_analytics')
         .select('listing_id, total_views, total_leads, total_impressions, impression_social_media, impression_website_visit, impression_share, impression_saved_listing')
         .in('listing_id', allListerListingIds)
         .eq('date', cal.date)
-        .eq('hour', cal.hour) // Only get current hour's data for user_analytics
+        // REMOVED: .eq('hour', cal.hour) - Now aggregate ALL hours for the date
       
-      if (allListingAnalytics) {
-        // Group analytics by listing_id
+      if (listingAnalyticsError) {
+        errorTracker.addError('LISTING_ANALYTICS', `Error fetching listing_analytics for date ${cal.date}`, { error: listingAnalyticsError.message, date: cal.date })
+      }
+      
+      if (allListingAnalytics && allListingAnalytics.length > 0) {
+        // Group and SUM analytics by listing_id (aggregate across all hours)
         for (const analytics of allListingAnalytics) {
-          listingAnalyticsByListingId[analytics.listing_id] = analytics
+          if (!listingAnalyticsByListingId[analytics.listing_id]) {
+            listingAnalyticsByListingId[analytics.listing_id] = {
+              total_views: 0,
+              total_leads: 0,
+              total_impressions: 0,
+              impression_social_media: 0,
+              impression_website_visit: 0,
+              impression_share: 0,
+              impression_saved_listing: 0
+            }
+          }
+          // Sum values across all hours for this listing
+          listingAnalyticsByListingId[analytics.listing_id].total_views += analytics.total_views || 0
+          listingAnalyticsByListingId[analytics.listing_id].total_leads += analytics.total_leads || 0
+          listingAnalyticsByListingId[analytics.listing_id].total_impressions += analytics.total_impressions || 0
+          listingAnalyticsByListingId[analytics.listing_id].impression_social_media += analytics.impression_social_media || 0
+          listingAnalyticsByListingId[analytics.listing_id].impression_website_visit += analytics.impression_website_visit || 0
+          listingAnalyticsByListingId[analytics.listing_id].impression_share += analytics.impression_share || 0
+          listingAnalyticsByListingId[analytics.listing_id].impression_saved_listing += analytics.impression_saved_listing || 0
         }
+      } else {
+      }
+      
+      // FALLBACK: Calculate from PostHog events if listing_analytics is missing or incomplete
+      // This ensures user_analytics has data even if listing_analytics hasn't been created yet
+      if (events.length > 0 && (Object.keys(listingAnalyticsByListingId).length === 0 || Object.keys(listingAnalyticsByListingId).length < allListerListingIds.length * 0.5)) {
+        
+        // Create a map of listing_id -> lister_id for quick lookup
+        const listingToListerMap = {}
+        for (const [userId, listings] of Object.entries(listingsByUserId)) {
+          for (const listing of listings) {
+            listingToListerMap[listing.id] = userId
+          }
+        }
+        
+        // Count events by listing_id for the current date
+        for (const event of events) {
+          const eventDate = new Date(event.timestamp)
+          const eventDayKey = formatDayKey(eventDate)
+          
+          // Only process events for the current date
+          if (eventDayKey !== cal.date) continue
+          
+          const listingId = event.properties?.listing_id || event.properties?.listingId
+          if (!listingId || !allListerListingIds.includes(listingId)) continue
+          
+          // Initialize if needed
+          if (!listingAnalyticsFromPostHog[listingId]) {
+            listingAnalyticsFromPostHog[listingId] = {
+              total_views: 0,
+              total_leads: 0,
+              total_impressions: 0,
+              impression_social_media: 0,
+              impression_website_visit: 0,
+              impression_share: 0,
+              impression_saved_listing: 0
+            }
+          }
+          
+          // Count different event types
+          if (event.event === 'property_view') {
+            listingAnalyticsFromPostHog[listingId].total_views++
+          } else if (event.event === 'lead') {
+            listingAnalyticsFromPostHog[listingId].total_leads++
+          } else if (event.event === 'listing_impression') {
+            listingAnalyticsFromPostHog[listingId].total_impressions++
+          } else if (event.event === 'impression_social_media') {
+            listingAnalyticsFromPostHog[listingId].impression_social_media++
+            listingAnalyticsFromPostHog[listingId].total_impressions++
+          } else if (event.event === 'impression_website_visit') {
+            listingAnalyticsFromPostHog[listingId].impression_website_visit++
+            listingAnalyticsFromPostHog[listingId].total_impressions++
+          } else if (event.event === 'impression_share') {
+            listingAnalyticsFromPostHog[listingId].impression_share++
+            listingAnalyticsFromPostHog[listingId].total_impressions++
+          } else if (event.event === 'impression_saved_listing') {
+            listingAnalyticsFromPostHog[listingId].impression_saved_listing++
+            listingAnalyticsFromPostHog[listingId].total_impressions++
+          }
+        }
+        
+        // Merge PostHog fallback data with database data (PostHog takes precedence for missing listings)
+        for (const [listingId, posthogData] of Object.entries(listingAnalyticsFromPostHog)) {
+          if (!listingAnalyticsByListingId[listingId]) {
+            listingAnalyticsByListingId[listingId] = posthogData
+          } else {
+            // Merge: use max of database or PostHog (database might be incomplete)
+            listingAnalyticsByListingId[listingId].total_views = Math.max(
+              listingAnalyticsByListingId[listingId].total_views,
+              posthogData.total_views
+            )
+            listingAnalyticsByListingId[listingId].total_leads = Math.max(
+              listingAnalyticsByListingId[listingId].total_leads,
+              posthogData.total_leads
+            )
+            listingAnalyticsByListingId[listingId].total_impressions = Math.max(
+              listingAnalyticsByListingId[listingId].total_impressions,
+              posthogData.total_impressions
+            )
+          }
+        }
+        
+      }
+      
+      // Validation: Log if we still have missing data
+      const listingsWithData = Object.keys(listingAnalyticsByListingId).length
+      const listingsWithoutData = allListerListingIds.length - listingsWithData
+      if (listingsWithoutData > 0) {
+        errorTracker.addWarning('LISTING_ANALYTICS', `${listingsWithoutData} listings have no analytics data`, { date: cal.date })
       }
     }
     
@@ -1704,17 +2217,16 @@ export async function POST(request) {
         )
         
         if (cumulativeError) {
-          console.error('❌ Error fetching cumulative listing views via SQL:', cumulativeError)
+          errorTracker.addError('LISTING_ANALYTICS', 'Error fetching cumulative listing views via SQL', { error: cumulativeError.message })
           // Fallback to PostHog calculation
         } else if (cumulativeViews && cumulativeViews.length > 0) {
           // Convert array to map for O(1) lookup
           for (const row of cumulativeViews) {
             cumulativeListingViewsByListingId[row.listing_id] = Number(row.total_views) || 0
           }
-          console.log(`✅ Fetched cumulative views for ${cumulativeViews.length} listings via SQL aggregation`)
         }
       } catch (err) {
-        console.error('❌ Exception calling get_cumulative_listing_views:', err)
+        errorTracker.addError('LISTING_ANALYTICS', 'Exception calling get_cumulative_listing_views', { error: err.message, stack: err.stack })
         // Will fallback to PostHog calculation
       }
     }
@@ -1734,13 +2246,11 @@ export async function POST(request) {
         }
       }
       
-      if (Object.keys(cumulativeListingViewsFromPostHog).length > 0) {
-        console.log(`📊 PostHog fallback: Calculated views for ${Object.keys(cumulativeListingViewsFromPostHog).length} listers from PostHog events`)
-      }
     }
     
     for (const userId of allUserIds) {
-      const user = aggregates.users[userId] || {
+      // PERFORMANCE: Use Map.get() instead of object access (Map already created above)
+      const user = usersMap.get(userId) || {
         user_type: 'unknown',
         profile_views: 0,
         unique_profile_viewers: new Set(),
@@ -1787,34 +2297,159 @@ export async function POST(request) {
       let properties_saved = user.properties_saved || 0
       // Note: total_revenue removed - revenue is tracked in sales_listings table, not via PostHog
 
-      // For developers/agents: aggregate from their listings (using pre-fetched data)
+      // For developers/agents: calculate DIRECTLY from PostHog events (independent of listing_analytics table)
+      // OPTIMIZED: Single-pass aggregation using O(1) Map lookups - no database queries, no redundant iterations
+      // This ensures user_analytics is always accurate and doesn't depend on listing_analytics being created first
       if (user_type === 'developer' || user_type === 'agent') {
-        // Use pre-fetched listings data
+        // Use pre-fetched listings data for listing counts
         const userListings = listingsByUserId[userId] || []
 
         total_listings = userListings.length
-        active_listings = userListings.filter(l => l.listing_status === 'active').length
-        rented_listings = userListings.filter(l => l.listing_status === 'rented').length
-        // Note: sold_listings removed - sales are tracked in sales_listings table
-
-        // Aggregate views, leads, impressions from pre-fetched listing analytics
-        if (userListings.length > 0) {
-          for (const listing of userListings) {
-            const analytics = listingAnalyticsByListingId[listing.id]
-            if (analytics) {
-              total_listing_views += analytics.total_views || 0
-              total_listing_leads += analytics.total_leads || 0
-              // Note: total_listing_sales removed - sales are tracked in sales_listings table
-              total_impressions_received += analytics.total_impressions || 0
-              impression_social_media_received += analytics.impression_social_media || 0
-              impression_website_visit_received += analytics.impression_website_visit || 0
-              impression_share_received += analytics.impression_share || 0
-              impression_saved_listing_received += analytics.impression_saved_listing || 0
+        
+        // OPTIMIZATION: Single pass to count statuses and aggregate metrics (instead of multiple filter() calls)
+        let listingsWithEvents = 0
+        let listingsWithoutEvents = 0
+        
+        // CRITICAL FIX: Count leads, profile_views, and impressions only from events where user matches (like comparison logic)
+        // The comparison tool uses matchesUser() which checks: lister_id, developer_id, agent_id, user_id, userId, profile_id, profileId, distinct_id, person_id
+        // This ensures we only count events where the user is the target (not just owner of listing)
+        let userListingLeads = 0
+        let userProfileViews = 0
+        let userLeadsInitiated = 0
+        let userImpressionShare = 0
+        let userImpressionSavedListing = 0
+        let userTotalImpressions = 0
+        let userImpressionSocialMedia = 0
+        let userImpressionWebsiteVisit = 0
+        
+        // Helper function to match user (same logic as comparison tool)
+        const matchesUser = (event, targetUserId) => {
+          if (!targetUserId) return false
+          const needle = String(targetUserId).toLowerCase()
+          const props = event.properties || {}
+          const candidates = [
+            props.lister_id,
+            props.listerId,
+            props.developer_id,
+            props.developerId,
+            props.agent_id,
+            props.agentId,
+            props.user_id,
+            props.userId,
+            props.profile_id,
+            props.profileId,
+            event.distinct_id,
+            event.person_id
+          ]
+          return candidates.some(value => value && String(value).toLowerCase() === needle)
+        }
+        
+        // Re-process hourEvents to count only events where user matches (like comparison logic)
+        for (const event of hourEvents) {
+          const props = event.properties || {}
+          const eventListingId = props.listing_id || props.listingId || props.listing_uuid || props.property_id
+          const eventName = event.event
+          
+          // Only count events where user matches (using same logic as comparison)
+          if (matchesUser(event, userId)) {
+            // Count listing leads (only if listing_id exists)
+            if ((eventName === 'lead' || eventName === 'lead_phone' || eventName === 'lead_message' || eventName === 'lead_appointment') 
+                && eventListingId) {
+              userListingLeads++
+            }
+            
+            // Count profile views
+            if (eventName === 'profile_view') {
+              userProfileViews++
+            }
+            
+            // Count leads initiated (lead_message or lead_phone events where user is the lister)
+            if ((eventName === 'lead_message' || eventName === 'lead_phone')) {
+              userLeadsInitiated++
+            }
+            
+            // CRITICAL FIX: Count impressions only where user matches (same as comparison tool)
+            if (eventName === 'listing_impression') {
+              userTotalImpressions++
+            }
+            if (eventName === 'impression_social_media') {
+              userImpressionSocialMedia++
+              userTotalImpressions++
+            }
+            if (eventName === 'impression_website_visit') {
+              userImpressionWebsiteVisit++
+              userTotalImpressions++
+            }
+            if (eventName === 'impression_share') {
+              userImpressionShare++
+              userTotalImpressions++
+            }
+            // CRITICAL FIX: Only count impression_saved_listing if listing_id exists (matches cron logic line 509 and comparison tool)
+            if (eventName === 'impression_saved_listing' && eventListingId) {
+              userImpressionSavedListing++
+              userTotalImpressions++
             }
           }
         }
+        
+          for (const listing of userListings) {
+          // Count listing statuses in the same loop
+          if (listing.listing_status === 'active') active_listings++
+          if (listing.listing_status === 'rented') rented_listings++
+          // Note: sold_listings removed - sales are tracked in sales_listings table
 
-        // Get leads generated from leads table for CURRENT HOUR ONLY (both listing and profile leads)
+          // OPTIMIZED: O(1) Map lookup - get listing data directly from PostHog event aggregates
+          // listingsMap is already populated from aggregateEvents() - no additional processing needed
+          const listingAggregate = listingsMap.get(listing.id)
+          if (listingAggregate) {
+            listingsWithEvents++
+            // Sum up all metrics from PostHog events for this listing (already aggregated, just sum)
+            total_listing_views += listingAggregate.total_views || 0
+            // NOTE: We don't use listingAggregate metrics here because they count ALL events for the listing
+            // regardless of lister_id. Instead, we use filtered counts which match comparison logic
+              // Note: total_listing_sales removed - sales are tracked in sales_listings table
+          } else {
+            listingsWithoutEvents++
+            // This is normal if the listing had no events in the current time range
+          }
+        }
+        
+        // CRITICAL FIX: Use filtered counts that match comparison logic (filtered by user match)
+        // This ensures user_analytics matches the comparison tool's counting exactly
+        total_listing_leads = userListingLeads
+        
+        // CRITICAL FIX: Override profile_views with filtered count to match comparison logic
+        // The comparison counts profile_view events where user matches (via lister_id, profile_id, etc.)
+        // Not just where profile_id matches (which might count views from other sources)
+        if (userProfileViews > 0 || user.profile_views === 0) {
+          // Override with filtered count to ensure we match the comparison tool's counting logic
+          // If userProfileViews is 0 but user.profile_views has a value, it means the comparison
+          // didn't find matching events, so we should use 0 to match
+          user.profile_views = userProfileViews
+        }
+        
+        // CRITICAL FIX: Track leads_initiated for developers/agents (currently only tracked for property_seekers)
+        // For developers/agents, leads_initiated = count of lead_message or lead_phone events where user matches
+        // This matches the comparison tool's logic which counts lead_message/lead_phone events
+        leads_initiated = userLeadsInitiated
+        
+        // CRITICAL FIX: Override impressions with filtered counts to match comparison logic
+        // The comparison tool counts impression events where user matches, not just impressions for listings owned by user
+        // This ensures we only count impressions where the event's lister_id matches the user
+        total_impressions_received = userTotalImpressions
+        impression_social_media_received = userImpressionSocialMedia
+        impression_website_visit_received = userImpressionWebsiteVisit
+        impression_share_received = userImpressionShare
+        impression_saved_listing_received = userImpressionSavedListing
+        
+        // Track warnings for users with no events
+          if (total_listing_views === 0 && userListings.length > 0 && listingsWithEvents === 0) {
+          errorTracker.addWarning('USER_ANALYTICS', `User ${userId} (${user_type}): No events found for any of ${userListings.length} listings`, { userId, user_type, date: cal.date, hour: cal.hour })
+        }
+
+        // Get leads generated from leads table for ALL HOURS of the date (both listing and profile leads)
+        // CRITICAL FIX: Now aggregates all hours for the date (like listing_analytics), not just current hour
+        // This ensures user_analytics has complete daily metrics even if cron only runs once per day
         const listerKey = `${userId}_${user_type}`
         const listerLeads = leadsByLister[listerKey]
         if (listerLeads) {
@@ -1824,25 +2459,30 @@ export async function POST(request) {
           website_leads_generated = listerLeads.website_leads
         }
         
-        // FIXED: Calculate total_leads = CURRENT HOUR leads only (listing + profile)
-        // Use leadsByLister which contains only current hour's leads, not cumulativeLeadsByLister
-        const total_leads = listerLeads?.total_leads || 0
+        // Calculate profile leads from TWO sources:
+        // 1. PostHog events (aggregates.users.profile_leads) - PRIMARY SOURCE (real-time, per-hour)
+        // 2. Leads table (profileLeadsByLister) - FALLBACK/VERIFICATION (persisted data)
+        // Prefer PostHog events as source of truth (like listing leads), use leads table as fallback
+        const profile_leads_from_posthog = user.profile_leads || 0 // From PostHog events (aggregates.users)
+        const profile_leads_from_db = profileLeadsByLister[listerKey] || 0 // From leads table
+        // Use PostHog as primary source, but log if there's a discrepancy
+        const profile_leads = profile_leads_from_posthog || profile_leads_from_db
+        if (profile_leads_from_posthog !== profile_leads_from_db) {
+          errorTracker.addWarning('USER_ANALYTICS', `Profile leads mismatch for user ${userId}`, { userId, posthog: profile_leads_from_posthog, db: profile_leads_from_db })
+        }
         
-        // DEBUG: Log total_leads calculation
-        console.log(`📊 [TOTAL_LEADS_DEBUG] User ${userId} (${user_type}): total_leads=${total_leads} (CURRENT HOUR ONLY), listerKey=${listerKey}, leadsByLister[${listerKey}]=${listerLeads?.total_leads || 0}`)
+        // CRITICAL FIX: total_leads = total_listing_leads (from PostHog events) + profile_leads (from PostHog events)
+        // This ensures consistency: BOTH listing leads AND profile leads come from PostHog (source of truth)
+        // total_listing_leads is already calculated from listingsMap (line 2361) - it's the sum of all listing leads from PostHog events
+        // profile_leads is now from aggregates.users.profile_leads - it's the sum of all profile leads from PostHog events
+        const total_leads = total_listing_leads + profile_leads
+        
 
-        // Add profile-based impressions from user aggregates
-        // Profile impressions are tracked directly in aggregates.users during event processing
-        const profileImpressions = user.profile_impressions || 0
-        const profileImpressionSocialMedia = user.profile_impression_social_media || 0
-        const profileImpressionWebsiteVisit = user.profile_impression_website_visit || 0
-        const profileImpressionShare = user.profile_impression_share || 0
-        
-        // Total impressions = listing impressions + profile impressions
-        total_impressions_received += profileImpressions
-        impression_social_media_received += profileImpressionSocialMedia
-        impression_website_visit_received += profileImpressionWebsiteVisit
-        impression_share_received += profileImpressionShare
+        // NOTE: Profile-based impressions are already included in the filtered counts above
+        // The filtered counts (userImpressionShare, userTotalImpressions, etc.) include ALL impression events 
+        // where user matches, regardless of whether they're listing-based or profile-based. 
+        // This matches the comparison tool's logic which counts all impression events where user matches.
+        // We don't need to add profile impressions separately because they're already counted in the filtered totals.
         
         // Total views = listing views + profile views
         const total_views = total_listing_views + (user.profile_views || 0)
@@ -1946,27 +2586,41 @@ export async function POST(request) {
           // Priority: PostHog → Database (not Database → Database)
           if (cumulativeTotalListingViews === 0 && cumulativeListingViewsFromPostHog[userId]) {
             cumulativeTotalListingViews = cumulativeListingViewsFromPostHog[userId]
-            console.log(`📊 Using PostHog fallback for developer ${userId}: ${cumulativeTotalListingViews} total listing views (from PostHog events)`)
           } else if (cumulativeTotalListingViews > 0 && cumulativeListingViewsFromPostHog[userId]) {
             // Log comparison for debugging (database vs PostHog)
             const posthogCount = cumulativeListingViewsFromPostHog[userId]
             if (Math.abs(cumulativeTotalListingViews - posthogCount) > 10) {
-              console.log(`⚠️ Discrepancy for developer ${userId}: DB=${cumulativeTotalListingViews}, PostHog=${posthogCount}`)
+              errorTracker.addWarning('DEVELOPERS', `Discrepancy for developer ${userId}`, { userId, db: cumulativeTotalListingViews, posthog: posthogCount })
             }
           }
           
-          developerTotals[userId] = {
-            hourly_views: total_views, // Current hour: listing views + profile views
-            hourly_listing_views: total_listing_views, // Current hour: listing views only
-            cumulative_listing_views: cumulativeTotalListingViews, // ALL TIME: from listing_analytics OR PostHog fallback
-            hourly_profile_views: user.profile_views || 0, // Current hour: profile views only
-            hourly_leads: total_leads, // Current hour: listing leads + profile leads
-            hourly_impressions: total_impressions_received, // Current hour: listing + profile impressions
-            profile_to_lead_rate: profile_to_lead_rate, // Current hour rate
-            views_change: viewsChange, // Change from previous hour
-            leads_change: leadsChange, // Change from previous hour
-            impressions_change: impressionsChange // Change from previous hour
+          // Accumulate developer totals across all hours
+          if (!allDeveloperTotals[userId]) {
+            allDeveloperTotals[userId] = {
+              hourly_views: 0,
+              hourly_listing_views: 0,
+              cumulative_listing_views: cumulativeTotalListingViews, // Use the latest cumulative value
+              hourly_profile_views: 0,
+              hourly_leads: 0,
+              hourly_impressions: 0,
+              profile_to_lead_rate: profile_to_lead_rate, // Use the latest rate
+              views_change: viewsChange, // Use the latest change
+              leads_change: leadsChange, // Use the latest change
+              impressions_change: impressionsChange // Use the latest change
+            }
           }
+          // Sum hourly values across all hours
+          allDeveloperTotals[userId].hourly_views += total_views
+          allDeveloperTotals[userId].hourly_listing_views += total_listing_views
+          allDeveloperTotals[userId].hourly_profile_views += (user.profile_views || 0)
+          allDeveloperTotals[userId].hourly_leads += total_leads
+          allDeveloperTotals[userId].hourly_impressions += total_impressions_received
+          // Update cumulative and latest values (these should be the same across hours, but update to latest)
+          allDeveloperTotals[userId].cumulative_listing_views = cumulativeTotalListingViews
+          allDeveloperTotals[userId].profile_to_lead_rate = profile_to_lead_rate
+          allDeveloperTotals[userId].views_change = viewsChange
+          allDeveloperTotals[userId].leads_change = leadsChange
+          allDeveloperTotals[userId].impressions_change = impressionsChange
         }
 
       userRows.push({
@@ -2045,8 +2699,8 @@ export async function POST(request) {
     // CRITICAL: Only create records for developments that had events (not all active developments)
     // This prevents creating empty records with all zeros
     const developmentRows = []
-    const developmentIdsWithEvents = Object.keys(aggregates.developments)
-    console.log(`📊 [DEVELOPMENT_ANALYTICS] Found ${developmentIdsWithEvents.length} developments with events (out of ${development_ids.length} active developments)`)
+    // PERFORMANCE: Use Map.keys() instead of Object.keys()
+    const developmentIdsWithEvents = Array.from(developmentsMap.keys())
     
     // OPTIMIZATION: Batch fetch all developer_ids for developments at once (fixes N+1 query issue)
     let developerIdByDevelopmentId = {}
@@ -2064,9 +2718,10 @@ export async function POST(request) {
     }
     
     for (const developmentId of developmentIdsWithEvents) {
-      const dev = aggregates.developments[developmentId]
+      // PERFORMANCE: Use Map.get() instead of object access (Map already created above)
+      const dev = developmentsMap.get(developmentId)
       if (!dev) {
-        console.warn(`⚠️ [DEVELOPMENT_ANALYTICS] Skipping ${developmentId}: not in aggregates`)
+        debugWarn(`⚠️ [DEVELOPMENT_ANALYTICS] Skipping ${developmentId}: not in aggregates`)
         continue
       }
 
@@ -2120,19 +2775,16 @@ export async function POST(request) {
     // Actions within the same run are merged together
     const leadRows = []
     
-    console.log(`📝 [LEAD_DEBUG] Starting to build lead rows from ${Object.keys(aggregates.leads).length} lead combinations`)
-    console.log(`📝 [LEAD_DEBUG] Aggregates.leads keys:`, Object.keys(aggregates.leads))
-    if (Object.keys(aggregates.leads).length === 0) {
-      console.warn(`⚠️ [LEAD_DEBUG] WARNING: No leads found in aggregates! This means no lead events were processed.`)
-      console.warn(`⚠️ [LEAD_DEBUG] Check if lead_phone, lead_message, or lead_appointment events exist in PostHog`)
+    if (leadsMap.size === 0) {
+      errorTracker.addWarning('LEADS', 'No leads found in aggregates - no lead events were processed', {})
     }
     
     // Fetch lister_id for leads that don't have it (e.g., lead_phone from customer care)
     const leadsNeedingListerId = []
-    for (const leadKey in aggregates.leads) {
-      const lead = aggregates.leads[leadKey]
-      if (lead.actions.length === 0) {
-        console.log(`⚠️ Skipping lead ${leadKey}: no actions`)
+    for (const [leadKey, lead] of leadsMap.entries()) {
+      // PERFORMANCE: lead already extracted from Map.entries() above
+      if (!lead || lead.actions.length === 0) {
+        errorTracker.addWarning('LEADS', `Skipping lead ${leadKey}: no actions or not found`, { leadKey })
         continue
       }
       if (!lead.lister_id && lead.listing_id) {
@@ -2144,7 +2796,6 @@ export async function POST(request) {
     const listingToListerMap = {}
     if (leadsNeedingListerId.length > 0) {
       const uniqueListingIds = [...new Set(leadsNeedingListerId)]
-      console.log(`🔍 Fetching lister_id for ${uniqueListingIds.length} listings without lister_id in events`)
       
       const { data: listingsData, error: listingsError } = await supabaseAdmin
         .from('listings')
@@ -2158,24 +2809,15 @@ export async function POST(request) {
             lister_type: listing.listing_type === 'unit' ? 'developer' : 'agent'
           }
         }
-        console.log(`✅ Fetched lister_id for ${Object.keys(listingToListerMap).length} listings`)
       } else if (listingsError) {
-        console.error(`❌ Error fetching lister_ids:`, listingsError)
+        errorTracker.addError('LISTINGS', 'Error fetching lister_ids', { error: listingsError.message })
       }
     }
     
-    for (const leadKey in aggregates.leads) {
-      const lead = aggregates.leads[leadKey]
-      console.log(`🔍 [LEAD_DEBUG] Processing lead ${leadKey}:`, {
-        listing_id: lead.listing_id,
-        seeker_id: lead.seeker_id,
-        lister_id: lead.lister_id,
-        lister_type: lead.lister_type,
-        actions_count: lead.actions.length
-      })
-      
+    for (const [leadKey, lead] of leadsMap.entries()) {
+      // PERFORMANCE: Use Map.entries() instead of for...in loop
       if (lead.actions.length === 0) {
-        console.warn(`⚠️ [LEAD_DEBUG] Skipping lead ${leadKey}: no actions`)
+        errorTracker.addWarning('LEADS', `Skipping lead ${leadKey}: no actions`, { leadKey })
         continue
       }
       
@@ -2184,21 +2826,18 @@ export async function POST(request) {
       let finalListerType = lead.lister_type
       
       if (!finalListerId && lead.listing_id) {
-        console.log(`🔍 [LEAD_DEBUG] Lead ${leadKey} missing lister_id, looking up from listing ${lead.listing_id}`)
         const listingInfo = listingToListerMap[lead.listing_id]
         if (listingInfo) {
           finalListerId = listingInfo.lister_id
           finalListerType = listingInfo.lister_type
-          console.log(`✅ [LEAD_DEBUG] Resolved lister_id for lead ${leadKey}: ${finalListerId} (${finalListerType})`)
         } else {
-          console.warn(`⚠️ [LEAD_DEBUG] Could not find lister_id for listing ${lead.listing_id}, skipping lead ${leadKey}`)
-          console.warn(`⚠️ [LEAD_DEBUG] Listing not found in listingToListerMap. Available listings:`, Object.keys(listingToListerMap))
+          errorTracker.addWarning('LEADS', `Could not find lister_id for listing ${lead.listing_id}`, { leadKey, listing_id: lead.listing_id, availableListings: Object.keys(listingToListerMap).length })
           continue
         }
       }
       
       if (!finalListerId) {
-        console.warn(`⚠️ [LEAD_DEBUG] Skipping lead ${leadKey}: no lister_id available after lookup`)
+        errorTracker.addWarning('LEADS', `Skipping lead ${leadKey}: no lister_id available after lookup`, { leadKey })
         continue
       }
 
@@ -2206,8 +2845,6 @@ export async function POST(request) {
       const sortedActions = lead.actions.sort((a, b) => 
         new Date(a.action_timestamp) - new Date(b.action_timestamp)
       )
-
-      console.log(`✅ [LEAD_DEBUG] Creating lead record for ${leadKey}: ${sortedActions.length} actions, lister_id=${finalListerId}`)
 
       // Create one lead record per seeker+listing combination for this cron run
       // This allows tracking: "User interacted with listing X in run 1, then again in run 2"
@@ -2258,28 +2895,22 @@ export async function POST(request) {
         updated_at: new Date().toISOString()
       }
       
-      console.log(`✅ [LEAD_DEBUG] Lead row prepared:`, {
-        listing_id: leadRow.listing_id,
-        seeker_id: leadRow.seeker_id,
-        lister_id: leadRow.lister_id,
-        lister_type: leadRow.lister_type,
-        total_actions: leadRow.total_actions,
-        first_action_date: leadRow.first_action_date,
-        last_action_date: leadRow.last_action_date,
-        last_action_type: leadRow.last_action_type
-      })
-      
+      // Lead row prepared
       leadRows.push(leadRow)
     }
     
-    console.log(`📊 [LEAD_DEBUG] Lead rows built: ${leadRows.length} records ready to insert`)
-    if (leadRows.length > 0) {
-      console.log(`📊 [LEAD_DEBUG] Sample lead row (first):`, JSON.stringify(leadRows[0], null, 2))
-    } else {
-      console.warn(`⚠️ [LEAD_DEBUG] WARNING: No lead rows built! Check if leads were aggregated and if lister_id resolution worked.`)
+    if (leadRows.length === 0 && leadsMap.size > 0) {
+      errorTracker.addWarning('LEADS', 'No lead rows built despite leads in aggregates - lister_id resolution may have failed', { leadsMapSize: leadsMap.size })
     }
 
-    // 10. Write to database
+    // Collect rows for this hour into the all* arrays
+    allListingRows.push(...listingRows)
+    allUserRows.push(...userRows)
+    allDevelopmentRows.push(...developmentRows)
+    allLeadRows.push(...leadRows)
+    } // End of hour processing loop
+
+    // 10. Write to database (using all* arrays that contain rows from all hours)
     const insertResults = {
       listings: { inserted: 0, errors: [] },
       users: { inserted: 0, errors: [] },
@@ -2290,78 +2921,219 @@ export async function POST(request) {
 
     // Insert listing analytics (time series - always insert new records)
     // Each cron run creates new records, allowing time series analysis
-    console.log(`💾 Inserting ${listingRows.length} listing analytics records...`)
-    if (listingRows.length > 0) {
+    if (allListingRows.length > 0) {
       try {
-        // Log detailed information about what we're inserting
-        const rowsWithData = listingRows.filter(r => r.total_views > 0 || r.total_impressions > 0 || r.total_leads > 0)
-        console.log('📊 Listing rows breakdown:', {
-          totalRows: listingRows.length,
-          rowsWithData: rowsWithData.length,
-          rowsWithViews: listingRows.filter(r => r.total_views > 0).length,
-          rowsWithImpressions: listingRows.filter(r => r.total_impressions > 0).length,
-          rowsWithLeads: listingRows.filter(r => r.total_leads > 0).length,
-          sampleRowWithData: rowsWithData[0] || null,
-          sampleRowWithoutData: listingRows.find(r => r.total_views === 0 && r.total_impressions === 0 && r.total_leads === 0) || null
-        })
-        // Safely serialize sample row (handle Sets and other non-serializable values)
-        const sampleRow = listingRows[0]
-        const serializableRow = sampleRow ? {
-          ...sampleRow,
-          unique_views: typeof sampleRow.unique_views === 'number' ? sampleRow.unique_views : (sampleRow.unique_views?.size || 0),
-          unique_leads: typeof sampleRow.unique_leads === 'number' ? sampleRow.unique_leads : (sampleRow.unique_leads?.size || 0)
-        } : null
-        console.log('📤 Sample listing row:', JSON.stringify(serializableRow, null, 2))
-        
         // Use upsert for hourly tracking - update if record exists for this listing+date+hour
         // This handles retries of failed runs: if a run partially inserted data then failed,
         // the next run will update those records instead of creating duplicates
         const { data, error } = await supabaseAdmin
           .from('listing_analytics')
-          .upsert(listingRows, {
+          .upsert(allListingRows, {
             onConflict: 'listing_id,date,hour', // Update if record exists for this listing+date+hour
             ignoreDuplicates: false // Update existing records (important for retrying failed runs)
           })
           .select()
         
         if (error) {
-          console.error('❌ Error upserting listing analytics:', error)
-          console.error('❌ Error details:', JSON.stringify(error, null, 2))
+          errorTracker.addError('LISTING_ANALYTICS', 'Error upserting listing analytics', { 
+            error: error.message, 
+            code: error.code, 
+            hint: error.hint,
+            rowsAttempted: allListingRows.length,
+            sampleRow: allListingRows[0] ? {
+              listing_id: allListingRows[0].listing_id,
+              date: allListingRows[0].date,
+              hour: allListingRows[0].hour
+            } : null
+          })
           insertResults.listings.errors.push(error.message)
         } else {
-          console.log(`✅ Successfully upserted ${listingRows.length} listing analytics records`)
-          console.log(`✅ Upserted data sample:`, data?.[0] || 'No data returned')
-          insertResults.listings.inserted = data?.length || listingRows.length
+          const insertedCount = data?.length || allListingRows.length
+          if (insertedCount !== allListingRows.length) {
+            errorTracker.addWarning('LISTING_ANALYTICS', `Partial insert: ${insertedCount} of ${allListingRows.length} rows inserted`, {
+              attempted: allListingRows.length,
+              inserted: insertedCount
+            })
+          }
+          logSuccess(`Upserted ${insertedCount} listing analytics records`)
+          insertResults.listings.inserted = insertedCount
         }
       } catch (err) {
-        console.error('❌ Exception inserting listing analytics:', err)
-        console.error('❌ Exception stack:', err.stack)
+        errorTracker.addError('LISTING_ANALYTICS', 'Exception inserting listing analytics', { error: err.message, stack: err.stack })
         insertResults.listings.errors.push(err.message)
       }
     } else {
-      console.warn('⚠️ No listing rows to insert!')
-      console.warn('⚠️ This might indicate:')
-      console.warn('  1. No active listings in database')
-      console.warn('  2. No events with listing_id in PostHog')
-      console.warn('  3. Issue with getAllActiveEntities()')
+      errorTracker.addWarning('LISTING_ANALYTICS', 'No listing rows to insert', { 
+        possibleReasons: [
+          'No active listings in database',
+          'No events with listing_id in PostHog',
+          'Issue with getAllActiveEntities()'
+        ]
+      })
     }
 
     // Upsert user analytics (hourly tracking - one record per user per hour)
     // Use upsert to handle multiple cron runs per hour, recalculations, or retries of failed runs
     // If a previous run partially inserted data then failed, this will update those records
-    if (userRows.length > 0) {
+    if (allUserRows.length > 0) {
       try {
+        // First, insert/update the user_analytics rows
         const { error } = await supabaseAdmin
           .from('user_analytics')
-          .upsert(userRows, {
+          .upsert(allUserRows, {
             onConflict: 'user_id,user_type,date,hour', // Update if record exists for this user+type+date+hour
             ignoreDuplicates: false // Update existing records (important for retrying failed runs)
           })
         
         if (error) {
+          errorTracker.addError('USER_ANALYTICS', 'Error upserting user analytics', {
+            error: error.message,
+            code: error.code,
+            hint: error.hint,
+            rowsAttempted: allUserRows.length,
+            sampleRow: allUserRows[0] ? {
+              user_id: allUserRows[0].user_id,
+              user_type: allUserRows[0].user_type,
+              date: allUserRows[0].date,
+              hour: allUserRows[0].hour
+            } : null
+          })
           insertResults.users.errors.push(error.message)
         } else {
-          insertResults.users.inserted = userRows.length
+          const insertedCount = allUserRows.length
+          logSuccess(`Upserted ${insertedCount} user analytics records`)
+          insertResults.users.inserted = insertedCount
+          
+          // CRITICAL FIX: After listing_analytics is inserted, update user_analytics with aggregated daily totals
+          // This ensures total_listing_views, total_listing_leads, etc. reflect ALL hours of the day, not just the current hour
+          if (allListingRows.length > 0) {
+            // Updating user_analytics with aggregated daily totals from listing_analytics
+            
+            // Get all unique user_ids and dates from user_analytics rows
+            const userDates = new Set()
+            const userIdsByDate = new Map()
+            for (const row of allUserRows) {
+              const key = `${row.user_id}_${row.user_type}_${row.date}`
+              if (!userDates.has(key)) {
+                userDates.add(key)
+                if (!userIdsByDate.has(row.date)) {
+                  userIdsByDate.set(row.date, new Set())
+                }
+                userIdsByDate.get(row.date).add(row.user_id)
+              }
+            }
+            
+            // For each date, aggregate listing_analytics and update user_analytics
+            for (const [date, userIds] of userIdsByDate.entries()) {
+              // Get all listings for these users
+              const allUserListingIds = []
+              for (const userId of userIds) {
+                const userListings = listingsByUserId[userId] || []
+                allUserListingIds.push(...userListings.map(l => l.id))
+              }
+              
+              if (allUserListingIds.length === 0) continue
+              
+              // Query listing_analytics for ALL hours of this date and aggregate by listing_id
+              const { data: dailyListingAnalytics } = await supabaseAdmin
+                .from('listing_analytics')
+                .select('listing_id, total_views, total_leads, total_impressions, impression_social_media, impression_website_visit, impression_share, impression_saved_listing')
+                .in('listing_id', allUserListingIds)
+                .eq('date', date)
+              
+              if (!dailyListingAnalytics || dailyListingAnalytics.length === 0) continue
+              
+              // Aggregate by listing_id (sum across all hours)
+              const aggregatedByListing = {}
+              for (const analytics of dailyListingAnalytics) {
+                if (!aggregatedByListing[analytics.listing_id]) {
+                  aggregatedByListing[analytics.listing_id] = {
+                    total_views: 0,
+                    total_leads: 0,
+                    total_impressions: 0,
+                    impression_social_media: 0,
+                    impression_website_visit: 0,
+                    impression_share: 0,
+                    impression_saved_listing: 0
+                  }
+                }
+                aggregatedByListing[analytics.listing_id].total_views += analytics.total_views || 0
+                aggregatedByListing[analytics.listing_id].total_leads += analytics.total_leads || 0
+                aggregatedByListing[analytics.listing_id].total_impressions += analytics.total_impressions || 0
+                aggregatedByListing[analytics.listing_id].impression_social_media += analytics.impression_social_media || 0
+                aggregatedByListing[analytics.listing_id].impression_website_visit += analytics.impression_website_visit || 0
+                aggregatedByListing[analytics.listing_id].impression_share += analytics.impression_share || 0
+                aggregatedByListing[analytics.listing_id].impression_saved_listing += analytics.impression_saved_listing || 0
+              }
+              
+              // For each user, sum up their listings' aggregated totals
+              for (const userId of userIds) {
+                const userListings = listingsByUserId[userId] || []
+                let total_listing_views = 0
+                let total_listing_leads = 0
+                let total_impressions_received = 0
+                let impression_social_media_received = 0
+                let impression_website_visit_received = 0
+                let impression_share_received = 0
+                let impression_saved_listing_received = 0
+                
+                for (const listing of userListings) {
+                  const aggregated = aggregatedByListing[listing.id]
+                  if (aggregated) {
+                    total_listing_views += aggregated.total_views
+                    total_listing_leads += aggregated.total_leads
+                    total_impressions_received += aggregated.total_impressions
+                    impression_social_media_received += aggregated.impression_social_media
+                    impression_website_visit_received += aggregated.impression_website_visit
+                    impression_share_received += aggregated.impression_share
+                    impression_saved_listing_received += aggregated.impression_saved_listing
+                  }
+                }
+                
+                // Get profile data from existing user_analytics rows (sum across all hours)
+                const userRowsForDate = allUserRows.filter(r => r.user_id === userId && r.date === date)
+                const total_profile_views = userRowsForDate.reduce((sum, r) => sum + (r.profile_views || 0), 0)
+                const total_profile_leads = userRowsForDate.reduce((sum, r) => sum + (r.leads_initiated || 0), 0)
+                
+                // Get user_type from the first row
+                const firstRow = userRowsForDate[0]
+                if (!firstRow) continue
+                const user_type = firstRow.user_type
+                
+                // Calculate total views and leads (listing + profile)
+                const total_views = total_listing_views + total_profile_views
+                const total_leads = total_listing_leads + total_profile_leads
+                
+                // Update all hours for this user+date
+                const { error: updateError } = await supabaseAdmin
+                  .from('user_analytics')
+                  .update({
+                    total_listing_views: total_listing_views,
+                    total_listing_leads: total_listing_leads,
+                    total_views: total_views,
+                    total_leads: total_leads,
+                    total_impressions_received: total_impressions_received,
+                    impression_social_media_received: impression_social_media_received,
+                    impression_website_visit_received: impression_website_visit_received,
+                    impression_share_received: impression_share_received,
+                    impression_saved_listing_received: impression_saved_listing_received,
+                    // Recalculate conversion rates with correct totals
+                    overall_conversion_rate: total_views > 0 ? Number(((total_leads / total_views) * 100).toFixed(2)) : 0,
+                    view_to_lead_rate: total_views > 0 ? Number(((total_leads / total_views) * 100).toFixed(2)) : 0,
+                    profile_to_lead_rate: total_profile_views > 0 ? Number(((total_leads / total_profile_views) * 100).toFixed(2)) : 0
+                  })
+                  .eq('user_id', userId)
+                  .eq('user_type', user_type)
+                  .eq('date', date)
+                
+                if (updateError) {
+                  errorTracker.addError('USER_ANALYTICS', `Error updating user_analytics for ${userId} on ${date}`, { userId, date, error: updateError.message })
+                } else {
+                  logSuccess(`Updated user_analytics for ${userId} (${user_type}) on ${date}`)
+                }
+              }
+            }
+          }
         }
       } catch (err) {
         insertResults.users.errors.push(err.message)
@@ -2371,19 +3143,32 @@ export async function POST(request) {
     // Upsert development analytics (hourly tracking - one record per development per hour)
     // Use upsert to handle multiple cron runs per hour, recalculations, or retries of failed runs
     // If a previous run partially inserted data then failed, this will update those records
-    if (developmentRows.length > 0) {
+    if (allDevelopmentRows.length > 0) {
       try {
         const { error } = await supabaseAdmin
           .from('development_analytics')
-          .upsert(developmentRows, {
+          .upsert(allDevelopmentRows, {
             onConflict: 'development_id,date,hour', // Update if record exists for this development+date+hour
             ignoreDuplicates: false // Update existing records (important for retrying failed runs)
           })
         
         if (error) {
+          errorTracker.addError('DEVELOPMENT_ANALYTICS', 'Error upserting development analytics', {
+            error: error.message,
+            code: error.code,
+            hint: error.hint,
+            rowsAttempted: allDevelopmentRows.length,
+            sampleRow: allDevelopmentRows[0] ? {
+              development_id: allDevelopmentRows[0].development_id,
+              date: allDevelopmentRows[0].date,
+              hour: allDevelopmentRows[0].hour
+            } : null
+          })
           insertResults.developments.errors.push(error.message)
         } else {
-          insertResults.developments.inserted = developmentRows.length
+          const insertedCount = allDevelopmentRows.length
+          logSuccess(`Upserted ${insertedCount} development analytics records`)
+          insertResults.developments.inserted = insertedCount
         }
       } catch (err) {
         insertResults.developments.errors.push(err.message)
@@ -2394,73 +3179,65 @@ export async function POST(request) {
     // The unique constraint on (listing_id, seeker_id) has been removed
     // This allows multiple lead records for the same seeker+listing combination
     // Each cron run creates new lead records, enabling time series tracking
-    console.log(`💾 [LEAD_DEBUG] Attempting to insert ${leadRows.length} lead records...`)
-    if (leadRows.length > 0) {
+    if (allLeadRows.length > 0) {
       try {
-        console.log('📤 [LEAD_DEBUG] Sample lead row (first):', JSON.stringify(leadRows[0], null, 2))
-        console.log('📤 [LEAD_DEBUG] All lead rows summary:', leadRows.map(r => ({
-          listing_id: r.listing_id,
-          seeker_id: r.seeker_id,
-          lister_id: r.lister_id,
-          total_actions: r.total_actions,
-          first_action_date: r.first_action_date
-        })))
-        
         const { data, error } = await supabaseAdmin
           .from('leads')
-          .insert(leadRows)
+          .insert(allLeadRows)
           .select()
         
         if (error) {
-          console.error('❌ [LEAD_DEBUG] Error inserting leads:', error)
-          console.error('❌ [LEAD_DEBUG] Error details:', JSON.stringify(error, null, 2))
-          console.error('❌ [LEAD_DEBUG] Error code:', error.code)
-          console.error('❌ [LEAD_DEBUG] Error message:', error.message)
-          console.error('❌ [LEAD_DEBUG] Error hint:', error.hint)
+          errorTracker.addError('LEADS', 'Error inserting leads', { 
+            error: error.message, 
+            code: error.code, 
+            hint: error.hint,
+            rowsAttempted: allLeadRows.length
+          })
           insertResults.leads.errors.push(error.message)
         } else {
-          console.log(`✅ [LEAD_DEBUG] Successfully inserted ${data?.length || leadRows.length} lead records`)
-          console.log(`✅ [LEAD_DEBUG] Inserted data sample:`, data?.[0] || 'No data returned')
-          insertResults.leads.inserted = data?.length || leadRows.length
+          logSuccess(`Inserted ${data?.length || allLeadRows.length} lead records`)
+          insertResults.leads.inserted = data?.length || allLeadRows.length
         }
       } catch (err) {
-        console.error('❌ [LEAD_DEBUG] Exception inserting leads:', err)
-        console.error('❌ [LEAD_DEBUG] Exception stack:', err.stack)
-        console.error('❌ [LEAD_DEBUG] Exception message:', err.message)
+        errorTracker.addError('LEADS', 'Exception inserting leads', { 
+          error: err.message, 
+          stack: err.stack,
+          rowsAttempted: allLeadRows.length
+        })
         insertResults.leads.errors.push(err.message)
       }
     } else {
-      console.warn('⚠️ [LEAD_DEBUG] No lead rows to insert!')
-      console.warn('⚠️ [LEAD_DEBUG] This could mean:')
-      console.warn('  1. No lead events (lead_phone, lead_message, lead_appointment) were found in PostHog')
-      console.warn('  2. Lead events were found but had missing listing_id or seeker_id')
-      console.warn('  3. Lead events were found but lister_id resolution failed')
-      console.warn('  4. All leads were filtered out due to missing data')
+      errorTracker.addWarning('LEADS', 'No lead rows to insert', {
+        possibleReasons: [
+          'No lead events (lead_phone, lead_message, lead_appointment) were found in PostHog',
+          'Lead events were found but had missing listing_id or seeker_id',
+          'Lead events were found but lister_id resolution failed',
+          'All leads were filtered out due to missing data'
+        ]
+      })
     }
 
     // 11. Aggregate breakdowns and update listings table with cumulative totals
     // Only update listings that had events in this run
-    console.log(`🔄 Aggregating breakdowns and updating listings table...`)
     let listingUpdatesData = {} // Store for response
     let developerUpdatesData = {} // Store for response
     try {
-      // Get unique listing IDs from events
-      const listingIdsToUpdate = Object.keys(aggregates.listings)
+      // Get unique listing IDs from events (accumulated across all hours)
+      const listingIdsToUpdate = Array.from(allListingIdsSet)
       
       if (listingIdsToUpdate.length === 0) {
-        console.log('ℹ️ No listings found in events to update')
+        // No listings found in events to update
       } else {
-        console.log(`📊 Found ${listingIdsToUpdate.length} listings to update`)
 
         // Aggregate share_breakdown and leads_breakdown from all listing_analytics records
-        console.log(`📊 Aggregating breakdowns for ${listingIdsToUpdate.length} listings...`)
+        // Aggregating breakdowns for listings
         const { data: allListingAnalytics, error: breakdownError } = await supabaseAdmin
           .from('listing_analytics')
           .select('listing_id, share_breakdown, leads_breakdown, impression_share, total_leads')
           .in('listing_id', listingIdsToUpdate)
 
         if (breakdownError) {
-          console.error('❌ Error fetching breakdowns:', breakdownError)
+          errorTracker.addError('LISTINGS', 'Error fetching breakdowns', { error: breakdownError.message })
         }
 
         // Aggregate breakdowns per listing
@@ -2494,12 +3271,38 @@ export async function POST(request) {
             }
             breakdownAggregates[listingId].total_shares += row.impression_share || 0
 
-            // Aggregate leads breakdown
+            // Aggregate leads breakdown - handle both nested messaging structure and flat structure
             if (row.leads_breakdown && typeof row.leads_breakdown === 'object') {
+              // Check if it has nested messaging structure
+              if (row.leads_breakdown.messaging && typeof row.leads_breakdown.messaging === 'object') {
+                // Handle nested structure
+                const messaging = row.leads_breakdown.messaging
+                if (messaging.whatsapp && messaging.whatsapp.total) {
+                  breakdownAggregates[listingId].leads_breakdown.whatsapp += messaging.whatsapp.total
+                }
+                if (messaging.direct_message && messaging.direct_message.total) {
+                  breakdownAggregates[listingId].leads_breakdown.direct_message += messaging.direct_message.total
+                }
+                // Also handle top-level whatsapp/direct_message for backward compatibility
+                if (row.leads_breakdown.whatsapp && row.leads_breakdown.whatsapp.total) {
+                  breakdownAggregates[listingId].leads_breakdown.whatsapp += row.leads_breakdown.whatsapp.total
+                }
+                if (row.leads_breakdown.direct_message && row.leads_breakdown.direct_message.total) {
+                  breakdownAggregates[listingId].leads_breakdown.direct_message += row.leads_breakdown.direct_message.total
+                }
+              }
+              
+              // Aggregate all lead types (handles both nested and flat structures)
               for (const [leadType, data] of Object.entries(row.leads_breakdown)) {
+                // Skip messaging object as we handle it separately above
+                if (leadType === 'messaging') continue
+                
                 if (data && typeof data === 'object' && data.total) {
-                  breakdownAggregates[listingId].leads_breakdown[leadType] = 
-                    (breakdownAggregates[listingId].leads_breakdown[leadType] || 0) + data.total
+                  // Only aggregate if it's a valid lead type
+                  if (['phone', 'whatsapp', 'direct_message', 'email', 'appointment', 'website', 'message_leads'].includes(leadType)) {
+                    breakdownAggregates[listingId].leads_breakdown[leadType] = 
+                      (breakdownAggregates[listingId].leads_breakdown[leadType] || 0) + data.total
+                  }
                 }
               }
             }
@@ -2519,11 +3322,53 @@ export async function POST(request) {
             shareBreakdown[platform] = { total, percentage }
           }
 
-          // Build leads breakdown with percentages
-          const leadsBreakdown = {}
-          for (const [leadType, total] of Object.entries(agg.leads_breakdown)) {
-            const percentage = agg.total_leads > 0 ? Number(((total / agg.total_leads) * 100).toFixed(2)) : 0
-            leadsBreakdown[leadType] = { total, percentage }
+          // Build leads breakdown with percentages and nested messaging structure
+          const whatsappTotal = agg.leads_breakdown.whatsapp || 0
+          const directMessageTotal = agg.leads_breakdown.direct_message || 0
+          const messageTotal = whatsappTotal + directMessageTotal
+          
+          const leadsBreakdown = {
+            phone: {
+              total: agg.leads_breakdown.phone || 0,
+              percentage: agg.total_leads > 0 ? Number(((agg.leads_breakdown.phone || 0) / agg.total_leads) * 100).toFixed(2) : 0
+            },
+            messaging: {
+              total: messageTotal,
+              percentage: agg.total_leads > 0 ? Number(((messageTotal / agg.total_leads) * 100).toFixed(2)) : 0,
+              direct_message: {
+                total: directMessageTotal,
+                percentage: messageTotal > 0 ? Number(((directMessageTotal / messageTotal) * 100).toFixed(2)) : 0
+              },
+              whatsapp: {
+                total: whatsappTotal,
+                percentage: messageTotal > 0 ? Number(((whatsappTotal / messageTotal) * 100).toFixed(2)) : 0
+              }
+            },
+            whatsapp: {
+              total: whatsappTotal,
+              percentage: agg.total_leads > 0 ? Number(((whatsappTotal / agg.total_leads) * 100).toFixed(2)) : 0
+            },
+            direct_message: {
+              total: directMessageTotal,
+              percentage: agg.total_leads > 0 ? Number(((directMessageTotal / agg.total_leads) * 100).toFixed(2)) : 0
+            },
+            email: {
+              total: agg.leads_breakdown.email || 0,
+              percentage: agg.total_leads > 0 ? Number(((agg.leads_breakdown.email || 0) / agg.total_leads) * 100).toFixed(2) : 0
+            },
+            appointment: {
+              total: agg.leads_breakdown.appointment || 0,
+              percentage: agg.total_leads > 0 ? Number(((agg.leads_breakdown.appointment || 0) / agg.total_leads) * 100).toFixed(2) : 0
+            },
+            website: {
+              total: agg.leads_breakdown.website || 0,
+              percentage: agg.total_leads > 0 ? Number(((agg.leads_breakdown.website || 0) / agg.total_leads) * 100).toFixed(2) : 0
+            },
+            // Backward compatibility
+            message_leads: {
+              total: messageTotal,
+              percentage: agg.total_leads > 0 ? Number(((messageTotal / agg.total_leads) * 100).toFixed(2)) : 0
+            }
           }
 
           finalBreakdowns[listingId] = {
@@ -2541,7 +3386,7 @@ export async function POST(request) {
           )
 
         if (analyticsError) {
-            console.error(`❌ Error fetching listing analytics via SQL:`, analyticsError)
+            errorTracker.addError('LISTINGS', 'Error fetching listing analytics via SQL', { error: analyticsError.message })
           } else if (aggregatedTotals && aggregatedTotals.length > 0) {
             // Convert array to map
             for (const row of aggregatedTotals) {
@@ -2550,10 +3395,10 @@ export async function POST(request) {
                 total_leads: Number(row.total_leads) || 0
               }
             }
-            console.log(`✅ Fetched aggregated totals for ${aggregatedTotals.length} listings via SQL`)
+            logSuccess(`Fetched aggregated totals for ${aggregatedTotals.length} listings`)
           }
         } catch (err) {
-          console.error('❌ Exception calling get_cumulative_listing_analytics:', err)
+          errorTracker.addError('LISTINGS', 'Exception calling get_cumulative_listing_analytics', { error: err.message, stack: err.stack })
         }
         
         if (Object.keys(listingTotals).length > 0 || Object.keys(finalBreakdowns).length > 0) {
@@ -2583,19 +3428,14 @@ export async function POST(request) {
           }
 
           if (listingUpdates.length > 0) {
-          // OPTIMIZATION: Use batch upsert instead of individual updates (much faster)
+          // OPTIMIZATION: Use batch update (only update existing listings, don't insert)
+          // Using individual updates to avoid issues with missing required fields like account_type
           let updateResults = []
             let successCount = 0
             let errorCount = 0
           
           try {
-            const { data: upsertData, error: upsertError } = await supabaseAdmin
-              .from('listings')
-              .upsert(listingUpdates, { onConflict: 'id' })
-            
-            if (upsertError) {
-              console.error('❌ Error batch upserting listings:', upsertError)
-              // Fallback to individual updates
+            // Update listings individually to avoid null constraint violations
               const updatePromises = listingUpdates.map(update =>
                 supabaseAdmin
                 .from('listings')
@@ -2612,47 +3452,77 @@ export async function POST(request) {
               updateResults = await Promise.all(updatePromises)
               successCount = updateResults.filter(r => !r.error).length
               errorCount = updateResults.filter(r => r.error).length
-              console.log(`✅ Updated ${successCount} listings via fallback (${errorCount} errors)`)
-              } else {
-              // All successful if upsert worked
-              updateResults = listingUpdates.map(u => ({ id: u.id, error: null }))
-              successCount = listingUpdates.length
-              errorCount = 0
-              console.log(`✅ Batch upserted ${listingUpdates.length} listings with breakdowns`)
+            
+            if (errorCount > 0) {
+              const errors = updateResults.filter(r => r.error)
+              // Track each individual failure
+              errors.forEach((err, idx) => {
+                if (idx < 10) { // Track first 10 errors in detail
+                  errorTracker.addError('LISTINGS', `Failed to update listing ${err.id}`, {
+                    listing_id: err.id,
+                    error: err.error?.message || err.error || 'Unknown error',
+                    errorCode: err.error?.code,
+                    errorHint: err.error?.hint
+                  })
+                }
+              })
+              // Summary error for all failures
+              errorTracker.addError('LISTINGS', `Errors updating ${errorCount} listings`, { 
+                totalErrors: errorCount,
+                successCount,
+                errorSample: errors.slice(0, 5).map(e => ({ id: e.id, error: e.error?.message || e.error }))
+              })
+            }
+            logSuccess(`Updated ${successCount} listings with breakdowns`)
+            if (errorCount > 0) {
+              errorTracker.addWarning('LISTINGS', `${errorCount} listings failed to update`, { successCount, errorCount })
             }
           } catch (err) {
-            console.error('❌ Exception batch upserting listings:', err)
+            errorTracker.addError('LISTINGS', 'Exception updating listings', { error: err.message, stack: err.stack })
             errorCount = listingUpdates.length
             successCount = 0
           }
-          
-          if (errorCount > 0) {
-            const errors = updateResults.filter(r => r.error)
-            console.error(`❌ Errors updating ${errorCount} listings:`, errors.slice(0, 5)) // Log first 5 errors
-            }
-            console.log(`✅ Updated ${successCount} listings with breakdowns (${errorCount} errors)`)
           }
         }
       }
     } catch (err) {
-      console.error('❌ Exception updating listings:', err)
+      errorTracker.addError('LISTINGS', 'Exception in listing updates section', { error: err.message, stack: err.stack })
     }
 
     // 12. Update developers table with cumulative totals
     // Only update developers whose lister_id appeared in the events we just processed
-    console.log(`🔄 Updating developers table with cumulative totals (only developers with events)...`)
+    // Updating developers table with cumulative totals
     try {
       // Get unique developer IDs from events (lister_ids with user_type = 'developer')
+      // Query developers table to get user types for accumulated user IDs
       const developerIdsToUpdate = new Set()
-      for (const userId of allUserIds) {
-        const user = aggregates.users[userId]
-        if (user && user.user_type === 'developer') {
-          developerIdsToUpdate.add(userId)
+      if (allUserIdsSet.size > 0) {
+        const { data: usersData } = await supabaseAdmin
+          .from('developers')
+          .select('developer_id')
+          .in('developer_id', Array.from(allUserIdsSet))
+        
+        if (usersData) {
+          for (const user of usersData) {
+            developerIdsToUpdate.add(user.developer_id)
+          }
+        }
+        
+        // Also check agents table (if it exists)
+        try {
+          const { data: agentsData } = await supabaseAdmin
+            .from('agents')
+            .select('agent_id, agency_id')
+            .in('agent_id', Array.from(allUserIdsSet))
+          
+          // Note: Agents are handled separately, not in developers table
+        } catch (agentsError) {
+          // Agents table doesn't exist yet - this is expected
+          errorTracker.addWarning('AGENTS', 'Agents table not found (will be created later)', {})
         }
       }
 
       if (developerIdsToUpdate.size === 0) {
-        console.log('ℹ️ No developers found in events to update')
         insertResults.developers = {
           updated: 0,
           errors: 0,
@@ -2660,7 +3530,6 @@ export async function POST(request) {
           message: 'No developers found in events to update'
         }
       } else {
-        console.log(`📊 Found ${developerIdsToUpdate.size} developers to update`)
 
         // Batch fetch user_analytics for all developers at once (for views and impressions)
         // For total_leads, query directly from leads table (more accurate)
@@ -2673,7 +3542,7 @@ export async function POST(request) {
           .in('developer_id', developerIdsArray)
 
         if (fetchError) {
-          console.error('❌ Error fetching current developer data:', fetchError)
+          errorTracker.addError('DEVELOPERS', 'Error fetching current developer data', { error: fetchError.message, code: fetchError.code })
         }
 
         // Create map of current values
@@ -2699,7 +3568,7 @@ export async function POST(request) {
             .rpc('get_developer_leads_breakdown', { developer_ids: developerIdsArray })
 
           if (breakdownError) {
-            console.error('❌ Error calling get_developer_leads_breakdown:', breakdownError)
+            errorTracker.addError('DEVELOPERS', 'Error calling get_developer_leads_breakdown', { error: breakdownError.message, code: breakdownError.code })
             // Fallback: set empty breakdowns for all developers
             for (const devId of developerIdsArray) {
               leadsBreakdownMap[devId] = {
@@ -2719,16 +3588,30 @@ export async function POST(request) {
               }
             }
           } else if (leadsBreakdownData && leadsBreakdownData.length > 0) {
+            logSuccess(`Fetched leads breakdown for ${leadsBreakdownData.length} developers`)
             // Convert SQL results to JSONB structure with proper message type breakdown
             for (const row of leadsBreakdownData) {
               const whatsappTotal = Number(row.whatsapp_leads) || 0
               const directMessageTotal = Number(row.direct_message_leads) || 0
               const messageTotal = whatsappTotal + directMessageTotal // Sum for backward compatibility
+              const totalLeads = Number(row.total_leads) || 0
               
               leadsBreakdownMap[row.user_id] = {
                 phone: {
                   total: Number(row.phone_leads) || 0,
                   percentage: Number(row.phone_percentage) || 0
+                },
+                messaging: {
+                  total: messageTotal,
+                  percentage: totalLeads > 0 ? Number(((messageTotal / totalLeads) * 100).toFixed(2)) : 0,
+                  direct_message: {
+                    total: directMessageTotal,
+                    percentage: Number(row.direct_message_percentage) || 0
+                  },
+                  whatsapp: {
+                    total: whatsappTotal,
+                    percentage: Number(row.whatsapp_percentage) || 0
+                  }
                 },
                 whatsapp: {
                   total: whatsappTotal,
@@ -2757,7 +3640,7 @@ export async function POST(request) {
                 },
                 message_leads: {
                   total: messageTotal,
-                  percentage: row.total_leads > 0 ? Number(((messageTotal / row.total_leads) * 100).toFixed(2)) : 0
+                  percentage: totalLeads > 0 ? Number(((messageTotal / totalLeads) * 100).toFixed(2)) : 0
                 },
                 website_leads: {
                   total: Number(row.website_leads) || 0,
@@ -2771,15 +3654,21 @@ export async function POST(request) {
                   total: Number(row.email_leads) || 0,
                   percentage: Number(row.email_percentage) || 0
                 },
-                total_leads: Number(row.total_leads) || 0
+                total_leads: totalLeads
               }
             }
-            console.log(`✅ Calculated leads breakdown for ${leadsBreakdownData.length} developers via SQL aggregation`)
+            logSuccess(`Calculated leads breakdown for ${leadsBreakdownData.length} developers via SQL aggregation`)
           } else {
             // No data found - set empty breakdowns
             for (const devId of developerIdsArray) {
               leadsBreakdownMap[devId] = {
                 phone: { total: 0, percentage: 0 },
+                messaging: {
+                  total: 0,
+                  percentage: 0,
+                  direct_message: { total: 0, percentage: 0 },
+                  whatsapp: { total: 0, percentage: 0 }
+                },
                 whatsapp: { total: 0, percentage: 0 },
                 direct_message: { total: 0, percentage: 0 },
                 email: { total: 0, percentage: 0 },
@@ -2796,11 +3685,17 @@ export async function POST(request) {
             }
           }
         } catch (err) {
-          console.error('❌ Exception calling get_developer_leads_breakdown:', err)
+          errorTracker.addError('DEVELOPERS', 'Exception calling get_developer_leads_breakdown', { error: err.message, stack: err.stack })
           // Fallback: set empty breakdowns
           for (const devId of developerIdsArray) {
             leadsBreakdownMap[devId] = {
               phone: { total: 0, percentage: 0 },
+              messaging: {
+                total: 0,
+                percentage: 0,
+                direct_message: { total: 0, percentage: 0 },
+                whatsapp: { total: 0, percentage: 0 }
+              },
               whatsapp: { total: 0, percentage: 0 },
               direct_message: { total: 0, percentage: 0 },
               email: { total: 0, percentage: 0 },
@@ -2820,29 +3715,78 @@ export async function POST(request) {
         // Store for response
         developerUpdatesData = {}
         
+        // CRITICAL FIX: Calculate cumulative totals from user_analytics table (atomic recalculation)
+        // This ensures data integrity by recalculating from scratch, not adding to potentially wrong DB values
+        // Similar to how cumulative_listing_views is calculated from listing_analytics
+        const developerIdsForCumulative = Object.keys(allDeveloperTotals)
+        let cumulativeUserAnalytics = {} // Map<developerId, {profile_views, total_leads, total_impressions}>
+        
+        if (developerIdsForCumulative.length > 0) {
+          try {
+            // Use SQL aggregation to get cumulative totals from user_analytics table
+            // This sums ALL historical data, ensuring atomic recalculation
+            const { data: cumulativeData, error: cumulativeError } = await supabaseAdmin
+              .from('user_analytics')
+              .select('user_id, profile_views, total_leads, total_impressions_received')
+              .in('user_id', developerIdsForCumulative)
+              .eq('user_type', 'developer')
+            
+            if (cumulativeError) {
+              errorTracker.addError('DEVELOPERS', 'Error fetching cumulative user analytics', { error: cumulativeError.message })
+            } else if (cumulativeData && cumulativeData.length > 0) {
+              // Aggregate by user_id (sum all hours/dates for each developer)
+              for (const row of cumulativeData) {
+                const userId = row.user_id
+                if (!cumulativeUserAnalytics[userId]) {
+                  cumulativeUserAnalytics[userId] = {
+                    profile_views: 0,
+                    total_leads: 0,
+                    total_impressions: 0
+                  }
+                }
+                cumulativeUserAnalytics[userId].profile_views += Number(row.profile_views) || 0
+                cumulativeUserAnalytics[userId].total_leads += Number(row.total_leads) || 0
+                cumulativeUserAnalytics[userId].total_impressions += Number(row.total_impressions_received) || 0
+              }
+              logSuccess(`Calculated cumulative totals from user_analytics for ${Object.keys(cumulativeUserAnalytics).length} developers`)
+            }
+          } catch (err) {
+            errorTracker.addError('DEVELOPERS', 'Exception calculating cumulative user analytics', { error: err.message, stack: err.stack })
+          }
+        }
+        
         // OPTIMIZATION: Prepare all updates first, then execute in parallel using Promise.all
         const developerUpdatePromises = []
-        for (const developerId in developerTotals) {
-          const hourly = developerTotals[developerId]
-          const current = currentDeveloperMap[developerId] || { 
-              total_views: 0,
-            total_listings_views: 0,
-            total_profile_views: 0,
-              total_leads: 0,
-            total_impressions: 0, 
-            conversion_rate: 0 
+        for (const developerId in allDeveloperTotals) {
+          const hourly = allDeveloperTotals[developerId]
+          
+          // CRITICAL FIX: Use cumulative values from user_analytics (atomic recalculation)
+          // DO NOT reference current DB values - recalculate from scratch to ensure data integrity
+          // This fixes the compounding error issue where wrong DB values would stay wrong
+          const cumulative = cumulativeUserAnalytics[developerId] || {
+            profile_views: 0,
+            total_leads: 0,
+            total_impressions: 0
           }
           
           // For total_listings_views: use cumulative value from ALL historical listing_analytics data
           // This ensures we have the complete sum of all views across all time periods
-          // For other metrics: add hourly values to existing cumulative totals
           const newTotalListingViews = hourly.cumulative_listing_views !== undefined 
             ? hourly.cumulative_listing_views  // Use cumulative value from all listing_analytics
-            : (current.total_listings_views + (hourly.hourly_listing_views || 0)) // Fallback: add hourly to existing
-          const newTotalProfileViews = current.total_profile_views + (hourly.hourly_profile_views || 0)
-          const newTotalViews = newTotalListingViews + newTotalProfileViews // Total = listing + profile
-          const newTotalLeads = current.total_leads + (hourly.hourly_leads || 0)
-          const newTotalImpressions = current.total_impressions + (hourly.hourly_impressions || 0)
+            : 0 // If no cumulative value, use 0 (don't add to potentially wrong DB value)
+          
+          // CRITICAL FIX: Use cumulative profile_views from user_analytics (not current DB + hourly)
+          // This ensures atomic recalculation - if DB was wrong, it gets corrected
+          const newTotalProfileViews = cumulative.profile_views
+          
+          // Total views = listing views + profile views (both from cumulative sources)
+          const newTotalViews = newTotalListingViews + newTotalProfileViews
+          
+          // CRITICAL FIX: Use cumulative total_leads from user_analytics (not current DB + hourly)
+          const newTotalLeads = cumulative.total_leads
+          
+          // CRITICAL FIX: Use cumulative total_impressions from user_analytics (not current DB + hourly)
+          const newTotalImpressions = cumulative.total_impressions
           
           // Calculate conversion_rate from cumulative totals
           const conversion_rate = newTotalViews > 0 
@@ -2862,8 +3806,22 @@ export async function POST(request) {
             impressions_change: hourly.impressions_change || 0
           }
           
-          // Get leads breakdown for this developer (cumulative from all user_analytics)
+          // Get leads breakdown for this developer (cumulative from ALL leads in leads table)
+          // This aggregates all leads across all time, not just the current run
           const leadsBreakdown = leadsBreakdownMap[developerId] || {
+            phone: { total: 0, percentage: 0 },
+            messaging: {
+              total: 0,
+              percentage: 0,
+              direct_message: { total: 0, percentage: 0 },
+              whatsapp: { total: 0, percentage: 0 }
+            },
+            whatsapp: { total: 0, percentage: 0 },
+            direct_message: { total: 0, percentage: 0 },
+            email: { total: 0, percentage: 0 },
+            appointment: { total: 0, percentage: 0 },
+            website: { total: 0, percentage: 0 },
+            // Backward compatibility
             phone_leads: { total: 0, percentage: 0 },
             message_leads: { total: 0, percentage: 0 },
             website_leads: { total: 0, percentage: 0 },
@@ -2871,6 +3829,8 @@ export async function POST(request) {
             email_leads: { total: 0, percentage: 0 },
             total_leads: 0
           }
+          
+          // Developer leads breakdown calculated
 
           // Add to parallel update promises
           developerUpdatePromises.push(
@@ -2886,11 +3846,30 @@ export async function POST(request) {
                 views_change: hourly.views_change || 0,
                 leads_change: hourly.leads_change || 0,
                 impressions_change: hourly.impressions_change || 0,
-                leads_breakdown: leadsBreakdown
+                leads_breakdown: leadsBreakdown // This aggregates ALL leads from leads table
             })
             .eq('developer_id', developerId)
-              .then(({ error }) => ({ developer_id: developerId, error, totals: developerUpdatesData[developerId] }))
-              .catch(error => ({ developer_id: developerId, error, totals: developerUpdatesData[developerId] }))
+              .then(({ error, data }) => {
+                if (error) {
+                  errorTracker.addError('DEVELOPERS', `Error updating developer ${developerId}`, {
+                    developer_id: developerId,
+                    error: error.message,
+                    code: error.code,
+                    hint: error.hint
+                  })
+                } else {
+                  logSuccess(`Updated developer ${developerId.substring(0, 8)}... with leads_breakdown`)
+                }
+                return { developer_id: developerId, error, totals: developerUpdatesData[developerId] }
+              })
+              .catch(error => {
+                errorTracker.addError('DEVELOPERS', `Exception updating developer ${developerId}`, {
+                  developer_id: developerId,
+                  error: error.message,
+                  stack: error.stack
+                })
+                return { developer_id: developerId, error, totals: developerUpdatesData[developerId] }
+              })
           )
         }
         
@@ -2901,9 +3880,28 @@ export async function POST(request) {
         
         if (errorCount > 0) {
           const errors = updateResults.filter(r => r.error)
-          console.error(`❌ Errors updating ${errorCount} developers:`, errors.slice(0, 5)) // Log first 5 errors
+          // Track each individual failure
+          errors.forEach((err, idx) => {
+            if (idx < 10) { // Track first 10 errors in detail
+              errorTracker.addError('DEVELOPERS', `Failed to update developer ${err.developer_id}`, {
+                developer_id: err.developer_id,
+                error: err.error?.message || err.error || 'Unknown error',
+                errorCode: err.error?.code,
+                errorHint: err.error?.hint
+              })
+            }
+          })
+          // Summary error
+          errorTracker.addError('DEVELOPERS', `Errors updating ${errorCount} developers`, {
+            totalErrors: errorCount,
+            successCount,
+            errorSample: errors.slice(0, 5).map(e => ({ developer_id: e.developer_id, error: e.error?.message || e.error }))
+          })
         }
-        console.log(`✅ Updated ${successCount} developers (${errorCount} errors)`)
+        logSuccess(`Updated ${successCount} developers`)
+        if (errorCount > 0) {
+          errorTracker.addWarning('DEVELOPERS', `${errorCount} developers failed to update`, { successCount, errorCount })
+        }
         
         // Store update results for API response
         insertResults.developers = {
@@ -2913,11 +3911,11 @@ export async function POST(request) {
         }
       }
     } catch (err) {
-      console.error('❌ Exception updating developers:', err)
+      errorTracker.addError('DEVELOPERS', 'Exception updating developers', { error: err.message, stack: err.stack })
     }
 
     // 13. Update admin_analytics table with platform-wide aggregations
-    console.log(`🔄 Updating admin_analytics for date ${cal.date}, hour ${cal.hour}, day ${cal.day}...`)
+    // Updating admin_analytics
     let adminAnalyticsData = null // Declare outside try block
     try {
       // Get current hour's data (for hourly tracking and change calculations)
@@ -2938,19 +3936,19 @@ export async function POST(request) {
         )
         
         if (aggregateError) {
-          console.error('❌ Error fetching platform aggregates via SQL:', aggregateError)
+          errorTracker.addError('ADMIN_ANALYTICS', 'Error fetching platform aggregates via SQL', { error: aggregateError.message, code: aggregateError.code })
         } else if (aggregates && aggregates.length > 0) {
           platformAggregates = aggregates[0]
-          console.log('✅ Fetched platform aggregates via SQL aggregation')
+          logSuccess('Fetched platform aggregates via SQL aggregation')
         }
       } catch (err) {
-        console.error('❌ Exception calling get_platform_analytics_aggregates:', err)
+        errorTracker.addError('ADMIN_ANALYTICS', 'Exception calling get_platform_analytics_aggregates', { error: err.message, stack: err.stack })
       }
       
       // Fallback: If SQL function fails, fetch manually (shouldn't happen, but safety net)
       let allListingAnalytics = []
       if (!platformAggregates) {
-        console.warn('⚠️ SQL aggregation failed, falling back to manual fetching')
+        errorTracker.addWarning('ADMIN_ANALYTICS', 'SQL aggregation failed, falling back to manual fetching', {})
         const batchSize = 100
         let offset = 0
         let hasMore = true
@@ -2963,7 +3961,7 @@ export async function POST(request) {
             .range(offset, offset + batchSize - 1)
           
           if (allListingAnalyticsError) {
-            console.error('❌ Error fetching listing_analytics for admin analytics:', allListingAnalyticsError)
+            errorTracker.addError('ADMIN_ANALYTICS', 'Error fetching listing_analytics for admin analytics', { error: allListingAnalyticsError.message })
             break
           }
           
@@ -2977,24 +3975,15 @@ export async function POST(request) {
         }
       }
 
-      // Query leads for current hour (for change calculations)
-      const currentHourStart = new Date(Date.UTC(
-        parseInt(cal.date.split('-')[0]),
-        parseInt(cal.date.split('-')[1]) - 1,
-        parseInt(cal.date.split('-')[2]),
-        cal.hour,
-        0,
-        0
-      ))
-      const currentHourEnd = new Date(currentHourStart)
-      currentHourEnd.setUTCHours(currentHourEnd.getUTCHours() + 1)
-
+      // CRITICAL FIX: Query leads for current hour using date and hour fields (not created_at)
+      // The leads table has `date` and `hour` fields that represent when the event happened,
+      // NOT `created_at` which is when the cron created the record
       // For current hour leads, we only need the count
       const { count: currentHourLeadsCount } = await supabaseAdmin
         .from('leads')
         .select('*', { count: 'exact', head: true })
-        .gte('created_at', currentHourStart.toISOString())
-        .lt('created_at', currentHourEnd.toISOString())
+        .eq('date', cal.date)
+        .eq('hour', cal.hour) // Use the hour field, not created_at timestamp
 
       // OPTIMIZATION: Use SQL aggregation for leads breakdown instead of fetching all leads
       // This replaces fetching thousands of rows and filtering in JavaScript
@@ -3004,19 +3993,19 @@ export async function POST(request) {
           .rpc('get_admin_leads_breakdown', { target_date: cal.date })
         
         if (leadsError) {
-          console.error('❌ Error calling get_admin_leads_breakdown:', leadsError)
+          errorTracker.addError('ADMIN_ANALYTICS', 'Error calling get_admin_leads_breakdown', { error: leadsError.message, code: leadsError.code })
         } else if (leadsData && leadsData.length > 0) {
           leadsBreakdownData = leadsData[0]
-          console.log('✅ Fetched leads breakdown via SQL aggregation')
+          logSuccess('Fetched leads breakdown via SQL aggregation')
         }
       } catch (err) {
-        console.error('❌ Exception calling get_admin_leads_breakdown:', err)
+        errorTracker.addError('ADMIN_ANALYTICS', 'Exception calling get_admin_leads_breakdown', { error: err.message, stack: err.stack })
       }
       
       // Fallback: Fetch all leads if SQL function fails (shouldn't happen, but safety net)
       let allLeads = null
       if (!leadsBreakdownData) {
-        console.warn('⚠️ SQL aggregation failed, falling back to manual fetching')
+        errorTracker.addWarning('ADMIN_ANALYTICS', 'SQL aggregation failed, falling back to manual fetching', {})
         const { data: fallbackLeads, error: leadsError } = await supabaseAdmin
           .from('leads')
           .select('lead_actions, lister_type, context_type, seeker_id')
@@ -3048,6 +4037,12 @@ export async function POST(request) {
       let propertySeekerSignups = 0
       let agencySignups = 0
       
+      // Calculate current hour start and end times
+      const currentHourStart = new Date(cal.date + 'T00:00:00Z')
+      currentHourStart.setUTCHours(cal.hour, 0, 0, 0)
+      const currentHourEnd = new Date(currentHourStart)
+      currentHourEnd.setUTCHours(cal.hour, 59, 59, 999)
+      
       try {
         const { data: signupsData, error: signupsError } = await supabaseAdmin
           .rpc('get_user_signups_for_hour', {
@@ -3056,7 +4051,7 @@ export async function POST(request) {
           })
         
         if (signupsError) {
-          console.error('❌ Error calling get_user_signups_for_hour:', signupsError)
+          errorTracker.addError('ADMIN_ANALYTICS', 'Error calling get_user_signups_for_hour', { error: signupsError.message, code: signupsError.code })
           // Fallback to individual queries
           const { count: devCount } = await supabaseAdmin
             .from('developers')
@@ -3065,12 +4060,19 @@ export async function POST(request) {
             .lt('created_at', currentHourEnd.toISOString())
           developerSignups = devCount || 0
           
+          // Try to query agents table (may not exist yet)
+          try {
           const { count: agentCount } = await supabaseAdmin
             .from('agents')
             .select('*', { count: 'exact', head: true })
             .gte('created_at', currentHourStart.toISOString())
             .lt('created_at', currentHourEnd.toISOString())
           agentSignups = agentCount || 0
+          } catch (agentsError) {
+            // Agents table doesn't exist yet - this is expected
+            agentSignups = 0
+            errorTracker.addWarning('AGENTS', 'Agents table not found (will be created later)', {})
+          }
           
           const { count: seekerCount } = await supabaseAdmin
             .from('property_seekers')
@@ -3083,10 +4085,10 @@ export async function POST(request) {
           agentSignups = Number(signupsData[0].agent_signups) || 0
           propertySeekerSignups = Number(signupsData[0].property_seeker_signups) || 0
           agencySignups = Number(signupsData[0].agency_signups) || 0
-          console.log('✅ Fetched all user signups via SQL aggregation')
+          logSuccess('Fetched all user signups via SQL aggregation')
         }
       } catch (err) {
-        console.error('❌ Exception calling get_user_signups_for_hour:', err)
+        errorTracker.addError('ADMIN_ANALYTICS', 'Exception calling get_user_signups_for_hour', { error: err.message, stack: err.stack })
       }
 
       // Get counts from database
@@ -3094,9 +4096,18 @@ export async function POST(request) {
         .from('developers')
         .select('*', { count: 'exact', head: true })
 
-      const { count: totalAgents } = await supabaseAdmin
+      // Try to query agents table (may not exist yet)
+      let totalAgents = 0
+      try {
+        const { count: agentCount } = await supabaseAdmin
         .from('agents')
         .select('*', { count: 'exact', head: true })
+        totalAgents = agentCount || 0
+      } catch (agentsError) {
+        // Agents table doesn't exist yet - this is expected
+        totalAgents = 0
+        errorTracker.addWarning('AGENTS', 'Agents table not found (will be created later)', {})
+      }
 
       const { count: totalPropertySeekers } = await supabaseAdmin
         .from('property_seekers')
@@ -3151,11 +4162,13 @@ export async function POST(request) {
       }
 
       // OPTIMIZATION: Use SQL aggregation for leads breakdown (replaces multiple JS filters and Set operations)
-      let phoneLeads, messageLeads, emailLeads, appointmentLeads, websiteLeads, totalLeadsCount
+      let phoneLeads, messageLeads, messagingLeads, emailLeads, appointmentLeads, websiteLeads, totalLeadsCount
       
       if (leadsBreakdownData) {
         // Use SQL aggregated data
         totalLeadsCount = Number(leadsBreakdownData.total_leads) || 0
+        const messageTotal = Number(leadsBreakdownData.message_leads_total) || 0
+        
         phoneLeads = {
           total: Number(leadsBreakdownData.phone_leads_total) || 0,
           unique: Number(leadsBreakdownData.phone_leads_unique) || 0,
@@ -3163,10 +4176,27 @@ export async function POST(request) {
           by_context: {} // Could be added to SQL function if needed
         }
         messageLeads = {
-          total: Number(leadsBreakdownData.message_leads_total) || 0,
+          total: messageTotal,
           unique: Number(leadsBreakdownData.message_leads_unique) || 0,
-          percentage: totalLeadsCount > 0 ? Number(((leadsBreakdownData.message_leads_total / totalLeadsCount) * 100).toFixed(2)) : 0,
+          percentage: totalLeadsCount > 0 ? Number(((messageTotal / totalLeadsCount) * 100).toFixed(2)) : 0,
           by_context: {}
+        }
+        // Create nested messaging structure
+        // Note: SQL function doesn't break down whatsapp/direct_message yet, so we'll calculate from fallback if available
+        // For now, set to 0 and will be calculated from fallback data if SQL doesn't provide breakdown
+        const whatsappTotal = Number(leadsBreakdownData.whatsapp_leads_total) || 0
+        const directMessageTotal = Number(leadsBreakdownData.direct_message_leads_total) || 0
+        messagingLeads = {
+          total: messageTotal,
+          percentage: totalLeadsCount > 0 ? Number(((messageTotal / totalLeadsCount) * 100).toFixed(2)) : 0,
+          direct_message: {
+            total: directMessageTotal,
+            percentage: messageTotal > 0 ? Number(((directMessageTotal / messageTotal) * 100).toFixed(2)) : 0
+          },
+          whatsapp: {
+            total: whatsappTotal,
+            percentage: messageTotal > 0 ? Number(((whatsappTotal / messageTotal) * 100).toFixed(2)) : 0
+          }
         }
         emailLeads = {
           total: Number(leadsBreakdownData.email_leads_total) || 0,
@@ -3186,10 +4216,10 @@ export async function POST(request) {
           percentage: totalLeadsCount > 0 ? Number(((leadsBreakdownData.website_leads_total / totalLeadsCount) * 100).toFixed(2)) : 0,
           by_context: {}
         }
-        console.log('✅ Used SQL aggregation for leads breakdown')
+        logSuccess('Used SQL aggregation for leads breakdown')
       } else {
         // Fallback: Calculate from allLeads array (inefficient, but safety net)
-        console.warn('⚠️ Using fallback JS aggregation for leads (SQL function failed)')
+        errorTracker.addWarning('ADMIN_ANALYTICS', 'Using fallback JS aggregation for leads (SQL function failed)', {})
         phoneLeads = {
           total: allLeads?.filter(lead => 
             lead.lead_actions?.some(action => action.action_type === 'lead_phone')
@@ -3200,15 +4230,43 @@ export async function POST(request) {
           percentage: 0,
           by_context: {}
         }
+        const messageLeadsList = allLeads?.filter(lead => 
+          lead.lead_actions?.some(action => action.action_type === 'lead_message')
+        ) || []
+        const messageTotal = messageLeadsList.length
+        const whatsappLeadsList = messageLeadsList.filter(lead =>
+          lead.lead_actions?.some(action => 
+            action.action_type === 'lead_message' &&
+            String(action.action_metadata?.message_type || action.action_metadata?.messageType || '').toLowerCase() === 'whatsapp'
+          )
+        )
+        const directMessageLeadsList = messageLeadsList.filter(lead =>
+          lead.lead_actions?.some(action => 
+            action.action_type === 'lead_message' &&
+            String(action.action_metadata?.message_type || action.action_metadata?.messageType || '').toLowerCase() !== 'whatsapp' &&
+            String(action.action_metadata?.message_type || action.action_metadata?.messageType || '').toLowerCase() !== 'email'
+          )
+        )
+        const whatsappTotal = whatsappLeadsList.length
+        const directMessageTotal = directMessageLeadsList.length
+        
         messageLeads = {
-          total: allLeads?.filter(lead => 
-            lead.lead_actions?.some(action => action.action_type === 'lead_message')
-          ).length || 0,
-          unique: new Set(allLeads?.filter(lead => 
-            lead.lead_actions?.some(action => action.action_type === 'lead_message')
-          ).map(lead => lead.seeker_id)).size || 0,
+          total: messageTotal,
+          unique: new Set(messageLeadsList.map(lead => lead.seeker_id)).size || 0,
           percentage: 0,
           by_context: {}
+        }
+        messagingLeads = {
+          total: messageTotal,
+          percentage: 0,
+          direct_message: {
+            total: directMessageTotal,
+            percentage: messageTotal > 0 ? Number(((directMessageTotal / messageTotal) * 100).toFixed(2)) : 0
+          },
+          whatsapp: {
+            total: whatsappTotal,
+            percentage: messageTotal > 0 ? Number(((whatsappTotal / messageTotal) * 100).toFixed(2)) : 0
+          }
         }
         emailLeads = {
           total: allLeads?.filter(lead => 
@@ -3244,9 +4302,27 @@ export async function POST(request) {
         if (totalLeadsCount > 0) {
           phoneLeads.percentage = Number(((phoneLeads.total / totalLeadsCount) * 100).toFixed(2))
           messageLeads.percentage = Number(((messageLeads.total / totalLeadsCount) * 100).toFixed(2))
+          messagingLeads.percentage = Number(((messagingLeads.total / totalLeadsCount) * 100).toFixed(2))
           emailLeads.percentage = Number(((emailLeads.total / totalLeadsCount) * 100).toFixed(2))
           appointmentLeads.percentage = Number(((appointmentLeads.total / totalLeadsCount) * 100).toFixed(2))
           websiteLeads.percentage = Number(((websiteLeads.total / totalLeadsCount) * 100).toFixed(2))
+        }
+      }
+      
+      // If messagingLeads wasn't created (shouldn't happen, but safety check)
+      if (!messagingLeads) {
+        const messageTotal = messageLeads?.total || 0
+        messagingLeads = {
+          total: messageTotal,
+          percentage: messageLeads?.percentage || 0,
+          direct_message: {
+            total: 0,
+            percentage: 0
+          },
+          whatsapp: {
+            total: 0,
+            percentage: 0
+          }
         }
       }
 
@@ -3327,7 +4403,8 @@ export async function POST(request) {
         total_leads: currentHourTotalLeads,
         total_leads_change: leadsChange,
         phone_leads: phoneLeads,
-        message_leads: messageLeads,
+        messaging: messagingLeads,
+        message_leads: messageLeads, // Backward compatibility
         email_leads: emailLeads,
         appointment_leads: appointmentLeads,
         website_leads: websiteLeads
@@ -3381,7 +4458,7 @@ export async function POST(request) {
         platform_engagement: platformEngagement,
         platform_impressions: platformImpressions,
         phone_leads: phoneLeads,
-        message_leads: messageLeads,
+        message_leads: messageLeads, // Backward compatibility (messaging is inside leads.messaging)
         email_leads: emailLeads,
         appointment_leads: appointmentLeads,
         website_leads: websiteLeads,
@@ -3407,41 +4484,46 @@ export async function POST(request) {
         .select()
 
       if (upsertError) {
-        console.error('❌ Error upserting admin_analytics:', upsertError)
+        errorTracker.addError('ADMIN_ANALYTICS', 'Error upserting admin_analytics', { error: upsertError.message, date: cal.date, hour: cal.hour })
       } else {
-        console.log(`✅ Upserted admin_analytics for date ${cal.date}, hour ${cal.hour}`)
+        logSuccess(`Upserted admin_analytics for date ${cal.date}, hour ${cal.hour}`)
       }
     } catch (err) {
-      console.error('❌ Exception updating admin_analytics:', err)
+      errorTracker.addError('ADMIN_ANALYTICS', 'Exception updating admin_analytics', { error: err.message, stack: err.stack })
     }
 
     // 13. Mark run as completed
     await completeRun(runId, {
-      events_processed: events.length,
-      listings_processed: listingRows.length,
-      users_processed: userRows.length,
-      developments_processed: developmentRows.length,
-      leads_processed: leadRows.length,
+      events_processed: totalEventsProcessed,
+      listings_processed: allListingRows.length,
+      users_processed: allUserRows.length,
+      developments_processed: allDevelopmentRows.length,
+      leads_processed: allLeadRows.length,
       listings_inserted: insertResults.listings.inserted,
       users_inserted: insertResults.users.inserted,
       developments_inserted: insertResults.developments.inserted,
-      leads_inserted: insertResults.leads.inserted
+      leads_inserted: insertResults.leads.inserted,
+      ...(testTimeSeries ? { metadata: { lastProcessedDate: simulatedDate, hoursProcessed: hoursToProcess.length } } : {})
     })
 
-    console.log(`✅ Cron run ${runId} completed successfully`)
+    logSuccess(`Cron run ${runId} completed successfully`)
 
     // Serialize Sets to numbers for JSON response
-    const serializeListingRows = listingRows.map(row => ({
+    const serializeListingRows = allListingRows.map(row => ({
       ...row,
       unique_views: typeof row.unique_views === 'number' ? row.unique_views : (row.unique_views?.size || 0),
       unique_leads: typeof row.unique_leads === 'number' ? row.unique_leads : (row.unique_leads?.size || 0)
     }))
 
-    const serializeUserRows = userRows.map(row => ({
+    const serializeUserRows = allUserRows.map(row => ({
       ...row,
       unique_profile_viewers: typeof row.unique_profile_viewers === 'number' ? row.unique_profile_viewers : (row.unique_profile_viewers?.size || 0),
       unique_properties_viewed: typeof row.unique_properties_viewed === 'number' ? row.unique_properties_viewed : (row.unique_properties_viewed?.size || 0)
     }))
+
+    // Serialize development and lead rows (no Sets in these, but ensure they're serializable)
+    const serializeDevelopmentRows = allDevelopmentRows.map(row => ({ ...row }))
+    const serializeLeadRows = allLeadRows.map(row => ({ ...row }))
 
     return NextResponse.json({
       success: true,
@@ -3450,6 +4532,12 @@ export async function POST(request) {
       run_id: runId,
       date: cal.date,
       hour: cal.hour, // Add hour for hourly tracking
+      ...(testTimeSeries ? {
+        testTimeSeries: true,
+        dayProcessed: simulatedDate,
+        hoursProcessed: hoursToProcess.length,
+        hoursWithEvents: hoursToProcess
+      } : {}),
       timeRange: {
         start: startTime.toISOString(),
         end: endTime.toISOString(),
@@ -3462,11 +4550,11 @@ export async function POST(request) {
         breakdown: customEventsBreakdown
       },
       processed: {
-        events: events.length,
-        listings: listingRows.length,
-        users: userRows.length,
-        developments: developmentRows.length,
-        leads: leadRows.length
+        events: totalEventsProcessed,
+        listings: allListingRows.length,
+        users: allUserRows.length,
+        developments: allDevelopmentRows.length,
+        leads: allLeadRows.length
       },
       inserted: insertResults,
       posthog: {
@@ -3477,16 +4565,18 @@ export async function POST(request) {
       data: {
         listing_analytics: serializeListingRows,
         user_analytics: serializeUserRows,
-        development_analytics: developmentRows,
-        leads: leadRows,
+        development_analytics: serializeDevelopmentRows,
+        leads: serializeLeadRows,
         listing_updates: listingUpdatesData,
         developer_updates: developerUpdatesData,
         admin_analytics: adminAnalyticsData || null
-      }
+      },
+      // Include all errors and warnings for tracking
+      errors: errorTracker.getSummary()
     })
 
   } catch (error) {
-    console.error('Cron analytics error:', error)
+    errorTracker.addError('CRON', 'Fatal error in cron execution', { error: error.message, stack: error.stack })
     
     // Mark run as failed
     if (runRecord) {
@@ -3496,7 +4586,8 @@ export async function POST(request) {
     return NextResponse.json({
       success: false,
       error: error.message,
-      run_id: runId
+      run_id: runId,
+      errors: errorTracker.getSummary()
     }, { status: 500 })
   }
 }

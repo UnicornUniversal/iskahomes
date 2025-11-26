@@ -5,11 +5,11 @@ import HomeProperties from "./components/HomeProperties";
 import SideBanner from "./components/Ads/SideBanner";
 import Layout1 from "./layout/Layout1";
 import PostHogDebug from "./components/PostHogDebug";
-
+import Nav from "./components/Nav";
 export default function Home() {
   return (
    <div className="  w-full h-full flex flex-col items-center justify-center" >
-   
+   <Nav />
       <Header />
       <Banner />
 

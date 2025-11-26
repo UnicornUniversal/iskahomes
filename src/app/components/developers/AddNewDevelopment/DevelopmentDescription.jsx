@@ -20,10 +20,10 @@ const DevelopmentDescription = ({ formData, updateFormData, isEditMode }) => {
   }
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow-sm">
+    <div className="w-full">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Development Description</h2>
-        <p className="text-gray-600">
+        <h2 className="mb-2">Development Description</h2>
+        <p>
           {isEditMode ? 'Update the development information' : 'Provide detailed information about your development project'}
         </p>
       </div>
@@ -31,7 +31,7 @@ const DevelopmentDescription = ({ formData, updateFormData, isEditMode }) => {
       <div className="space-y-6">
         {/* Title */}
         <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="title" className="block text-sm font-medium mb-2">
             Development Title *
           </label>
           <Input
@@ -45,9 +45,24 @@ const DevelopmentDescription = ({ formData, updateFormData, isEditMode }) => {
           />
         </div>
 
+        {/* Tagline */}
+        <div>
+          <label htmlFor="tagline" className="block text-sm font-medium mb-2">
+            Tagline
+          </label>
+          <Input
+            id="tagline"
+            type="text"
+            placeholder="Enter a catchy tagline for your development"
+            value={formData.tagline || ''}
+            onChange={(e) => handleInputChange('tagline', e.target.value)}
+            className="w-full"
+          />
+        </div>
+
         {/* Description */}
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="description" className="block text-sm font-medium mb-2">
             Description *
           </label>
           <textarea
@@ -64,7 +79,7 @@ const DevelopmentDescription = ({ formData, updateFormData, isEditMode }) => {
         {/* Size and Status Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="size" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="size" className="block text-sm font-medium mb-2">
               Size (sq ft)
             </label>
             <Input
@@ -78,7 +93,7 @@ const DevelopmentDescription = ({ formData, updateFormData, isEditMode }) => {
           </div>
 
           <div>
-            <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="status" className="block text-sm font-medium mb-2">
               Status *
             </label>
             <select
@@ -98,7 +113,7 @@ const DevelopmentDescription = ({ formData, updateFormData, isEditMode }) => {
 
         {/* Number of Buildings */}
         <div>
-          <label htmlFor="number_of_buildings" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="number_of_buildings" className="block text-sm font-medium mb-2">
             Number of Buildings
           </label>
           <Input

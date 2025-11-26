@@ -25,10 +25,12 @@ import {
   FiMap,
   FiChevronDown,
 } from 'react-icons/fi'
+import { FaWhatsapp, FaYoutube, FaTiktok } from 'react-icons/fa'
 import dynamic from 'next/dynamic'
 import { Wrapper } from '@googlemaps/react-wrapper'
 import countryToCurrency from 'country-to-currency'
 import DeveloperNav from '../../../components/developers/DeveloperNav'
+import { CustomSelect } from '../../../components/ui/custom-select'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'react-toastify'
 
@@ -161,6 +163,7 @@ const ProfilePage = () => {
   // Developer data from database
   const [developerData, setDeveloperData] = useState({
     name: '',
+    slogan: '',
     email: '',
     phone: '',
     secondary_email: '',
@@ -184,12 +187,15 @@ const ProfilePage = () => {
       facebook: '',
       instagram: '',
       linkedin: '',
-      tiktok: ''
+      tiktok: '',
+      whatsapp: '',
+      youtube: ''
     },
     customer_care: [],
     registration_files: [],
     locations: [],
-    company_statistics: []
+    company_statistics: [],
+    company_gallery: []
   })
 
   // Google Places + multi-location and company statistics (frontend-only for now)
@@ -261,6 +267,7 @@ const ProfilePage = () => {
         // Normalize data to ensure no null values and handle field name differences
         const normalizedData = {
           name: data.name || '',
+          slogan: data.slogan || '',
           email: data.email || '',
           phone: data.phone || '',
           secondary_email: data.secondary_email || '',
@@ -279,31 +286,48 @@ const ProfilePage = () => {
           license_number: data.license_number || data.license || '',
           profile_image: data.profile_image || '',
           cover_image: data.cover_image || '',
-          specialization: data.specialization || { database: [], custom: [] },
+          specialization: (() => {
+            // Normalize specialization - handle both old format (with IDs) and new format (just strings)
+            const spec = data.specialization || { database: [], custom: [] }
+            return {
+              database: Array.isArray(spec.database) 
+                ? spec.database.map(s => typeof s === 'string' ? s : (s.name || s))
+                : [],
+              custom: Array.isArray(spec.custom)
+                ? spec.custom.map(s => typeof s === 'string' ? s : (s.name || s))
+                : []
+            }
+          })(),
           social_media: Array.isArray(data.social_media) ? {
             facebook: '',
             instagram: '',
             linkedin: '',
-            tiktok: ''
+            tiktok: '',
+            whatsapp: '',
+            youtube: ''
           } : (data.social_media || {
             facebook: '',
             instagram: '',
             linkedin: '',
-            tiktok: ''
+            tiktok: '',
+            whatsapp: '',
+            youtube: ''
           }),
           customer_care: data.customer_care || [],
           registration_files: data.registration_files || [],
           // New structures
           locations: Array.isArray(data.locations) ? data.locations : [],
           company_statistics: Array.isArray(data.company_statistics) ? data.company_statistics : [],
+          company_gallery: Array.isArray(data.company_gallery) ? data.company_gallery : [],
           // Additional fields for display
           account_status: data.account_status || 'active',
           created_at: data.created_at || null,
-          profile_completion_percentage: data.profile_completion_percentage || 0
+          profile_completion_percentage: data.profile_completion_percentage || 0,
+          verified: data.verified || false
         }
         
         // Store full data for account info
-        setDeveloperData({ ...normalizedData, account_status: data.account_status, created_at: data.created_at, profile_completion_percentage: data.profile_completion_percentage })
+        setDeveloperData({ ...normalizedData, account_status: data.account_status, created_at: data.created_at, profile_completion_percentage: data.profile_completion_percentage, verified: data.verified || false })
         setFormData(normalizedData)
       } else {
         toast.error('Failed to fetch profile data')
@@ -666,6 +690,13 @@ const ProfilePage = () => {
     return `${years} year${years > 1 ? 's' : ''}, ${remainingMonths} month${remainingMonths > 1 ? 's' : ''}`
   }
 
+  // Helper function to format date
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A'
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+  }
+
   // Handle input changes
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -701,7 +732,8 @@ const ProfilePage = () => {
       // Check if there are file uploads
       const hasFileUploads = formData.profile_image instanceof File || 
                             formData.cover_image instanceof File || 
-                            formData.registration_files.some(file => file instanceof File)
+                            formData.registration_files.some(file => file instanceof File) ||
+                            formData.company_gallery?.some(file => file instanceof File)
 
       let response
       if (hasFileUploads) {
@@ -719,6 +751,13 @@ const ProfilePage = () => {
           formData.registration_files.forEach(file => {
             if (file instanceof File) {
               formDataToSend.append('registrationFiles', file)
+            }
+          })
+        }
+        if (formData.company_gallery && formData.company_gallery.length > 0) {
+          formData.company_gallery.forEach((file, index) => {
+            if (file instanceof File) {
+              formDataToSend.append('galleryImages', file)
             }
           })
         }
@@ -751,7 +790,8 @@ const ProfilePage = () => {
           locations: data.locations || (data.company_locations || []),
           account_status: data.account_status || 'active',
           created_at: data.created_at,
-          profile_completion_percentage: data.profile_completion_percentage || 0
+          profile_completion_percentage: data.profile_completion_percentage || 0,
+          verified: data.verified || false
         }
         
         // Update developerData with complete response data
@@ -867,19 +907,63 @@ const ProfilePage = () => {
     }))
   }
 
-  // Specialization management functions
-  const addDatabaseSpecialization = (category) => {
-    const specialization = {
-      id: category.id,
-      name: category.name,
-      type: 'database'
+  // Company Gallery handlers
+  const handleGalleryUpload = (event) => {
+    const files = Array.from(event.target.files)
+    const maxImages = 7
+    const maxSize = 300 * 1024 // 300 KB in bytes
+    
+    // Check current gallery count
+    const currentCount = formData.company_gallery?.length || 0
+    const remainingSlots = maxImages - currentCount
+    
+    if (remainingSlots <= 0) {
+      toast.error(`Maximum ${maxImages} images allowed`)
+      return
     }
+
+    // Filter valid files
+    const validFiles = files.slice(0, remainingSlots).filter(file => {
+      // Check file size
+      if (file.size > maxSize) {
+        toast.error(`File ${file.name} is too large. Maximum size is 300KB.`)
+        return false
+      }
+      // Check if it's an image
+      if (!file.type.startsWith('image/')) {
+        toast.error(`${file.name} is not an image file`)
+        return false
+      }
+      return true
+    })
+
+    if (validFiles.length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        company_gallery: [...(prev.company_gallery || []), ...validFiles]
+      }))
+      toast.success(`${validFiles.length} image(s) added to gallery`)
+    }
+  }
+
+  const removeGalleryImage = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      company_gallery: prev.company_gallery.filter((_, i) => i !== index)
+    }))
+    toast.success('Image removed from gallery')
+  }
+
+  // Specialization management functions - Store actual values instead of IDs
+  const addDatabaseSpecialization = (category) => {
+    // Store just the name value, not the ID
+    const specializationName = category.name
     
     setFormData(prev => ({
       ...prev,
       specialization: {
         ...prev.specialization,
-        database: [...prev.specialization.database, specialization]
+        database: [...prev.specialization.database, specializationName]
       }
     }))
     setShowSpecializationDropdown(false)
@@ -891,17 +975,14 @@ const ProfilePage = () => {
       return
     }
 
-    const specialization = {
-      id: `custom_${Date.now()}`,
-      name: newCustomSpecialization.trim(),
-      type: 'custom'
-    }
+    // Store just the name value
+    const specializationName = newCustomSpecialization.trim()
     
     setFormData(prev => ({
       ...prev,
       specialization: {
         ...prev.specialization,
-        custom: [...prev.specialization.custom, specialization]
+        custom: [...prev.specialization.custom, specializationName]
       }
     }))
     setNewCustomSpecialization('')
@@ -921,7 +1002,7 @@ const ProfilePage = () => {
     return (
       
      
-        <div className="flex-1 p-6 flex items-center justify-center">
+        <div className="flex-1 p-2 md:p-2 md:p-6 flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <p className="text-gray-600">Loading profile data...</p>
@@ -935,15 +1016,15 @@ const ProfilePage = () => {
   
     
       
-      <div className="flex-1 p-6  relative">
+      <div className="flex-1 md:p-2 md:p-2 md:p-6  relative">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Profile Settings</h1>
-          <p className="text-gray-600">Manage your developer profile and account settings</p>
+          <h1 className=" mb-2">Profile Settings</h1>
+          <p>Manage your developer profile and account settings</p>
         </div>
 
         {/* Tab Navigation */}
-        <div className="bg-white rounded-2xl p-1 mb-6 shadow-sm border border-gray-100">
+        <div className=" rounded-2xl p-1 mb-6 shadow-sm border border-gray-100">
           <div className="flex space-x-1">
             {[
               { id: 'profile', label: 'Profile Information', icon: FiUser },
@@ -954,8 +1035,8 @@ const ProfilePage = () => {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all duration-200 ${
                   activeTab === tab.id
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    ? 'secondary_button'
+                    : 'hover:secondary_button'
                 }`}
               >
                 <tab.icon className="w-4 h-4" />
@@ -967,7 +1048,7 @@ const ProfilePage = () => {
 
         {/* Profile Information Tab */}
         {activeTab === 'profile' && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className=" rounded-2xl shadow-sm border border-gray-100 text-primary_color overflow-hidden">
             {/* Cover Photo */}
             <div className="relative h-80 bg-gradient-to-r from-primary_color to-blue-600 rounded-t-2xl overflow-hidden">
               {formData.cover_image ? (
@@ -979,14 +1060,14 @@ const ProfilePage = () => {
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <div className="text-center !text-white">
-                    <FiCamera className="w-16 h-16 mx-auto mb-4 opacity-70" />
+                    <FiCamera className="w-16 h-16 mx-auto mb-4" />
                     <p className="text-xl font-medium">Set Cover Image</p>
                     <p className="text-sm opacity-80">Upload a cover photo for your profile</p>
                   </div>
                 </div>
               )}
-              <label className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg p-2 cursor-pointer shadow-lg hover:bg-white transition-colors z-10">
-                <FiCamera className="w-4 h-4 text-gray-600" />
+              <label className="absolute top-4 right-4 /90 backdrop-blur-sm rounded-lg p-2 cursor-pointer shadow-lg hover: transition-colors z-10">
+                <FiCamera className="w-4 h-4 " />
                 <input
                   type="file"
                   accept="image/*"
@@ -1015,7 +1096,7 @@ const ProfilePage = () => {
                         </div>
                       </div>
                     )}
-                    <label className="absolute bottom-0 right-0 bg-white rounded-full p-2 cursor-pointer shadow-lg hover:bg-gray-50 transition-colors">
+                    <label className="absolute bottom-0 right-0 bg-white  rounded-full p-2 cursor-pointer shadow-lg hover: transition-colors">
                       <FiCamera className="w-4 h-4 text-gray-600" />
                       <input
                         type="file"
@@ -1030,111 +1111,101 @@ const ProfilePage = () => {
               
               {/* Company Info Below Cover */}
               <div className="mt-4">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">{formData.name || 'Company Name'}</h2>
-                <p className="text-primary_color font-medium mb-2">Real Estate Developer</p>
+            <div className="flex items-start gap-2 flex-wrap ">
+            <h2 className="mb-3 ">{formData.name || 'Company Name'}</h2>
+                      {/* Account Status */}
+                      <span className={`px-3 py-1 rounded-full font-semibold capitalize !text-[1em]  ${
+                    developerData.account_status === 'active' 
+                      ? 'secondary_button' 
+                      : developerData.account_status === 'suspended' 
+                      ? 'bg-red-100'
+                      : 'bg-gray-100'
+                  }`}>
+                    {developerData.account_status || 'active'}
+                  </span>
+               </div>
                 
-                {/* Account Status, Time on Platform, and Profile Completion */}
-                <div className="flex flex-wrap items-center gap-4 mb-3">
-                  {/* Account Status */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">Status:</span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      developerData.account_status === 'active' 
-                        ? 'bg-green-100 text-green-700' 
-                        : developerData.account_status === 'suspended' 
-                        ? 'bg-red-100 text-red-700'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      {developerData.account_status || 'active'}
-                    </span>
-                  </div>
+                {/* Status, Verification, Joined Date, Profile Completion, and Specializations */}
+                <div className="flex flex-wrap items-center w-full justify-between gap-4 mb-3">
+            
                   
-                  {/* Time on Platform */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">On platform:</span>
-                    <span className="text-sm font-medium text-gray-900">
-                      {getTimeOnPlatform(developerData.created_at)}
+                  {/* Verification Status */}
+                  {developerData.verified && (
+                    <span className="px-3 py-1 rounded-full font-semibold capitalize bg-primary_color text-white">
+                      Verified
+                    </span>
+                  )}
+                  
+                  {/* Joined IskaHomes since */}
+                  <div className="flex flex-col">
+                    <span className="font-medium">Joined IskaHomes since:</span>
+                    <span className="text-sm opacity-70">
+                      {formatDate(developerData.created_at)}
+                    </span>
+                    <span className="text-xs opacity-60">
+                      Duration: {getTimeOnPlatform(developerData.created_at)}
                     </span>
                   </div>
                   
                   {/* Profile Completion */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">Profile:</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full transition-all duration-300 ${
-                            (developerData.profile_completion_percentage || 0) >= 100 
-                              ? 'bg-green-500' 
-                              : (developerData.profile_completion_percentage || 0) >= 60 
-                              ? 'bg-blue-500' 
-                              : (developerData.profile_completion_percentage || 0) >= 40 
-                              ? 'bg-yellow-500' 
-                              : 'bg-red-500'
-                          }`}
-                          style={{ width: `${developerData.profile_completion_percentage || 0}%` }}
-                        />
-                      </div>
-                      <span className={`text-sm font-semibold ${
-                        (developerData.profile_completion_percentage || 0) >= 100 
-                          ? 'text-green-600' 
-                          : (developerData.profile_completion_percentage || 0) >= 60 
-                          ? 'text-blue-600' 
-                          : (developerData.profile_completion_percentage || 0) >= 40 
-                          ? 'text-yellow-600' 
-                          : 'text-red-600'
-                      }`}>
-                        {developerData.profile_completion_percentage || 0}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex flex-wrap gap-2">
-                  {[...(formData.specialization?.database || []), ...(formData.specialization?.custom || [])].map((spec, index) => (
-                    <span key={index} className="bg-primary_color/10 text-primary_color px-3 py-1 rounded-full text-sm font-medium">
-                      {spec.name}
+                  <div className="flex flex-col">
+                    <span className="font-medium">Profile:</span>
+                    <span className="font-semibold">
+                      {developerData.profile_completion_percentage || 0}%
                     </span>
+                  </div>
+                  
+                  {/* Property Specializations */}
+               <div className="">
+                <span className="font-medium">Specializations:</span>
+                <div className="flex flex-wrap gap-2"> 
+               {[...(formData.specialization?.database || []), ...(formData.specialization?.custom || [])].map((spec, index) => (
+                    <p key={index} className="bg-primary_color/10 px-3 py-1 rounded-full font-medium">
+                      {typeof spec === 'string' ? spec : spec.name}
+                    </p>
                   ))}
+</div>
+</div>
                 </div>
               </div>
             </div>
 
             {/* Profile Content */}
-            <div className="p-6 space-y-8">
+            <div className="p-2 md:p-2 md:p-6 space-y-8">
               
               {/* Section 1: Company Information */}
-              <div className="bg-gray-50 rounded-2xl p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                  <FiHome className="w-6 h-6 text-primary_color" />
+              <div className=" rounded-2xl p-2 md:p-2 md:p-6 ">
+                <h3 className="mb-6 flex items-center gap-2">
+                  <FiHome className="w-6 h-6" />
                   Company Information
                 </h3>
                 
                 {/* Basic Company Details */}
                 <div className="mb-8">
-                  <h4 className="text-lg font-semibold text-gray-800 mb-4">Basic Details</h4>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <h4 className="font-semibold mb-4">Basic Details</h4>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 md:p-2 ">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Company Name</label>
+                      <label className="block font-medium mb-2">Company Name</label>
                       <div className="relative">
-                        <FiHome className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <FiHome className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" />
                         <input
                           type="text"
                           value={formData.name}
                           onChange={(e) => handleInputChange('name', e.target.value)}
-                          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Website</label>
+                      <label className="block font-medium mb-2">Slogan</label>
                       <div className="relative">
-                        <FiGlobe className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <FiHome className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" />
                         <input
-                          type="url"
-                          value={formData.website}
-                          onChange={(e) => handleInputChange('website', e.target.value)}
-                          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                          type="text"
+                          value={formData.slogan}
+                          onChange={(e) => handleInputChange('slogan', e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
+                          placeholder="Your company slogan or tagline"
                         />
                       </div>
                     </div>
@@ -1143,49 +1214,62 @@ const ProfilePage = () => {
 
                 {/* Contact Information */}
                 <div className="mb-8">
-                  <h4 className="text-lg font-semibold text-gray-800 mb-4">Contact Information</h4>
+                  <h4 className="font-semibold mb-4">Contact Information</h4>
+                  <div className="mb-6">
+                    <label className="block font-medium mb-2">Website</label>
+                    <div className="relative">
+                      <FiGlobe className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" />
+                      <input
+                        type="url"
+                        value={formData.website}
+                        onChange={(e) => handleInputChange('website', e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
+                        placeholder="https://yourcompany.com"
+                      />
+                    </div>
+                  </div>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Email Addresses */}
                     <div className="space-y-4">
-                      <h5 className="text-md font-medium text-gray-700 flex items-center gap-2">
-                        <FiMail className="w-4 h-4 text-primary_color" />
+                      <h5 className="font-medium flex items-center gap-2">
+                        <FiMail className="w-4 h-4" />
                         Email Addresses
                       </h5>
                       <div className="space-y-3">
                         <div>
-                          <label className="block text-sm font-medium text-gray-600 mb-2">Primary Email</label>
+                          <label className="block font-medium mb-2">Primary Email</label>
                           <div className="relative">
-                            <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" />
                             <input
                               type="email"
                               value={formData.email}
                               onChange={(e) => handleInputChange('email', e.target.value)}
-                              className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                              className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                             />
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-600 mb-2">Secondary Email</label>
+                          <label className="block font-medium mb-2">Secondary Email</label>
                           <div className="relative">
-                            <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" />
                             <input
                               type="email"
                               value={getSafeValue(formData.secondary_email)}
                               onChange={(e) => handleInputChange('secondary_email', e.target.value)}
-                              className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                              className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                               placeholder="support@company.com"
                             />
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-600 mb-2">Tertiary Email</label>
+                          <label className="block font-medium mb-2">Tertiary Email</label>
                           <div className="relative">
-                            <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" />
                             <input
                               type="email"
                               value={getSafeValue(formData.tertiary_email)}
                               onChange={(e) => handleInputChange('tertiary_email', e.target.value)}
-                              className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                              className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                               placeholder="sales@company.com"
                             />
                           </div>
@@ -1195,45 +1279,45 @@ const ProfilePage = () => {
 
                     {/* Phone Numbers */}
                     <div className="space-y-4">
-                      <h5 className="text-md font-medium text-gray-700 flex items-center gap-2">
-                        <FiPhone className="w-4 h-4 text-primary_color" />
+                      <h5 className="font-medium flex items-center gap-2">
+                        <FiPhone className="w-4 h-4" />
                         Phone Numbers
                       </h5>
                       <div className="space-y-3">
                         <div>
-                          <label className="block text-sm font-medium text-gray-600 mb-2">Primary Phone</label>
+                          <label className="block font-medium mb-2">Primary Phone</label>
                           <div className="relative">
-                            <FiPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            <FiPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" />
                             <input
                               type="tel"
                               value={formData.phone}
                               onChange={(e) => handleInputChange('phone', e.target.value)}
-                              className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                              className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                             />
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-600 mb-2">Secondary Phone</label>
+                          <label className="block font-medium mb-2">Secondary Phone</label>
                           <div className="relative">
-                            <FiPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            <FiPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" />
                             <input
                               type="tel"
                               value={getSafeValue(formData.secondary_phone)}
                               onChange={(e) => handleInputChange('secondary_phone', e.target.value)}
-                              className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                              className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                               placeholder="+233 30 111 2225"
                             />
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-600 mb-2">Tertiary Phone</label>
+                          <label className="block font-medium mb-2">Tertiary Phone</label>
                           <div className="relative">
-                            <FiPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            <FiPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" />
                             <input
                               type="tel"
                               value={getSafeValue(formData.tertiary_phone)}
                               onChange={(e) => handleInputChange('tertiary_phone', e.target.value)}
-                              className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                              className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                               placeholder="+233 30 111 2226"
                             />
                           </div>
@@ -1245,75 +1329,146 @@ const ProfilePage = () => {
 
                 {/* Company Details */}
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-800 mb-4">Company Details</h4>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <h4 className="font-semibold mb-4">Company Details</h4>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 md:p-2 ">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Founded Year</label>
+                      <label className="block font-medium mb-2">Founded Year</label>
                       <div className="relative">
-                        <FiCalendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <FiCalendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" />
                         <input
                           type="text"
                           value={formData.founded_year}
                           onChange={(e) => handleInputChange('founded_year', e.target.value)}
-                          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Company Size</label>
-                      <select
+                      <label className="block font-medium mb-2">Company Size</label>
+                      <CustomSelect
                         value={formData.company_size}
                         onChange={(e) => handleInputChange('company_size', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
-                      >
-                        <option value="1-10">1-10 employees</option>
-                        <option value="11-50">11-50 employees</option>
-                        <option value="50-100">50-100 employees</option>
-                        <option value="100+">100+ employees</option>
-                      </select>
+                        options={[
+                          { value: '1-10', label: '1-10 employees' },
+                          { value: '11-50', label: '11-50 employees' },
+                          { value: '50-100', label: '50-100 employees' },
+                          { value: '100+', label: '100+ employees' }
+                        ]}
+                        placeholder="Select company size"
+                      />
                     </div>
                   </div>
                   <div className="mt-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Company Description</label>
+                    <label className="block font-medium mb-2">Company Description</label>
                     <textarea
                       value={formData.description}
                       onChange={(e) => handleInputChange('description', e.target.value)}
                       rows={4}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50 resize-none"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled: resize-none"
                       placeholder="Describe your company and services..."
                     />
                   </div>
+
+                  {/* Company Gallery */}
+                  <div className="mt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <label className="block font-medium">Company Gallery</label>
+                      <label className="primary_button flex items-center gap-2 cursor-pointer">
+                        <FiUpload className="w-4 h-4" />
+                        Add Images
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          onChange={handleGalleryUpload}
+                          disabled={(formData.company_gallery?.length || 0) >= 7}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                    <p className="text-sm opacity-70 mb-4">
+                      Maximum 7 images, 300KB per image
+                      {(formData.company_gallery?.length || 0) > 0 && (
+                        <span className="ml-2">
+                          ({formData.company_gallery.length}/7)
+                        </span>
+                      )}
+                    </p>
+                    
+                    {/* Gallery Grid */}
+                    {formData.company_gallery && formData.company_gallery.length > 0 ? (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {formData.company_gallery.map((image, index) => (
+                          <div key={index} className="relative group">
+                            <div className="aspect-square rounded-xl overflow-hidden border border-gray-200">
+                              {image instanceof File ? (
+                                <img
+                                  src={URL.createObjectURL(image)}
+                                  alt={`Gallery ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <img
+                                  src={typeof image === 'object' ? image.url : image}
+                                  alt={`Gallery ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </div>
+                            <button
+                              onClick={() => removeGalleryImage(index)}
+                              className="absolute top-2 right-2 tertiary_button p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <FiTrash2 className="w-4 h-4" />
+                            </button>
+                            {image instanceof File && (
+                              <p className="text-xs mt-1 text-center opacity-70">
+                                {(image.size / 1024).toFixed(1)} KB
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 rounded-xl border border-gray-200">
+                        <FiCamera className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p>No gallery images added yet</p>
+                        <p className="text-sm opacity-70">Add up to 7 images to showcase your company</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
+              <hr className="border-white/50 mt-6" />
 
               {/* Section 2: Property Specialization */}
-              <div className="bg-gray-50 rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <FiMap className="w-6 h-6 text-primary_color" />
+              <div className=" rounded-2xl p-2 md:p-2 md:p-6">
+                <div className="flex items-center flex-wrap justify-between mb-6">
+                  <h3 className=" flex items-center gap-2">
+                    <FiMap className="w-6 h-6" />
                     Property Specialization
                   </h3>
                   <div className="flex gap-2">
                     <div className="relative">
                       <button
                         onClick={() => setShowSpecializationDropdown(!showSpecializationDropdown)}
-                        className="bg-primary_color text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+                        className="primary_button flex items-center gap-2"
                       >
                         <FiPlus className="w-4 h-4" />
                         Add from Database
                         <FiChevronDown className="w-4 h-4" />
                       </button>
                       {showSpecializationDropdown && (
-                        <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-10 max-h-60 overflow-y-auto">
+                        <div className="absolute right-0 top-full mt-2 w-64 bg-white/80 rounded-lg shadow-lg border border-gray-200 z-10 max-h-60 overflow-y-auto">
                           {propertyCategories.map((category) => (
                             <button
                               key={category.id}
                               onClick={() => addDatabaseSpecialization(category)}
-                              className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                              className="w-full px-4 py-3 text-left hover: border-b border-gray-100 last:border-b-0"
                             >
-                              <div className="font-medium text-gray-900">{category.name}</div>
+                              <div className="font-medium">{category.name}</div>
                               {category.description && (
-                                <div className="text-sm text-gray-500">{category.description}</div>
+                                <div>{category.description}</div>
                               )}
                             </button>
                           ))}
@@ -1326,17 +1481,17 @@ const ProfilePage = () => {
                 {/* Database Specializations */}
                 {formData.specialization?.database?.length > 0 && (
                   <div className="mb-6">
-                    <h4 className="text-lg font-semibold text-gray-800 mb-3">Database Specializations</h4>
+                    <h4 className="font-semibold mb-3">Database Specializations</h4>
                     <div className="space-y-2">
                       {formData.specialization.database.map((spec, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                        <div key={index} className="flex items-center justify-between p-3  rounded-lg border border-gray-200">
                           <div className="flex items-center gap-3">
                             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                            <span className="font-medium text-gray-900">{spec.name}</span>
+                            <span className="font-medium">{typeof spec === 'string' ? spec : spec.name}</span>
                           </div>
                           <button
                             onClick={() => removeSpecialization(index, 'database')}
-                            className="text-red-600 hover:text-red-800 p-1"
+                            className="tertiary_button p-1"
                           >
                             <FiTrash2 className="w-4 h-4" />
                           </button>
@@ -1348,7 +1503,7 @@ const ProfilePage = () => {
 
                 {/* Custom Specializations */}
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-800 mb-3">Custom Specializations</h4>
+                  <h4 className="font-semibold mb-3">Custom Specializations</h4>
                   
                   {/* Add Custom Specialization */}
                   <div className="mb-4 flex gap-2">
@@ -1361,7 +1516,7 @@ const ProfilePage = () => {
                     />
                     <button
                       onClick={addCustomSpecialization}
-                      className="bg-green-600 text-white px-4 py-3 rounded-xl hover:bg-green-700 transition-colors flex items-center gap-2"
+                      className="secondary_button flex items-center gap-2"
                     >
                       <FiPlus className="w-4 h-4" />
                       Add
@@ -1372,14 +1527,14 @@ const ProfilePage = () => {
                   {formData.specialization?.custom?.length > 0 && (
                     <div className="space-y-2">
                       {formData.specialization.custom.map((spec, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                        <div key={index} className="flex items-center justify-between p-3  rounded-lg border border-gray-200">
                           <div className="flex items-center gap-3">
                             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                            <span className="font-medium text-gray-900">{spec.name}</span>
+                            <span className="font-medium">{typeof spec === 'string' ? spec : spec.name}</span>
                           </div>
                           <button
                             onClick={() => removeSpecialization(index, 'custom')}
-                            className="text-red-600 hover:text-red-800 p-1"
+                            className="tertiary_button p-1"
                           >
                             <FiTrash2 className="w-4 h-4" />
                           </button>
@@ -1390,25 +1545,26 @@ const ProfilePage = () => {
 
                   {/* Empty State */}
                   {(!formData.specialization?.database?.length && !formData.specialization?.custom?.length) && (
-                    <div className="text-center py-8 text-gray-500 bg-white rounded-xl border border-gray-200">
-                      <FiMap className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                    <div className="text-center py-8  rounded-xl border border-gray-200">
+                      <FiMap className="w-12 h-12 mx-auto mb-2" />
                       <p>No specializations added yet</p>
-                      <p className="text-sm">Add specializations from the database or create custom ones</p>
+                      <p>Add specializations from the database or create custom ones</p>
                     </div>
                   )}
                 </div>
               </div>
+              <hr className="border-white/50 mt-6" />
 
             {/* Section 2.5: Company Locations */}
-              <div className="bg-gray-50 rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <FiMapPin className="w-6 h-6 text-primary_color" />
+              <div className=" rounded-2xl p-2 md:p-2 md:p-6">
+              <div className="flex items-center flex-wrap justify-between mb-6">
+                <h3 className=" flex items-center gap-2">
+                  <FiMapPin className="w-6 h-6" />
                   Company Locations
                 </h3>
                 <button
                   onClick={() => openLocationModal('add')}
-                  className="bg-primary_color text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  className="primary_button flex items-center gap-2"
                 >
                   <FiPlus className="w-4 h-4" />
                   Add Location
@@ -1418,10 +1574,10 @@ const ProfilePage = () => {
               {/* Locations list */}
               <div className="space-y-3">
                 {(formData.locations || []).length === 0 && (
-                  <div className="text-center py-8 text-gray-500 bg-white rounded-xl border border-gray-200">
-                    <FiMapPin className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                  <div className="text-center py-8  rounded-xl border border-gray-200">
+                    <FiMapPin className="w-12 h-12 mx-auto mb-2" />
                     <p>No locations added yet</p>
-                    <p className="text-sm">Click "Add Location" to add your company locations using Google Maps</p>
+                    <p>Click "Add Location" to add your company locations using Google Maps</p>
                   </div>
                 )}
 
@@ -1432,37 +1588,37 @@ const ProfilePage = () => {
                   return (
                     <div
                       key={loc.id || index}
-                      className={`p-4 rounded-xl border ${isPrimary ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'} flex items-start justify-between gap-4`}
+                      className={`p-4 rounded-xl border ${isPrimary ? 'default_bg border-blue-300' : 'border-gray-200 '} flex items-start justify-between gap-4`}
                     >
                       <div className="flex-1">
                         {isPrimary && (
-                          <span className="inline-block px-2 py-1 rounded-full text-xs font-semibold bg-blue-600 text-white mb-2">Primary Location</span>
+                          <span className="inline-block px-2 py-1 rounded-full font-semibold secondary_button mb-2">Primary Location</span>
                         )}
-                        <div className="font-semibold text-gray-900 break-words mb-1">{loc.description || loc.address || 'Selected Location'}</div>
+                        <p className="font-semibold break-words mb-1">{loc.description || loc.address || 'Selected Location'}</p>
                         {loc.address && loc.address !== (loc.description || '') && (
-                          <div className="text-sm text-gray-700 mb-1">{loc.address}</div>
+                          <p className="mb-1">{loc.address}</p>
                         )}
-                        <div className="text-sm text-gray-600 mt-1">
+                        <p className="mt-1">
                           {[loc.city, loc.region, loc.country].filter(Boolean).join(', ')}
-                    </div>
+                        </p>
                         <div className="flex items-center gap-4 mt-2">
-                          <div className="text-xs text-gray-500">Lat: {loc.latitude} · Lng: {loc.longitude}</div>
-                          <div className="text-xs font-medium text-gray-700">
+                          <p>Lat: {loc.latitude} · Lng: {loc.longitude}</p>
+                          <p className="font-medium">
                             Currency: {currencyName} ({currencyCode})
-                  </div>
-                    </div>
+                          </p>
+                        </div>
                     </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => openLocationModal('edit', index)}
-                    className="px-3 py-2 rounded-lg text-sm font-medium border border-blue-200 text-blue-700 hover:bg-blue-50 transition-colors"
+                    className="secondary_button"
                   >
                     <FiEdit3 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => removeLocationAt(index)}
                     disabled={isPrimary}
-                    className="px-3 py-2 rounded-lg text-sm font-medium border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="tertiary_button disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <FiTrash2 className="w-4 h-4" />
                   </button>
@@ -1472,79 +1628,111 @@ const ProfilePage = () => {
                 })}
                 </div>
               </div>
+              <hr className="border-white/50 mt-6" />
 
               {/* Section 4: Social Media */}
-              <div className="bg-gray-50 rounded-2xl p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                  <FiGlobe className="w-6 h-6 text-primary_color" />
+              <div className=" rounded-2xl p-2 md:p-2 md:p-6">
+                <h3 className=" mb-6 flex items-center gap-2">
+                  <FiGlobe className="w-6 h-6" />
                   Social Media Presence
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:p-2 md:p-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Facebook</label>
+                    <label className="block font-medium mb-2">
+                      WhatsApp <span className="text-red-500">*</span>
+                    </label>
                     <div className="relative">
-                      <FiFacebook className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-600 w-5 h-5" />
+                      <FaWhatsapp className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-green-600" />
+                      <input
+                        type="text"
+                        required
+                        value={getSafeValue(formData.social_media.whatsapp)}
+                        onChange={(e) => handleSocialMediaChange('whatsapp', e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
+                        placeholder="+233 XX XXX XXXX or https://wa.me/233XXXXXXXXX"
+                      />
+                    </div>
+                    <p className="text-xs mt-1 opacity-70">Required - Major communication channel</p>
+                  </div>
+                  <div>
+                    <label className="block font-medium mb-2">Facebook</label>
+                    <div className="relative">
+                      <FiFacebook className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" />
                       <input
                         type="url"
                         value={getSafeValue(formData.social_media.facebook)}
                         onChange={(e) => handleSocialMediaChange('facebook', e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                         placeholder="https://facebook.com/yourpage"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Instagram</label>
+                    <label className="block font-medium mb-2">Instagram</label>
                     <div className="relative">
-                      <FiInstagram className="absolute left-3 top-1/2 transform -translate-y-1/2 text-pink-600 w-5 h-5" />
+                      <FiInstagram className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" />
                       <input
                         type="url"
                         value={formData.social_media.instagram}
                         onChange={(e) => handleSocialMediaChange('instagram', e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                         placeholder="https://instagram.com/yourpage"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">LinkedIn</label>
+                    <label className="block font-medium mb-2">LinkedIn</label>
                     <div className="relative">
-                      <FiLinkedin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-700 w-5 h-5" />
+                      <FiLinkedin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" />
                       <input
                         type="url"
                         value={formData.social_media.linkedin}
                         onChange={(e) => handleSocialMediaChange('linkedin', e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                         placeholder="https://linkedin.com/company/yourcompany"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">TikTok</label>
+                    <label className="block font-medium mb-2">YouTube</label>
                     <div className="relative">
-                      <FiGlobe className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600 w-5 h-5" />
+                      <FaYoutube className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-red-600" />
+                      <input
+                        type="url"
+                        value={getSafeValue(formData.social_media.youtube)}
+                        onChange={(e) => handleSocialMediaChange('youtube', e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
+                        placeholder="https://youtube.com/@yourchannel"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block font-medium mb-2">TikTok</label>
+                    <div className="relative">
+                      <FaTiktok className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" />
                       <input
                         type="url"
                         value={formData.social_media.tiktok}
                         onChange={(e) => handleSocialMediaChange('tiktok', e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                         placeholder="https://tiktok.com/@yourpage"
                       />
                     </div>
                   </div>
                 </div>
+                <hr className="border-white/50 mt-6" />
               </div>
 
               {/* Section 5: Customer Care Team */}
-              <div className="bg-gray-50 rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <FiUser className="w-6 h-6 text-primary_color" />
+              <div className=" rounded-2xl p-2 md:p-2 md:p-6">
+                <div className="flex items-center flex-wrap justify-between mb-6">
+                  <h3 className=" flex items-center gap-2">
+                    <FiUser className="w-6 h-6" />
                     Customer Care Team
                   </h3>
                   <button
                     onClick={addCustomerCareRep}
-                    className="bg-primary_color text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    className="primary_button flex items-center gap-2"
                   >
                     <FiPlus className="w-4 h-4" />
                     Add Representative
@@ -1554,24 +1742,24 @@ const ProfilePage = () => {
                   {formData.customer_care.map((rep, index) => (
                     <div key={index} className="flex gap-4 items-end">
                       <div className="flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                        <label className="block font-medium mb-2">Name</label>
                         <input
                           type="text"
                           value={getSafeValue(rep.name)}
                           onChange={(e) => updateCustomerCareRep(index, 'name', e.target.value)}
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                           placeholder="Representative name"
                         />
                       </div>
                       <div className="flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                        <label className="block font-medium mb-2">Phone Number</label>
                         <div className="relative">
-                          <FiPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                          <FiPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" />
                           <input
                             type="tel"
                             value={getSafeValue(rep.phone)}
                             onChange={(e) => updateCustomerCareRep(index, 'phone', e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                            className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                             placeholder="+233 30 111 2222"
                           />
                         </div>
@@ -1579,7 +1767,7 @@ const ProfilePage = () => {
                       {formData.customer_care.length > 1 && (
                         <button
                           onClick={() => removeCustomerCareRep(index)}
-                          className="bg-red-100 text-red-600 p-3 rounded-xl hover:bg-red-200 transition-colors"
+                          className="tertiary_button p-3 rounded-xl"
                         >
                           <FiTrash2 className="w-4 h-4" />
                         </button>
@@ -1588,15 +1776,16 @@ const ProfilePage = () => {
                   ))}
                 </div>
               </div>
+              <hr className="border-white/50 mt-6" />
 
               {/* Section 6: Registration & Documentation */}
-              <div className="bg-gray-50 rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <FiFileText className="w-6 h-6 text-primary_color" />
+              <div className=" rounded-2xl p-2 md:p-2 md:p-6">
+                <div className="flex items-center flex-wrap justify-between mb-6">
+                  <h3 className=" flex items-center gap-2">
+                    <FiFileText className="w-6 h-6" />
                     Registration & Documentation
                   </h3>
-                  <label className="bg-primary_color text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2 cursor-pointer">
+                  <label className="primary_button flex items-center gap-2 cursor-pointer">
                     <FiUpload className="w-4 h-4" />
                     Upload Files
                     <input
@@ -1611,12 +1800,12 @@ const ProfilePage = () => {
                 
                 {/* License Number */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">License Number</label>
+                  <label className="block font-medium mb-2">License Number</label>
                   <input
                     type="text"
                     value={formData.license_number}
                     onChange={(e) => handleInputChange('license_number', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                     placeholder="Enter your business license number"
                   />
                 </div>
@@ -1624,44 +1813,45 @@ const ProfilePage = () => {
                 {/* File Uploads */}
                 <div className="space-y-3">
                   {formData.registration_files.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-200">
+                    <div key={index} className="flex items-center justify-between p-4  rounded-xl border border-gray-200">
                       <div className="flex items-center gap-3">
-                        <FiFileText className="w-5 h-5 text-gray-600" />
+                        <FiFileText className="w-5 h-5" />
                         <div>
-                          <p className="font-medium text-gray-900">{file.name || file.filename}</p>
-                          <p className="text-sm text-gray-500">
+                          <p className="font-medium">{file.name || file.filename}</p>
+                          <p>
                             {file instanceof File ? `${(file.size / 1024).toFixed(1)} KB` : `${(file.size / 1024).toFixed(1)} KB`}
                           </p>
                         </div>
                       </div>
                       <button
                         onClick={() => removeFile(index)}
-                        className="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200 transition-colors"
+                        className="tertiary_button p-2 rounded-lg"
                       >
                         <FiTrash2 className="w-4 h-4" />
                       </button>
                     </div>
                   ))}
                   {formData.registration_files.length === 0 && (
-                    <div className="text-center py-8 text-gray-500 bg-white rounded-xl border border-gray-200">
-                      <FiFileText className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                    <div className="text-center py-8  rounded-xl border border-gray-200">
+                      <FiFileText className="w-12 h-12 mx-auto mb-2" />
                       <p>No registration documents uploaded</p>
                     </div>
                   )}
                 </div>
               </div>
+              <hr className="border-white/50 mt-6" />
             </div>
 
             {/* Section 5.5: Company Statistics */}
-            <div className="bg-gray-50 rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <FiFileText className="w-6 h-6 text-primary_color" />
+            <div className=" rounded-2xl p-2 md:p-2 md:p-6">
+              <div className="flex items-center flex-wrap justify-between mb-6">
+                <h3 className=" flex items-center gap-2">
+                  <FiFileText className="w-6 h-6" />
                   Company Statistics
                 </h3>
                 <button
                   onClick={addCompanyStat}
-                  className="bg-primary_color text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  className="primary_button flex items-center gap-2"
                 >
                   <FiPlus className="w-4 h-4" />
                   Add Statistic
@@ -1669,39 +1859,39 @@ const ProfilePage = () => {
               </div>
 
               {(formData.company_statistics || []).length === 0 ? (
-                <div className="text-center py-8 text-gray-500 bg-white rounded-xl border border-gray-200">
-                  <FiFileText className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                <div className="text-center py-8  rounded-xl border border-gray-200">
+                  <FiFileText className="w-12 h-12 mx-auto mb-2" />
                   <p>No company statistics added</p>
-                  <p className="text-sm">Add metrics like Employees, Projects Completed, Awards, etc.</p>
+                  <p>Add metrics like Employees, Projects Completed, Awards, etc.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {(formData.company_statistics || []).map((row, index) => (
-                    <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end bg-white border border-gray-200 rounded-xl p-4">
+                    <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end  border border-gray-200 rounded-xl p-4">
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Label</label>
+                        <label className="block font-medium mb-2">Label</label>
                         <input
                           type="text"
                           value={row.label || ''}
                           onChange={(e) => updateCompanyStat(index, 'label', e.target.value)}
                           placeholder="e.g., Employees"
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Value</label>
+                        <label className="block font-medium mb-2">Value</label>
                         <input
                           type="text"
                           value={row.value || ''}
                           onChange={(e) => updateCompanyStat(index, 'value', e.target.value)}
                           placeholder="e.g., 250+"
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                         />
                       </div>
                       <div className="flex md:justify-end">
                         <button
                           onClick={() => removeCompanyStat(index)}
-                          className="bg-red-100 text-red-600 px-4 py-3 rounded-xl hover:bg-red-200 transition-colors flex items-center gap-2"
+                          className="tertiary_button px-4 py-3 rounded-xl flex items-center gap-2"
                         >
                           <FiTrash2 className="w-4 h-4" />
                           Remove
@@ -1712,6 +1902,7 @@ const ProfilePage = () => {
                 </div>
               )}
             </div>
+            <hr className="border-white/50 mt-6" />
 
             {/* Save Button at the End */}
             <div className="sticky bottom-6 mt-10 px-6 py-4 z-10">
@@ -1719,7 +1910,7 @@ const ProfilePage = () => {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="bg-primary_color text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                  className="primary_button flex items-center gap-2 disabled:opacity-50"
                 >
                   <FiSave className="w-4 h-4" />
                   {saving ? 'Saving...' : 'Save Changes'}
@@ -1730,23 +1921,23 @@ const ProfilePage = () => {
             {/* Location Modal */}
             {showLocationModal && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" >
-                <div className="bg-white mt-20 rounded-2xl shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto">
-                  <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
-                    <h3 className="text-xl font-bold text-gray-900">
+                <div className=" mt-20 bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto">
+                  <div className="sticky top-0  border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+                    <h3 className="">
                       {locationModalMode === 'add' ? 'Add New Location' : 'Edit Location'}
                     </h3>
                     <button
                       onClick={closeLocationModal}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                      className="transition-colors"
                     >
                       <FiX className="w-6 h-6" />
                     </button>
                   </div>
 
-                  <div className="p-6 space-y-6">
+                  <div className="p-2 md:p-2 md:p-6 space-y-6">
                     {/* Google Places Autocomplete */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block font-medium mb-2">
                         Search Location (Google Maps)
                       </label>
                       <div className="relative">
@@ -1756,20 +1947,20 @@ const ProfilePage = () => {
                           onChange={(e) => handleModalPlaceInputChange(e.target.value)}
                           placeholder={gmIsLoaded ? 'Type an address or area' : 'Loading Google Places...'}
                           disabled={!gmIsLoaded}
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:bg-gray-50"
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
                         />
                         {gmIsLoaded && modalPlaceQuery && modalPlaceSuggestions.length > 0 && (
-                          <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                          <div className="absolute z-20 w-full mt-1  border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
                             {modalPlaceSuggestions.map((p) => (
                               <button
                                 key={p.place_id}
                                 type="button"
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => handleModalSuggestionClick(p)}
-                                className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                                className="w-full text-left px-4 py-3 hover: border-b border-gray-100 last:border-b-0"
                               >
-                                <div className="font-medium text-gray-900">{p.structured_formatting?.main_text || p.description}</div>
-                                <div className="text-sm text-gray-500">{p.structured_formatting?.secondary_text || ''}</div>
+                                <div className="font-medium">{p.structured_formatting?.main_text || p.description}</div>
+                                <div>{p.structured_formatting?.secondary_text || ''}</div>
                               </button>
                             ))}
                           </div>
@@ -1779,10 +1970,10 @@ const ProfilePage = () => {
 
                     {/* Interactive Map */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block font-medium mb-2">
                         Map Selector - Click on the map to set location
                       </label>
-                      <p className="text-sm text-gray-500 mb-3">
+                      <p className="mb-3">
                         Use the pin on the map or search above to select your location. You can also click directly on the map to set coordinates. Drag the marker to fine-tune the position.
                       </p>
                       <div className="h-96 rounded-lg overflow-hidden border border-gray-300">
@@ -1822,9 +2013,9 @@ const ProfilePage = () => {
                       </div>
                       {modalForm.latitude !== 0 && modalForm.longitude !== 0 && (
                         <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-600">Current Location:</span>
-                            <span className="font-mono text-blue-700">
+                          <div className="flex items-center justify-between">
+                            <span>Current Location:</span>
+                            <span className="font-mono">
                               {modalForm.latitude.toFixed(6)}, {modalForm.longitude.toFixed(6)}
                             </span>
                           </div>
@@ -1834,7 +2025,7 @@ const ProfilePage = () => {
 
                     {/* Description */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Location Name/Description</label>
+                      <label className="block font-medium mb-2">Location Name/Description</label>
                       <input
                         type="text"
                         value={modalForm.description}
@@ -1847,47 +2038,47 @@ const ProfilePage = () => {
                     {/* Location Details (auto-filled from Google) */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Country</label>
+                        <label className="block font-medium mb-2">Country</label>
                         <input
                           type="text"
                           value={modalForm.country}
                           disabled
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-600"
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Region/State</label>
+                        <label className="block font-medium mb-2">Region/State</label>
                         <input
                           type="text"
                           value={modalForm.region}
                           disabled
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-600"
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
+                        <label className="block font-medium mb-2">City</label>
                         <input
                           type="text"
                           value={modalForm.city}
                           disabled
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-600"
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Currency <span className="text-xs text-gray-500">(Auto-selected based on country)</span>
+                        <label className="block font-medium mb-2">
+                          Currency <span>(Auto-selected based on country)</span>
                         </label>
                         <input
                           type="text"
                           value={modalForm.currency_name ? `${modalForm.currency_name} (${modalForm.currency})` : (modalForm.currency || 'Not set')}
                           disabled
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-600"
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Full Address</label>
+                      <label className="block font-medium mb-2">Full Address</label>
                       <textarea
                         value={modalForm.address}
                         onChange={(e) => setModalForm(prev => ({ ...prev, address: e.target.value }))}
@@ -1899,7 +2090,7 @@ const ProfilePage = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Latitude</label>
+                        <label className="block font-medium mb-2">Latitude</label>
                         <input
                           type="number"
                           step="any"
@@ -1916,7 +2107,7 @@ const ProfilePage = () => {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Longitude</label>
+                        <label className="block font-medium mb-2">Longitude</label>
                         <input
                           type="number"
                           step="any"
@@ -1951,7 +2142,7 @@ const ProfilePage = () => {
                         disabled={Array.isArray(formData.locations) && formData.locations.some(l => l?.primary_location && (!editingLocationIndex || formData.locations.indexOf(l) !== editingLocationIndex))}
                         className="w-4 h-4 text-primary_color border-gray-300 rounded focus:ring-primary_color"
                       />
-                      <label htmlFor="primaryLocation" className="text-sm font-medium text-gray-700">
+                      <label htmlFor="primaryLocation" className="font-medium">
                         Set as primary location (locked once set)
                       </label>
                     </div>
@@ -1960,13 +2151,13 @@ const ProfilePage = () => {
                     <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200">
                       <button
                         onClick={closeLocationModal}
-                        className="px-4 py-2 rounded-lg font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                        className="secondary_button"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={saveLocation}
-                        className="px-4 py-2 rounded-lg font-medium bg-primary_color text-white hover:bg-blue-700 transition-colors"
+                        className="primary_button"
                       >
                         {locationModalMode === 'add' ? 'Add Location' : 'Save Changes'}
                       </button>
@@ -1980,14 +2171,14 @@ const ProfilePage = () => {
 
         {/* Change Password Tab */}
         {activeTab === 'password' && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-6">Change Password</h3>
+          <div className=" rounded-2xl shadow-sm border border-gray-100 text-primary_color p-2 md:p-2 md:p-6">
+            <h3 className="font-semibold mb-6">Change Password</h3>
             
             <div className="max-w-md space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
+                <label className="block font-medium mb-2">Current Password</label>
                 <div className="relative">
-                  <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={passwordData.currentPassword}
@@ -1998,7 +2189,7 @@ const ProfilePage = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2  transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2  transform -translate-y-1/2 transition-colors"
                   >
                     {showPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
                   </button>
@@ -2006,9 +2197,9 @@ const ProfilePage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+                <label className="block font-medium mb-2">New Password</label>
                 <div className="relative">
-                  <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" />
                   <input
                     type={showNewPassword ? 'text' : 'password'}
                     value={passwordData.newPassword}
@@ -2019,7 +2210,7 @@ const ProfilePage = () => {
                   <button
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 transition-colors"
                   >
                     {showNewPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
                   </button>
@@ -2027,9 +2218,9 @@ const ProfilePage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
+                <label className="block font-medium mb-2">Confirm New Password</label>
                 <div className="relative">
-                  <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" />
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={passwordData.confirmPassword}
@@ -2040,7 +2231,7 @@ const ProfilePage = () => {
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 transition-colors"
                   >
                     {showConfirmPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
                   </button>
@@ -2049,7 +2240,7 @@ const ProfilePage = () => {
 
               <button
                 onClick={handlePasswordUpdate}
-                className="w-full bg-primary_color text-white py-3 px-6 rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center gap-2"
+                className="primary_button w-full py-3 px-6 rounded-xl font-medium transition-colors duration-200 flex items-center justify-center gap-2"
               >
                 <FiSave className="w-4 h-4" />
                 Update Password

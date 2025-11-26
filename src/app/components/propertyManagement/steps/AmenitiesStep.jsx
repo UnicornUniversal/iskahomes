@@ -6,8 +6,8 @@ const AmenitiesStep = ({ formData, updateFormData, mode }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Amenities</h2>
-        <p className="text-sm text-gray-600">Select the amenities available in your property</p>
+        <h2 className="">Amenities</h2>
+        <p className="">{mode === 'edit' ? 'Update the amenities available in your property' : 'Select the amenities available in your property'}</p>
       </div>
 
       <PropertyAmenities 

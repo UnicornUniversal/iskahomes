@@ -1,6 +1,7 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 import Link from 'next/link'
 import { 
   ArrowLeft, 
@@ -20,17 +21,63 @@ import TopSoldProperties from '@/app/components/analytics/TopSoldProperties'
 import DevelopmentsBySale from '@/app/components/analytics/DevelopmentsBySale'
 import SalesTrendChart from '@/app/components/analytics/SalesTrendChart'
 import SalesByLocation from '@/app/components/analytics/SalesByLocation'
+import { formatCurrency } from '@/lib/utils'
 
 const SalesAnalytics = () => {
   const params = useParams()
+  const { user } = useAuth()
   const [overview, setOverview] = useState({
     totalRevenue: 0,
     totalUnitsSold: 0,
     expectedRevenue: 0,
     averageSalesTime: 0,
-    leadsToSales: 0
+    leadsToSales: 0,
+    currency: 'USD'
   })
   const [loading, setLoading] = useState(true)
+
+  // Get currency from user profile if not in overview
+  const currency = useMemo(() => {
+    if (overview.currency && overview.currency !== 'USD') {
+      return overview.currency
+    }
+    
+    if (!user?.profile?.company_locations) return 'USD'
+    
+    // Parse company_locations if it's a string
+    let locations = user.profile.company_locations
+    if (typeof locations === 'string') {
+      try {
+        locations = JSON.parse(locations)
+      } catch (e) {
+        return 'USD'
+      }
+    }
+    
+    if (Array.isArray(locations)) {
+      const primaryLocation = locations.find(loc => loc.primary_location === true)
+      if (primaryLocation?.currency) {
+        return primaryLocation.currency
+      }
+    }
+    
+    // Fallback to default_currency
+    if (user?.profile?.default_currency) {
+      let defaultCurrency = user.profile.default_currency
+      if (typeof defaultCurrency === 'string') {
+        try {
+          defaultCurrency = JSON.parse(defaultCurrency)
+        } catch (e) {
+          return 'USD'
+        }
+      }
+      if (defaultCurrency?.code) {
+        return defaultCurrency.code
+      }
+    }
+    
+    return 'USD'
+  }, [overview.currency, user?.profile?.company_locations, user?.profile?.default_currency])
 
   useEffect(() => {
     const fetchOverview = async () => {
@@ -53,20 +100,21 @@ const SalesAnalytics = () => {
     }
   }, [params.slug])
 
+
   return (
-    <div className="min-h-screen default_bg p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen  p-6">
+      <div className="max-w-7xl  mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <Link 
+          {/* <Link 
             href={`/developer/${params.slug}/analytics`}
             className="inline-flex items-center text-blue-600 hover:text-blue-800 mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Analytics
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Sales Analytics</h1>
-          <p className="text-gray-600">Track sales performance, revenue, and conversion metrics</p>
+          </Link> */}
+          <h1 className=" mb-2">Sales Analytics</h1>
+          <p className="">Track sales performance, revenue, and conversion metrics</p>
         </div>
 
         {/* Time Range Selector */}
@@ -102,7 +150,7 @@ const SalesAnalytics = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             <DataCard
               title="Total Revenue"
-              value={`$${overview.totalRevenue.toLocaleString()}`}
+              value={formatCurrency(overview.totalRevenue, currency)}
               icon={DollarSign}
             />
             
@@ -114,7 +162,7 @@ const SalesAnalytics = () => {
             
             <DataCard
               title="Expected Revenue"
-              value={`$${overview.expectedRevenue.toLocaleString()}`}
+              value={formatCurrency(overview.expectedRevenue, currency)}
               icon={Target}
             />
             
@@ -134,7 +182,7 @@ const SalesAnalytics = () => {
 
         {/* Sales Trend Chart */}
         <div className="mb-8">
-          <SalesTrendChart listerId={params.slug} />
+          <SalesTrendChart listerId={params.slug} currency={currency} />
         </div>
   {/* Sales by Location */}
   <div className="mb-8">
@@ -150,12 +198,12 @@ const SalesAnalytics = () => {
 
         {/* Top Sold Properties */}
         <div className="mb-8">
-          <TopSoldProperties listerId={params.slug} />
+          <TopSoldProperties listerId={params.slug} currency={currency} />
         </div>
 
         {/* Developments by Sale */}
         <div className="mb-8">
-          <DevelopmentsBySale developerId={params.slug} />
+          <DevelopmentsBySale developerId={params.slug} currency={currency} />
         </div>
 
       

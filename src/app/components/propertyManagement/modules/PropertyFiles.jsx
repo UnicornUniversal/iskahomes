@@ -138,7 +138,7 @@ const PropertyFiles = ({ formData, updateFormData, isEditMode, accountType = 'de
   }
 
   return (
-    <div className="w-full p-6 bg-white rounded-lg shadow-sm">
+    <div className="w-full p-6  rounded-lg shadow-sm">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Property Files</h2>
         <p className="text-gray-600">

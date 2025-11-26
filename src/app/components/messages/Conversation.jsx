@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/app/components/ui/avatar';
 import { ScrollArea } from '@/app/components/ui/scroll-area';
 import { Input } from '@/app/components/ui/input';
@@ -17,6 +17,7 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
   const [sending, setSending] = useState(false);
   const [pagination, setPagination] = useState({ hasMore: false, offset: 0, limit: 50 });
   const scrollRef = useRef(null);
+  const initialLoadRef = useRef(true);
   const { user, developerToken, propertySeekerToken } = useAuth();
 
   // Get the appropriate token based on user type
@@ -53,18 +54,52 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
           const data = await response.json();
           const newMessages = data.messages || [];
           
+          // Remove duplicates and sort messages by created_at to ensure chronological order (oldest first)
+          const uniqueMessages = new Map();
+          newMessages.forEach(msg => {
+            if (msg.id && !uniqueMessages.has(msg.id)) {
+              uniqueMessages.set(msg.id, msg);
+            }
+          });
+          const sortedNewMessages = Array.from(uniqueMessages.values()).sort((a, b) => {
+            const dateA = new Date(a.created_at || 0);
+            const dateB = new Date(b.created_at || 0);
+            return dateA - dateB; // Oldest first
+          });
+          
           if (isLoadMore) {
-            // Prepend older messages (they come in reverse chronological order)
-            setMessages(prev => [...newMessages.reverse(), ...prev]);
+            // Prepend older messages
+            setMessages(prev => {
+              // Remove duplicates from existing messages
+              const existingMap = new Map();
+              prev.forEach(msg => {
+                if (msg.id) {
+                  existingMap.set(msg.id, msg);
+                }
+              });
+              // Add new messages
+              sortedNewMessages.forEach(msg => {
+                if (msg.id) {
+                  existingMap.set(msg.id, msg);
+                }
+              });
+              // Convert back to array and sort
+              const combined = Array.from(existingMap.values());
+              return combined.sort((a, b) => {
+                const dateA = new Date(a.created_at || 0);
+                const dateB = new Date(b.created_at || 0);
+                return dateA - dateB;
+              });
+            });
           } else {
-            // Initial load - reverse to show oldest first
-            setMessages(newMessages.reverse());
+            // Initial load - show oldest first
+            setMessages(sortedNewMessages);
           }
           
           // Update pagination state
           setPagination({
             hasMore: data.pagination?.hasMore || false,
-            offset: offset + newMessages.length,
+            offset: offset + sortedNewMessages.length,
             limit
           });
           
@@ -97,6 +132,7 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
     };
 
     // Reset state when conversation changes
+    initialLoadRef.current = true;
     setMessages([]);
     setPagination({ hasMore: false, offset: 0, limit: 50 });
 
@@ -104,9 +140,11 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
     fetchMessages(0, 50, false);
 
     // Subscribe to realtime messages
-    const channel = supabase
-      .channel(`messages-${selectedChatId}`)
-      .on(
+    let channel = null;
+    try {
+      channel = supabase
+        .channel(`messages-${selectedChatId}`)
+        .on(
         'postgres_changes',
         {
           event: '*',
@@ -120,7 +158,45 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
           if (payload.eventType === 'INSERT') {
             // New message added - append to end (most recent)
             console.log('📨 New message received:', payload.new);
-            // Need to fetch sender name for new message
+            
+            // Check if message already exists to prevent duplicates
+            setMessages(prev => {
+              // Use Map to ensure no duplicates
+              const messageMap = new Map();
+              prev.forEach(msg => {
+                if (msg.id) {
+                  messageMap.set(msg.id, msg);
+                }
+              });
+              
+              // Check if message already exists
+              if (payload.new.id && messageMap.has(payload.new.id)) {
+                console.log('⚠️ Message already exists, skipping duplicate');
+                return prev;
+              }
+              
+              // Add temporary message with loading state
+              const tempMessage = {
+                ...payload.new,
+                sender_name: 'Loading...',
+                sender_profile_image: null,
+                _isLoading: true
+              };
+              
+              if (tempMessage.id) {
+                messageMap.set(tempMessage.id, tempMessage);
+              }
+              
+              // Convert back to array and sort to maintain chronological order
+              const updated = Array.from(messageMap.values());
+              return updated.sort((a, b) => {
+                const dateA = new Date(a.created_at || 0);
+                const dateB = new Date(b.created_at || 0);
+                return dateA - dateB; // Oldest first
+              });
+            });
+
+            // Fetch sender info and update the message
             const fetchSenderName = async () => {
               try {
                 let senderName = 'User';
@@ -158,14 +234,33 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
                   }
                 }
                 
-                setMessages(prev => [...prev, {
-                  ...payload.new,
-                  sender_name: senderName,
-                  sender_profile_image: senderImage
-                }]);
+                // Update the message with actual sender info
+                setMessages(prev => {
+                  // Check if message still exists (might have been removed or replaced)
+                  const messageExists = prev.some(msg => msg.id === payload.new.id);
+                  if (!messageExists) {
+                    console.log('⚠️ Message no longer exists, skipping update');
+                    return prev;
+                  }
+                  return prev.map(msg => 
+                    msg.id === payload.new.id 
+                      ? { ...msg, sender_name: senderName, sender_profile_image: senderImage, _isLoading: false }
+                      : msg
+                  );
+                });
               } catch (err) {
                 console.error('Error fetching sender name:', err);
-                setMessages(prev => [...prev, payload.new]);
+                setMessages(prev => {
+                  const messageExists = prev.some(msg => msg.id === payload.new.id);
+                  if (!messageExists) {
+                    return prev;
+                  }
+                  return prev.map(msg => 
+                    msg.id === payload.new.id 
+                      ? { ...msg, sender_name: 'User', _isLoading: false }
+                      : msg
+                  );
+                });
               }
             };
             
@@ -173,9 +268,16 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
           } else if (payload.eventType === 'UPDATE') {
             // Message updated (e.g., edited)
             console.log('✏️ Message updated:', payload.new);
-            setMessages(prev => prev.map(msg => 
-              msg.id === payload.new.id ? payload.new : msg
-            ));
+            setMessages(prev => {
+              const messageExists = prev.some(msg => msg.id === payload.new.id);
+              if (!messageExists) {
+                console.log('⚠️ Message not found for update, skipping');
+                return prev;
+              }
+              return prev.map(msg => 
+                msg.id === payload.new.id ? payload.new : msg
+              );
+            });
           } else if (payload.eventType === 'DELETE') {
             // Message deleted
             console.log('🗑️ Message deleted:', payload.old);
@@ -183,22 +285,32 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
           }
         }
       )
-      .subscribe((status) => {
-        console.log('📡 Realtime subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to messages channel');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Channel subscription error');
-        } else if (status === 'TIMED_OUT') {
-          console.error('⏰ Channel subscription timed out');
-        } else if (status === 'CLOSED') {
-          console.log('🔒 Channel subscription closed');
-        }
-      });
+        .subscribe((status) => {
+          console.log('📡 Realtime subscription status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Successfully subscribed to messages channel');
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Channel subscription error');
+          } else if (status === 'TIMED_OUT') {
+            console.error('⏰ Channel subscription timed out');
+          } else if (status === 'CLOSED') {
+            console.log('🔒 Channel subscription closed');
+          }
+        });
+    } catch (error) {
+      console.error('❌ Error setting up realtime subscription:', error);
+      channel = null;
+    }
 
     // Cleanup: unsubscribe when component unmounts or chat changes
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+        } catch (error) {
+          console.error('Error removing channel:', error);
+        }
+      }
     };
   }, [selectedChatId, token]);
 
@@ -230,16 +342,50 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
 
       if (response.ok) {
         const data = await response.json();
-        const newMessages = (data.messages || []).reverse(); // Reverse to show oldest first
+        const newMessages = data.messages || [];
         
-        if (newMessages.length > 0) {
-          // Prepend older messages
-          setMessages(prev => [...newMessages, ...prev]);
+        // Remove duplicates and sort messages by created_at to ensure chronological order
+        const uniqueNewMessages = new Map();
+        newMessages.forEach(msg => {
+          if (msg.id && !uniqueNewMessages.has(msg.id)) {
+            uniqueNewMessages.set(msg.id, msg);
+          }
+        });
+        const sortedNewMessages = Array.from(uniqueNewMessages.values()).sort((a, b) => {
+          const dateA = new Date(a.created_at || 0);
+          const dateB = new Date(b.created_at || 0);
+          return dateA - dateB; // Oldest first
+        });
+        
+        if (sortedNewMessages.length > 0) {
+          // Prepend older messages and re-sort to maintain order
+          setMessages(prev => {
+            // Remove duplicates from existing messages
+            const existingMap = new Map();
+            prev.forEach(msg => {
+              if (msg.id) {
+                existingMap.set(msg.id, msg);
+              }
+            });
+            // Add new messages
+            sortedNewMessages.forEach(msg => {
+              if (msg.id) {
+                existingMap.set(msg.id, msg);
+              }
+            });
+            // Convert back to array and sort
+            const combined = Array.from(existingMap.values());
+            return combined.sort((a, b) => {
+              const dateA = new Date(a.created_at || 0);
+              const dateB = new Date(b.created_at || 0);
+              return dateA - dateB;
+            });
+          });
           
           // Update pagination
           setPagination({
             hasMore: data.pagination?.hasMore || false,
-            offset: pagination.offset + newMessages.length,
+            offset: pagination.offset + sortedNewMessages.length,
             limit: pagination.limit
           });
 
@@ -259,18 +405,35 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
     }
   };
 
-  // Auto-scroll to bottom only on initial load or new message
-  useEffect(() => {
-    if (scrollRef.current && !loadingMore) {
-      // Only auto-scroll if we're near the bottom (within 100px)
-      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-      
-      if (isNearBottom || messages.length <= pagination.limit) {
-        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-      }
+  const scrollToBottom = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages.length]); // Only trigger on message count change, not on every render
+  };
+
+  // Handle auto-scroll behavior for initial load and new messages without visible jump
+  useLayoutEffect(() => {
+    if (!scrollRef.current || messages.length === 0) {
+      return;
+    }
+
+    if (initialLoadRef.current) {
+      scrollToBottom();
+      initialLoadRef.current = false;
+      return;
+    }
+
+    if (loadingMore) {
+      return;
+    }
+
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 200;
+
+    if (isNearBottom) {
+      scrollToBottom();
+    }
+  }, [messages, loadingMore]);
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedChatId || sending) return;

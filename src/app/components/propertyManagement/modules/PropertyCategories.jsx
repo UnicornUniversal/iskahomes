@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
+import { CustomSelect } from '../../ui/custom-select'
 import { cn } from '@/lib/utils'
 import { 
   usePropertyPurposes, 
@@ -267,13 +268,8 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
   };
 
   return (
-    <div className="p-4 sm:p-6 bg-white rounded-lg shadow-sm">
-      <div className="mb-4 sm:mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Property Categories</h2>
-        <p className="text-sm sm:text-base text-gray-600">
-          {isEditMode ? 'Update the property categories' : 'Select the appropriate categories for your property'}
-        </p>
-      </div>
+    <div className="p-4 sm:p-6  rounded-lg shadow-sm">
+    
 
       <div className="grid grid-cols-1 sm:grid-cols-2  gap-4 sm:gap-6">
         {/* Property Purpose */}
@@ -288,8 +284,7 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
           </div>
           <p className="text-blue-700 text-xs mb-2 sm:mb-3">Select the primary purpose</p>
           
-          <select
-            suppressHydrationWarning
+          <CustomSelect
             value={formData.purposes.length > 0 ? formData.purposes[0] : ''}
             onChange={(e) => {
               if (e.target.value) {
@@ -298,18 +293,17 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
                 updateFormData({ purposes: [] });
               }
             }}
+            options={purposesLoading 
+              ? [{ value: '', label: 'Loading...' }]
+              : [
+                  { value: '', label: 'Select Purpose' },
+                  ...purposes.map(purpose => ({ value: purpose.id, label: purpose.name }))
+                ]
+            }
+            placeholder="Select Purpose"
             required
-            className="w-full px-2 sm:px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-xs sm:text-sm"
-          >
-            <option value="">Select Purpose</option>
-            {purposesLoading ? (
-              <option disabled>Loading...</option>
-            ) : (
-              purposes.map(purpose => (
-                <option key={purpose.id} value={purpose.id}>{purpose.name}</option>
-              ))
-            )}
-          </select>
+            disabled={purposesLoading}
+          />
         </div>
 
         {/* Property Type */}
@@ -324,8 +318,7 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
           </div>
           <p className="text-green-700 text-xs mb-2 sm:mb-3">Choose the property type</p>
           
-          <select
-            suppressHydrationWarning
+          <CustomSelect
             value={formData.types.length > 0 ? formData.types[0] : ''}
             onChange={(e) => {
               if (e.target.value) {
@@ -334,18 +327,17 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
                 updateFormData({ types: [] });
               }
             }}
+            options={typesLoading 
+              ? [{ value: '', label: 'Loading...' }]
+              : [
+                  { value: '', label: 'Select Property Type' },
+                  ...types.map(type => ({ value: type.id, label: type.name }))
+                ]
+            }
+            placeholder="Select Property Type"
             required
-            className="w-full px-2 sm:px-3 py-2 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-xs sm:text-sm"
-          >
-            <option value="">Select Property Type</option>
-            {typesLoading ? (
-              <option disabled>Loading...</option>
-            ) : (
-              types.map(type => (
-                <option key={type.id} value={type.id}>{type.name}</option>
-              ))
-            )}
-          </select>
+            disabled={typesLoading}
+          />
         </div>
 
         {/* Property Category */}
@@ -361,8 +353,7 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
           <p className="text-purple-700 text-xs mb-2 sm:mb-3">Auto-populated</p>
           {/* <p>{formData.categories.length > 0 ? formData.categories[0] : 'Nothing is showing'}</p>
            */}
-          <select
-            suppressHydrationWarning
+          <CustomSelect
             value={formData.categories.length > 0 ? formData.categories[0] : ''}
             onChange={(e) => {
               if (e.target.value) {
@@ -371,20 +362,16 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
                 updateFormData({ categories: [] });
               }
             }}
-            disabled={formData.types.length === 0}
-            className="w-full px-2 sm:px-3 py-2 border border-purple-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-xs sm:text-sm disabled:bg-gray-100"
-          >
-            {/* <option value="">Select category</option> */}
-            {categoriesLoading ? (
-              <option disabled>Loading...</option>
-            ) : formData.types.length > 0 ? (
-              filteredCategories.map(category => (
-                <option key={category.id} value={category.id}>{category.name}</option>
-              ))
-            ) : (
-              <option disabled>Select type first</option>
-            )}
-          </select>
+            options={
+              categoriesLoading 
+                ? [{ value: '', label: 'Loading...' }]
+                : formData.types.length === 0
+                ? [{ value: '', label: 'Select type first', disabled: true }]
+                : filteredCategories.map(category => ({ value: category.id, label: category.name }))
+            }
+            placeholder="Select category"
+            disabled={formData.types.length === 0 || categoriesLoading}
+          />
         </div>
 
         {/* Property Subtype */}
@@ -400,8 +387,7 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
           <p className="text-orange-700 text-xs mb-2 sm:mb-3">Select specific subtype</p>
           
           {formData.types.length > 0 ? (
-            <select
-              suppressHydrationWarning
+            <CustomSelect
               value={(() => {
                 const propertyTypes = formData.listing_types || { database: [], inbuilt: [], custom: [] };
                 if (!propertyTypes.database || propertyTypes.database.length === 0) return '';
@@ -419,20 +405,17 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
                   updateFormData({ listing_types: { database: [], inbuilt: [], custom: [] } });
                 }
               }}
+              options={
+                subtypesLoading 
+                  ? [{ value: '', label: 'Loading...' }]
+                  : filteredSubtypes.length > 0
+                  ? filteredSubtypes.map(subtype => ({ value: subtype.id, label: subtype.name }))
+                  : [{ value: '', label: 'No subtypes available', disabled: true }]
+              }
+              placeholder="Select subtype"
               required
-              className="w-full px-2 sm:px-3 py-2 border border-orange-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white text-xs sm:text-sm"
-            >
-      
-              {subtypesLoading ? (
-                <option disabled>Loading...</option>
-              ) : filteredSubtypes.length > 0 ? (
-                filteredSubtypes.map(subtype => (
-                  <option key={subtype.id} value={subtype.id}>{subtype.name}</option>
-                ))
-              ) : (
-                <option disabled>No subtypes available</option>
-              )}
-            </select>
+              disabled={subtypesLoading}
+            />
           ) : (
             <div className="text-orange-600 text-xs italic">
               Select property type first

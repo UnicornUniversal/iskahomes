@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
+import { CustomSelect } from '../../ui/custom-select'
 import { cn } from '@/lib/utils'
 import SalesInformationModal from '../../ui/SalesInformationModal'
 
@@ -10,13 +11,14 @@ const PropertyDescription = ({ formData, updateFormData, isEditMode }) => {
   const [previousStatus, setPreviousStatus] = useState(formData.status || '')
 
   const statusOptions = [
-    'Available',
-    'Unavailable',
-    'Sold',
-    'Rented Out',
-    'Taken',
-    'Under Maintenance / Renovation',
-    'Coming Soon'
+    { value: '', label: 'Select status' },
+    { value: 'Available', label: 'Available' },
+    { value: 'Unavailable', label: 'Unavailable' },
+    { value: 'Sold', label: 'Sold' },
+    { value: 'Rented Out', label: 'Rented Out' },
+    { value: 'Taken', label: 'Taken' },
+    { value: 'Under Maintenance / Renovation', label: 'Under Maintenance / Renovation' },
+    { value: 'Coming Soon', label: 'Coming Soon' }
   ]
 
   const isSoldRentedOrTaken = (status) => {
@@ -70,9 +72,9 @@ const PropertyDescription = ({ formData, updateFormData, isEditMode }) => {
   }
 
   return (
-    <div className="p-4 sm:p-6 bg-white rounded-lg shadow-sm">
+    <div className="p-4 sm:p-6 ">
       <div className="mb-4 sm:mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Property Description</h2>
+        <h2 className="text-xl sm:text-2xl  mb-2">Property Description</h2>
         <p className="text-sm sm:text-base text-gray-600">
           {isEditMode ? 'Update the property information' : 'Provide detailed information about your property'}
         </p>
@@ -81,7 +83,7 @@ const PropertyDescription = ({ formData, updateFormData, isEditMode }) => {
     <div className="space-y-4 sm:space-y-6">
         {/* Title */}
           <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="title" className="block text-sm font-medium  mb-2">
             Property Title *
             </label>
           <Input
@@ -97,7 +99,7 @@ const PropertyDescription = ({ formData, updateFormData, isEditMode }) => {
 
         {/* Description */}
           <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="description" className="block text-sm font-medium  mb-2">
             Description *
           </label>
           <textarea
@@ -107,15 +109,15 @@ const PropertyDescription = ({ formData, updateFormData, isEditMode }) => {
             value={formData.description || ''}
             onChange={(e) => handleInputChange('description', e.target.value)}
             required
-            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 preserve-whitespace"
+            className="flex w-full rounded-md border border-input  px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 preserve-whitespace"
           />
       </div>
 
         {/* Size and Status Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="size" className="block text-sm font-medium text-gray-700 mb-2">
-              Size (sq ft)
+            <label htmlFor="size" className="block text-sm font-medium  mb-2">
+              Size (sq meters)
             </label>
             <Input
               id="size"
@@ -128,22 +130,17 @@ const PropertyDescription = ({ formData, updateFormData, isEditMode }) => {
           </div>
 
           <div>
-            <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="status" className="block text-sm font-medium  mb-2">
               Status *
             </label>
-            <select
-              suppressHydrationWarning
+            <CustomSelect
               id="status"
               value={formData.status || ''}
               onChange={(e) => handleInputChange('status', e.target.value)}
+              options={statusOptions}
+              placeholder="Select status"
               required
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="">Select status</option>
-              {statusOptions.map(status => (
-                <option key={status} value={status}>{status}</option>
-              ))}
-            </select>
+            />
           </div>
         </div>
 

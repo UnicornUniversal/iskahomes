@@ -37,11 +37,11 @@ export default function RootLayout({ children }) {
       >
         <PostHogProvider>
           <AuthProvider>
-            <Nav />
-            <Layout1>
+            {/* <Nav /> */}
+            {/* <Layout1> */}
               {children}
-            </Layout1>
-            <Footer />
+            {/* </Layout1> */}
+            {/* <Footer /> */}
           </AuthProvider>
         </PostHogProvider>
       </body>

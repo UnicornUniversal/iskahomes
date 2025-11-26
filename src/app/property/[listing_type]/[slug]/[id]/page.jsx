@@ -35,7 +35,8 @@ import {
   Linkedin,
   Twitter,
   Map,
-  Navigation
+  Navigation,
+  Box
 } from 'lucide-react'
 import Property3DViewer from '@/app/components/propertyManagement/modules/Property3DViewer'
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner'
@@ -44,7 +45,9 @@ import NearbyAmenities from '@/app/components/Listing/NearbyAmenities'
 import ShareModal from '@/app/components/ui/ShareModal'
 import SectionTracker from '@/app/components/property/SectionTracker'
 import GalleryViewer from '@/app/components/property/GalleryViewer'
-import { getAmenityIcon, getAmenityName } from '@/lib/StaticData'
+import ListingList from '@/app/components/Listing/ListingList'
+import { getAmenityIcon, getAmenityName, getAmenityById } from '@/lib/StaticData'
+import { getSpecificationDataByTypeName, getSpecificationDataByTypeId, getFieldDataByKey } from '@/app/components/Data/StaticData'
 import { toast } from 'react-toastify'
 
 const PropertyDetailPage = () => {
@@ -64,6 +67,7 @@ const PropertyDetailPage = () => {
   const [isSaved, setIsSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [showContactModal, setShowContactModal] = useState(false)
 
   useEffect(() => {
     const fetchListing = async () => {
@@ -118,6 +122,15 @@ const PropertyDetailPage = () => {
               listingData.specifications = JSON.parse(listingData.specifications)
             } catch (e) {
               console.error('Error parsing specifications:', e)
+            }
+          }
+          
+          // Parse types if it's a string
+          if (typeof listingData.types === 'string') {
+            try {
+              listingData.types = JSON.parse(listingData.types)
+            } catch (e) {
+              console.error('Error parsing types:', e)
             }
           }
           
@@ -198,8 +211,8 @@ const PropertyDetailPage = () => {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Listing Not Found</h2>
-          <p className="text-gray-600 mb-4">{error || 'The listing you are looking for does not exist.'}</p>
+          <h2 className="text-2xl font-semibold -900 mb-2">Listing Not Found</h2>
+          <p className="-600 mb-4">{error || 'The listing you are looking for does not exist.'}</p>
           <button
             onClick={() => router.back()}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
@@ -238,6 +251,7 @@ const PropertyDetailPage = () => {
     relatedListings,
     propertySubtypes,
     listing_types,
+    types,
     socialAmenities,
     cancellation_policy,
     is_negotiable,
@@ -357,11 +371,50 @@ const PropertyDetailPage = () => {
 
   const specs = getSpecifications()
   
+  // Get property type ID from types field (primary method)
+  const getPropertyTypeId = () => {
+    // Try types field first (contains property type IDs)
+    if (types && Array.isArray(types) && types.length > 0) {
+      return types[0] // Use first type ID
+    }
+    
+    // Fallback: try to get from propertySubtypes if it has type IDs
+    if (propertySubtypes && propertySubtypes.length > 0) {
+      const firstSubtype = propertySubtypes[0]
+      if (firstSubtype?.id) return firstSubtype.id
+      if (typeof firstSubtype === 'string') return firstSubtype
+    }
+    
+    return null
+  }
+  
+  const propertyTypeId = getPropertyTypeId()
+  
+  // Get specification data based on property type ID (preferred) or name (fallback)
+  const specData = propertyTypeId 
+    ? getSpecificationDataByTypeId(propertyTypeId)
+    : getSpecificationDataByTypeName(listing_type || '')
+  
+  // Helper to get icon for a specification field
+  const getSpecIcon = (key) => {
+    if (!specData) return null
+    
+    const field = specData.fields.find(f => f.key === key)
+    if (field && field.icon) {
+      const IconComponent = field.icon
+      return <IconComponent className="box_holder w-10 h-10 " />
+    }
+    return null
+  }
+  
   // Helper to format specification labels
   const formatSpecLabel = (key) => {
-    return key
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, l => l.toUpperCase())
+    if (!specData) {
+      return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+    }
+    
+    const field = specData.fields.find(f => f.key === key)
+    return field ? field.label : key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
   }
   
   // Helper to check if a spec value should be displayed
@@ -591,21 +644,22 @@ const PropertyDetailPage = () => {
   return (
     <div className="min-h-screen flex">
       {/* Sticky Sidebar - Section Tracker */}
-      <div className="hidden lg:block w-64 flex-shrink-0 px-4">
-        <div className="sticky h-full top-8">
-          <SectionTracker
+      <div className="hidden lg:block w-64 flex-shrink-0">
+        <div className="sticky top-0 h-screen   border-r border-r-primary_color/10 ">
+          <div className="">
+            <SectionTracker
             sections={[
+              { id: 'intro', label: 'Intro', icon: 'intro' },
               { id: 'gallery', label: 'Gallery', icon: 'gallery' },
               { id: 'description', label: 'Description', icon: 'description' },
               { id: 'pricing', label: 'Pricing', icon: 'pricing' },
               { id: 'specifications', label: 'Specifications', icon: 'specifications' },
-              { id: 'completeSpecs', label: 'Complete Specs', icon: 'completeSpecs' },
               { id: 'amenities', label: 'Amenities', icon: 'amenities' },
               ...(additional_information ? [{ id: 'additionalInfo', label: 'Additional Info', icon: 'additionalInfo' }] : []),
-              ...(acquisition_rules && acquisition_rules !== 'None' ? [{ id: 'acquisitionRules', label: 'Acquisition Rules', icon: 'acquisitionRules' }] : []),
               { id: 'location', label: 'Location', icon: 'location' }
             ]}
           />
+          </div>
         </div>
       </div>
 
@@ -613,33 +667,33 @@ const PropertyDetailPage = () => {
       <div className="flex-1  mx-auto px-4 py-8">
         <div className="mx-auto space-y-8">
           {/* 1. Title, Price, Location, and Badges */}
-          <div className="space-y-4">
-            <div className="flex items-start justify-between">
+          <div id="intro" className="scroll-mt-24 space-y-4">
+            <div className="flex items-start justify-between flex-col md:flex-row">
               <div className="flex-1">
                 <h1 className="text-4xl md:text-[4em] mb-3">{title}</h1>
                 
                 {/* Price and Status */}
                 <div className="flex items-center gap-4 mb-3">
-                  <div className="text-3xl ">
+                  <h4 className="text-3xl ">
                     {formatPrice()}
-                  </div>
+                  </h4>
                   {price_type && (
-                    <span className={`px-4 py-1 rounded-full text-sm font-medium ${
+                    <p className={`px-4 py-1 rounded-full text-sm font-medium ${
                       price_type === 'rent' 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-blue-100 text-blue-800'
                     }`}>
-                      {price_type === 'rent' ? 'FOR RENT' : price_type === 'sale' ? 'FOR SALE' : price_type.toUpperCase()}
-                    </span>
+                      {price_type === 'rent' ? 'For Rent' : price_type === 'sale' ? 'For Sale' : price_type.toUpperCase()}
+                    </p>
                   )}
                 </div>
 
                 {/* Location */}
-                <div className="flex items-center text-gray-600 mb-4">
+                <div className="flex items-center -600 mb-4">
                   <MapPin className="w-5 h-5 mr-2 text-blue-600" />
-                  <span className="text-base">
+                  <p className="text-base">
                     {full_address || `${town}, ${city}, ${state}, ${country}`}
-                  </span>
+                  </p>
                 </div>
 
                 {/* Badges */}
@@ -667,7 +721,7 @@ const PropertyDetailPage = () => {
                     </span>
                   )}
                   {listingTypes.length > 0 && listingTypes.map((type, index) => (
-                    <span key={index} className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-xs">
+                    <span key={index} className="bg-gray-100 -800 px-3 py-1 rounded-full text-xs">
                       {type}
                     </span>
                   ))}
@@ -678,7 +732,7 @@ const PropertyDetailPage = () => {
               <div className="flex items-center space-x-2 ml-6">
                 <button 
                   onClick={() => setShowShareModal(true)}
-                  className="flex items-center text-gray-600 hover:text-blue-600 transition-colors p-2 hover:bg-gray-100 rounded-lg"
+                  className="flex items-center -600 bg-white text-primary_color hover:text-blue-600 transition-colors p-2 = rounded-lg"
                   title="Share"
                 >
                   <Share2 className="w-5 h-5" />
@@ -686,14 +740,14 @@ const PropertyDetailPage = () => {
                 <button 
                   onClick={handleSaveListing}
                   disabled={saving}
-                  className={`flex items-center transition-colors p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 ${
+                  className={`flex items-center transition-colors bg-white   p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed  ${
                     isSaved 
                       ? 'text-red-600' 
-                      : 'text-gray-600 hover:text-red-600'
+                      : '-600 hover:text-red-600 '
                   }`}
                   title={isSaved ? 'Saved' : 'Save'}
                 >
-                  <Heart className={`w-5 h-5 ${isSaved ? 'fill-current' : ''}`} />
+                  <Heart className={`w-5 h-5 ${isSaved ? 'fill-current' : 'text-primary_color'}`} />
                 </button>
               </div>
             </div>
@@ -705,64 +759,155 @@ const PropertyDetailPage = () => {
           </div>
 
           {/* After Album - Two Column Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 w-full">
             {/* Left Column - Main Content */}
-            <div className="lg:col-span-2 space-y-8">
+            <div className="xl:col-span-2 space-y-8">
 
               {/* Description */}
-              <div id="description" className="scroll-mt-24 bg-white rounded-2xl shadow-xl p-8">
-                <h3 className="text-2xl font-bold mb-4 text-gray-900">Description</h3>
-                <p className="text-gray-700 leading-relaxed text-lg">{description}</p>
+              <div id="description" className="scroll-mt-24 flex gap-[3em]">
+                <h3 className="text-2xl font-semibold mb-4 -900">Description</h3>
+                <div className="whitespace-pre-line text-gray-700 leading-relaxed space-y-4">
+                  {description?.split('\n').map((paragraph, index) => (
+                    paragraph.trim() && (
+                      <p key={index} className="mb-4">{paragraph}</p>
+                    )
+                  ))}
+                  <br/>
+                    {floorPlan && (
+                <div className="scroll-mt-24">
+                  <h3 className="text-2xl font-semibold mb-4 -900">Floor Plan</h3>
+                  <div className="bg-gray-50 rounded-lg p-6">
+                    {Array.isArray(floorPlan) ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {floorPlan.map((plan, index) => (
+                          <div key={index} className="relative aspect-square bg-white rounded-lg overflow-hidden border border-gray-200 max-w-[500px]">
+                            {plan?.url ? (
+                              <img
+                                src={plan.url}
+                                alt={`Floor plan ${index + 1}`}
+                                className="w-full h-full object-contain"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                Floor Plan {index + 1}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : floorPlan?.url ? (
+                      <div className="relative aspect-square bg-white rounded-lg overflow-hidden border border-gray-200 max-w-[500px] mx-auto">
+                        <img
+                          src={floorPlan.url}
+                          alt="Floor plan"
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+                </div>
+
+
+                  {/* Floor Plan */}
+            
               </div>
 
-              {/* Pricing Information */}
-              {pricingData && (
-              <div id="pricing" className="scroll-mt-24 bg-white rounded-2xl shadow-xl p-8">
-                  <h3 className="text-2xl font-bold mb-6 text-gray-900">Pricing</h3>
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      <div>
-                        <div className="text-sm text-gray-600 mb-1">Price</div>
-                        <div className="text-2xl font-bold text-gray-900">
-                          {pricingData.currency || currency} {parseFloat(pricingData.price || price).toLocaleString()}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-gray-600 mb-1">Price Type</div>
-                        <div className="text-lg font-semibold text-gray-900 capitalize">
-                          {pricingData.price_type || price_type || 'N/A'}
-                        </div>
-                      </div>
-                      {pricingData.duration && (
-                        <div>
-                          <div className="text-sm text-gray-600 mb-1">Duration</div>
-                          <div className="text-lg font-semibold text-gray-900 capitalize">
-                            {pricingData.duration}
+            
+
+              {/* Pricing & Availability */}
+              {(pricingData || price) && (
+              <div id="pricing" className="scroll-mt-24">
+                  <h3 className="text-2xl font-semibold mb-6 ">Pricing & Availability</h3>
+                  
+                  <div className="space-y-6">
+                    {(() => {
+                      const currencyLabel = (pricingData?.currency || currency || 'GHS').toUpperCase()
+                      const basePrice = parseFloat(pricingData?.price || price || 0)
+                      const formattedPrice = `${currencyLabel} ${basePrice.toLocaleString()}`
+                      const isRent = (pricingData?.price_type || price_type) === 'rent'
+                      const billingPeriod = pricingData?.duration || duration || (isRent ? 'month' : '')
+                      const priceDisplay = isRent
+                        ? `${formattedPrice} / ${billingPeriod}`
+                        : formattedPrice
+
+                      let idealLabel = null
+                      let idealValue = null
+                      if (pricingData?.ideal_duration) {
+                        const idealSpan = pricingData.time_span || 'months'
+                        idealLabel = `Ideal Duration: ${pricingData.ideal_duration} ${idealSpan}`
+
+                        if (isRent && billingPeriod.toLowerCase().includes('month')) {
+                          const yearlyTotal = basePrice * 12
+                          idealValue = `${currencyLabel} ${yearlyTotal.toLocaleString()} / year`
+                        } else {
+                          idealValue = `${formattedPrice} ${billingPeriod ? `/ ${billingPeriod}` : ''}`.trim()
+                        }
+                      }
+
+                      return (
+                        <div className="border-b border-gray-200 pb-6">
+                          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                            <div>
+                              <p className="text-sm uppercase tracking-wide font-medium mb-2">Price</p>
+                              <p className="text-4xl md:text-5xl font-light">{priceDisplay}</p>
+                            </div>
+                            {idealLabel && (
+                              <div>
+                                <p className="text-sm uppercase tracking-wide font-medium mb-2">{idealLabel}</p>
+                                <p className="text-3xl font-light">{idealValue}</p>
+                              </div>
+                            )}
                           </div>
+                        </div>
+                      )
+                    })()}
+
+                    {/* Additional Pricing Fields */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {is_negotiable !== undefined && (
+                        <p className=" italic">{is_negotiable ? 'Negotiable' : 'Non-negotiable'}</p>
+                      )}
+
+{available_from && (
+                        <div>
+                          <p className="text-sm font-medium mb-1">Available From</p>
+                          <p>
+                            {new Date(available_from).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                          </p>
                         </div>
                       )}
-                      {pricingData.time && (
+                      
+                      {available_until && (
                         <div>
-                          <div className="text-sm text-gray-600 mb-1">Time Period</div>
-                          <div className="text-lg font-semibold text-gray-900">
-                            {pricingData.time} {pricingData.time_span || ''}
-                          </div>
+                          <p className="text-sm font-medium mb-1">Available Until</p>
+                          <p>
+                            {new Date(available_until).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                          </p>
                         </div>
                       )}
-                      {pricingData.ideal_duration && (
+                      
+                      
+                      {security_requirements && (
                         <div>
-                          <div className="text-sm text-gray-600 mb-1">Ideal Duration</div>
-                          <div className="text-lg font-semibold text-gray-900">
-                            {pricingData.ideal_duration} {pricingData.time_span || 'months'}
-                          </div>
+                          <p className="text-sm font-medium mb-1">Security Deposit</p>
+                          <p>{security_requirements}</p>
                         </div>
                       )}
-                      {pricingData.security_requirements && (
-                        <div className="md:col-span-2">
-                          <div className="text-sm text-gray-600 mb-1">Security Requirements</div>
-                          <div className="text-lg font-semibold text-gray-900">
-                            {pricingData.security_requirements}
-                          </div>
+                      
+                      {cancellation_policy && (
+                        <div>
+                          <p className="text-sm font-medium mb-1">Cancellation Policy</p>
+                          <p>{cancellation_policy}</p>
+                        </div>
+                      )}
+                      
+                     
+                      {pricingData?.security_requirements && (
+                        <div>
+                          <p className="text-sm font-medium mb-1">Security Requirements</p>
+                          <p>{pricingData.security_requirements}</p>
                         </div>
                       )}
                     </div>
@@ -770,207 +915,87 @@ const PropertyDetailPage = () => {
                 </div>
               )}
 
-              {/* Specifications Grid - Key Metrics */}
-              <div id="specifications" className="scroll-mt-24 bg-white rounded-2xl shadow-xl p-8">
-                <h3 className="text-2xl font-bold mb-6 text-gray-900">Key Specifications</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                  {specs.bedrooms > 0 && (
-                    <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl">
-                      <Bed className="w-8 h-8 mx-auto mb-3 text-blue-600" />
-                      <div className="text-2xl font-bold text-gray-900">{specs.bedrooms}</div>
-                      <div className="text-sm text-gray-600">Bedrooms</div>
-                    </div>
-                  )}
-                  {specs.bathrooms > 0 && (
-                    <div className="text-center p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl">
-                      <Bath className="w-8 h-8 mx-auto mb-3 text-green-600" />
-                      <div className="text-2xl font-bold text-gray-900">{specs.bathrooms}</div>
-                      <div className="text-sm text-gray-600">Bathrooms</div>
-                    </div>
-                  )}
-                  {specs.size > 0 && (
-                    <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl">
-                      <Square className="w-8 h-8 mx-auto mb-3 text-purple-600" />
-                      <div className="text-2xl font-bold text-gray-900">{specs.size}</div>
-                      <div className="text-sm text-gray-600">
-                        {listing_type === 'unit' ? 'sq ft' : 'sq m'}
+              {/* Unified Specifications */}
+              <div id="specifications" className="scroll-mt-24 rounded-2xl ">
+                <h3 className="text-2xl font-semibold mb-6 ">Specifications</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {Object.entries(specs).map(([key, value]) => {
+                    if (!shouldDisplaySpec(key, value)) return null
+                    
+                    const icon = getSpecIcon(key)
+                    const label = formatSpecLabel(key)
+                    
+                    // Format the value
+                    let displayValue = value
+                    if (typeof value === 'number') {
+                      // For size, add unit
+                      if (key === 'size' || key === 'property_size') {
+                        displayValue = `${value} ${listing_type === 'unit' ? 'sq ft' : 'sq m'}`
+                      } else {
+                        displayValue = value.toString()
+                      }
+                    } else if (typeof value === 'string') {
+                      // Capitalize and replace underscores
+                      displayValue = value.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                    } else if (typeof value === 'boolean') {
+                      displayValue = value ? 'Yes' : 'No'
+                    }
+                    
+                    // Skip if no icon found (fallback to not showing)
+                    if (!icon) return null
+                    
+                    return (
+                      <div 
+                        key={key} 
+                        className=" flex p-4 text-left gap-2"
+                      >
+                      
+                            {icon}
+                       
+                        <div className="flex flex-col items-start">
+                        <p className="text-lg font-semibold text-[0.7em] mb-1">{label}</p>
+                        <p className="text-base font-medium ">{displayValue}</p>
+                      
+                        </div>
+                      
                       </div>
-                    </div>
-                  )}
-                  {specs.floor_level > 0 && (
-                    <div className="text-center p-6 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl">
-                      <div className="w-8 h-8 mx-auto mb-3 text-orange-600">🏢</div>
-                      <div className="text-2xl font-bold text-gray-900">{specs.floor_level}</div>
-                      <div className="text-sm text-gray-600">Floor Level</div>
-                    </div>
-                  )}
-                  {specs.living_rooms > 0 && (
-                    <div className="text-center p-6 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl">
-                      <Home className="w-8 h-8 mx-auto mb-3 text-indigo-600" />
-                      <div className="text-2xl font-bold text-gray-900">{specs.living_rooms}</div>
-                      <div className="text-sm text-gray-600">Living Rooms</div>
-                    </div>
-                  )}
-                  {specs.number_of_balconies > 0 && (
-                    <div className="text-center p-6 bg-gradient-to-br from-teal-50 to-teal-100 rounded-xl">
-                      <div className="w-8 h-8 mx-auto mb-3 text-teal-600">🌿</div>
-                      <div className="text-2xl font-bold text-gray-900">{specs.number_of_balconies}</div>
-                      <div className="text-sm text-gray-600">Balconies</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Complete Specifications Details */}
-              <div id="completeSpecs" className="scroll-mt-24 bg-white rounded-2xl shadow-xl p-8">
-                <h3 className="text-2xl font-bold mb-6 text-gray-900">Complete Specifications</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* Property Details Column */}
-                  <div className="bg-gray-50 rounded-xl p-6">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Property Details</h4>
-                  <div className="space-y-3">
-                      {shouldDisplaySpec('furnishing', specs.furnishing) && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Furnishing:</span>
-                      <span className="font-medium capitalize">{specs.furnishing}</span>
-                    </div>
-                      )}
-                      {shouldDisplaySpec('property_condition', specs.property_condition) && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Condition:</span>
-                          <span className="font-medium capitalize">{specs.property_condition}</span>
-                    </div>
-                      )}
-                      {shouldDisplaySpec('property_age', specs.property_age) && (
-                    <div className="flex justify-between">
-                          <span className="text-gray-600">Property Age:</span>
-                          <span className="font-medium capitalize">{specs.property_age}</span>
-                    </div>
-                      )}
-                      {shouldDisplaySpec('building_style', specs.building_style) && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Building Style:</span>
-                          <span className="font-medium capitalize">{specs.building_style}</span>
-                        </div>
-                      )}
-                      {shouldDisplaySpec('compound_type', specs.compound_type) && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Compound Type:</span>
-                          <span className="font-medium capitalize">{specs.compound_type}</span>
-                        </div>
-                      )}
-                      {shouldDisplaySpec('size', specs.size) && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Size:</span>
-                          <span className="font-medium">{specs.size} {listing_type === 'unit' ? 'sq ft' : 'sq m'}</span>
-                    </div>
-                      )}
-                  </div>
-                </div>
-
-                  {/* Kitchen & Interior Column */}
-                  <div className="bg-gray-50 rounded-xl p-6">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Kitchen & Interior</h4>
-                    <div className="space-y-3">
-                      {shouldDisplaySpec('kitchen_type', specs.kitchen_type) && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Kitchen Type:</span>
-                          <span className="font-medium capitalize">{specs.kitchen_type.replace(/_/g, ' ')}</span>
-                        </div>
-                      )}
-                      {shouldDisplaySpec('kitchen', specs.kitchen) && specs.kitchen > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Kitchens:</span>
-                          <span className="font-medium">{specs.kitchen}</span>
-                        </div>
-                      )}
-                      {shouldDisplaySpec('toilets', specs.toilets) && specs.toilets > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Toilets:</span>
-                          <span className="font-medium">{specs.toilets}</span>
-                        </div>
-                      )}
-                      {shouldDisplaySpec('guest_room', specs.guest_room) && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Guest Room:</span>
-                          <span className="font-medium capitalize">{specs.guest_room}</span>
-                        </div>
-                      )}
-                      {shouldDisplaySpec('guest_washroom', specs.guest_washroom) && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Guest Washroom:</span>
-                          <span className="font-medium capitalize">{specs.guest_washroom}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Utilities & Features Column */}
-                  <div className="bg-gray-50 rounded-xl p-6">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Utilities & Features</h4>
-                    <div className="space-y-3">
-                      {shouldDisplaySpec('shared_electricity_meter', specs.shared_electricity_meter) && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Electricity Meter:</span>
-                          <span className="font-medium capitalize">{specs.shared_electricity_meter}</span>
-                        </div>
-                      )}
-                      {/* Display any other specification fields that exist */}
-                      {Object.entries(specs).map(([key, value]) => {
-                        // Skip already displayed fields
-                        const displayedFields = [
-                          'bedrooms', 'bathrooms', 'size', 'floor_level', 'living_rooms', 
-                          'number_of_balconies', 'furnishing', 'property_condition', 'property_age',
-                          'building_style', 'compound_type', 'kitchen_type', 'kitchen', 'toilets',
-                          'guest_room', 'guest_washroom', 'shared_electricity_meter'
-                        ]
-                        if (displayedFields.includes(key) || !shouldDisplaySpec(key, value)) return null
-                        
-                        return (
-                          <div key={key} className="flex justify-between">
-                            <span className="text-gray-600">{formatSpecLabel(key)}:</span>
-                            <span className="font-medium">
-                              {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : 
-                               typeof value === 'string' ? value.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) :
-                               value}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
+                    )
+                  })}
                 </div>
               </div>
 
               {/* Amenities */}
               {amenities && (amenities.general?.length > 0 || amenities.database?.length > 0 || amenities.custom?.length > 0) && (
-                <div id="amenities" className="mb-8 scroll-mt-24 bg-white rounded-2xl shadow-xl p-8">
-                  <h3 className="text-2xl font-bold mb-6 text-gray-900">Amenities</h3>
+                <div id="amenities" className="scroll-mt-24 rounded-2xl">
+                  <h3 className="text-2xl font-semibold mb-6">Amenities</h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                     {amenities.general?.map((amenity, index) => (
-                       <div key={index} className="flex items-center p-4 bg-blue-50 rounded-xl">
-                         <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                           <span className="text-lg">{getAmenityIcon(amenity)}</span>
+                     {amenities.general?.map((amenity, index) => {
+                       const amenityData = getAmenityById(amenity)
+                       const IconComponent = amenityData?.icon
+                       const amenityName = getAmenityName(amenity)
+                       return (
+                         <div key={index} className="flex items-center p-4 text-left gap-2">
+                           {IconComponent && <IconComponent className="box_holder w-10 h-10" />}
+                          
+                             <p className="">{amenityName}</p>
+                          
                          </div>
-                         <span className="font-medium text-gray-900">
-                           {getAmenityName(amenity)}
-                         </span>
-                       </div>
-                     ))}
+                       )
+                     })}
                     {amenities.database?.map((amenity, index) => (
-                      <div key={index} className="flex items-center p-4 bg-green-50 rounded-xl">
-                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
-                          <CheckCircle className="w-5 h-5 text-green-600" />
+                      <div key={index} className="flex p-4 text-left gap-2">
+                        <CheckCircle className="box_holder w-10 h-10" />
+                        <div className="flex flex-col items-start">
+                          <p className="text-lg font-semibold text-[0.7em] mb-1">Custom Amenity</p>
                         </div>
-                        <span className="font-medium text-gray-900">Custom Amenity</span>
                       </div>
                     ))}
                     {amenities.custom?.map((amenity, index) => (
-                      <div key={index} className="flex items-center p-4 bg-purple-50 rounded-xl">
-                        <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
-                          <Star className="w-5 h-5 text-purple-600" />
+                      <div key={index} className="flex p-4 text-left gap-2">
+                        <Star className="box_holder w-10 h-10" />
+                        <div className="flex flex-col items-start">
+                          <p className="text-lg font-semibold text-[0.7em] mb-1">{amenity}</p>
                         </div>
-                        <span className="font-medium text-gray-900">{amenity}</span>
                       </div>
                     ))}
                   </div>
@@ -979,8 +1004,8 @@ const PropertyDetailPage = () => {
 
               {/* Location Map - Via OpenStreetMap with full location details */}
               {(latitude && longitude) && (
-                <div id="location" className="mb-8 scroll-mt-24 bg-white rounded-2xl shadow-xl p-8">
-                  <h3 className="text-2xl font-bold mb-6 text-gray-900">Location</h3>
+                <div id="location" className="mb-8 scroll-mt-24  rounded-2xl  ">
+                  <h3 className="text-2xl font-semibold mb-6 -900">Location</h3>
                   <div className="bg-gray-100 rounded-xl p-6 h-96 flex items-center justify-center mb-4">
                     <iframe
                       width="100%"
@@ -993,57 +1018,80 @@ const PropertyDetailPage = () => {
                       className="rounded-lg"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex items-start">
-                      <MapPin className="w-5 h-5 mr-2 text-blue-600 mt-1 flex-shrink-0" />
-                      <div>
-                        <p className="font-semibold text-gray-900">Full Address</p>
-                        <p className="text-gray-700">{full_address || `${town}, ${city}, ${state}, ${country}`}</p>
+                  <div className="space-y-3">
+                    {full_address && (
+                      <div className="flex items-start">
+                        <MapPin className="w-5 h-5 mr-2 text-blue-600 mt-1 flex-shrink-0" />
+                        <div>
+                          <p className="font-semibold -900">Full Address</p>
+                          <p className="-700">{full_address}</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-start">
-                      <Navigation className="w-5 h-5 mr-2 text-blue-600 mt-1 flex-shrink-0" />
-                      <div>
-                        <p className="font-semibold text-gray-900">Coordinates</p>
-                        <p className="text-gray-700">{latitude}, {longitude}</p>
+                    )}
+                    {(town || city || state || country) && (
+                      <div className="flex items-start">
+                        <MapPin className="w-5 h-5 mr-2 text-blue-600 mt-1 flex-shrink-0" />
+                        <div>
+                          <p className="font-semibold -900">Location Details</p>
+                          <p className="-700">
+                            {[town, city, state, country].filter(Boolean).join(', ')}
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    )}
                     {location_additional_information && (
                       <div className="mt-4 bg-blue-50 p-4 rounded-xl">
-                        <p className="text-gray-700">{location_additional_information}</p>
+                        <p className="-700">{location_additional_information}</p>
                       </div>
                     )}
                   </div>
                 </div>
               )}
 
-              {/* Video and YouTube */}
-              {(video?.url || youtubeUrl) && (
-                <div className="mb-8 bg-white rounded-2xl shadow-xl p-8">
-                  <h3 className="text-2xl font-bold mb-6 text-gray-900">Property Video</h3>
-                  {video?.url ? (
-                    <div className="rounded-xl overflow-hidden">
-                      <video
-                        src={video.url}
-                        controls
-                        className="w-full h-auto max-h-[500px]"
-                        poster={mainImage}
-                      >
-                        Your browser does not support the video tag.
-                      </video>
-                    </div>
-                  ) : youtubeUrl ? (
-                    <div className="rounded-xl overflow-hidden">
-                      <iframe
-                        src={youtubeUrl.replace('watch?v=', 'embed/').split('&')[0]}
-                        className="w-full aspect-video"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              )}
+
+
+ {/* Video and YouTube */}
+{/* Video and YouTube Section */}
+{(video?.url || youtubeUrl) && (
+  <div className="mb-12 relative">
+    <h3 className="text-2xl font-semibold mb-6">Property Video</h3>
+    
+    <div className="flex flex-col">
+      
+      {/* 1. BOTTOM CARD (Uploaded Video) */}
+      {/* This STICKS. It waits for the YouTube video to slide over it. */}
+      {video?.url && (
+        <div className={`w-full overflow-hidden  shadow-lg bg-white/50  
+          ${youtubeUrl ? 'sticky top-24 z-0 mb-4' : 'relative'}`} // Add margin-bottom (mb-4) to create a small gap before overlap
+        >
+          <video
+            src={video.url}
+            controls
+            className="w-full h-auto max-h-[500px] object-contain"
+            poster={mainImage}
+          >
+            Your browser does not support the video tag.
+          </video>
+        </div>
+      )}
+
+      {/* 2. TOP CARD (YouTube) */}
+      {/* This SCROLLS over the top. Needs bg-white to hide the video behind it. */}
+      {youtubeUrl && (
+        <div className="relative z-10 w-full overflow-hidden shadow-lg bg-white">
+          <iframe
+            src={youtubeUrl.replace('watch?v=', 'embed/').split('&')[0]}
+            className="w-full aspect-video"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      )}
+      
+    </div>
+  </div>
+)}
+
 
               {/* Social Amenities */}
               {socialAmenities && (
@@ -1053,12 +1101,14 @@ const PropertyDetailPage = () => {
                   state={state}
                 />
               )}
+
+             
             </div>
 
-            {/* Right Column - PropertyContactForm */}
-            <div className="lg:col-span-1">
-              <div className="sticky top-8">
-                <div className="bg-white rounded-2xl shadow-xl p-6">
+            {/* Right Column - PropertyContactForm - Only on XL devices */}
+            <div className="hidden xl:block xl:col-span-1">
+              <div className="sticky top-2">
+                <div className=" rounded-2xl  p-6">
                   <PropertyContactForm 
                     propertyId={id}
                     propertyTitle={title}
@@ -1071,66 +1121,44 @@ const PropertyDetailPage = () => {
             </div>
           </div>
 
+          {/* PropertyContactForm at Bottom - For Small/Medium/Large devices (not XL) */}
+          <div className="xl:hidden mt-8">
+            <PropertyContactForm 
+              propertyId={id}
+              propertyTitle={title}
+              propertyType={listing_type}
+              developer={developers}
+              listing={listing}
+            />
+          </div>
+
           {/* Rest of Content After Two Column Layout */}
           <div className="space-y-8">
             {/* Additional Information */}
             {additional_information && (
-              <div id="additionalInfo" className="scroll-mt-24 bg-white rounded-2xl shadow-xl p-8">
-                <h3 className="text-2xl font-bold mb-4 text-gray-900">Additional Information</h3>
+              <div id="additionalInfo" className="scroll-mt-24  rounded-2xl  ">
+                <h3 className="text-2xl font-semibold mb-4 -900">Additional Information</h3>
                 <div className="bg-gray-50 p-6 rounded-xl">
-                  <p className="text-gray-700 leading-relaxed">{additional_information}</p>
+                  <p className="-700 leading-relaxed">{additional_information}</p>
                 </div>
               </div>
             )}
 
             {/* Acquisition Rules */}
             {acquisition_rules && acquisition_rules !== 'None' && (
-              <div id="acquisitionRules" className="scroll-mt-24 bg-white rounded-2xl shadow-xl p-8">
-                <h3 className="text-2xl font-bold mb-4 text-gray-900">Acquisition Rules</h3>
+              <div id="acquisitionRules" className="scroll-mt-24  rounded-2xl  ">
+                <h3 className="text-2xl font-semibold mb-4 -900">Acquisition Rules</h3>
                 <div className="bg-yellow-50 p-6 rounded-xl border border-yellow-200">
-                  <p className="text-gray-700 leading-relaxed">{acquisition_rules}</p>
+                  <p className="-700 leading-relaxed">{acquisition_rules}</p>
                 </div>
               </div>
             )}
 
             {/* Related Listings */}
             {relatedListings && relatedListings.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-xl p-8">
-                <h3 className="text-2xl font-bold mb-6 text-gray-900">More from {developers?.name}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {relatedListings.slice(0, 6).map((related) => (
-                    <Link
-                      key={related.id}
-                      href={`/property/${related.listing_type}/${related.slug}/${related.id}`}
-                      className="group block"
-                    >
-                      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-300 group-hover:scale-105">
-                        <div className="h-48 bg-gray-200">
-                          {related.media?.mediaFiles?.[0]?.url ? (
-                            <img
-                              src={related.media.mediaFiles[0].url}
-                              alt={related.title}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-500">
-                              {related.title?.charAt(0) || 'P'}
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-4">
-                          <h4 className="font-semibold text-gray-900 mb-2 line-clamp-2">{related.title}</h4>
-                          <p className="text-sm text-gray-600 mb-2">
-                            {related.city}, {related.state}
-                          </p>
-                          <p className="text-lg font-bold text-blue-600">
-                            {formatPrice(related.price, related.currency, related.price_type, related.duration)}
-                          </p>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+              <div className=" rounded-2xl  ">
+                <h3 className="text-2xl font-semibold mb-6 -900">More from {developers?.name}</h3>
+                <ListingList listings={relatedListings.slice(0, 6)} />
                 {relatedListings.length > 6 && (
                   <div className="text-center mt-6">
                     <Link
@@ -1148,37 +1176,80 @@ const PropertyDetailPage = () => {
       </div>
 
 
-      {/* 3D Model Overlay */}
+      {/* 3D Model Overlay - Premium Design */}
       {show3DModel && model3D?.url && (
-        <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-sm">
-          <div className="relative w-full h-full">
-            {/* Close Button */}
+        <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-slate-900/20 via-gray-900/15 to-slate-800/20 backdrop-blur-xl">
+          <div className="relative w-full h-full flex items-center justify-center p-8">
+            {/* Elegant Close Button */}
             <button
               onClick={() => setShow3DModel(false)}
-              className="absolute top-6 right-6 z-10 bg-white/90 backdrop-blur-sm hover:bg-white text-gray-900 p-3 rounded-full shadow-lg transition-all duration-300"
+              className="absolute top-8 right-8 z-20 group"
+              aria-label="Close 3D Model"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <div className="relative">
+                <div className="absolute inset-0 bg-white/10 backdrop-blur-md rounded-full group-hover:bg-white/20 transition-all duration-300 w-12 h-12"></div>
+                <div className="relative w-12 h-12 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white group-hover:text-gray-200 transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+              </div>
             </button>
 
-            {/* 3D Model Container */}
-            <div className="w-full h-full p-8">
-              <div className="w-full h-full bg-white rounded-2xl shadow-2xl overflow-hidden">
-                <div className="h-full">
+            {/* Premium 3D Model Container with Elegant Frame */}
+            <div className="w-full max-w-7xl h-full max-h-[90vh] relative">
+              {/* Outer Glow Effect */}
+              <div className="absolute -inset-1 bg-gradient-to-r from-white/10 via-white/5 to-transparent rounded-3xl blur-2xl opacity-50"></div>
+              
+              {/* Main Container */}
+              <div className="relative w-full h-full bg-white/5 backdrop-blur-sm rounded-3xl border border-white/10 shadow-2xl overflow-hidden">
+                {/* Top Gradient Overlay */}
+                <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-black/20 to-transparent z-10 pointer-events-none"></div>
+                
+                {/* Bottom Gradient Overlay */}
+                <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/20 to-transparent z-10 pointer-events-none"></div>
+                
+                {/* 3D Model */}
+                <div className="w-full h-full">
                   <Property3DViewer 
                     modelData={model3D} 
                     unitTitle={title}
+                    hideTitle={true}
+                    hideControls={true}
                   />
                 </div>
               </div>
             </div>
 
-            {/* Controls Info */}
-            <div className="absolute bottom-6 left-6 bg-white/90 backdrop-blur-sm text-gray-900 px-4 py-2 rounded-lg shadow-lg">
-              <div className="text-sm font-medium mb-1">3D Viewer Controls</div>
-              <div className="text-xs text-gray-600">
-                Drag to rotate • Scroll to zoom • Right-click to pan
+            {/* Premium Controls Info - Bottom Left */}
+            <div className="absolute bottom-8 left-8 z-20">
+              <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl px-6 py-4 shadow-2xl">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-white/60 animate-pulse"></div>
+                  <div className="text-sm font-semibold text-white tracking-wide">3D VIEWER CONTROLS</div>
+                </div>
+                <div className="space-y-2 text-xs text-white/80 font-light">
+                  <div className="flex items-center gap-2">
+                    <span className="text-white/60">↔</span>
+                    <span>Drag to rotate</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white/60">🔍</span>
+                    <span>Scroll to zoom</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white/60">↕</span>
+                    <span>Right-click to pan</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Elegant Title - Top Left */}
+            <div className="absolute top-8 left-8 z-20">
+              <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl px-6 py-3 shadow-2xl">
+                <div className="text-xs font-medium text-white/60 uppercase tracking-widest mb-1">3D Model</div>
+                <div className="text-lg font-light text-white">{title}</div>
               </div>
             </div>
           </div>
@@ -1191,6 +1262,88 @@ const PropertyDetailPage = () => {
         onClose={() => setShowShareModal(false)}
         property={listing}
       />
+
+      {/* Floating Contact Button - Only on Small/Medium/Large devices (not XL) */}
+      <div className="xl:hidden fixed bottom-6 right-6 z-40">
+        <button
+          onClick={() => setShowContactModal(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110 flex items-center justify-center"
+          aria-label="Contact Property Owner"
+        >
+          <MessageCircle className="w-6 h-6" />
+        </button>
+      </div>
+
+      {/* Contact Modal - Only on Small/Medium/Large devices */}
+      {showContactModal && (
+        <div 
+          className="xl:hidden fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowContactModal(false)
+            }
+          }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">Contact Property Owner</h2>
+              <button
+                onClick={() => setShowContactModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto">
+              <PropertyContactForm 
+                propertyId={id}
+                propertyTitle={title}
+                propertyType={listing_type}
+                developer={developers}
+                listing={listing}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Immersive Content - Fixed at Bottom */}
+      {(model3D?.url || virtualTourUrl) && (
+        <div className="fixed bottom-15 lg:bottom-6 right-0 lg:right-auto lg:left-[15em]  z-50">
+          <div className=" backdrop-blur-sm rounded-full shadow-xl border border-gray-200 py-4  px-1 flex flex-col items-center gap-3 ">
+            {/* <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Immersive Content</h4> */}
+            
+            {model3D?.url && (
+              <button
+                onClick={() => setShow3DModel(true)}
+                className="flex flex-col items-center gap-2 p-1  rounded-lg hover:bg-gray-50 transition-colors group"
+                aria-label="View 3D Model"
+              >
+                <Box className="w-6 h-6 text-primary_color group-hover:text-blue-700" />
+                {/* <span className="text-xs font-medium text-gray-700">3D Model</span> */}
+              </button>
+            )}
+            
+            {virtualTourUrl && (
+              <a
+                href={virtualTourUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-gray-50 transition-colors group"
+              >
+                <Eye className="w-6 h-6 text-primary_color group-hover:text-blue-700" />
+                {/* <span className="text-xs font-medium text-gray-700">Virtual Tour</span> */}
+              </a>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

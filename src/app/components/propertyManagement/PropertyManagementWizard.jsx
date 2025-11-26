@@ -1,7 +1,8 @@
 "use client"
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { toast } from 'react-toastify'
+import { toast, ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 import { useDevelopments } from '@/hooks/useCachedData'
 import { CheckCircle2, Circle, ChevronRight, ChevronLeft, Save } from 'lucide-react'
 import DeleteConfirmationModal from '../ui/DeleteConfirmationModal'
@@ -52,6 +53,7 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [draftListingId, setDraftListingId] = useState(propertyId) // Track draft ID for new listings
+  const [listingStatus, setListingStatus] = useState('draft') // Track listing status
 
   // Determine if it's add mode
   const isAddMode = slug === 'addNewUnit' || slug === 'addNewProperty'
@@ -142,6 +144,7 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
           floor_plan: data.floor_plan || null,
           virtual_tour_link: data.virtual_tour_link || '',
           property_status: data.listing_status || 'active',
+          listing_status: data.listing_status || 'draft',
           social_amenities: data.social_amenities || {
             schools: [],
             hospitals: [],
@@ -151,6 +154,8 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
             police: []
           }
         })
+        // Update listing status state
+        setListingStatus(data.listing_status || 'draft')
       } else {
         toast.error('Failed to fetch listing data')
       }
@@ -257,9 +262,37 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
           break
 
         case 'media':
+          // Determine if video is a new upload (has file property) or already uploaded
+          let videoData = null
+          if (formData.media?.video) {
+            // If it's a File object, it's a new upload - don't include in stepData
+            if (formData.media.video instanceof File) {
+              videoData = null // Will be uploaded as file
+            } 
+            // If it has a file property, it's a new upload - don't include in stepData
+            else if (formData.media.video.file instanceof File) {
+              videoData = null // Will be uploaded as file
+            }
+            // If it has a url that's NOT a blob URL, it's already uploaded - include it
+            else if (formData.media.video.url && !formData.media.video.url.startsWith('blob:')) {
+              videoData = {
+                url: formData.media.video.url,
+                name: formData.media.video.name,
+                size: formData.media.video.size,
+                type: formData.media.video.type,
+                path: formData.media.video.path,
+                filename: formData.media.video.filename
+              }
+            }
+            // If it's a string (legacy format), include it
+            else if (typeof formData.media.video === 'string') {
+              videoData = formData.media.video
+            }
+          }
+
           stepData = {
             media: {
-              video: formData.media?.video && !(formData.media.video instanceof File) ? formData.media.video : null,
+              video: videoData,
               youtubeUrl: formData.media?.youtubeUrl || '',
               virtualTourUrl: formData.media?.virtualTourUrl || '',
               albums: formData.media?.albums ? formData.media.albums.map(album => ({
@@ -287,7 +320,7 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
             }
           }
           
-          // Add video file if it exists
+          // Add video file if it exists (for new uploads)
           if (formData.media?.video) {
             if (formData.media.video instanceof File) {
               formDataForUpload.append('video', formData.media.video)
@@ -378,16 +411,27 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
           window.history.pushState({}, '', newUrl)
         }
 
+        // Update listing status if returned
+        if (result.data?.listing_status) {
+          setListingStatus(result.data.listing_status)
+          setFormData(prev => ({
+            ...prev,
+            listing_status: result.data.listing_status,
+            property_status: result.data.listing_status
+          }))
+        }
+
         // Mark step as completed
         setCompletedSteps(prev => new Set([...prev, currentStepData.id]))
         toast.success(`${currentStepData.label} saved successfully!`)
       } else {
         const error = await response.json()
         toast.error(error.error || `Failed to save ${currentStepData.label}`)
+        throw new Error(error.error || `Failed to save ${currentStepData.label}`)
       }
     } catch (error) {
       console.error('Error saving step:', error)
-      toast.error('Error saving step')
+      toast.error(error.message || 'Error saving step')
     } finally {
       setSaving(false)
     }
@@ -530,15 +574,23 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
   const currentStepData = STEPS[currentStep]
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="w-full mx-autosm:px-6 lg:px-8 py-6">
       {/* Header */}
-      <div className="mb-6 flex justify-between items-center">
+      <div className="mb-6 flex justify-between flex-wrap items-center border-b border-white/50 pb-2">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-            {isAddMode 
-              ? (accountType === 'developer' ? 'Add New Unit' : 'Add New Property')
-              : 'Edit Property'}
-          </h1>
+          <div className="flex items-center gap-3 flex-wrap  pb-2">
+            <h1 className="">
+              {isAddMode 
+                ? (accountType === 'developer' ? 'Add New Unit' : 'Add New Property')
+                : 'Edit Property'}
+            </h1>
+            {/* Draft Status Badge */}
+            {(listingStatus === 'draft' || formData.listing_status === 'draft') && (
+              <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium border border-yellow-300">
+                Draft
+              </span>
+            )}
+          </div>
           <p className="text-sm text-gray-500 mt-1">
             Step {currentStep + 1} of {STEPS.length}: {currentStepData.label}
           </p>
@@ -555,9 +607,41 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
 
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Sidebar - Step Navigation */}
-        <div className="lg:w-64 flex-shrink-0">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Steps</h3>
+        <div className="lg:w-64 flex-shrink-0 lg:border-r border-white/50 lg:pr-4">
+          {/* Mobile: Horizontal Scroll */}
+          <div className="lg:hidden secondary_bg p-4 mb-4 overflow-x-auto">
+            <nav className="flex gap-2 min-w-max">
+              {STEPS.map((step, index) => {
+                const isCompleted = completedSteps.has(step.id)
+                const isCurrent = index === currentStep
+                
+                return (
+                  <button
+                    key={step.id}
+                    onClick={() => goToStep(index)}
+                    className={`flex-shrink-0 text-left px-3 py-2 transition-colors flex items-center gap-2 border ${
+                      isCurrent
+                        ? 'secondary_button !text-[0.9em]'
+                        : isCompleted
+                        ? 'text-primary_color/80 border-transparent hover:bg-primary_color/5'
+                        : 'text-primary_color/60 border-transparent hover:bg-primary_color/5'
+                    }`}
+                  >
+                    {isCompleted ? (
+                      <CheckCircle2 className="w-4 h-4 text-primary_color flex-shrink-0" />
+                    ) : (
+                      <Circle className={`w-4 h-4 flex-shrink-0 ${isCurrent ? 'text-primary_color' : 'text-primary_color/40'}`} />
+                    )}
+                    <span className="text-primary_color whitespace-nowrap text-sm">{step.label}</span>
+                  </button>
+                )
+              })}
+            </nav>
+          </div>
+          
+          {/* Desktop: Vertical Sticky */}
+          <div className="hidden lg:block sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-primary_color mb-4">Steps</h3>
             <nav className="space-y-2">
               {STEPS.map((step, index) => {
                 const isCompleted = completedSteps.has(step.id)
@@ -567,20 +651,20 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
                   <button
                     key={step.id}
                     onClick={() => goToStep(index)}
-                    className={`w-full text-left px-3 py-2 rounded-md transition-colors flex items-center gap-2 ${
+                    className={`w-full text-left !p-[1em] rounded-md transition-colors flex items-center gap-2 border ${
                       isCurrent
-                        ? 'bg-blue-50 text-blue-700 font-medium border border-blue-200'
+                        ? 'secondary_button !text-[1em]'
                         : isCompleted
-                        ? 'text-green-700 hover:bg-green-50'
-                        : 'text-gray-700 hover:bg-gray-50'
+                        ? 'text-primary_color/80 border-transparent hover:bg-primary_color/5'
+                        : 'text-primary_color/60 border-transparent hover:bg-primary_color/5'
                     }`}
                   >
                     {isCompleted ? (
-                      <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      <CheckCircle2 className="w-5 h-5 text-primary_color flex-shrink-0" />
                     ) : (
-                      <Circle className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                      <Circle className={`w-5 h-5 flex-shrink-0 ${isCurrent ? 'text-primary_color' : 'text-primary_color/40'}`} />
                     )}
-                    <span className="text-sm">{step.label}</span>
+                    <span className="text-primary_color">{step.label}</span>
                   </button>
                 )
               })}
@@ -588,9 +672,12 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
           </div>
         </div>
 
+{/* line - Desktop only */}
+        <div className="hidden lg:block w-[0.1em] h-[100vh] bg-primary_color"> </div>
+
         {/* Main Content */}
         <div className="flex-1">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="secondary_bg rounded-lg shadow-sm border border-gray-200 !p-[1.5em]">
             <CurrentStepComponent
               formData={formData}
               updateFormData={updateFormData}
@@ -654,6 +741,20 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
         itemName={formData.title || `this ${accountType === 'developer' ? 'unit' : 'property'}`}
         itemType={accountType === 'developer' ? 'unit' : 'property'}
         isLoading={isDeleting}
+      />
+
+      {/* Toast Container */}
+      <ToastContainer
+        position="top-center"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
       />
     </div>
   )

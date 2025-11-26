@@ -13,8 +13,10 @@ export function PostHogProvider({ children }) {
     posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
       api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com',
       person_profiles: 'identified_only', // or 'always' to create profiles for anonymous users as well
-      capture_pageviews: false, // We'll handle this manually for better control
-      capture_pageleave: true,
+      capture_pageviews: false, // Disabled - we only track custom events
+      capture_pageleave: false, // Disabled - we only track custom events
+      autocapture: false, // CRITICAL: Disable auto-capture completely (no $autocapture, $pageview, etc.)
+      disable_session_recording: true, // Disable session recording to reduce noise
       loaded: (posthog) => {
         if (process.env.NODE_ENV === 'development') {
           // Optional: disable in development
@@ -40,24 +42,12 @@ export function PostHogProvider({ children }) {
 }
 
 // Component to track page views
+// DISABLED: We're not tracking $pageview anymore - only custom events
+// This prevents auto-capture events from cluttering our analytics
 function PostHogPageView() {
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const posthog = usePostHog()
-
-  useEffect(() => {
-    if (pathname && posthog) {
-      let url = window.origin + pathname
-      if (searchParams && searchParams.toString()) {
-        url = url + `?${searchParams.toString()}`
-      }
-      
-      posthog.capture('$pageview', {
-        $current_url: url
-      })
-    }
-  }, [pathname, searchParams, posthog])
-
+  // DISABLED: Manual pageview tracking removed
+  // We only track custom events (property_view, profile_view, etc.)
+  // If you need pageview tracking, use a custom event instead
   return null
 }
 

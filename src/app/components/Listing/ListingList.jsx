@@ -45,7 +45,7 @@ const ListingList = ({ listings = [], loading = false, error = null }) => {
 
   return (
     <div className="w-full">
-      <div className="flex flex-wrap gap-4 justify-between items-start flex-wrap">
+      <div className="md:columns-2 lg:columns-3 md:gap-4">
         {listings.map((listing, index) => {
           // Randomly select one of the 5 image size configurations
           const randomIndex = Math.floor(Math.random() * dynamicImages.length)
@@ -54,11 +54,11 @@ const ListingList = ({ listings = [], loading = false, error = null }) => {
           return (
             <div 
               key={listing.id || index} 
-              className="flex-shrink-0"
+              className={`${index % 2 === 0 ? 'md:col-span-2' : 'md:col-span-1'} break-inside-avoid mb-4`}
             >
               <SecondaryListingCard 
                 listing={listing} 
-                imageConfig={imageConfig}
+                // imageConfig={imageConfig}
               />
             </div>
           )

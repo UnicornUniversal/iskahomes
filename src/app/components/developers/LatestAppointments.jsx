@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { Calendar, Clock, User, MapPin, Loader2, ChevronRight } from 'lucide-react'
+import { Calendar, Loader2, ChevronRight, Phone, Mail, Clock } from 'lucide-react'
 import Link from 'next/link'
 
 const LatestAppointments = () => {
@@ -18,7 +18,7 @@ const LatestAppointments = () => {
 
   const fetchAppointments = async () => {
     try {
-      const response = await fetch(`/api/appointments/latest?account_id=${user.id}&limit=5`)
+      const response = await fetch(`/api/appointments/latest?account_id=${user.id}&limit=3`)
       if (response.ok) {
         const result = await response.json()
         setAppointments(result.data || [])
@@ -47,75 +47,98 @@ const LatestAppointments = () => {
 
   if (loading) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className=" border border-white/20 rounded-2xl p-6">
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-5 h-5 animate-spin text-primary_color" />
+          <Loader2 className="w-5 h-5 animate-spin" />
         </div>
       </div>
     )
   }
 
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary_color/10 flex items-center justify-center">
-            <Calendar className="w-4 h-4 text-primary_color" />
+  const AppointmentCard = ({ appointment }) => (
+    <div className=" border-b border-primary_color  pb-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs px-2 py-0.5 rounded-md bg-primary_color/20 text-primary_color font-medium capitalize">
+              {appointment.appointmentType || 'Meeting'}
+            </span>
           </div>
-          <h3 className="text-base font-semibold text-gray-900">Latest Appointments</h3>
+          <h4 className="font-semibold text-sm sm:text-base truncate mb-0.5">
+            {appointment.clientName || 'Client'}
+          </h4>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs opacity-80">
+            {appointment.clientPhone && (
+              <div className="flex items-center gap-1.5">
+                <Phone className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{appointment.clientPhone}</span>
+              </div>
+            )}
+            {appointment.clientEmail && (
+              <div className="flex items-center gap-1.5">
+                <Mail className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{appointment.clientEmail}</span>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="text-right flex flex-col gap-0.5 text-xs sm:text-sm whitespace-nowrap flex-shrink-0">
+          <div className="flex items-center gap-1 justify-end">
+            <Clock className="w-3 h-3 opacity-70" />
+            <span className="font-semibold">{formatDate(appointment.date)}</span>
+          </div>
+          <span className="opacity-70">{formatTime(appointment.startTime)}</span>
+        </div>
+      </div>
+      {/* {appointment.property?.title && (
+        <div className="text-xs opacity-60 truncate pt-2 border-t border-white/10">
+          {appointment.property.title}
+        </div>
+      )} */}
+    </div>
+  )
+
+  return (
+    <div className="border border-white/20 rounded-2xl p-4 sm:p-6 w-full flex flex-col gap-4 overflow-hidden">
+      <div className="flex items-center justify-between 4 flex-wrap gap-2">
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-wide opacity-70">This Week</p>
+          <h3 className="text-lg sm:text-xl font-semibold truncate">Latest Appointments</h3>
         </div>
         {appointments.length > 0 && (
-          <span className="text-xs text-gray-500">{appointments.length}</span>
+          <span className="text-xs px-2 sm:px-3 py-1 rounded-full border border-white/30 flex-shrink-0">
+            {appointments.length} scheduled
+          </span>
         )}
       </div>
 
-      <div className="space-y-2">
-        {appointments.map((appointment) => (
-          <div 
-            key={appointment.id} 
-            className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:border-primary_color/20 hover:bg-gray-50/50 transition-all"
-          >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1.5">
-                <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                <span className="font-medium text-sm text-gray-900 truncate">{appointment.clientName}</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                <span className="truncate">{appointment.property.title}</span>
-              </div>
-            </div>
-            <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-3">
-              <div className="flex items-center gap-1 text-xs text-gray-600">
-                <Calendar className="w-3 h-3 text-gray-400" />
-                <span>{formatDate(appointment.date)}</span>
-              </div>
-              <div className="flex items-center gap-1 text-xs text-gray-600">
-                <Clock className="w-3 h-3 text-gray-400" />
-                <span>{formatTime(appointment.startTime)}</span>
-              </div>
-            </div>
+      {appointments.length === 0 ? (
+        <div className="text-center py-8 sm:py-12">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-white/5 border border-white/20 flex items-center justify-center mx-auto mb-3">
+            <Calendar className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-        ))}
-      </div>
-
-      {appointments.length === 0 && (
-        <div className="text-center py-12">
-          <div className="w-16 h-16 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-3">
-            <Calendar className="w-6 h-6 text-gray-300" />
-          </div>
-          <p className="text-sm text-gray-500">No appointments yet</p>
+          <p className="text-xs sm:text-sm opacity-80">No appointments yet</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {appointments.map((appointment) => (
+            <AppointmentCard key={appointment.id} appointment={appointment} />
+          ))}
         </div>
       )}
 
       {appointments.length > 0 && (
-        <div className="mt-6 pt-4 border-t border-gray-100">
+        <div className="mt-6 sm:mt-8 flex items-center justify-between text-xs sm:text-sm flex-wrap gap-2">
+          <div className="text-xs uppercase tracking-wide opacity-60">
+            Need to see more?
+          </div>
           <Link
             href="#"
-            className="flex items-center justify-center gap-1 text-sm font-medium text-primary_color hover:text-primary_color/80 transition-colors"
+            className="flex items-center gap-1 font-medium px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-white/30 hover:bg-white/10 transition-colors flex-shrink-0"
           >
-            View All Appointments
-            <ChevronRight className="w-4 h-4" />
+            <span className="hidden sm:inline">View calendar</span>
+            <span className="sm:hidden">Calendar</span>
+            <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
           </Link>
         </div>
       )}

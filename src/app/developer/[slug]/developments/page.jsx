@@ -1,21 +1,17 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import DevelopmentCard from '@/app/components/developers/DevelopmentCard'
 import DeveloperHeader from '@/app/components/developers/DeveloperHeader'
 import { useAuth } from '@/contexts/AuthContext'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import dynamic from 'next/dynamic'
-
-// Dynamically import MapComponent to avoid SSR issues
-const MapComponent = dynamic(() => import('@/app/components/propertyManagement/modules/MapComponent'), {
-  ssr: false,
-  loading: () => (
-    <div className='w-full h-96 bg-gray-200 rounded-lg flex items-center justify-center'>
-      <div className='text-gray-500'>Loading map...</div>
-    </div>
-  )
-})
+import { CustomSelect } from '@/app/components/ui/custom-select'
+import { 
+  usePropertyPurposes, 
+  usePropertyTypes, 
+  usePropertyCategories, 
+  usePropertySubtypes 
+} from '@/hooks/useCachedData'
 
 const page = () => {
   const { user } = useAuth()
@@ -28,11 +24,10 @@ const page = () => {
   // Filter states
   const [searchQuery, setSearchQuery] = useState('')
   
-  // Location filters
-  const [selectedCountry, setSelectedCountry] = useState('')
-  const [selectedState, setSelectedState] = useState('')
-  const [selectedCity, setSelectedCity] = useState('')
-  const [selectedTown, setSelectedTown] = useState('')
+  // Location filter - single search field
+  const [locationSearch, setLocationSearch] = useState('')
+  const [locationSearchResults, setLocationSearchResults] = useState([])
+  const [selectedLocation, setSelectedLocation] = useState(null) // { type: 'country'|'state'|'city'|'town', value: string }
   
   // Category filters
   const [selectedPurpose, setSelectedPurpose] = useState('')
@@ -40,28 +35,47 @@ const page = () => {
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedSubType, setSelectedSubType] = useState('')
   
-  // Available filter options
-  const [countries, setCountries] = useState([])
-  const [states, setStates] = useState([])
-  const [cities, setCities] = useState([])
-  const [towns, setTowns] = useState([])
-  const [purposes, setPurposes] = useState([])
-  const [types, setTypes] = useState([])
-  const [categories, setCategories] = useState([])
-  const [subTypes, setSubTypes] = useState([])
+  // Use cached categorization data
+  const { data: purposesData = [], loading: purposesLoading } = usePropertyPurposes()
+  const { data: typesData = [], loading: typesLoading } = usePropertyTypes()
+  const { data: categoriesData = [], loading: categoriesLoading } = usePropertyCategories()
+  const { data: subtypesData = [], loading: subtypesLoading } = usePropertySubtypes()
   
+  // Convert to options format for CustomSelect - using IDs as values
+  const purposeOptions = useMemo(() => [
+    { value: '', label: 'All Purposes' },
+    ...purposesData.map(p => ({ value: p.id, label: p.name }))
+  ], [purposesData])
+  
+  const typeOptions = useMemo(() => [
+    { value: '', label: 'All Types' },
+    ...typesData.map(t => ({ value: t.id, label: t.name }))
+  ], [typesData])
+  
+  const categoryOptions = useMemo(() => [
+    { value: '', label: 'All Categories' },
+    ...categoriesData.map(c => ({ value: c.id, label: c.name }))
+  ], [categoriesData])
+  
+  const subtypeOptions = useMemo(() => [
+    { value: '', label: 'All Sub Types' },
+    ...subtypesData.map(s => ({ value: s.id, label: s.name }))
+  ], [subtypesData])
+  
+  // Location options from search results
+  const locationOptions = useMemo(() => [
+    { value: '', label: 'All Locations' },
+    ...locationSearchResults.map(loc => ({
+      value: `${loc.type}:${loc.value}`,
+      label: `${loc.label} (${loc.type})`
+    }))
+  ], [locationSearchResults])
   
   // View mode state
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
   
-  // Collapsible filter sections
-  const [showLocationFilters, setShowLocationFilters] = useState(false)
-  const [showCategoryFilters, setShowCategoryFilters] = useState(false)
-  
-  // Map state
-  const [mapCenter, setMapCenter] = useState([7.9465, -1.0232]) // Ghana coordinates
-  const [mapZoom, setMapZoom] = useState(6)
-  const [selectedDevelopment, setSelectedDevelopment] = useState(null)
+  // Filter visibility for mobile/tablet
+  const [showFilters, setShowFilters] = useState(false)
 
   // Debug user object
   useEffect(() => {
@@ -118,26 +132,6 @@ const page = () => {
           const devs = data.data || data || []
           setDevelopments(devs)
           setFilteredDevelopments(devs)
-          
-          // Extract unique values for all filters
-          const uniqueCountries = [...new Set(devs.map(dev => dev.country).filter(Boolean))]
-          const uniqueStates = [...new Set(devs.map(dev => dev.state).filter(Boolean))]
-          const uniqueCities = [...new Set(devs.map(dev => dev.city).filter(Boolean))]
-          const uniqueTowns = [...new Set(devs.map(dev => dev.town).filter(Boolean))]
-          
-          const uniquePurposes = [...new Set(devs.map(dev => dev.purpose).filter(Boolean))]
-          const uniqueTypes = [...new Set(devs.map(dev => dev.type).filter(Boolean))]
-          const uniqueCategories = [...new Set(devs.map(dev => dev.category).filter(Boolean))]
-          const uniqueSubTypes = [...new Set(devs.map(dev => dev.sub_type).filter(Boolean))]
-          
-          setCountries(uniqueCountries)
-          setStates(uniqueStates)
-          setCities(uniqueCities)
-          setTowns(uniqueTowns)
-          setPurposes(uniquePurposes)
-          setTypes(uniqueTypes)
-          setCategories(uniqueCategories)
-          setSubTypes(uniqueSubTypes)
         } else {
           const errorData = await response.json()
           console.error('Error fetching developments:', errorData)
@@ -154,58 +148,195 @@ const page = () => {
     fetchDevelopments()
   }, [user])
 
-  // Filter developments based on selected filters
+  // Search locations using API
   useEffect(() => {
-    let filtered = [...developments]
-
-    // Filter by search query
-    if (searchQuery) {
-      filtered = filtered.filter(dev => 
-        dev.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        dev.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        dev.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        dev.country?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    if (!locationSearch.trim() || locationSearch.trim().length < 1) {
+      setLocationSearchResults([])
+      return
     }
 
-    // Location filters
-    if (selectedCountry) {
-      filtered = filtered.filter(dev => dev.country === selectedCountry)
+    // Debounce the search
+    const timeoutId = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/locations/search?q=${encodeURIComponent(locationSearch.trim())}&limit=10`)
+        if (response.ok) {
+          const result = await response.json()
+          setLocationSearchResults(result.data || [])
+        } else {
+          setLocationSearchResults([])
+        }
+      } catch (error) {
+        console.error('Error searching locations:', error)
+        setLocationSearchResults([])
+      }
+    }, 200) // 200ms debounce
+
+    return () => clearTimeout(timeoutId)
+  }, [locationSearch])
+
+  // Handle location selection from CustomSelect
+  const handleLocationSelect = (e) => {
+    const value = e.target.value
+    if (!value || value === '') {
+      setSelectedLocation(null)
+      setLocationSearch('')
+      return
     }
-    if (selectedState) {
-      filtered = filtered.filter(dev => dev.state === selectedState)
+    
+    const [type, locationValue] = value.split(':')
+    const location = locationSearchResults.find(loc => loc.type === type && loc.value === locationValue)
+    if (location) {
+      setSelectedLocation(location)
+      setLocationSearch(location.label)
     }
-    if (selectedCity) {
-      filtered = filtered.filter(dev => dev.city === selectedCity)
-    }
-    if (selectedTown) {
-      filtered = filtered.filter(dev => dev.town === selectedTown)
+  }
+
+  // Fetch filtered developments from server
+  useEffect(() => {
+    const fetchFilteredDevelopments = async () => {
+      if (!user?.profile?.developer_id) return
+
+      try {
+        const token = localStorage.getItem('developer_token')
+        if (!token) return
+
+        // Build query parameters
+        const params = new URLSearchParams({
+          developer_id: user.profile.developer_id
+        })
+
+        if (searchQuery) params.append('search', searchQuery)
+        if (selectedLocation) {
+          params.append('location_type', selectedLocation.type)
+          params.append('location_value', selectedLocation.value)
+        }
+        if (selectedPurpose) params.append('purpose', selectedPurpose)
+        if (selectedType) params.append('type', selectedType)
+        if (selectedCategory) params.append('category', selectedCategory)
+        if (selectedSubType) params.append('sub_type', selectedSubType)
+
+        const response = await fetch(`/api/developments?${params.toString()}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const devs = data.data || data || []
+          setFilteredDevelopments(devs)
+        } else {
+          // Fallback to client-side filtering if server-side fails
+          filterClientSide()
+        }
+      } catch (error) {
+        console.error('Error fetching filtered developments:', error)
+        // Fallback to client-side filtering
+        filterClientSide()
+      }
     }
 
-    // Category filters
-    if (selectedPurpose) {
-      filtered = filtered.filter(dev => dev.purpose === selectedPurpose)
-    }
-    if (selectedType) {
-      filtered = filtered.filter(dev => dev.type === selectedType)
-    }
-    if (selectedCategory) {
-      filtered = filtered.filter(dev => dev.category === selectedCategory)
-    }
-    if (selectedSubType) {
-      filtered = filtered.filter(dev => dev.sub_type === selectedSubType)
+    // Client-side filtering fallback
+    const filterClientSide = () => {
+      let filtered = [...developments]
+
+      if (searchQuery) {
+        filtered = filtered.filter(dev => 
+          dev.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          dev.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          dev.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          dev.country?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      }
+
+      if (selectedLocation) {
+        switch (selectedLocation.type) {
+          case 'country':
+            filtered = filtered.filter(dev => dev.country === selectedLocation.value)
+            break
+          case 'state':
+            filtered = filtered.filter(dev => dev.state === selectedLocation.value)
+            break
+          case 'city':
+            filtered = filtered.filter(dev => dev.city === selectedLocation.value)
+            break
+          case 'town':
+            filtered = filtered.filter(dev => dev.town === selectedLocation.value)
+            break
+        }
+      }
+
+      // Filter by category IDs (stored as JSON arrays)
+      if (selectedPurpose) {
+        filtered = filtered.filter(dev => {
+          try {
+            const purposes = typeof dev.purposes === 'string' 
+              ? JSON.parse(dev.purposes) 
+              : dev.purposes || []
+            return Array.isArray(purposes) && purposes.includes(selectedPurpose)
+          } catch (e) {
+            return false
+          }
+        })
+      }
+      
+      if (selectedType) {
+        filtered = filtered.filter(dev => {
+          try {
+            const types = typeof dev.types === 'string' 
+              ? JSON.parse(dev.types) 
+              : dev.types || []
+            return Array.isArray(types) && types.includes(selectedType)
+          } catch (e) {
+            return false
+          }
+        })
+      }
+      
+      if (selectedCategory) {
+        filtered = filtered.filter(dev => {
+          try {
+            const categories = typeof dev.categories === 'string' 
+              ? JSON.parse(dev.categories) 
+              : dev.categories || []
+            return Array.isArray(categories) && categories.includes(selectedCategory)
+          } catch (e) {
+            return false
+          }
+        })
+      }
+      
+      if (selectedSubType) {
+        filtered = filtered.filter(dev => {
+          try {
+            // Subtypes are stored in unit_types.database array
+            const unitTypes = typeof dev.unit_types === 'string' 
+              ? JSON.parse(dev.unit_types) 
+              : dev.unit_types || {}
+            const databaseSubtypes = unitTypes.database || []
+            return databaseSubtypes.some(st => st.id === selectedSubType)
+          } catch (e) {
+            return false
+          }
+        })
+      }
+
+      setFilteredDevelopments(filtered)
     }
 
-    setFilteredDevelopments(filtered)
-  }, [developments, searchQuery, selectedCountry, selectedState, selectedCity, selectedTown, selectedPurpose, selectedType, selectedCategory, selectedSubType])
+    // Debounce server-side filtering
+    const timeoutId = setTimeout(() => {
+      fetchFilteredDevelopments()
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [user, developments, searchQuery, selectedLocation, selectedPurpose, selectedType, selectedCategory, selectedSubType])
 
   // Clear all filters
   const clearFilters = () => {
     setSearchQuery('')
-    setSelectedCountry('')
-    setSelectedState('')
-    setSelectedCity('')
-    setSelectedTown('')
+    setLocationSearch('')
+    setSelectedLocation(null)
     setSelectedPurpose('')
     setSelectedType('')
     setSelectedCategory('')
@@ -238,13 +369,24 @@ const page = () => {
 
   return (
     <div className='normal_div'>
-      <div className='w-full flex gap-6 p-6'>
+      <div className='w-full flex items-start gap-6 p-6'>
         {/* Main Content Area */}
         <div className='flex-1 flex flex-col gap-4'>
           {/* Header */}
-          <div className='flex justify-between items-center flex-wrap gap-4'>
-            <h2 className="font-bold !text-xl">Manage your Developments</h2>
+          <div className='flex justify-between items-center flex-wrap gap-4 '>
+            <h1 className="">Manage your Developments</h1>
             <div className='flex items-center gap-3'>
+              {/* Filter Toggle Button - Only visible on small/medium devices */}
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className='lg:hidden primary_button flex items-center gap-2'
+              >
+                <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z' />
+                </svg>
+                Filters
+              </button>
+
               {/* View Toggle */}
               <div className='flex items-center bg-gray-100 rounded-lg p-1'>
                 <button
@@ -274,428 +416,323 @@ const page = () => {
               </div>
               
               <Link href={`/developer/${params.slug}/developments/addNewDevelopment`}>
-                <button className='bg-primary_color text-white px-4 py-2 rounded-md hover:bg-primary_color/90 transition-colors'>
+                <button className='primary_button'>
                   Add Development
                 </button>
               </Link>
             </div>
           </div>
 
-          {/* Search Bar */}
-          <div className='bg-white rounded-lg shadow-sm border border-gray-200 p-4'>
-            <div className='relative mb-4'>
-              <input
-                type='text'
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder='Search developments by title, description, or location...'
-                className='w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm'
-              />
-              <svg className='absolute left-4 top-3.5 h-5 w-5 text-gray-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' />
-              </svg>
-            </div>
-          </div>
-
-          {/* Sticky Filters */}
-          <div className='sticky top-20 z-10 bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4'>
-            {/* Filter Dropdowns */}
-            <div className='space-y-4 grid grid-cols-1 lg:grid-cols-2  gap-3'>
-              {/* Location Filter Dropdown */}
-              <div className='w-full'>
-                <button
-                  onClick={() => setShowLocationFilters(!showLocationFilters)}
-                  className='w-full px-4 py-2 text-left bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-between'
-                >
-                  <span className='text-sm font-medium text-gray-700'>
-                    {selectedCountry || selectedState || selectedCity || selectedTown ? 'Location Filters Applied' : 'Location'}
-                  </span>
-                  <svg className={`w-4 h-4 text-gray-500 transition-transform ${showLocationFilters ? 'rotate-180' : ''}`} fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 9l-7 7-7-7' />
-                  </svg>
-                </button>
-                
-                {showLocationFilters && (
-                  <div className='mt-2 p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3'>
-                    <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'>
-                      <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1'>Country</label>
-                        <select
-                          value={selectedCountry}
-                          onChange={(e) => setSelectedCountry(e.target.value)}
-                          className='w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
-                        >
-                          <option value=''>All Countries</option>
-                          {countries.map((country) => (
-                            <option key={country} value={country}>
-                              {country}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1'>State/Region</label>
-                        <select
-                          value={selectedState}
-                          onChange={(e) => setSelectedState(e.target.value)}
-                          className='w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
-                        >
-                          <option value=''>All States</option>
-                          {states.map((state) => (
-                            <option key={state} value={state}>
-                              {state}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1'>City</label>
-                        <select
-                          value={selectedCity}
-                          onChange={(e) => setSelectedCity(e.target.value)}
-                          className='w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
-                        >
-                          <option value=''>All Cities</option>
-                          {cities.map((city) => (
-                            <option key={city} value={city}>
-                              {city}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1'>Town</label>
-                        <select
-                          value={selectedTown}
-                          onChange={(e) => setSelectedTown(e.target.value)}
-                          className='w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
-                        >
-                          <option value=''>All Towns</option>
-                          {towns.map((town) => (
-                            <option key={town} value={town}>
-                              {town}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Category Filter Dropdown */}
-              <div className='w-full'>
-                <button
-                  onClick={() => setShowCategoryFilters(!showCategoryFilters)}
-                  className='w-full px-4 py-2 text-left bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-between'
-                >
-                  <span className='text-sm font-medium text-gray-700'>
-                    {selectedPurpose || selectedType || selectedCategory || selectedSubType ? 'Category Filters Applied' : 'Categories'}
-                  </span>
-                  <svg className={`w-4 h-4 text-gray-500 transition-transform ${showCategoryFilters ? 'rotate-180' : ''}`} fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 9l-7 7-7-7' />
-                  </svg>
-                </button>
-                
-                {showCategoryFilters && (
-                  <div className='mt-2 p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3'>
-                    <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'>
-                      <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1'>Purpose</label>
-                        <select
-                          value={selectedPurpose}
-                          onChange={(e) => setSelectedPurpose(e.target.value)}
-                          className='w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent'
-                        >
-                          <option value=''>All Purposes</option>
-                          {purposes.map((purpose) => (
-                            <option key={purpose} value={purpose}>
-                              {purpose}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1'>Type</label>
-                        <select
-                          value={selectedType}
-                          onChange={(e) => setSelectedType(e.target.value)}
-                          className='w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent'
-                        >
-                          <option value=''>All Types</option>
-                          {types.map((type) => (
-                            <option key={type} value={type}>
-                              {type}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1'>Category</label>
-                        <select
-                          value={selectedCategory}
-                          onChange={(e) => setSelectedCategory(e.target.value)}
-                          className='w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent'
-                        >
-                          <option value=''>All Categories</option>
-                          {categories.map((category) => (
-                            <option key={category} value={category}>
-                              {category}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1'>Sub Type</label>
-                        <select
-                          value={selectedSubType}
-                          onChange={(e) => setSelectedSubType(e.target.value)}
-                          className='w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent'
-                        >
-                          <option value=''>All Sub Types</option>
-                          {subTypes.map((subType) => (
-                            <option key={subType} value={subType}>
-                              {subType}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
           {/* Results Summary */}
-          <div className='flex items-center justify-between text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-lg'>
+          <div className='flex items-center justify-between text-sm px-4 py-2 rounded-lg '>
             <span>
               Showing {filteredDevelopments.length} of {developments.length} developments
             </span>
-            {(searchQuery || selectedCountry || selectedState || selectedCity || selectedTown || selectedPurpose || selectedType || selectedCategory || selectedSubType) && (
-              <span className='text-blue-600 font-medium'>
-                Filters applied
-              </span>
-            )}
           </div>
 
-          {/* Active Filters */}
-          {(searchQuery || selectedCountry || selectedState || selectedCity || selectedTown || selectedPurpose || selectedType || selectedCategory || selectedSubType) && (
-            <div className='bg-white rounded-lg shadow-sm border border-gray-200 p-4'>
-              <div className='flex flex-wrap gap-2'>
-                <span className='text-sm text-gray-600 font-medium'>Active filters:</span>
-                {searchQuery && (
-                  <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800'>
-                    Search: "{searchQuery}"
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className='ml-2 text-blue-600 hover:text-blue-800'
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-                {selectedCountry && (
-                  <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800'>
-                    Country: {selectedCountry}
-                    <button
-                      onClick={() => setSelectedCountry('')}
-                      className='ml-2 text-green-600 hover:text-green-800'
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-                {selectedState && (
-                  <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800'>
-                    State: {selectedState}
-                    <button
-                      onClick={() => setSelectedState('')}
-                      className='ml-2 text-green-600 hover:text-green-800'
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-                {selectedCity && (
-                  <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800'>
-                    City: {selectedCity}
-                    <button
-                      onClick={() => setSelectedCity('')}
-                      className='ml-2 text-green-600 hover:text-green-800'
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-                {selectedTown && (
-                  <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800'>
-                    Town: {selectedTown}
-                    <button
-                      onClick={() => setSelectedTown('')}
-                      className='ml-2 text-green-600 hover:text-green-800'
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-                {selectedPurpose && (
-                  <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800'>
-                    Purpose: {selectedPurpose}
-                    <button
-                      onClick={() => setSelectedPurpose('')}
-                      className='ml-2 text-purple-600 hover:text-purple-800'
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-                {selectedType && (
-                  <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800'>
-                    Type: {selectedType}
-                    <button
-                      onClick={() => setSelectedType('')}
-                      className='ml-2 text-purple-600 hover:text-purple-800'
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-                {selectedCategory && (
-                  <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800'>
-                    Category: {selectedCategory}
-                    <button
-                      onClick={() => setSelectedCategory('')}
-                      className='ml-2 text-purple-600 hover:text-purple-800'
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-                {selectedSubType && (
-                  <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800'>
-                    Sub Type: {selectedSubType}
-                    <button
-                      onClick={() => setSelectedSubType('')}
-                      className='ml-2 text-purple-600 hover:text-purple-800'
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-        
-
-        {/* Developments and Map Container */}
-        <div className='flex gap-2 items-start justify-start'>
           {/* Developments List */}
-          <div className='flex-1 w-full xl:w-2/3'>
+          <div className='w-full '>
             {developments.length === 0 ? (
               <div className='flex justify-center items-center h-64'>
                 <div className='text-center'>
-                  <div className='text-lg text-gray-600 mb-2'>No developments found</div>
-                  <div className='text-sm text-gray-500'>Create your first development to get started</div>
+                  <div className='text-lg mb-2'>No developments found</div>
+                  <div className='text-sm'>Create your first development to get started</div>
                 </div>
               </div>
             ) : filteredDevelopments.length === 0 ? (
               <div className='flex justify-center items-center h-64'>
                 <div className='text-center'>
-                  <div className='text-lg text-gray-600 mb-2'>No developments match your filters</div>
-                  <div className='text-sm text-gray-500 mb-4'>Try adjusting your search criteria</div>
+                  <div className='text-lg mb-2'>No developments match your filters</div>
+                  <div className='text-sm mb-4'>Try adjusting your search criteria</div>
                   <button
                     onClick={clearFilters}
-                    className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors'
+                    className='secondary_button'
                   >
                     Clear Filters
                   </button>
                 </div>
               </div>
             ) : (
-              <div className={`mt-6 ${viewMode === 'grid' ? 'flex flex-col gap-6' : 'space-y-4'}`}>
+              <div className={`${viewMode === 'grid' ? 'flex flex-col gap-6' : 'space-y-4'}`}>
                 {filteredDevelopments.map((development) => (
-                  <div
+                  <DevelopmentCard 
                     key={development.id}
-                    className={`${selectedDevelopment?.id === development.id ? 'ring-2 ring-blue-500' : ''}`}
-                    onClick={() => {
-                      if (development.latitude && development.longitude) {
-                        setSelectedDevelopment(development)
-                        setMapCenter([parseFloat(development.latitude), parseFloat(development.longitude)])
-                        setMapZoom(15)
-                      }
+                    development={{
+                      ...development,
+                      total_units: development.total_units || 0
                     }}
-                  >
-                    <DevelopmentCard 
-                      development={{
-                        ...development,
-                        total_units: development.total_units || 0
-                      }}
-                      viewMode={viewMode}
-                    />
-                  </div>
+                    viewMode={viewMode}
+                  />
                 ))}
               </div>
             )}
           </div>
+        </div>
 
-          {/* Map Sidebar - Hidden on medium and small devices */}
-          <div className={`w-1/3 bg-white     h-fit sticky top-6 hidden xl:block`}>
-        
+        {/* Filters Sidebar - Hidden on small/medium, visible on large+ */}
+        <div className='hidden lg:block w-80 flex-shrink-0'>
+          <div className='border-l border-white/50 p-4 sticky top-20 max-h-[calc(100vh-5rem)] overflow-y-auto'>
+            <div className='flex items-center justify-between mb-4'>
+              <h2 className='text-lg font-semibold'>Filters</h2>
+              {(searchQuery || selectedLocation || selectedPurpose || selectedType || selectedCategory || selectedSubType) && (
+                <button
+                  onClick={clearFilters}
+                  className='secondary_button text-sm'
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
 
-          {/* Map */}
-          <div className='h-screen  overflow-hidden border border-gray-200'>
-            <MapComponent
-              center={mapCenter}
-              zoom={mapZoom}
-              coordinates={selectedDevelopment ? [parseFloat(selectedDevelopment.latitude), parseFloat(selectedDevelopment.longitude)] : null}
-              onMapClick={(lat, lng) => {
-                console.log('Map clicked:', lat, lng)
-              }}
-            />
+            {/* Search by Name */}
+            <div className='mb-6'>
+              <label className='block text-sm font-medium mb-2'>Search by Name</label>
+              <div className='relative'>
+                <input
+                  type='text'
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder='Search developments...'
+                  className='w-full pl-10'
+                />
+                <svg className='absolute left-3 top-2.5 h-4 w-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' />
+                </svg>
+              </div>
+            </div>
+
+            {/* Location Filter */}
+            <div className='mb-6'>
+              <label className='block text-sm font-medium mb-2'>Location</label>
+              <div className='relative'>
+                <input
+                  type='text'
+                  value={locationSearch}
+                  onChange={(e) => setLocationSearch(e.target.value)}
+                  placeholder='Search location...'
+                  className='w-full pl-10'
+                />
+                <svg className='absolute left-3 top-2.5 h-4 w-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z' />
+                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 11a3 3 0 11-6 0 3 3 0 016 0z' />
+                </svg>
+              </div>
+              
+              {/* Location Dropdown - Only show when there are results */}
+              {locationSearch.trim().length > 0 && locationSearchResults.length > 0 && (
+                <div className='mt-2'>
+                  <CustomSelect
+                    value={selectedLocation ? `${selectedLocation.type}:${selectedLocation.value}` : ''}
+                    onChange={handleLocationSelect}
+                    options={locationOptions}
+                    placeholder='Select location...'
+                  />
+                </div>
+              )}
+              
+              {selectedLocation && (
+                <div className='mt-2 px-3 py-2 rounded-lg border border-gray-200 flex items-center justify-between'>
+                  <span className='text-sm'>{selectedLocation.label}</span>
+                  <button
+                    onClick={() => {
+                      setSelectedLocation(null)
+                      setLocationSearch('')
+                    }}
+                    className='text-sm'
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Category Filters */}
+            <div className='space-y-4'>
+              <div>
+                <label className='block text-sm font-medium mb-2'>Purpose</label>
+                <CustomSelect
+                  value={selectedPurpose}
+                  onChange={(e) => setSelectedPurpose(e.target.value)}
+                  options={purposeOptions}
+                  placeholder='All Purposes'
+                  disabled={purposesLoading}
+                />
+              </div>
+
+              <div>
+                <label className='block text-sm font-medium mb-2'>Type</label>
+                <CustomSelect
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value)}
+                  options={typeOptions}
+                  placeholder='All Types'
+                  disabled={typesLoading}
+                />
+              </div>
+
+              <div>
+                <label className='block text-sm font-medium mb-2'>Category</label>
+                <CustomSelect
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  options={categoryOptions}
+                  placeholder='All Categories'
+                  disabled={categoriesLoading}
+                />
+              </div>
+
+              <div>
+                <label className='block text-sm font-medium mb-2'>Sub Type</label>
+                <CustomSelect
+                  value={selectedSubType}
+                  onChange={(e) => setSelectedSubType(e.target.value)}
+                  options={subtypeOptions}
+                  placeholder='All Sub Types'
+                  disabled={subtypesLoading}
+                />
+              </div>
+            </div>
           </div>
+        </div>
 
-          {/* Development Info */}
-          {selectedDevelopment && (
-            <div className='mt-4 p-4 bg-gray-50 rounded-lg'>
-              <h4 className='font-semibold text-gray-900 mb-2'>{selectedDevelopment.title}</h4>
-              <div className='text-sm text-gray-600 space-y-1'>
-                <div className='flex items-center'>
-                  <svg className='w-4 h-4 mr-2 text-gray-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z' />
-                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 11a3 3 0 11-6 0 3 3 0 016 0z' />
-                  </svg>
-                  <span>
-                    {[selectedDevelopment.town, selectedDevelopment.city, selectedDevelopment.state, selectedDevelopment.country]
-                      .filter(Boolean)
-                      .join(', ')}
-                  </span>
+        {/* Mobile/Tablet Filters Overlay */}
+        {showFilters && (
+          <div className='fixed inset-0 bg-white/70 z-50 lg:hidden overflow-y-auto'>
+            <div className='w-full mt-20 p-4'>
+              <div className='bg-white rounded-lg shadow-lg p-4 max-w-2xl mx-auto'>
+                <div className='flex items-center justify-between mb-4'>
+                  <h2 className='text-lg font-semibold'>Filters</h2>
+                  <button
+                    onClick={() => setShowFilters(false)}
+                    className='secondary_button text-sm flex items-center gap-2'
+                  >
+                    <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
+                    </svg>
+                    Cancel
+                  </button>
                 </div>
-                <div className='flex items-center'>
-                  <svg className='w-4 h-4 mr-2 text-gray-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1' />
-                  </svg>
-                  <span>{selectedDevelopment.price ? `${selectedDevelopment.currency || 'GHS'} ${selectedDevelopment.price}` : 'Price not set'}</span>
+                {(searchQuery || selectedLocation || selectedPurpose || selectedType || selectedCategory || selectedSubType) && (
+                  <button
+                    onClick={clearFilters}
+                    className='secondary_button text-sm mb-4 w-full'
+                  >
+                    Clear All
+                  </button>
+                )}
+
+                {/* Search by Name */}
+                <div className='mb-6'>
+                  <label className='block text-sm font-medium mb-2'>Search by Name</label>
+                  <div className='relative'>
+                    <input
+                      type='text'
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder='Search developments...'
+                      className='w-full pl-10'
+                    />
+                    <svg className='absolute left-3 top-2.5 h-4 w-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' />
+                    </svg>
+                  </div>
                 </div>
-                <div className='flex items-center'>
-                  <svg className='w-4 h-4 mr-2 text-gray-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' />
-                  </svg>
-                  <span>{selectedDevelopment.total_units || 0} units</span>
+
+                {/* Location Filter */}
+                <div className='mb-6'>
+                  <label className='block text-sm font-medium mb-2'>Location</label>
+                  <div className='relative'>
+                    <input
+                      type='text'
+                      value={locationSearch}
+                      onChange={(e) => setLocationSearch(e.target.value)}
+                      placeholder='Search location...'
+                      className='w-full pl-10'
+                    />
+                    <svg className='absolute left-3 top-2.5 h-4 w-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z' />
+                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 11a3 3 0 11-6 0 3 3 0 016 0z' />
+                    </svg>
+                  </div>
+                  
+                  {/* Location Dropdown - Only show when there are results */}
+                  {locationSearch.trim().length > 0 && locationSearchResults.length > 0 && (
+                    <div className='mt-2'>
+                      <CustomSelect
+                        value={selectedLocation ? `${selectedLocation.type}:${selectedLocation.value}` : ''}
+                        onChange={handleLocationSelect}
+                        options={locationOptions}
+                        placeholder='Select location...'
+                      />
+                    </div>
+                  )}
+                  
+                  {selectedLocation && (
+                    <div className='mt-2 px-3 py-2 rounded-lg border border-gray-200 flex items-center justify-between'>
+                      <span className='text-sm'>{selectedLocation.label}</span>
+                      <button
+                        onClick={() => {
+                          setSelectedLocation(null)
+                          setLocationSearch('')
+                        }}
+                        className='text-sm'
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Category Filters */}
+                <div className='space-y-4'>
+                  <div>
+                    <label className='block text-sm font-medium mb-2'>Purpose</label>
+                    <CustomSelect
+                      value={selectedPurpose}
+                      onChange={(e) => setSelectedPurpose(e.target.value)}
+                      options={purposeOptions}
+                      placeholder='All Purposes'
+                      disabled={purposesLoading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className='block text-sm font-medium mb-2'>Type</label>
+                    <CustomSelect
+                      value={selectedType}
+                      onChange={(e) => setSelectedType(e.target.value)}
+                      options={typeOptions}
+                      placeholder='All Types'
+                      disabled={typesLoading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className='block text-sm font-medium mb-2'>Category</label>
+                    <CustomSelect
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      options={categoryOptions}
+                      placeholder='All Categories'
+                      disabled={categoriesLoading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className='block text-sm font-medium mb-2'>Sub Type</label>
+                    <CustomSelect
+                      value={selectedSubType}
+                      onChange={(e) => setSelectedSubType(e.target.value)}
+                      options={subtypeOptions}
+                      placeholder='All Sub Types'
+                      disabled={subtypesLoading}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          )}
-
-          {/* Map Instructions */}
-          <div className='mt-4 text-xs text-gray-500 text-center'>
-            Click on development cards to view their location on the map
           </div>
-        </div>
-
-        
-        </div>
-        </div>
+        )}
       </div>
     </div>
   )

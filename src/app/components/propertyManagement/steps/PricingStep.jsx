@@ -31,8 +31,8 @@ const PricingStep = ({ formData, updateFormData, mode, user }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Pricing & Availability</h2>
-        <p className="text-sm text-gray-600">Set the pricing details and availability for your property</p>
+        <h2 className="">Pricing & Availability</h2>
+        <p className="">{mode === 'edit' ? 'Update the pricing and availability information for this property' : 'Set the pricing details and availability for your property'}</p>
       </div>
 
       <PropertyPricing 

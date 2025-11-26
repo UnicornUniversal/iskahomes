@@ -36,6 +36,7 @@ const Development = ({ isAddMode, developmentId }) => {
   const [formData, setFormData] = useState({
     // Description section
     title: '',
+    tagline: '',
     description: '',
     size: '',
     status: '',
@@ -67,8 +68,7 @@ const Development = ({ isAddMode, developmentId }) => {
     
     // Amenities section
     amenities: {
-      database: [],
-      general: [],
+      inbuilt: [],
       custom: []
     },
     
@@ -120,6 +120,7 @@ const Development = ({ isAddMode, developmentId }) => {
         // Populate form with existing data
         setFormData({
           title: data.title || '',
+          tagline: data.tagline || '',
           description: data.description || '',
           size: data.size || '',
           status: data.status || '',
@@ -140,7 +141,7 @@ const Development = ({ isAddMode, developmentId }) => {
             },
             additionalInformation: data.additional_information || ''
           },
-          amenities: data.amenities || { database: [], general: [], custom: [] },
+          amenities: data.amenities || { inbuilt: [], custom: [] },
           media: data.media || {
             banner: data.banner || null,
             video: data.video || null,
@@ -426,16 +427,16 @@ const Development = ({ isAddMode, developmentId }) => {
   }
 
   return (
-    <div className='w-full flex flex-col gap-6'>
+    <div className='w-full flex flex-col gap-6 text-primary_color'>
       {/* Header */}
       <div className='flex justify-between items-center w-full'>
-        <h1 className='text-2xl font-bold'>
+        <h1 className=''>
           {isAddMode ? 'Add New Development' : 'Edit Development'}
         </h1>
         {!isAddMode && (
           <button
             onClick={handleDeleteDevelopment}
-            className='px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors'
+            className='tertiary_button'
           >
             Delete Development
           </button>
@@ -443,7 +444,7 @@ const Development = ({ isAddMode, developmentId }) => {
       </div>
 
       {/* Navigation Menu */}
-      <div className='sticky top-0 bg-white border-b border-gray-200 py-4 z-10'>
+      <div className='sticky top-0 border-b border-gray-200 py-4 z-10'>
         <div className='flex gap-4 w-full overflow-x-auto'>
           {[
             { id: 'description', label: 'Description' },
@@ -456,7 +457,7 @@ const Development = ({ isAddMode, developmentId }) => {
             <button
               key={section.id}
               onClick={() => scrollToSection(section.id)}
-              className='flex-shrink-0 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors whitespace-nowrap'
+              className='flex-shrink-0 px-4 py-2 secondary_button whitespace-nowrap'
             >
               {section.label}
             </button>
@@ -522,7 +523,7 @@ const Development = ({ isAddMode, developmentId }) => {
       </form>
 
       {/* Sticky Submit Button */}
-      <div className='fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-50 shadow-lg'>
+      <div className='fixed bottom-0 left-0 right-0 border-t border-gray-200 p-4 z-50 shadow-lg'>
         <div className='max-w-7xl mx-auto flex justify-center items-center'>
           {console.log('Button render state:', { loading, isAddMode, user: !!user })}
           <button
@@ -545,7 +546,7 @@ const Development = ({ isAddMode, developmentId }) => {
               console.log('handleSubmit called successfully');
             }}
             disabled={loading}
-            className='px-8 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed'
+            className='primary_button backdrop-blur-md'
           >
             {loading ? 'Processing...' : (isAddMode ? 'Create Development' : 'Update Development')}
           </button>

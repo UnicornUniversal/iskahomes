@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Input } from '../../ui/input'
+import { CustomSelect } from '../../ui/custom-select'
 import countryToCurrencyCode from 'country-to-currency'
 
 // Helper function to get currency from country code using country-to-currency package
@@ -355,13 +356,13 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
   }
 
   return (
-    <div className="w-full p-4 sm:p-6 bg-white rounded-lg shadow-sm" onKeyDown={handleKeyDown}>
-      <div className="mb-4 sm:mb-6">
+    <div className="w-full  " onKeyDown={handleKeyDown}>
+      {/* <div className="mb-4 sm:mb-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Property Pricing & Availability</h2>
         <p className="text-sm sm:text-base text-gray-600">
           {mode === 'edit' ? 'Update the pricing and availability information for this property' : 'Set the pricing details and availability for this property'}
         </p>
-      </div>
+      </div> */}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {/* Price Input */}
@@ -388,19 +389,16 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
             />
             <div className="flex flex-col">
               <label className="text-xs text-gray-500 mb-1">Currency *</label>
-              <select
-                suppressHydrationWarning
+              <CustomSelect
                 value={pricingData.currency || defaultCurrency}
                 onChange={(e) => handlePricingChange('currency', e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 !text-sm"
+                options={availableCurrencies.map(curr => ({
+                  value: curr.code,
+                  label: `${curr.code} (${curr.name})`
+                }))}
+                placeholder="Select currency"
                 required
-              >
-                {availableCurrencies.map(curr => (
-                  <option key={curr.code} value={curr.code}>
-                    {curr.code} ({curr.name})
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           </div>
           <p className="text-sm text-gray-500 mt-1">
@@ -450,16 +448,16 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
               />
               <div className="flex flex-col">
                 <label className="text-xs text-gray-500 mb-1">Duration *</label>
-                <select
-                  suppressHydrationWarning
+                <CustomSelect
                   value={pricingData.duration || 'monthly'}
                   onChange={(e) => handlePricingChange('duration', e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 !text-sm"
+                  options={[
+                    { value: 'monthly', label: 'Monthly' },
+                    { value: 'yearly', label: 'Yearly' }
+                  ]}
+                  placeholder="Select duration"
                   required
-                >
-                  <option value="monthly">Monthly</option>
-                  <option value="yearly">Yearly</option>
-                </select>
+                />
               </div>
             </div>
             <p className="text-sm text-gray-500 mt-1">
@@ -544,16 +542,16 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Time Span *
             </label>
-            <select
-              suppressHydrationWarning
+            <CustomSelect
               value={pricingData.time_span || 'months'}
               onChange={(e) => handlePricingChange('time_span', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 !text-sm"
+              options={[
+                { value: 'months', label: 'Months' },
+                { value: 'years', label: 'Years' }
+              ]}
+              placeholder="Select time span"
               required
-            >
-              <option value="months">Months</option>
-              <option value="years">Years</option>
-            </select>
+            />
             <p className="text-xs text-gray-500 mt-1">
               Duration unit
             </p>

@@ -100,6 +100,24 @@ export async function GET(request) {
 
     // Calculate percentages for leads breakdown
     const leadTotal = aggregated.total_leads
+    const messageTotal = aggregated.message_leads
+    
+    // Create nested messaging structure
+    // Note: development_analytics doesn't have whatsapp/direct_message breakdowns
+    // These would need to be calculated from leads table if detailed breakdown is needed
+    const messagingData = {
+      total: messageTotal,
+      percentage: leadTotal > 0 ? parseFloat(((messageTotal / leadTotal) * 100).toFixed(2)) : 0,
+      direct_message: {
+        total: 0, // Would need to calculate from leads table
+        percentage: 0
+      },
+      whatsapp: {
+        total: 0, // Would need to calculate from leads table
+        percentage: 0
+      }
+    }
+    
     const leadBreakdown = [
       {
         name: 'Phone Leads',
@@ -187,6 +205,7 @@ export async function GET(request) {
         stats: {
           views: viewsBreakdown,
           leads: leadBreakdown,
+          messaging: messagingData, // Nested messaging structure
           engagement: [
             {
               name: 'Total Shares',

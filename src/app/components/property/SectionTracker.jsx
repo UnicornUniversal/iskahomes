@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useEffect } from 'react'
-import { FaImages, FaFileAlt, FaDollarSign, FaHome, FaList, FaStar, FaMapMarkerAlt, FaInfoCircle, FaGavel } from 'react-icons/fa'
+import { FaImages, FaFileAlt, FaCoins, FaHome, FaList, FaStar, FaMapMarkerAlt, FaInfoCircle, FaGavel, FaInfo } from 'react-icons/fa'
 
 const SectionTracker = ({ sections = [] }) => {
   const [activeSection, setActiveSection] = useState('')
@@ -44,9 +44,10 @@ const SectionTracker = ({ sections = [] }) => {
 
   const getIcon = (iconName) => {
     const icons = {
+      intro: FaInfo,
       gallery: FaImages,
       description: FaFileAlt,
-      pricing: FaDollarSign,
+      pricing: FaCoins,
       specifications: FaHome,
       completeSpecs: FaList,
       amenities: FaStar,
@@ -61,7 +62,7 @@ const SectionTracker = ({ sections = [] }) => {
 
   return (
     <div className="w-full">
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
+      <div className="p-4">
         <div className="space-y-2">
           {sections.map((section) => {
             const Icon = getIcon(section.icon)

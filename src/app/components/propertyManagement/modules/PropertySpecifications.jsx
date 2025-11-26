@@ -2,6 +2,7 @@
 import React, { useState, useEffect, memo } from 'react'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
+import { CustomSelect } from '../../ui/custom-select'
 import { cn } from '@/lib/utils'
 import { usePropertyTypes } from '@/hooks/useCachedData'
 
@@ -71,16 +72,17 @@ const HousesApartmentsSpecs = ({ specifications, updateFormData, purposeData }) 
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Furnishing Status
           </label>
-          <select
+          <CustomSelect
             value={specifications?.furnishing || ''}
             onChange={(e) => handleInputChange('furnishing', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Select furnishing</option>
-            <option value="furnished">Furnished</option>
-            <option value="semi-furnished">Semi-Furnished</option>
-            <option value="unfurnished">Unfurnished</option>
-          </select>
+            options={[
+              { value: '', label: 'Select furnishing' },
+              { value: 'furnished', label: 'Furnished' },
+              { value: 'semi-furnished', label: 'Semi-Furnished' },
+              { value: 'unfurnished', label: 'Unfurnished' }
+            ]}
+            placeholder="Select furnishing"
+          />
         </div>
 
         {/* Property Age */}
@@ -88,18 +90,19 @@ const HousesApartmentsSpecs = ({ specifications, updateFormData, purposeData }) 
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Property Age
           </label>
-          <select
+          <CustomSelect
             value={specifications?.property_age || ''}
             onChange={(e) => handleInputChange('property_age', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Select age</option>
-            <option value="new">New Construction</option>
-            <option value="1-5">1-5 Years</option>
-            <option value="6-10">6-10 Years</option>
-            <option value="11-20">11-20 Years</option>
-            <option value="20+">20+ Years</option>
-          </select>
+            options={[
+              { value: '', label: 'Select age' },
+              { value: 'new', label: 'New Construction' },
+              { value: '1-5', label: '1-5 Years' },
+              { value: '6-10', label: '6-10 Years' },
+              { value: '11-20', label: '11-20 Years' },
+              { value: '20+', label: '20+ Years' }
+            ]}
+            placeholder="Select age"
+          />
         </div>
 
         {/* Living Rooms */}
@@ -122,18 +125,19 @@ const HousesApartmentsSpecs = ({ specifications, updateFormData, purposeData }) 
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Kitchen Type *
           </label>
-          <select
+          <CustomSelect
             value={specifications?.kitchen_type || ''}
             onChange={(e) => handleInputChange('kitchen_type', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            options={[
+              { value: '', label: 'Select kitchen type' },
+              { value: 'open_kitchen', label: 'Open Kitchen' },
+              { value: 'closed_kitchen', label: 'Closed Kitchen' },
+              { value: 'kitchenette', label: 'Kitchenette' },
+              { value: 'no_kitchen', label: 'No Kitchen' }
+            ]}
+            placeholder="Select kitchen type"
             required
-          >
-            <option value="">Select kitchen type</option>
-            <option value="open_kitchen">Open Kitchen</option>
-            <option value="closed_kitchen">Closed Kitchen</option>
-            <option value="kitchenette">Kitchenette</option>
-            <option value="no_kitchen">No Kitchen</option>
-          </select>
+          />
         </div>
 
         {/* Property Condition */}
@@ -141,18 +145,19 @@ const HousesApartmentsSpecs = ({ specifications, updateFormData, purposeData }) 
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Property Condition *
           </label>
-          <select
+          <CustomSelect
             value={specifications?.property_condition || ''}
             onChange={(e) => handleInputChange('property_condition', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            options={[
+              { value: '', label: 'Select condition' },
+              { value: 'excellent', label: 'Excellent' },
+              { value: 'good', label: 'Good' },
+              { value: 'fair', label: 'Fair' },
+              { value: 'needs_renovation', label: 'Needs Renovation' }
+            ]}
+            placeholder="Select condition"
             required
-          >
-            <option value="">Select condition</option>
-            <option value="excellent">Excellent</option>
-            <option value="good">Good</option>
-            <option value="fair">Fair</option>
-            <option value="needs_renovation">Needs Renovation</option>
-          </select>
+          />
         </div>
 
         {/* Shared Electricity Meter */}
@@ -160,17 +165,18 @@ const HousesApartmentsSpecs = ({ specifications, updateFormData, purposeData }) 
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Shared Electricity Meter *
           </label>
-          <select
+          <CustomSelect
             value={specifications?.shared_electricity_meter || ''}
             onChange={(e) => handleInputChange('shared_electricity_meter', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            options={[
+              { value: '', label: 'Select electricity meter' },
+              { value: 'shared', label: 'Shared Meter' },
+              { value: 'individual', label: 'Individual Meter' },
+              { value: 'prepaid', label: 'Prepaid Meter' }
+            ]}
+            placeholder="Select electricity meter"
             required
-          >
-            <option value="">Select electricity meter</option>
-            <option value="shared">Shared Meter</option>
-            <option value="individual">Individual Meter</option>
-            <option value="prepaid">Prepaid Meter</option>
-          </select>
+          />
         </div>
 
         {/* Compound Type */}
@@ -178,18 +184,19 @@ const HousesApartmentsSpecs = ({ specifications, updateFormData, purposeData }) 
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Compound Type *
           </label>
-          <select
+          <CustomSelect
             value={specifications?.compound_type || ''}
             onChange={(e) => handleInputChange('compound_type', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            options={[
+              { value: '', label: 'Select compound type' },
+              { value: 'gated_community', label: 'Gated Community' },
+              { value: 'open_compound', label: 'Open Compound' },
+              { value: 'shared_compound', label: 'Shared Compound' },
+              { value: 'private_compound', label: 'Private Compound' }
+            ]}
+            placeholder="Select compound type"
             required
-          >
-            <option value="">Select compound type</option>
-            <option value="gated_community">Gated Community</option>
-            <option value="open_compound">Open Compound</option>
-            <option value="shared_compound">Shared Compound</option>
-            <option value="private_compound">Private Compound</option>
-          </select>
+          />
         </div>
 
         {/* Building Style */}
@@ -197,21 +204,22 @@ const HousesApartmentsSpecs = ({ specifications, updateFormData, purposeData }) 
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Building Style *
           </label>
-          <select
+          <CustomSelect
             value={specifications?.building_style || ''}
             onChange={(e) => handleInputChange('building_style', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            options={[
+              { value: '', label: 'Select building style' },
+              { value: 'modern', label: 'Modern' },
+              { value: 'traditional', label: 'Traditional' },
+              { value: 'colonial', label: 'Colonial' },
+              { value: 'contemporary', label: 'Contemporary' },
+              { value: 'mediterranean', label: 'Mediterranean' },
+              { value: 'minimalist', label: 'Minimalist' },
+              { value: 'villa', label: 'Villa Style' }
+            ]}
+            placeholder="Select building style"
             required
-          >
-            <option value="">Select building style</option>
-            <option value="modern">Modern</option>
-            <option value="traditional">Traditional</option>
-            <option value="colonial">Colonial</option>
-            <option value="contemporary">Contemporary</option>
-            <option value="mediterranean">Mediterranean</option>
-            <option value="minimalist">Minimalist</option>
-            <option value="villa">Villa Style</option>
-          </select>
+          />
         </div>
 
         {/* Number of Balconies */}
@@ -233,15 +241,16 @@ const HousesApartmentsSpecs = ({ specifications, updateFormData, purposeData }) 
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Guest Room
           </label>
-          <select
+          <CustomSelect
             value={specifications?.guest_room || ''}
             onChange={(e) => handleInputChange('guest_room', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Select guest room</option>
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-          </select>
+            options={[
+              { value: '', label: 'Select guest room' },
+              { value: 'yes', label: 'Yes' },
+              { value: 'no', label: 'No' }
+            ]}
+            placeholder="Select guest room"
+          />
         </div>
 
         {/* Guest Washroom */}
@@ -249,15 +258,16 @@ const HousesApartmentsSpecs = ({ specifications, updateFormData, purposeData }) 
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Guest Washroom
           </label>
-          <select
+          <CustomSelect
             value={specifications?.guest_washroom || ''}
             onChange={(e) => handleInputChange('guest_washroom', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Select guest washroom</option>
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-          </select>
+            options={[
+              { value: '', label: 'Select guest washroom' },
+              { value: 'yes', label: 'Yes' },
+              { value: 'no', label: 'No' }
+            ]}
+            placeholder="Select guest washroom"
+          />
         </div>
       </div>
     </div>
@@ -315,17 +325,18 @@ const OfficesSpecs = ({ specifications, updateFormData, purposeData }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Available Units *
             </label>
-            <select
+            <CustomSelect
               value={specifications?.available_units || ''}
               onChange={(e) => handleInputChange('available_units', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              options={[
+                { value: '', label: 'Select available units' },
+                { value: 'full_floor', label: 'Full Floor' },
+                { value: 'partial_units', label: 'Partial Units' },
+                { value: 'coworking_space', label: 'Co-working Space' }
+              ]}
+              placeholder="Select available units"
               required
-            >
-              <option value="">Select available units</option>
-              <option value="full_floor">Full Floor</option>
-              <option value="partial_units">Partial Units</option>
-              <option value="coworking_space">Co-working Space</option>
-            </select>
+            />
           </div>
 
           {/* Furnishing Status */}
@@ -333,17 +344,18 @@ const OfficesSpecs = ({ specifications, updateFormData, purposeData }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Furnishing Status *
             </label>
-            <select
+            <CustomSelect
               value={specifications?.furnishing_status || ''}
               onChange={(e) => handleInputChange('furnishing_status', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              options={[
+                { value: '', label: 'Select furnishing status' },
+                { value: 'fully_furnished', label: 'Fully Furnished' },
+                { value: 'semi_furnished', label: 'Semi Furnished' },
+                { value: 'unfurnished', label: 'Unfurnished' }
+              ]}
+              placeholder="Select furnishing status"
               required
-            >
-              <option value="">Select furnishing status</option>
-              <option value="fully_furnished">Fully Furnished</option>
-              <option value="semi_furnished">Semi Furnished</option>
-              <option value="unfurnished">Unfurnished</option>
-            </select>
+            />
           </div>
         </div>
       </div>
@@ -357,15 +369,16 @@ const OfficesSpecs = ({ specifications, updateFormData, purposeData }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Reception Area
             </label>
-            <select
+            <CustomSelect
               value={specifications?.reception_area || ''}
               onChange={(e) => handleInputChange('reception_area', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select reception area</option>
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
+              options={[
+                { value: '', label: 'Select reception area' },
+                { value: 'yes', label: 'Yes' },
+                { value: 'no', label: 'No' }
+              ]}
+              placeholder="Select reception area"
+            />
           </div>
 
           {/* Meeting Rooms */}
@@ -401,17 +414,18 @@ const OfficesSpecs = ({ specifications, updateFormData, purposeData }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Pantry/Cafeteria
             </label>
-            <select
+            <CustomSelect
               value={specifications?.pantry_cafeteria || ''}
               onChange={(e) => handleInputChange('pantry_cafeteria', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select pantry/cafeteria</option>
-              <option value="pantry">Pantry</option>
-              <option value="cafeteria">Cafeteria</option>
-              <option value="both">Both</option>
-              <option value="none">None</option>
-            </select>
+              options={[
+                { value: '', label: 'Select pantry/cafeteria' },
+                { value: 'pantry', label: 'Pantry' },
+                { value: 'cafeteria', label: 'Cafeteria' },
+                { value: 'both', label: 'Both' },
+                { value: 'none', label: 'None' }
+              ]}
+              placeholder="Select pantry/cafeteria"
+            />
           </div>
 
           {/* Washrooms */}
@@ -457,19 +471,20 @@ const WarehousesSpecs = ({ specifications, updateFormData, purposeData }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Warehouse Type *
             </label>
-            <select
+            <CustomSelect
               value={specifications?.warehouse_type || ''}
               onChange={(e) => handleInputChange('warehouse_type', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              options={[
+                { value: '', label: 'Select warehouse type' },
+                { value: 'dry_storage', label: 'Dry Storage' },
+                { value: 'cold_storage', label: 'Cold Storage' },
+                { value: 'bonded', label: 'Bonded Warehouse' },
+                { value: 'distribution', label: 'Distribution Center' },
+                { value: 'open_yard', label: 'Open Yard' }
+              ]}
+              placeholder="Select warehouse type"
               required
-            >
-              <option value="">Select warehouse type</option>
-              <option value="dry_storage">Dry Storage</option>
-              <option value="cold_storage">Cold Storage</option>
-              <option value="bonded">Bonded Warehouse</option>
-              <option value="distribution">Distribution Center</option>
-              <option value="open_yard">Open Yard</option>
-            </select>
+            />
           </div>
         </div>
       </div>
@@ -483,18 +498,19 @@ const WarehousesSpecs = ({ specifications, updateFormData, purposeData }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Construction Type *
             </label>
-            <select
+            <CustomSelect
               value={specifications?.construction_type || ''}
               onChange={(e) => handleInputChange('construction_type', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              options={[
+                { value: '', label: 'Select construction type' },
+                { value: 'rcc_peb', label: 'RCC + Pre-Engineered Building (PEB)' },
+                { value: 'rcc_only', label: 'RCC Only' },
+                { value: 'peb_only', label: 'PEB Only' },
+                { value: 'steel_frame', label: 'Steel Frame' }
+              ]}
+              placeholder="Select construction type"
               required
-            >
-              <option value="">Select construction type</option>
-              <option value="rcc_peb">RCC + Pre-Engineered Building (PEB)</option>
-              <option value="rcc_only">RCC Only</option>
-              <option value="peb_only">PEB Only</option>
-              <option value="steel_frame">Steel Frame</option>
-            </select>
+            />
           </div>
 
           {/* Clear Height */}
@@ -518,18 +534,19 @@ const WarehousesSpecs = ({ specifications, updateFormData, purposeData }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Flooring Type *
             </label>
-            <select
+            <CustomSelect
               value={specifications?.flooring_type || ''}
               onChange={(e) => handleInputChange('flooring_type', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              options={[
+                { value: '', label: 'Select flooring type' },
+                { value: 'tremix', label: 'Tremix' },
+                { value: 'vdf_industrial', label: 'VDF Industrial Flooring' },
+                { value: 'concrete', label: 'Concrete' },
+                { value: 'epoxy', label: 'Epoxy Coated' }
+              ]}
+              placeholder="Select flooring type"
               required
-            >
-              <option value="">Select flooring type</option>
-              <option value="tremix">Tremix</option>
-              <option value="vdf_industrial">VDF Industrial Flooring</option>
-              <option value="concrete">Concrete</option>
-              <option value="epoxy">Epoxy Coated</option>
-            </select>
+            />
           </div>
 
           {/* Floor Load Capacity */}
@@ -566,18 +583,19 @@ const WarehousesSpecs = ({ specifications, updateFormData, purposeData }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Roofing *
             </label>
-            <select
+            <CustomSelect
               value={specifications?.roofing || ''}
               onChange={(e) => handleInputChange('roofing', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              options={[
+                { value: '', label: 'Select roofing' },
+                { value: 'galvalume_insulated', label: 'Galvalume sheet with insulation' },
+                { value: 'galvalume', label: 'Galvalume sheet' },
+                { value: 'metal_sheet', label: 'Metal sheet' },
+                { value: 'concrete', label: 'Concrete' }
+              ]}
+              placeholder="Select roofing"
               required
-            >
-              <option value="">Select roofing</option>
-              <option value="galvalume_insulated">Galvalume sheet with insulation</option>
-              <option value="galvalume">Galvalume sheet</option>
-              <option value="metal_sheet">Metal sheet</option>
-              <option value="concrete">Concrete</option>
-            </select>
+            />
           </div>
         </div>
       </div>
@@ -591,18 +609,19 @@ const WarehousesSpecs = ({ specifications, updateFormData, purposeData }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Ventilation *
             </label>
-            <select
+            <CustomSelect
               value={specifications?.ventilation || ''}
               onChange={(e) => handleInputChange('ventilation', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              options={[
+                { value: '', label: 'Select ventilation' },
+                { value: 'turbo_ridge_exhaust', label: 'Turbo ventilators + Ridge Vents + Exhaust Fans' },
+                { value: 'natural', label: 'Natural ventilation' },
+                { value: 'mechanical', label: 'Mechanical ventilation' },
+                { value: 'mixed', label: 'Mixed ventilation' }
+              ]}
+              placeholder="Select ventilation"
               required
-            >
-              <option value="">Select ventilation</option>
-              <option value="turbo_ridge_exhaust">Turbo ventilators + Ridge Vents + Exhaust Fans</option>
-              <option value="natural">Natural ventilation</option>
-              <option value="mechanical">Mechanical ventilation</option>
-              <option value="mixed">Mixed ventilation</option>
-            </select>
+            />
           </div>
 
           {/* Natural Lighting */}
@@ -610,18 +629,19 @@ const WarehousesSpecs = ({ specifications, updateFormData, purposeData }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Natural Lighting *
             </label>
-            <select
+            <CustomSelect
               value={specifications?.natural_lighting || ''}
               onChange={(e) => handleInputChange('natural_lighting', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              options={[
+                { value: '', label: 'Select natural lighting' },
+                { value: 'polycarbonate', label: 'Polycarbonate sheets for daylight' },
+                { value: 'skylights', label: 'Skylights' },
+                { value: 'windows', label: 'Windows' },
+                { value: 'minimal', label: 'Minimal natural lighting' }
+              ]}
+              placeholder="Select natural lighting"
               required
-            >
-              <option value="">Select natural lighting</option>
-              <option value="polycarbonate">Polycarbonate sheets for daylight</option>
-              <option value="skylights">Skylights</option>
-              <option value="windows">Windows</option>
-              <option value="minimal">Minimal natural lighting</option>
-            </select>
+            />
           </div>
         </div>
       </div>
@@ -650,15 +670,16 @@ const WarehousesSpecs = ({ specifications, updateFormData, purposeData }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Dock Levelers
             </label>
-            <select
+            <CustomSelect
               value={specifications?.dock_levelers || ''}
               onChange={(e) => handleInputChange('dock_levelers', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select dock levelers</option>
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
+              options={[
+                { value: '', label: 'Select dock levelers' },
+                { value: 'yes', label: 'Yes' },
+                { value: 'no', label: 'No' }
+              ]}
+              placeholder="Select dock levelers"
+            />
           </div>
 
           {/* Ramps */}
@@ -666,15 +687,16 @@ const WarehousesSpecs = ({ specifications, updateFormData, purposeData }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Ramps
             </label>
-            <select
+            <CustomSelect
               value={specifications?.ramps || ''}
               onChange={(e) => handleInputChange('ramps', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select ramps</option>
-              <option value="yes">Yes (for forklift/container access)</option>
-              <option value="no">No</option>
-            </select>
+              options={[
+                { value: '', label: 'Select ramps' },
+                { value: 'yes', label: 'Yes (for forklift/container access)' },
+                { value: 'no', label: 'No' }
+              ]}
+              placeholder="Select ramps"
+            />
           </div>
         </div>
       </div>
@@ -706,17 +728,18 @@ const EventCentersSpecs = ({ specifications, updateFormData, purposeData }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Availability *
             </label>
-            <select
+            <CustomSelect
               value={specifications?.availability || ''}
               onChange={(e) => handleInputChange('availability', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              options={[
+                { value: '', label: 'Select availability' },
+                { value: 'available', label: 'Available' },
+                { value: 'booked', label: 'Booked' },
+                { value: 'maintenance', label: 'Under Maintenance' }
+              ]}
+              placeholder="Select availability"
               required
-            >
-              <option value="">Select availability</option>
-              <option value="available">Available</option>
-              <option value="booked">Booked</option>
-              <option value="maintenance">Under Maintenance</option>
-            </select>
+            />
           </div>
         </div>
       </div>
@@ -1107,12 +1130,12 @@ const PropertySpecifications = ({ selectedTypeIds, specifications, updateFormDat
   };
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow-sm">
+    <div className="">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Property Specifications</h2>
+        {/* <h2 className="text-2xl font-bold text-gray-900 mb-2">Property Specifications</h2>
         <p className="text-gray-600">
           {isEditMode ? 'Update the property specifications' : 'Specify detailed characteristics of your property based on its type'}
-        </p>
+        </p> */}
         {selectedPropertyType && (
           <div className="mt-2 p-3 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-800">

@@ -15,7 +15,8 @@ import LatestLeads from '@/app/components/developers/DataStats/LatestLeads'
 import RecentMessages from '@/app/components/developers/DataStats/RecentMessages'
 import RecentSales from '@/app/components/developers/DataStats/RecentSales'
 import PopularListings from '@/app/components/developers/DataStats/PopularListings'
-
+import LatestReminders from '@/app/components/developers/DataStats/LatestReminders'
+import { formatCurrency } from '@/lib/utils'
 
 const page = () => {
   const { user } = useAuth()
@@ -24,13 +25,6 @@ const page = () => {
   const formatNumber = (num) => {
     if (num === null || num === undefined) return '0'
     return Number(num).toLocaleString('en-US')
-  }
-
-  // Format currency value
-  const formatCurrency = (amount, currencyCode = 'GHS') => {
-    if (amount === null || amount === undefined || amount === 0) return '0'
-    const formatted = formatNumber(amount)
-    return `${currencyCode} ${formatted}`
   }
 
   // Get currency from company_locations primary_location
@@ -57,7 +51,7 @@ const page = () => {
     return 'GHS'
   }, [user?.profile?.company_locations])
 
-  // Get values directly from user profile
+  // Get values directly from user profile (for other metrics)
   const totalUnits = user?.profile?.total_units ?? 0
   const totalDevelopments = user?.profile?.total_developments ?? 0
   const totalRevenue = user?.profile?.total_revenue ?? 0
@@ -65,10 +59,11 @@ const page = () => {
   const totalImpressions = user?.profile?.total_impressions ?? 0
 
   return (
-    <div className='w-full flex flex-col gap-4 px-[1rem] h-full overflow-y-auto'>
-      <DeveloperHeader />
+    <div className=' w-full flex flex-col gap-4 px-[1rem] h-full overflow-y-auto'>
+      {/* <DeveloperHeader /> */}
 
-      <div className='grid grid-cols-2 items-center justify-center lg:grid-cols-5 gap-4'>
+        <h1 className=' text-primary_color mb-4'>Dashboard Overview</h1>
+        <div className='grid grid-cols-2 items-center justify-center lg:grid-cols-5 gap-4'>
         <DataCard 
           title='Total Units' 
           value={formatNumber(totalUnits)}
@@ -104,27 +99,63 @@ const page = () => {
           linkText='View All' 
           icon={Building2}
         />
-      </div>
+        </div>
+   
 
       <div className='w-full flex flex-col gap-4'>
-        <StatisticsView />
-
-        <div className='w-full flex justify-between gap-4'>
-          <PropertiesByCategories />
-          <PropertiesBySubType />
-          {/* <PropertiesByStatus /> */}
-          <PropertiesByType />
+        <div className='\p-4 rounded-2xl shadow-sm'>
+          <StatisticsView />
         </div>
 
-        <div className='w-full flex justify-between gap-4'>
+     
+
+        <div className='secondary_bg p-4 rounded-2xl shadow-sm flex-1'>
+            <RecentSales />
+          </div>
+
+        <div className='w-full flex justify-between gap-4 flex-col md:grid md:grid-cols-3 gap-4'>
        
-       
-          <RecentMessages />  <RecentSales />   <LatestAppointments />
+          <div className='secondary_bg p-4 rounded-2xl shadow-sm flex-1'>
+            <RecentMessages />
+          </div>
+         
+          <div className='secondary_bg p-4 rounded-2xl shadow-sm flex-1'>
+            <LatestAppointments />
+          </div>
+
+          <LatestReminders />
         </div>
-        <PopularListings limit={4} />
-       {/* <div className='w-full justify-between flex gap-4'> */}
-       <LatestLeads />   
-       {/* </div> */}
+
+
+        <div className='w-full flex justify-between gap-4 flex-col lg:flex-row'>
+         
+         <PropertiesByCategories />
+    
+    
+         <PropertiesBySubType />
+
+     
+         {/* <PropertiesByStatus /> */}
+         <PropertiesByType />
+   
+     </div>
+
+
+        <div className='secondary_bg p-4 rounded-2xl shadow-sm'>
+          <PopularListings limit={4} />
+        </div>
+        <LatestLeads />  
+   
+       {/* <div className='w-full justify-between flex flex-col md:grid md:grid-cols-3 gap-4'>
+
+       <div className='w-full md:col-span-2 secondary_bg p-4 rounded-2xl shadow-sm'>
+    
+       </div>
+       
+       <div className='w-full md:col-span-1 secondary_bg p-4 rounded-2xl shadow-sm'>
+    
+       </div>
+       </div> */}
 
  
     

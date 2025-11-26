@@ -5,9 +5,9 @@ import ImmersiveExperience from '../modules/ImmersiveExperience'
 const ImmersiveExperienceStep = ({ formData, updateFormData, mode, accountType }) => {
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Immersive Experience</h2>
-        <p className="text-sm text-gray-600">Add 3D models and virtual tour experiences</p>
+      <div className='border-b border-white/50 pb-4'>
+        <h2 className="mb-2">Immersive Experience</h2>
+        <p className="">Add 3D models and virtual tour experiences for your property</p>
       </div>
 
       <ImmersiveExperience 

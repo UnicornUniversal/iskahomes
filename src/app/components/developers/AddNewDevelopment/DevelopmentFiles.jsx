@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { cn } from '@/lib/utils'
 // React Icons imports
@@ -8,9 +7,7 @@ import { FaFilePdf, FaFileExcel, FaFileWord, FaFilePowerpoint, FaFileImage, FaFi
 const DevelopmentFiles = ({ formData, updateFormData, isEditMode }) => {
   const [allFiles, setAllFiles] = useState([])
   const [dragActive, setDragActive] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState({})
   const fileInputRef = useRef(null)
-  const [selectedFileIndex, setSelectedFileIndex] = useState(0)
 
   // Initialize with form data
   useEffect(() => {
@@ -22,10 +19,10 @@ const DevelopmentFiles = ({ formData, updateFormData, isEditMode }) => {
   const getFileIcon = (fileType) => {
     if (fileType.includes('pdf')) return <FaFilePdf className="text-red-500" />;
     if (fileType.includes('excel') || fileType.includes('spreadsheet')) return <FaFileExcel className="text-green-500" />;
-    if (fileType.includes('word') || fileType.includes('document')) return <FaFileWord className="text-blue-500" />;
+    if (fileType.includes('word') || fileType.includes('document')) return <FaFileWord className="" />;
     if (fileType.includes('powerpoint') || fileType.includes('presentation')) return <FaFilePowerpoint className="text-orange-500" />;
     if (fileType.includes('image')) return <FaFileImage className="text-purple-500" />;
-    return <FaFileAlt className="text-gray-500" />;
+    return <FaFileAlt className="" />;
   }
 
 
@@ -104,13 +101,6 @@ const DevelopmentFiles = ({ formData, updateFormData, isEditMode }) => {
     const updatedFiles = allFiles.filter(file => file.id !== fileId);
     setAllFiles(updatedFiles);
 
-    // Adjust selected index if needed
-    if (selectedFileIndex >= updatedFiles.length && updatedFiles.length > 0) {
-      setSelectedFileIndex(updatedFiles.length - 1);
-    } else if (updatedFiles.length === 0) {
-      setSelectedFileIndex(0);
-    }
-
     // Update form data
     updateFormData({
       additional_files: updatedFiles
@@ -135,8 +125,7 @@ const DevelopmentFiles = ({ formData, updateFormData, isEditMode }) => {
           type: newFile.type,
           size: newFile.size,
           file: newFile,
-          uploadedAt: new Date().toISOString(),
-          category: getFileCategory(newFile.type)
+          uploadedAt: new Date().toISOString()
         };
       }
       return file;
@@ -152,10 +141,10 @@ const DevelopmentFiles = ({ formData, updateFormData, isEditMode }) => {
 
 
   return (
-    <div className="w-full p-6 bg-white rounded-lg shadow-sm">
+    <div className="w-full">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Development Files</h2>
-        <p className="text-gray-600">
+        <h2 className="mb-2">Development Files</h2>
+        <p>
           {isEditMode ? 'Upload and manage documents for your development' : 'Upload documents, presentations, and other files for your development project'}
         </p>
       </div>
@@ -164,10 +153,10 @@ const DevelopmentFiles = ({ formData, updateFormData, isEditMode }) => {
         {/* File Upload Area */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium ">
               Upload Files
             </label>
-            <div className="text-sm text-gray-500">
+            <div className="text-sm ">
               {allFiles.length}/15 files • Max 300KB per file
             </div>
           </div>
@@ -182,22 +171,22 @@ const DevelopmentFiles = ({ formData, updateFormData, isEditMode }) => {
             onDragOver={handleDrag}
             onDrop={handleDrop}
           >
-            <FaUpload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <p className="text-gray-600 mb-2">Drag and drop files here or click to upload</p>
-            <p className="text-sm text-gray-500 mb-4">
+            <FaUpload className="mx-auto h-12 w-12  mb-4" />
+            <p className=" mb-2">Drag and drop files here or click to upload</p>
+            <p className="text-sm  mb-4">
               Supports: PDF, Excel, Word, PowerPoint, and other documents (no images)
             </p>
             <p className="text-xs text-red-500 mb-4">
               Maximum 15 files • 300KB per file limit
             </p>
-            <Button
+            <button
               type="button"
-              variant="outline"
               onClick={() => fileInputRef.current?.click()}
               disabled={allFiles.length >= 15}
+              className="primary_button"
             >
               {allFiles.length >= 15 ? 'Maximum files reached' : 'Choose Files'}
-            </Button>
+            </button>
             <input
               ref={fileInputRef}
               type="file"
@@ -213,137 +202,75 @@ const DevelopmentFiles = ({ formData, updateFormData, isEditMode }) => {
         {allFiles.length > 0 ? (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-800">
+              <h3 className="text-lg font-semibold ">
                 Uploaded Files ({allFiles.length})
               </h3>
               <div className="flex space-x-2">
-                <span className="text-sm text-gray-500">
+                <span className="text-sm ">
                   {allFiles.length} Additional Files
                 </span>
               </div>
             </div>
 
-            {/* File Preview */}
-            <div className="bg-gray-50 rounded-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-medium text-gray-700">File Preview</h4>
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-500">
-                    {selectedFileIndex + 1} of {allFiles.length}
-                  </span>
-                  {allFiles.length > 1 && (
-                    <div className="flex space-x-1">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedFileIndex(Math.max(0, selectedFileIndex - 1))}
-                        disabled={selectedFileIndex === 0}
-                        className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        ←
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedFileIndex(Math.min(allFiles.length - 1, selectedFileIndex + 1))}
-                        disabled={selectedFileIndex === allFiles.length - 1}
-                        className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        →
-                      </button>
+            {/* Files List - Optimized */}
+            <div className="space-y-2">
+              {allFiles.map((file, index) => (
+                <div
+                  key={file.id}
+                  className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    <div className="text-2xl flex-shrink-0">
+                      {getFileIcon(file.type)}
                     </div>
-                  )}
-                </div>
-              </div>
-              
-              {allFiles[selectedFileIndex] && (
-                <div className="h-64 bg-white rounded-lg p-4 flex items-center justify-center border">
-                  <div className="text-center">
-                    <div className="text-6xl mb-4">
-                      {getFileIcon(allFiles[selectedFileIndex].type)}
-                    </div>
-                    <p className="text-sm text-gray-500">{formatFileSize(allFiles[selectedFileIndex].size)}</p>
-                    <p className="text-xs text-gray-400">{allFiles[selectedFileIndex].type}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* File Thumbnails */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">All Files</h4>
-              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
-                {allFiles.map((file, index) => (
-                  <div
-                    key={file.id}
-                    className={cn(
-                      "h-16 bg-white rounded-lg p-2 flex items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors border-2",
-                      selectedFileIndex === index ? "border-blue-500" : "border-gray-200"
-                    )}
-                    onClick={() => setSelectedFileIndex(index)}
-                  >
-                    <div className="text-center">
-                      <div className="text-lg">
-                        {getFileIcon(file.type)}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {file.name}
+                      </p>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <p className={`text-xs font-medium ${getFileSizeColor(file.size)}`}>
+                          {formatFileSize(file.size)}
+                        </p>
+                        <span className="text-xs ">•</span>
+                        <p className="text-xs  truncate">{file.type}</p>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                  <div className="flex items-center space-x-2 flex-shrink-0">
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.rtf"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          replaceFile(file.id, e.target.files[0]);
+                        }
+                      }}
+                      className="hidden"
+                      id={`replace-file-${file.id}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById(`replace-file-${file.id}`)?.click()}
+                      className="secondary_button p-2"
+                      title="Replace File"
+                    >
+                      <FaEdit className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(file.id)}
+                      className="tertiary_button p-2"
+                      title="Remove File"
+                    >
+                      <FaTrash className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-
-            {/* File Actions */}
-            {allFiles[selectedFileIndex] && (
-              <div className="flex items-center justify-between p-4 bg-white rounded-lg border">
-                <div className="flex items-center space-x-3">
-                  <div className="text-2xl">
-                    {getFileIcon(allFiles[selectedFileIndex].type)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {allFiles[selectedFileIndex].name}
-                    </p>
-                    <div className="flex items-center space-x-2">
-                      <p className={`text-xs font-medium ${getFileSizeColor(allFiles[selectedFileIndex].size)}`}>
-                        {formatFileSize(allFiles[selectedFileIndex].size)}
-                      </p>
-                      <span className="text-xs text-gray-400">•</span>
-                      <p className="text-xs text-gray-400">{allFiles[selectedFileIndex].type}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.rtf"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        replaceFile(allFiles[selectedFileIndex].id, e.target.files[0]);
-                      }
-                    }}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-blue-500 hover:text-blue-700 p-2"
-                    title="Replace File"
-                  >
-                    <FaEdit className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(allFiles[selectedFileIndex].id)}
-                    className="text-red-500 hover:text-red-700 p-2"
-                    title="Remove File"
-                  >
-                    <FaTrash className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         ) : (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 ">
             <FaFileAlt className="mx-auto h-16 w-16 mb-4" />
             <p className="text-lg">No files uploaded yet</p>
             <p className="text-sm">Upload your first file to get started</p>

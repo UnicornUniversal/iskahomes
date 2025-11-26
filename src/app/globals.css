@@ -98,6 +98,47 @@
   left: -10px;
 }
 
+/* Reminders Swiper custom styles */
+.reminders-swiper {
+  padding: 10px 0 40px 0;
+}
+
+.reminders-swiper .swiper-button-next,
+.reminders-swiper .swiper-button-prev {
+  color: var(--color-primary_color);
+  background: white;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-primary_color);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.reminders-swiper .swiper-button-next:after,
+.reminders-swiper .swiper-button-prev:after {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.reminders-swiper .swiper-pagination {
+  bottom: 10px !important;
+}
+
+.reminders-swiper .swiper-pagination-bullet {
+  background: var(--color-primary_color);
+  opacity: 0.3;
+  width: 8px;
+  height: 8px;
+}
+
+.reminders-swiper .swiper-pagination-bullet-active {
+  opacity: 1;
+}
+
+.reminders-swiper .swiper-slide {
+  height: auto;
+}
+
 /* Preserve whitespace in text content */
 .preserve-whitespace {
   white-space: pre-wrap;
@@ -201,6 +242,11 @@ body {
   }
 }
 
+.design1 {
+  @apply shadow w-full bg-[rgba(255,255,255,0.4)] rounded-lg border-[1px];
+  border-image: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,1), rgba(255,255,255,0.1)) 1;
+}
+
 /* MESSAGING APP STYLES - COMPLETELY SEPARATE FROM MAIN SITE */
 .messages-page {
   /* Override button styles only for messaging app */
@@ -239,7 +285,7 @@ body {
 
 
 .box_holder{
-  @apply bg-white rounded-2xl shadow-xl p-2 text-primary_color shadow-sm;
+  @apply bg-white rounded-sm shadow-xl p-2 text-primary_color shadow-sm;
 }
 
 /* Message bubble animations - only for messaging app */
@@ -296,6 +342,54 @@ body {
 }
 
 
+
+@layer components {
+  .primary_button{
+    @apply bg-white/17 text-primary_color  rounded-full min-w-24 p-4 shadow-lg text-[0.9em] hover:bg-primary_color/50 hover:text-white shadow-primary_color/20 font-medium border border-1 border-white/40 duration-500;
+  }
+
+  input{
+    @apply bg-white/17 text-primary_color  rounded-md  px-4 py-[0.65em]  shadow-lg text-[0.9em] hover:bg-primary_color/10 hover:border-primary_color outline-none shadow-primary_color/20 font-medium border border-1 border-white duration-500;
+  }
+
+  select{
+    @apply bg-white/17 text-primary_color rounded-md px-4 py-[0.5em] shadow-lg text-[0.9em] hover:bg-primary_color/10 hover:border-primary_color outline-none shadow-primary_color/20 font-medium border border-1 border-white duration-500 appearance-none cursor-pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2317637C' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
+    border-bottom: 2px solid transparent;
+  }
+
+  select:focus,
+  select:hover {
+    border-bottom: 2px solid var(--color-primary_color);
+  }
+
+  option{
+    @apply bg-white text-primary_color;
+    padding: 0.5rem;
+  }
+
+  option:hover,
+  option:checked {
+    @apply bg-primary_color/10;
+  }
+  .secondary_button{
+    @apply bg-gradient-to-r from-primary_color/14 to-secondary_color/14 text-primary_color rounded-full p-4 shadow-lg text-[0.7em] shadow-primary_color/20 font-medium border border-1 border-white/40 duration-500;
+  }
+
+  .tertiary_button{
+    @apply bg-white/17 text-red-500 rounded-full p-4  shadow-lg text-[0.8em] hover:bg-red-500/50 hover:text-white shadow-primary_color/20 font-medium border border-1 border-red-500/40 duration-500;
+  }
+
+
+.negative_button{
+  @apply bg-white/17 text-primary_color rounded-full px-4 py-2 shadow-lg text-[0.8em] hover:bg-primary_color/50 hover:text-white shadow-primary_color/20 font-medium border border-1 border-white/40 duration-500;
+}
+
+}
+
 .ocean-sunset_secondary_bg {
   background: rgba(255, 255, 255, 0.3);
   background-attachment: fixed;
@@ -338,4 +432,39 @@ body {
   -webkit-backdrop-filter: blur(10px); 
  
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.secondary_bg{
+  background: rgba(255, 255, 255, 0.23);
+padding: 10px;
+  background-attachment: fixed;
+ @apply text-primary_color;
+  /* border: 1px solid transparent; */
+  /* border-image: linear-gradient(140deg, 
+    #F6F6F6 0%, 
+    #FFFFFF 47%, 
+    #CFCFCF 100%) 1; */
+ border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(67, 97, 190, 0.08);
+}
+
+
+.template_body_bg{
+  background: linear-gradient(
+    135deg,
+    rgba(23, 99, 124, 0.2) 0%,
+    rgba(83, 114, 125, 0.3) 61%,
+    rgba(255, 137, 1, 0.15) 100%
+  );
+/* 
+  background: url('/bg.jpg') no-repeat center center;
+  background-size: cover;
+  background-attachment: fixed;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover; */
+
+
+
+  
 }

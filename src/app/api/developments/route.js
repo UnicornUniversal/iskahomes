@@ -1,8 +1,54 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 import { cache } from 'react'
 import { invalidateDevelopmentsCache } from '@/lib/cacheInvalidation'
+
+// Helper function to update developer's total_developments count
+async function updateDeveloperTotalDevelopments(developerIdFromRequest) {
+  try {
+    // Get developer record by developer_id (which matches the developer_id in developments table)
+    const { data: developer, error: devError } = await supabaseAdmin
+      .from('developers')
+      .select('id, developer_id')
+      .eq('developer_id', developerIdFromRequest)
+      .single()
+
+    if (devError || !developer) {
+      console.error('Error fetching developer for total_developments update:', devError)
+      return
+    }
+
+    // Count developments where developer_id matches the developer_id from request
+    // Note: developments.developer_id stores developers.developer_id (not developers.id)
+    const { count: totalDevelopmentsCount, error: countError } = await supabaseAdmin
+      .from('developments')
+      .select('*', { count: 'exact', head: true })
+      .eq('developer_id', developerIdFromRequest)
+
+    if (countError) {
+      console.error('Error counting developments:', countError)
+      return
+    }
+
+    // Update developer's total_developments
+    const { error: updateError } = await supabaseAdmin
+      .from('developers')
+      .update({ total_developments: totalDevelopmentsCount || 0 })
+      .eq('id', developer.id)
+
+    if (updateError) {
+      console.error('Error updating developer total_developments:', updateError)
+    } else {
+      console.log('✅ Developer total_developments updated:', {
+        developer_id: developerIdFromRequest,
+        total_developments: totalDevelopmentsCount || 0
+      })
+    }
+  } catch (error) {
+    console.error('Error in updateDeveloperTotalDevelopments:', error)
+  }
+}
 
 // Cached function to fetch developments for a developer
 const getCachedDevelopments = cache(async (developerId) => {
@@ -19,11 +65,20 @@ const getCachedDevelopments = cache(async (developerId) => {
   return developments
 })
 
-// GET - Fetch all developments for a developer
+// GET - Fetch all developments for a developer (with optional filtering)
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const developerId = searchParams.get('developer_id')
+    
+    // Filter parameters
+    const search = searchParams.get('search')
+    const locationType = searchParams.get('location_type')
+    const locationValue = searchParams.get('location_value')
+    const purpose = searchParams.get('purpose')
+    const type = searchParams.get('type')
+    const category = searchParams.get('category')
+    const subType = searchParams.get('sub_type')
     
     if (!developerId) {
       return NextResponse.json(
@@ -44,37 +99,113 @@ export async function GET(request) {
     const token = authHeader.substring(7)
     const decoded = verifyToken(token)
     
-    console.log('GET Token verification debug:', {
-      developerId_from_request: developerId,
-      decoded_token: decoded ? {
-        id: decoded.id,
-        user_id: decoded.user_id,
-        developer_id: decoded.developer_id,
-        email: decoded.email,
-        user_type: decoded.user_type
-      } : null,
-      comparison: decoded ? {
-        'decoded.developer_id': decoded.developer_id,
-        'developerId_from_request': developerId,
-        'types_match': typeof decoded.developer_id === typeof developerId,
-        'values_match': decoded.developer_id === developerId
-      } : null
-    });
-    
     if (!decoded || decoded.developer_id !== developerId) {
-      console.log('GET Token verification failed:', {
-        decoded_exists: !!decoded,
-        developer_id_match: decoded ? decoded.developer_id === developerId : false
-      });
       return NextResponse.json(
         { error: 'Invalid or expired token' },
         { status: 401 }
       )
     }
 
-    // Use cached function to fetch developments
-    const developments = await getCachedDevelopments(developerId)
-    return NextResponse.json({ data: developments })
+    // Build query with filters
+    let query = supabase
+      .from('developments')
+      .select('*')
+      .eq('developer_id', developerId)
+
+    // Apply search filter
+    if (search) {
+      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%,city.ilike.%${search}%,country.ilike.%${search}%`)
+    }
+
+    // Apply location filter
+    if (locationType && locationValue) {
+      switch (locationType) {
+        case 'country':
+          query = query.eq('country', locationValue)
+          break
+        case 'state':
+          query = query.eq('state', locationValue)
+          break
+        case 'city':
+          query = query.eq('city', locationValue)
+          break
+        case 'town':
+          query = query.eq('town', locationValue)
+          break
+      }
+    }
+
+    // Order by created_at
+    query = query.order('created_at', { ascending: false })
+
+    const { data: developments, error } = await query
+
+    if (error) {
+      console.error('Error fetching developments:', error)
+      return NextResponse.json(
+        { error: 'Failed to fetch developments' },
+        { status: 500 }
+      )
+    }
+
+    // Filter by category IDs (stored as JSON arrays)
+    let filtered = developments || []
+    
+    if (purpose) {
+      filtered = filtered.filter(dev => {
+        try {
+          const purposes = typeof dev.purposes === 'string' 
+            ? JSON.parse(dev.purposes) 
+            : dev.purposes || []
+          return Array.isArray(purposes) && purposes.includes(purpose)
+        } catch (e) {
+          return false
+        }
+      })
+    }
+    
+    if (type) {
+      filtered = filtered.filter(dev => {
+        try {
+          const types = typeof dev.types === 'string' 
+            ? JSON.parse(dev.types) 
+            : dev.types || []
+          return Array.isArray(types) && types.includes(type)
+        } catch (e) {
+          return false
+        }
+      })
+    }
+    
+    if (category) {
+      filtered = filtered.filter(dev => {
+        try {
+          const categories = typeof dev.categories === 'string' 
+            ? JSON.parse(dev.categories) 
+            : dev.categories || []
+          return Array.isArray(categories) && categories.includes(category)
+        } catch (e) {
+          return false
+        }
+      })
+    }
+    
+    if (subType) {
+      filtered = filtered.filter(dev => {
+        try {
+          // Subtypes are stored in unit_types.database array
+          const unitTypes = typeof dev.unit_types === 'string' 
+            ? JSON.parse(dev.unit_types) 
+            : dev.unit_types || {}
+          const databaseSubtypes = unitTypes.database || []
+          return databaseSubtypes.some(st => st.id === subType)
+        } catch (e) {
+          return false
+        }
+      })
+    }
+
+    return NextResponse.json({ data: filtered })
 
   } catch (error) {
     console.error('Get developments error:', error)
@@ -161,6 +292,9 @@ export async function POST(request) {
 
     // Invalidate cache after successful creation
     invalidateDevelopmentsCache(developer_id)
+
+    // Update developer's total_developments count
+    await updateDeveloperTotalDevelopments(developer_id)
 
     return NextResponse.json({ 
       success: true, 

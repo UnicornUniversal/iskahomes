@@ -31,8 +31,8 @@ const SpecificationsStep = ({ formData, updateFormData, mode }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Specifications</h2>
-        <p className="text-sm text-gray-600">Enter the detailed specifications for your property</p>
+        <h2 className="">Specifications</h2>
+        <p className="">{mode === 'edit' ? 'Update the property specifications' : 'Enter the detailed specifications for your property'}</p>
       </div>
 
       <PropertySpecifications 

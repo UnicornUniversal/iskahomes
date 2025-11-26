@@ -47,7 +47,7 @@ const UnitCard = ({ unit, developerSlug }) => {
       case 'lease':
         return 'bg-purple-100 text-purple-800'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-gray-100 -800'
     }
   }
 
@@ -58,7 +58,7 @@ const UnitCard = ({ unit, developerSlug }) => {
       case 'rented out':
         return 'bg-red-100 text-red-800'
       case 'sold':
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-gray-100 -800'
       default:
         return 'bg-yellow-100 text-yellow-800'
     }
@@ -84,11 +84,11 @@ const UnitCard = ({ unit, developerSlug }) => {
 
   return (
     <div 
-      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer border border-gray-200"
+      className=" bg-white/70 backdrop-blur-sm   duration-300 cursor-pointer border border-gray-200"
       onClick={handleCardClick}
     >
       {/* Image Section */}
-      <div className="relative h-48 overflow-hidden rounded-t-lg">
+      <div className="relative h-48 text-primary_color overflow-hidden -t-lg">
         {coverImage ? (
           <img 
             src={coverImage} 
@@ -97,7 +97,7 @@ const UnitCard = ({ unit, developerSlug }) => {
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-            <div className="text-center text-gray-500">
+            <div className="text-center -500">
               <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
@@ -106,12 +106,12 @@ const UnitCard = ({ unit, developerSlug }) => {
           </div>
         )}
         <div className="absolute top-3 left-3">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPurposeColor(unit.pricing?.price_type || unit.price_type)}`}>
+          <span className={`px-2 py-1 -full text-xs font-medium ${getPurposeColor(unit.pricing?.price_type || unit.price_type)}`}>
             {unit.pricing?.price_type || unit.price_type || 'rent'}
           </span>
         </div>
         <div className="absolute top-3 right-3">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(unit.status)}`}>
+          <span className={`px-2 py-1 -full text-xs font-medium ${getStatusColor(unit.status)}`}>
             {unit.status}
           </span>
         </div>
@@ -121,28 +121,28 @@ const UnitCard = ({ unit, developerSlug }) => {
       <div className="p-4">
         {/* Unit Title */}
         <div className="mb-3">
-          <h3 className="font-semibold text-lg text-gray-900">{unit.title}</h3>
+          <h3 className="font-semibold text-lg -900">{unit.title}</h3>
         </div>
 
         {/* Location Info */}
         <div className="mb-2">
-          <div className="flex items-center text-sm text-gray-600 mb-1">
+          <div className="flex items-center text-sm -600 mb-1">
             <MapPin className="w-3 h-3 mr-1" />
             <span>{unit.city}, {unit.state}</span>
           </div>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs -500">
             {unit.town}
           </p>
         </div>
 
         {/* Price */}
         <div className="mb-3">
-          <p className="text-2xl font-bold text-gray-900">
+          <p className="text-2xl font-bold -900">
             {formatPrice(
               unit.pricing?.price || unit.price, 
               unit.pricing?.currency || unit.currency
             )}
-            <span className="text-sm font-normal text-gray-600 ml-1">
+            <span className="text-sm font-normal -600 ml-1">
               {(unit.pricing?.price_type || unit.price_type) === 'rent' 
                 ? `/${unit.pricing?.duration || unit.duration || 'month'}` 
                 : ''}
@@ -152,7 +152,7 @@ const UnitCard = ({ unit, developerSlug }) => {
 
         {/* Property Details */}
         {unit.specifications && (
-          <div className="flex items-center justify-between mb-3 text-sm text-gray-600">
+          <div className="flex items-center justify-between mb-3 text-sm -600">
             {unit.specifications.bedrooms && (
               <div className="flex items-center">
                 <Bed className="w-4 h-4 mr-1" />
@@ -194,13 +194,13 @@ const UnitCard = ({ unit, developerSlug }) => {
                   {allAmenities.slice(0, 3).map((amenity, index) => (
                     <span 
                       key={index}
-                      className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
+                      className="px-2 py-1 bg-gray-100 -700 text-xs -full"
                     >
                       {typeof amenity === 'string' ? amenity.replace(/-/g, ' ') : amenity}
                     </span>
                   ))}
                   {allAmenities.length > 3 && (
-                    <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
+                    <span className="px-2 py-1 bg-gray-100 -700 text-xs -full">
                       +{allAmenities.length - 3} more
                     </span>
                   )}
@@ -213,7 +213,7 @@ const UnitCard = ({ unit, developerSlug }) => {
 
         {/* Property Type */}
         {/* <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-500 capitalize">
+          <span className="text-xs -500 capitalize">
             {unit.listing_type} • {unit.property_status}
           </span>
         </div> */}
