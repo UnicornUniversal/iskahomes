@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Filters from '../components/users/Filters'
 import SearchProperties from '../components/users/SearchProperties'
@@ -19,8 +19,8 @@ const UserMap = dynamic(() => import('../components/users/UserMap'), {
   )
 })
 
-
-const page = () => {
+// Component that uses useSearchParams - needs to be wrapped in Suspense
+const ExplorePropertiesContent = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [filters, setFilters] = useState({});
@@ -197,6 +197,22 @@ const page = () => {
         </div>
       )}
     </div>
+  )
+}
+
+// Main page component with Suspense boundary
+const page = () => {
+  return (
+    <Suspense fallback={
+      <div className='w-full h-screen flex items-center justify-center'>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary_color mx-auto mb-2"></div>
+          <span className="text-primary_color">Loading...</span>
+        </div>
+      </div>
+    }>
+      <ExplorePropertiesContent />
+    </Suspense>
   )
 }
 
