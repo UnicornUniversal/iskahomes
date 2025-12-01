@@ -9,21 +9,25 @@ const Filters = ({ onChange, initial = {} }) => {
   const [selectedPurposeIds, setSelectedPurposeIds] = useState(initial.purposeIds || []);
   const [selectedTypeId, setSelectedTypeId] = useState(initial.typeId || "");
   const [selectedSubtypeIds, setSelectedSubtypeIds] = useState(initial.subtypeIds || []);
-  const [country, setCountry] = useState(initial.country || "");
+  // Default to Ghana only if no initial country provided
+  const [country, setCountry] = useState(initial.country !== undefined ? initial.country : "Ghana");
   const [state, setState] = useState(initial.state || "");
   const [city, setCity] = useState(initial.city || "");
   const [town, setTown] = useState(initial.town || "");
-  // Initialize location search from initial props (prioritize town > city > state > country)
-  const [locationSearch, setLocationSearch] = useState(
-    initial.town || initial.city || initial.state || initial.country || ""
+  // Location input - local state for typing, debounced to parent
+  const [locationInput, setLocationInput] = useState(
+    initial.town || initial.city || initial.state || initial.country || "Ghana"
   );
-  const [locationSearchResults, setLocationSearchResults] = useState([]);
-  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
-  const [priceMin, setPriceMin] = useState(initial.priceMin || "");
-  const [priceMax, setPriceMax] = useState(initial.priceMax || "");
+  // Use refs to store values without causing re-renders
+  const priceMinRef = useRef(initial.priceMin || "");
+  const priceMaxRef = useRef(initial.priceMax || "");
+  // Location input should be empty by default, even though country defaults to Ghana
+  const locationInputRef = useRef(initial.town || initial.city || initial.state || initial.country || "");
   const [bedrooms, setBedrooms] = useState(initial.bedrooms || "");
   const [bathrooms, setBathrooms] = useState(initial.bathrooms || "");
   const [specifications, setSpecifications] = useState(initial.specifications || {});
+  
+  // Location dropdown state - moved to LocationInput component to prevent parent re-renders
   
   // State for taxonomy data
   const [taxonomyData, setTaxonomyData] = useState({
@@ -33,6 +37,42 @@ const Filters = ({ onChange, initial = {} }) => {
     locations: { countries: [], states: [], cities: [], towns: [] }
   });
   const [loading, setLoading] = useState(true);
+
+  // Track if we've synced from initial props to avoid loops
+  const hasSyncedRef = useRef(false);
+  const lastInitialRef = useRef(JSON.stringify(initial));
+
+  // Sync with initial prop changes (when URL params load)
+  useEffect(() => {
+    const currentInitialStr = JSON.stringify(initial);
+    
+    // Only sync if initial has actually changed
+    if (currentInitialStr !== lastInitialRef.current) {
+      lastInitialRef.current = currentInitialStr;
+      
+      if (Array.isArray(initial.purposeIds)) setSelectedPurposeIds(initial.purposeIds);
+      if (initial.typeId !== undefined) setSelectedTypeId(initial.typeId || "");
+      if (Array.isArray(initial.subtypeIds)) setSelectedSubtypeIds(initial.subtypeIds);
+      // Only set country if it's explicitly provided, otherwise keep default
+      if (initial.country !== undefined) {
+        setCountry(initial.country || "Ghana");
+      }
+      if (initial.state !== undefined) setState(initial.state || "");
+      if (initial.city !== undefined) setCity(initial.city || "");
+      if (initial.town !== undefined) setTown(initial.town || "");
+      if (initial.bedrooms !== undefined) setBedrooms(initial.bedrooms || "");
+      if (initial.bathrooms !== undefined) setBathrooms(initial.bathrooms || "");
+      if (initial.specifications !== undefined) setSpecifications(initial.specifications || {});
+      if (initial.priceMin !== undefined) {
+        priceMinRef.current = initial.priceMin?.toString() || "";
+      }
+      if (initial.priceMax !== undefined) {
+        priceMaxRef.current = initial.priceMax?.toString() || "";
+      }
+      
+      hasSyncedRef.current = true;
+    }
+  }, [initial]);
 
   // Fetch taxonomy data on component mount
   useEffect(() => {
@@ -66,9 +106,62 @@ const Filters = ({ onChange, initial = {} }) => {
   }, [taxonomyData.subtypes, selectedTypeId]);
 
 
-  // Bubble up changes
+  // State for detected currency from listings
+  const [detectedCurrency, setDetectedCurrency] = useState("GHS"); // Default to GHS for Ghana
+
+  // Fetch currency from listings based on location
   useEffect(() => {
+    const fetchCurrency = async () => {
+      // Default to GHS for Ghana
+      if (!country || (!city && !state && !town)) {
+        setDetectedCurrency("GHS");
+        return;
+      }
+
+      // Only fetch if we have a specific location (not just default country)
+      if (country === "Ghana" && !state && !city && !town) {
+        setDetectedCurrency("GHS");
+        return;
+      }
+
+      try {
+        const params = new URLSearchParams();
+        if (country) params.append('country', country);
+        if (state) params.append('state', state);
+        if (city) params.append('city', city);
+        if (town) params.append('town', town);
+        params.append('limit', '1'); // Just need one listing to get currency
+
+        const response = await fetch(`/api/listings/search?${params.toString()}`);
+        if (response.ok) {
+          const result = await response.json();
+          if (result.data && result.data.length > 0) {
+            // Get currency from first listing - check both currency and currencyCode fields
+            const listing = result.data[0];
+            const currency = listing.currency || listing.currencyCode || "GHS";
+            setDetectedCurrency(currency);
+          } else {
+            // No listings found, default based on country
+            setDetectedCurrency(country === "Ghana" ? "GHS" : "GHS");
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching currency:', error);
+        setDetectedCurrency("GHS");
+      }
+    };
+
+    const timeoutId = setTimeout(fetchCurrency, 500);
+    return () => clearTimeout(timeoutId);
+  }, [country, state, city, town]);
+
+  // Debounce location input changes (only when user selects from dropdown or applies filters)
+  // This is handled by handleLocationSelect, not on every keystroke
+
+  // Apply filters function - only called when user clicks "Apply Filters"
+  const applyFilters = () => {
     if (typeof onChange === "function") {
+      // Get values from refs (for price) and state (for everything else)
       const filterData = {
         purposeIds: selectedPurposeIds,
         typeId: selectedTypeId,
@@ -77,16 +170,16 @@ const Filters = ({ onChange, initial = {} }) => {
         state,
         city,
         town,
-        priceMin: priceMin === "" ? undefined : Number(priceMin),
-        priceMax: priceMax === "" ? undefined : Number(priceMax),
+        priceMin: priceMinRef.current === "" ? undefined : Number(priceMinRef.current),
+        priceMax: priceMaxRef.current === "" ? undefined : Number(priceMaxRef.current),
         bedrooms: bedrooms === "" ? undefined : Number(bedrooms),
         bathrooms: bathrooms === "" ? undefined : Number(bathrooms),
         specifications
       };
-      console.log('📤 Filters onChange called with:', filterData);
+      console.log('📤 Filters applied:', filterData);
       onChange(filterData);
     }
-  }, [selectedPurposeIds, selectedTypeId, selectedSubtypeIds, country, state, city, town, priceMin, priceMax, bedrooms, bathrooms, specifications, onChange]);
+  };
 
   // Reset children when parent changes
   useEffect(() => {
@@ -96,116 +189,37 @@ const Filters = ({ onChange, initial = {} }) => {
 
   useEffect(() => {
     setSelectedSubtypeIds([]);
-    // Reset specifications when property type changes
-    setSpecifications({});
+    // Don't reset specifications when property type changes - allow users to keep their filters
+    // Only reset if user explicitly wants to change property type
+    // setSpecifications({});
   }, [selectedTypeId]);
 
-  // Keep location section open when typing
-  const [locationSectionOpen, setLocationSectionOpen] = useState(true);
 
 
-  // Sync location search display when location fields change externally
-  // This handles initial props but doesn't interfere with user typing
+  // Sync location input ref when location fields change externally
   useEffect(() => {
-    const currentDisplay = town || city || state || country || "";
-    // Only update if we have a location value and search is empty or different
-    // This prevents overwriting user input while they're typing
-    if (currentDisplay) {
-      if (!locationSearch || locationSearch !== currentDisplay) {
-        // Check if current search matches any result - if not, user might be typing
-        const matchesCurrent = locationSearchResults.some(r => r.value === currentDisplay);
-        if (!locationSearch || matchesCurrent) {
-          setLocationSearch(currentDisplay);
-        }
-      }
-    } else if (!currentDisplay && locationSearch && !showLocationDropdown) {
-      // Clear search only if dropdown is closed (user finished searching)
-      setLocationSearch("");
+    const currentDisplay = town || city || state || country || "Ghana";
+    // Only update if location input ref is empty or matches the current location
+    if (!locationInputRef.current || locationInputRef.current === currentDisplay) {
+      locationInputRef.current = currentDisplay;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [country, state, city, town]);
 
-  // Get location options from taxonomy data
-  const countryOptions = useMemo(() => taxonomyData.locations.countries || [], [taxonomyData.locations.countries]);
-  const stateOptions = useMemo(() => taxonomyData.locations.states || [], [taxonomyData.locations.states]);
-  const cityOptions = useMemo(() => taxonomyData.locations.cities || [], [taxonomyData.locations.cities]);
-  const townOptions = useMemo(() => taxonomyData.locations.towns || [], [taxonomyData.locations.towns]);
-
-  // Search locations using API
-  useEffect(() => {
-    if (!locationSearch.trim() || locationSearch.trim().length < 1) {
-      setLocationSearchResults([]);
-      if (locationSearch.trim().length === 0) {
-        setShowLocationDropdown(false);
-      }
-      return;
-    }
-
-    // Debounce the search
-    const timeoutId = setTimeout(async () => {
-      try {
-        const response = await fetch(`/api/locations/search?q=${encodeURIComponent(locationSearch.trim())}&limit=10`);
-        if (response.ok) {
-          const result = await response.json();
-          setLocationSearchResults(result.data || []);
-          setShowLocationDropdown((result.data || []).length > 0);
-        } else {
-          setLocationSearchResults([]);
-          setShowLocationDropdown(false);
-        }
-      } catch (error) {
-        console.error('Error searching locations:', error);
-        setLocationSearchResults([]);
-        setShowLocationDropdown(false);
-      }
-    }, 200); // 200ms debounce
-
-    return () => clearTimeout(timeoutId);
-  }, [locationSearch]);
-
-  // Handle location selection
-  const handleLocationSelect = (location) => {
-    // Clear all location fields first
-    setCountry("");
-    setState("");
-    setCity("");
-    setTown("");
-
-    // Set the appropriate field based on location type
-    switch (location.type) {
-      case 'country':
-        setCountry(location.value);
-        break;
-      case 'state':
-        setState(location.value);
-        break;
-      case 'city':
-        setCity(location.value);
-        break;
-      case 'town':
-        setTown(location.value);
-        break;
-    }
-
-    setLocationSearch(location.label);
-    setShowLocationDropdown(false);
-  };
 
   const handleClear = () => {
     setSelectedPurposeIds([]);
     setSelectedTypeId("");
     setSelectedSubtypeIds([]);
-    setLocationSearch("");
-    setCountry("");
+    locationInputRef.current = "Ghana";
+    setCountry("Ghana");
     setState("");
     setCity("");
     setTown("");
-    setPriceMin("");
-    setPriceMax("");
+    priceMinRef.current = "";
+    priceMaxRef.current = "";
     setBedrooms("");
     setBathrooms("");
     setSpecifications({});
-    setShowLocationDropdown(false);
   };
 
   const Select = ({ label, value, onChange, options, placeholder, disabled }) => {
@@ -272,19 +286,37 @@ const Filters = ({ onChange, initial = {} }) => {
     );
   };
 
-  const NumberInput = ({ label, value, onChange, placeholder, min = 0, step = 1, icon: Icon }) => {
-    const handleChange = (e) => {
-      // Prevent scroll to top when typing
-      const scrollContainer = e.target.closest('.overflow-y-auto');
-      const scrollTop = scrollContainer?.scrollTop || 0;
-      onChange(e.target.value);
-      // Restore scroll position after state update
+  const NumberInput = React.memo(({ label, valueRef, placeholder, min = 0, step = 1, icon: Icon }) => {
+    const inputRef = useRef(null);
+    // Use local state for display - completely isolated from parent
+    const [localValue, setLocalValue] = useState(valueRef?.current || "");
+
+    // Sync with ref value only when component mounts or ref changes externally
+    useEffect(() => {
+      if (valueRef?.current !== localValue && document.activeElement !== inputRef.current) {
+        setLocalValue(valueRef?.current || "");
+      }
+    }, [valueRef?.current]);
+
+    const handleChange = useCallback((e) => {
+      const newValue = e.target.value;
+      
+      // Update ref immediately (no re-render, no API calls)
+      if (valueRef) {
+        valueRef.current = newValue;
+      }
+      
+      // Update local display state (completely isolated - doesn't trigger parent re-render)
+      setLocalValue(newValue);
+      
+      // For number inputs, we can't use setSelectionRange, so just ensure focus
+      // The browser handles cursor position automatically for number inputs
       requestAnimationFrame(() => {
-        if (scrollContainer) {
-          scrollContainer.scrollTop = scrollTop;
+        if (inputRef.current && document.activeElement !== inputRef.current) {
+          inputRef.current.focus();
         }
       });
-    };
+    }, [valueRef]);
 
     return (
       <div className="w-full text-sm">
@@ -293,17 +325,18 @@ const Filters = ({ onChange, initial = {} }) => {
           {label}
         </label>
         <input
+          ref={inputRef}
           type="number"
           min={min}
           step={step}
-          value={value}
+          value={localValue}
           onChange={handleChange}
           placeholder={placeholder}
           className="w-full px-3 py-2 rounded-xl border text-primary_color bg-white outline-none border-primary_color/20 focus:border-primary_color focus:ring-2 focus:ring-secondary_color/30 text-sm"
         />
       </div>
     );
-  };
+  });
 
   const SpecificationSelect = ({ label, value, onChange, options, placeholder, icon: Icon }) => {
     const handleChange = (e) => {
@@ -339,19 +372,42 @@ const Filters = ({ onChange, initial = {} }) => {
     );
   };
 
-  const SpecificationTextInput = ({ label, value, onChange, placeholder, icon: Icon }) => {
-    const handleChange = (e) => {
-      // Prevent scroll to top when typing
-      const scrollContainer = e.target.closest('.overflow-y-auto');
-      const scrollTop = scrollContainer?.scrollTop || 0;
-      onChange(e.target.value);
-      // Restore scroll position after state update
+  const SpecificationTextInput = React.memo(({ label, value, onChange, placeholder, icon: Icon }) => {
+    const inputRef = useRef(null);
+    // Use local state for display - completely isolated from parent
+    const [localValue, setLocalValue] = useState(value || "");
+
+    // Sync with prop value only when component mounts or value changes externally
+    useEffect(() => {
+      if (value !== localValue && document.activeElement !== inputRef.current) {
+        setLocalValue(value || "");
+      }
+    }, [value]);
+
+    const handleChange = useCallback((e) => {
+      const newValue = e.target.value;
+      const cursorPosition = e.target.selectionStart;
+      
+      // Update local display state immediately (completely isolated - doesn't trigger parent re-render)
+      setLocalValue(newValue);
+      
+      // Update parent via onChange (but parent won't re-render Filters component)
+      if (onChange) {
+        onChange(newValue);
+      }
+      
+      // Restore cursor position for text inputs
       requestAnimationFrame(() => {
-        if (scrollContainer) {
-          scrollContainer.scrollTop = scrollTop;
+        if (inputRef.current) {
+          inputRef.current.focus();
+          const newPosition = Math.min(cursorPosition, newValue.length);
+          // Only use setSelectionRange for text inputs
+          if (inputRef.current.type === 'text') {
+            inputRef.current.setSelectionRange(newPosition, newPosition);
+          }
         }
       });
-    };
+    }, [onChange]);
 
     return (
       <div className="w-full text-sm">
@@ -360,57 +416,150 @@ const Filters = ({ onChange, initial = {} }) => {
           {label}
         </label>
         <input
+          ref={inputRef}
           type="text"
-          value={value || ""}
+          value={localValue}
           onChange={handleChange}
           placeholder={placeholder}
           className="w-full px-3 py-2 rounded-xl border text-primary_color bg-white outline-none border-primary_color/20 focus:border-primary_color focus:ring-2 focus:ring-secondary_color/30 text-sm"
         />
       </div>
     );
-  };
+  });
 
-  const LocationSearch = React.memo(({ onKeepSectionOpen }) => {
+  // Location search function - passed to LocationInput to avoid parent re-renders
+  const triggerLocationSearch = useCallback(async (searchValue) => {
+    if (!searchValue || searchValue.trim().length < 1) {
+      return [];
+    }
+
+    try {
+      const response = await fetch(`/api/locations/search?q=${encodeURIComponent(searchValue.trim())}&limit=10`);
+      if (response.ok) {
+        const result = await response.json();
+        return result.data || [];
+      } else {
+        return [];
+      }
+    } catch (error) {
+      console.error('Error searching locations:', error);
+      return [];
+    }
+  }, []);
+
+  // State to trigger LocationInput update when location is selected
+  const [locationDisplayKey, setLocationDisplayKey] = useState(0);
+
+  // Handle location selection
+  const handleLocationSelect = useCallback((location) => {
+    // Clear all location fields first
+    setCountry("");
+    setState("");
+    setCity("");
+    setTown("");
+
+    // Set the appropriate field based on location type
+    switch (location.type) {
+      case 'country':
+        setCountry(location.value);
+        locationInputRef.current = location.label;
+        break;
+      case 'state':
+        setState(location.value);
+        locationInputRef.current = location.label;
+        break;
+      case 'city':
+        setCity(location.value);
+        locationInputRef.current = location.label;
+        break;
+      case 'town':
+        setTown(location.value);
+            locationInputRef.current = location.label;
+        break;
+    }
+
+    // Trigger LocationInput to sync with ref (minimal re-render)
+    setLocationDisplayKey(prev => prev + 1);
+  }, []);
+
+  const LocationInput = React.memo(() => {
     const inputRef = useRef(null);
     const dropdownRef = useRef(null);
-    const isTypingRef = useRef(false);
+    const searchTimeoutRef = useRef(null);
+    // Use local state for display - completely isolated from parent
+    // Start empty - don't show default country in input
+    const [localDisplay, setLocalDisplay] = useState("");
+    // Move search results state here to prevent parent re-renders
+    const [locationSearchResults, setLocationSearchResults] = useState([]);
+    const [showLocationDropdown, setShowLocationDropdown] = useState(false);
 
+    // Sync with ref value when locationDisplayKey changes (when location is selected or cleared)
+    // Only update if input is not focused (to prevent focus loss while typing)
+    useEffect(() => {
+      if (document.activeElement !== inputRef.current) {
+        const refValue = locationInputRef.current || "";
+        if (refValue !== localDisplay) {
+          setLocalDisplay(refValue);
+        }
+      }
+    }, [locationDisplayKey]); // Sync when key changes (location selected or cleared)
+    
     const handleChange = useCallback((e) => {
       const newValue = e.target.value;
-      isTypingRef.current = true;
-      setLocationSearch(newValue);
-      // Ensure location section stays open
-      if (onKeepSectionOpen) {
-        onKeepSectionOpen(true);
+      const cursorPosition = e.target.selectionStart;
+      
+      // Update local display state immediately (completely isolated - doesn't trigger parent re-render)
+      setLocalDisplay(newValue);
+      
+      // Update ref immediately (no re-render, no API calls)
+      locationInputRef.current = newValue;
+      
+      // Debounce location search - only if there's a value
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
       }
-      // Keep focus on input - use requestAnimationFrame for better reliability
+      
+      if (newValue.trim().length > 0) {
+        searchTimeoutRef.current = setTimeout(async () => {
+          // Search and update results without causing parent re-render
+          const results = await triggerLocationSearch(newValue);
+          setLocationSearchResults(results);
+          setShowLocationDropdown(results.length > 0);
+          // Ensure input maintains focus after search completes
+          if (inputRef.current && document.activeElement !== inputRef.current) {
+            inputRef.current.focus();
+          }
+        }, 300);
+      } else {
+        // Clear results if input is empty
+        setLocationSearchResults([]);
+        setShowLocationDropdown(false);
+      }
+      
+      // Restore cursor position immediately for text inputs
       requestAnimationFrame(() => {
-        if (inputRef.current && document.activeElement !== inputRef.current) {
-          inputRef.current.focus();
-          // Set cursor to end of input
-          const len = inputRef.current.value.length;
-          inputRef.current.setSelectionRange(len, len);
+        if (inputRef.current && document.activeElement === inputRef.current) {
+          const newPosition = Math.min(cursorPosition, newValue.length);
+          // Only use setSelectionRange for text inputs
+          if (inputRef.current.type === 'text') {
+            try {
+              inputRef.current.setSelectionRange(newPosition, newPosition);
+            } catch (e) {
+              // Ignore errors if input is not focused
+            }
+          }
         }
-        setTimeout(() => {
-          isTypingRef.current = false;
-        }, 100);
       });
-    }, [onKeepSectionOpen]);
+    }, [triggerLocationSearch]);
 
     const handleFocus = useCallback(() => {
-      if (locationSearchResults.length > 0) {
-        setShowLocationDropdown(true);
-      }
-    }, [locationSearchResults.length]);
+      // Don't trigger search on focus - only when typing
+      // This prevents unnecessary API calls
+    }, []);
 
     const handleBlur = useCallback((e) => {
-      // Don't close if user is clicking dropdown
-      if (isTypingRef.current) {
-        return;
-      }
       setTimeout(() => {
-        // Check if focus moved to dropdown or if still typing
-        if (dropdownRef.current?.contains(document.activeElement) || isTypingRef.current) {
+        if (dropdownRef.current?.contains(document.activeElement)) {
           return; // Keep dropdown open
         }
         setShowLocationDropdown(false);
@@ -419,11 +568,10 @@ const Filters = ({ onChange, initial = {} }) => {
 
     const handleLocationClick = useCallback((result) => {
       handleLocationSelect(result);
-      setShowLocationDropdown(false);
       if (inputRef.current) {
         inputRef.current.blur();
       }
-    }, []);
+    }, [handleLocationSelect]);
 
     return (
       <div className="flex-1 min-w-[220px] text-sm relative">
@@ -432,19 +580,13 @@ const Filters = ({ onChange, initial = {} }) => {
           <input
             ref={inputRef}
             type="text"
-            value={locationSearch}
+            value={localDisplay}
             onChange={handleChange}
             onFocus={handleFocus}
             onBlur={handleBlur}
-            placeholder="Search by country, state, city, or town"
+            placeholder="Enter country, state, city, or town"
             className="w-full px-3 py-2 pr-10 rounded-xl border text-primary_color bg-white outline-none border-primary_color/20 focus:border-primary_color focus:ring-2 focus:ring-secondary_color/30 text-sm"
             autoComplete="off"
-            onKeyDown={(e) => {
-              // Prevent form submission or other default behaviors
-              if (e.key === 'Enter') {
-                e.preventDefault();
-              }
-            }}
           />
           <svg
             className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-primary_color/50 pointer-events-none"
@@ -459,7 +601,7 @@ const Filters = ({ onChange, initial = {} }) => {
               ref={dropdownRef}
               className="location-dropdown absolute z-[100] w-full mt-1 bg-white border border-primary_color/20 rounded-xl shadow-lg max-h-60 overflow-y-auto"
               onMouseDown={(e) => {
-                e.preventDefault(); // Prevent blur when clicking dropdown
+                e.preventDefault();
                 e.stopPropagation();
               }}
             >
@@ -492,11 +634,20 @@ const Filters = ({ onChange, initial = {} }) => {
     );
   });
 
-  const SectionCard = ({ title, children, defaultOpen = false, controlledOpen, onToggle }) => {
+  const SectionCard = React.memo(({ title, children, defaultOpen = false, controlledOpen, onToggle, onClear }) => {
+    // Use ref to persist state across re-renders
+    const internalOpenRef = useRef(defaultOpen);
     const [internalOpen, setInternalOpen] = useState(defaultOpen);
+    
+    // Sync ref when defaultOpen changes (but only on mount, not on every render)
+    useEffect(() => {
+      internalOpenRef.current = defaultOpen;
+      setInternalOpen(defaultOpen);
+    }, []); // Empty deps - only set on mount
+    
     const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
     
-    const handleToggle = (e) => {
+    const handleToggle = useCallback((e) => {
       e.preventDefault();
       e.stopPropagation();
       // Prevent scroll to top when clicking section header
@@ -506,7 +657,9 @@ const Filters = ({ onChange, initial = {} }) => {
       if (onToggle) {
         onToggle(!open);
       } else {
-        setInternalOpen(!open);
+        const newOpen = !internalOpenRef.current;
+        internalOpenRef.current = newOpen;
+        setInternalOpen(newOpen);
       }
       
       // Restore scroll position
@@ -515,23 +668,43 @@ const Filters = ({ onChange, initial = {} }) => {
           scrollContainer.scrollTop = scrollTop;
         });
       }
-    };
+    }, [open, onToggle]);
+
+    const handleClear = useCallback((e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (onClear) {
+        onClear();
+      }
+    }, [onClear]);
     
     return (
       <div className="w-full rounded-xl border border-primary_color/15 overflow-visible mb-3">
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={handleToggle}
-          className="bg-primary_color text-white px-3 py-2 text-xs font-semibold uppercase tracking-wide w-full flex items-center justify-between"
-        >
-          <span>{title}</span>
-          <span className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>⌃</span>
-        </button>
+        <div className="bg-primary_color text-white px-3 py-2 text-xs font-semibold uppercase tracking-wide w-full flex items-center justify-between">
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={handleToggle}
+            className="flex-1 flex items-center justify-between"
+          >
+            <span>{title}</span>
+            <span className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>⌃</span>
+          </button>
+          {onClear && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="text-xs hover:underline ml-2"
+              title="Clear this section"
+            >
+              Clear
+            </button>
+          )}
+        </div>
         <div className={`${open ? 'block' : 'hidden'} p-3 bg-white`}>{children}</div>
       </div>
     );
-  };
+  });
 
   // Component to render dynamic specification fields based on property type
   const SpecificationFields = ({ propertyTypeId, specifications, bedrooms, bathrooms, onSpecificationsChange, onBedroomsChange, onBathroomsChange }) => {
@@ -749,24 +922,55 @@ const Filters = ({ onChange, initial = {} }) => {
         <SectionCard 
           title="Location" 
           defaultOpen={true}
-          controlledOpen={locationSectionOpen}
-          onToggle={setLocationSectionOpen}
+          onClear={() => {
+            locationInputRef.current = "";
+            setCountry("Ghana"); // Keep default for filtering, but don't show in input
+            setState("");
+            setCity("");
+            setTown("");
+            // Trigger LocationInput to clear display
+            setLocationDisplayKey(prev => prev + 1);
+          }}
         >
           <div className="flex flex-col gap-3">
-            <LocationSearch onKeepSectionOpen={setLocationSectionOpen} />
+            <LocationInput />
           </div>
         </SectionCard>
 
-        <SectionCard title="Price (GHS)">
+        <SectionCard 
+          title={`Price (${detectedCurrency})`}
+          onClear={() => {
+            priceMinRef.current = "";
+            priceMaxRef.current = "";
+          }}
+        >
           <div className="flex w-full items-center gap-3">
-            <NumberInput label="Min" value={priceMin} onChange={setPriceMin} placeholder="0" min={0} />
-            <NumberInput label="Max" value={priceMax} onChange={setPriceMax} placeholder="Any" min={0} />
+            <NumberInput 
+              label="Min" 
+              valueRef={priceMinRef} 
+              placeholder="0" 
+              min={0} 
+            />
+            <NumberInput 
+              label="Max" 
+              valueRef={priceMaxRef} 
+              placeholder="Any" 
+              min={0} 
+            />
           </div>
         </SectionCard>
 
         {/* Dynamic Specifications based on Property Type */}
         {selectedTypeId ? (
-          <SectionCard title="Specifications" defaultOpen>
+          <SectionCard 
+            title="Specifications" 
+            defaultOpen
+            onClear={() => {
+              setSpecifications({});
+              setBedrooms("");
+              setBathrooms("");
+            }}
+          >
             <SpecificationFields
               propertyTypeId={selectedTypeId}
               specifications={specifications}
@@ -779,16 +983,14 @@ const Filters = ({ onChange, initial = {} }) => {
           </SectionCard>
         ) : (
           <SectionCard title="Specifications">
-            <div className="flex w-full items-center gap-3">
-              <NumberInput label="Bedrooms" value={bedrooms} onChange={setBedrooms} placeholder="Any" min={0} />
-              <NumberInput label="Bathrooms" value={bathrooms} onChange={setBathrooms} placeholder="Any" min={0} />
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-500 italic">Choose property type to select specifications</p>
             </div>
-            <p className="text-xs text-gray-500 mt-2 italic">Select a property type to see more specifications</p>
           </SectionCard>
         )}
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      {/* <div className="mt-6 flex flex-wrap items-center gap-3">
         {selectedPurposeIds.map(purposeId => (
           <span key={purposeId} className="px-3 py-1 rounded-full bg-primary_color/10 text-primary_color">
             {taxonomyData.purposes.find(p => p.id === purposeId)?.name}
@@ -809,8 +1011,8 @@ const Filters = ({ onChange, initial = {} }) => {
             {town || city || state || country}
           </span>
         )}
-        {(priceMin !== "" || priceMax !== "") && (
-          <span className="px-3 py-1 rounded-full bg-secondary_color/10 text-secondary_color">GHS {priceMin || 0} - {priceMax || 'Any'}</span>
+        {(priceMinRef.current !== "" || priceMaxRef.current !== "") && (
+          <span className="px-3 py-1 rounded-full bg-secondary_color/10 text-secondary_color">{detectedCurrency} {priceMinRef.current || 0} - {priceMaxRef.current || 'Any'}</span>
         )}
         {(bedrooms || bathrooms) && (
           <span className="px-3 py-1 rounded-full bg-primary_color/10 text-primary_color">{bedrooms ? `${bedrooms} BR` : ''} {bathrooms ? `${bathrooms} BA` : ''}</span>
@@ -833,6 +1035,17 @@ const Filters = ({ onChange, initial = {} }) => {
             </span>
           );
         })}
+      </div> */}
+
+      {/* Apply Filters Button */}
+      <div className="mt-6 sticky bottom-0 bg-white pt-4 border-t border-primary_color/10">
+        <button
+          type="button"
+          onClick={applyFilters}
+          className="w-full bg-primary_color text-white px-4 py-3 rounded-lg font-semibold hover:bg-primary_color/90 transition-colors"
+        >
+          Apply Filters
+        </button>
       </div>
     </div>
   );

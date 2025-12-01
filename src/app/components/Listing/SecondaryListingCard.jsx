@@ -7,7 +7,7 @@ import { useAnalytics } from '@/hooks/useAnalytics'
 import { toast } from 'react-toastify'
 import { getSpecificationDataByTypeId, getFieldDataByKey } from '@/app/components/Data/StaticData'
 
-const SecondaryListingCard = ({ listing, imageConfig = null }) => {
+const SecondaryListingCard = ({ listing, imageClasses = null }) => {
   const { trackPropertyView, trackListingImpression, trackSavedListing, trackShare } = useAnalytics()
 
   const {
@@ -214,42 +214,39 @@ const SecondaryListingCard = ({ listing, imageConfig = null }) => {
     toast.success('Link copied to clipboard!')
   }
 
-  // Get image classes from config or use default
-  // Extract only height classes from imageClasses, always use w-full for width
-  const getImageHeightClasses = () => {
-    if (!imageConfig?.imageClasses) return 'h-[220px] md:h-[240px] lg:h-[260px]'
+  // Extract height classes from imageClasses, always use w-full for width
+  const getImageClasses = () => {
+    if (!imageClasses) return 'w-full h-[220px] md:h-[240px] lg:h-[260px]'
     
     // Extract only height classes (h-*) from the imageClasses string
-    const classes = imageConfig.imageClasses.split(' ')
+    const classes = imageClasses.split(' ')
     const heightClasses = classes.filter(cls => cls.startsWith('h-'))
     
-    return heightClasses.length > 0 ? heightClasses.join(' ') : 'h-[220px] md:h-[240px] lg:h-[260px]'
+    // Always use w-full for width, combine with extracted height classes
+    return heightClasses.length > 0 
+      ? `w-full ${heightClasses.join(' ')}` 
+      : 'w-full h-[220px] md:h-[240px] lg:h-[260px]'
   }
-  
-  const imageHeightClasses = getImageHeightClasses()
-  const containerClasses = imageConfig?.containerClasses || 'w-full'
 
   return (
     <Link href={`/property/${listing_type}/${slug}/${id}`} onClick={handleCardClick} className="block">
-      <div className={` overflow-hidden hover:shadow-xl transition-all duration-300  transform hover:-translate-y-1 cursor-pointer group flex flex-col ${containerClasses}`}>
+      <div className="overflow-hidden transition-all mx-auto duration-300 transform hover:-translate-y-1 cursor-pointer group flex flex-col w-auto">
         {/* Image Section */}
-        <div className={`relative overflow-hidden w-full`}>
-          <div className={`w-full ${imageHeightClasses}`}>
-            {mainImage ? (
-              <img
-                src={mainImage}
-                alt={title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }}
-              />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center" style={{ width: '100%', height: '100%', minHeight: '200px' }}>
-                <div className="text-white text-2xl font-bold">
-                  {title?.charAt(0) || 'P'}
-                </div>
+        <div className={`relative overflow-hidden ${getImageClasses()}`}>
+          {mainImage ? (
+            <img
+              src={mainImage}
+              alt={title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }}
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center" style={{ width: '100%', height: '100%', minHeight: '200px' }}>
+              <div className="text-white text-2xl font-bold">
+                {title?.charAt(0) || 'P'}
               </div>
-            )}
-          </div>
+            </div>
+          )}
           
           {/* Badges */}
           <div className="absolute top-4 left-4 flex flex-col gap-2">
@@ -271,42 +268,42 @@ const SecondaryListingCard = ({ listing, imageConfig = null }) => {
           </div>
 
           {/* Action Buttons */}
-          <div className="absolute top-4 right-4 flex flex-col gap-2">
+          {/* <div className="absolute top-6 right-6 flex flex-col gap-2">
             <button
               onClick={handleSaveClick}
               className="bg-white/90 backdrop-blur-sm p-2 rounded-full hover:bg-white transition-colors"
               title="Save to favorites"
             >
-              <Heart className="w-4 h-4 text-gray-600 hover:text-red-500" />
+              <Heart className="w-4 h-4 text-primary_color hover:text-red-500" />
             </button>
             <button
               onClick={handleShareClick}
               className="bg-white/90 backdrop-blur-sm p-2 rounded-full hover:bg-white transition-colors"
               title="Share property"
             >
-              <Share2 className="w-4 h-4 text-gray-600 hover:text-blue-500" />
+              <Share2 className="w-4 h-4 text-primary_color hover:text-blue-500" />
             </button>
-          </div>
+          </div> */}
 
           {/* Price Badge and purpose */}
           <div className="absolute bottom-4 left-4 flex flex-col gap-2 items-start">
-        {purpose_name && (
-          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full whitespace-nowrap w-auto">
-            {purpose_name}
-          </span>
-        )}
-        <span className="text-sm bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full font-bold text-gray-900 w-auto">
-          {formatPrice(price, currency, price_type, duration)}
-        </span>
-      </div>
+            {purpose_name && (
+              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full whitespace-nowrap w-auto">
+                {purpose_name}
+              </span>
+            )}
+            <span className="text-sm bg-white/90 backdrop-blur-sm px-3 py-1  rounded-md font-bold text-primary_color w-auto">
+              {formatPrice(price, currency, price_type, duration)}
+            </span>
+          </div>
         </div>
 
         {/* Content Section */}
-        <div className="p-6">
+        <div className="mt-4">
           {/* Title and Location */}
           <div className="mb-4">
-            <div className="flex flex-col items-start justify-between mb-2">
-              <div className="flex flex-col gap-1 items-end">
+            <div className="flex flex-col items-start justify-between ">
+              <div className="flex flex-col gap-1 items-start">
               
                 {status && (
                   <span className={`px-2 py-1 text-xs font-medium rounded-full whitespace-nowrap ${
@@ -322,25 +319,25 @@ const SecondaryListingCard = ({ listing, imageConfig = null }) => {
                   </span>
                 )}
               </div>
-              <h3 className="text-xl font-bold text-gray-900 line-clamp-2 flex-1">
+              <h6 className=" font-medium line-clamp-2 flex-1">
                 {title}
-              </h3>
+              </h6>
             </div>
-            <div className="flex items-center text-gray-600 text-sm">
+            <div className="flex items-center text-primary_color text-sm">
               <MapPin className="w-4 h-4 mr-1" />
-              <span className="line-clamp-1">
+              <p className="line-clamp-1">
                 {city && state ? `${city}, ${state}` : country}
-              </span>
+              </p>
             </div>
           </div>
 
           {/* Description */}
-          {/* <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+          {/* <p className="text-primary_color text-sm mb-4 line-clamp-2">
             {description}
           </p> */}
 
           {/* Specifications */}
-          <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+          <div className="flex items-center justify-between text-sm text-primary_color mb-4">
             <div className="flex items-center space-x-4 flex-wrap gap-2">
               {specs.fields.map((field, index) => {
                 const IconComponent = field.icon

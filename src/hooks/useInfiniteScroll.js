@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
-const useInfiniteScroll = (initialData = [], searchTerm = '') => {
+const useInfiniteScroll = (initialData = [], searchTerm = '', locationTerm = '') => {
   const [developers, setDevelopers] = useState(initialData)
   const [loading, setLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [page, setPage] = useState(1)
   const [error, setError] = useState(null)
 
-  const fetchDevelopers = useCallback(async (pageNum = 1, search = '', reset = false) => {
+  const fetchDevelopers = useCallback(async (pageNum = 1, search = '', location = '', reset = false) => {
     try {
       setLoading(true)
       setError(null)
@@ -21,6 +21,10 @@ const useInfiniteScroll = (initialData = [], searchTerm = '') => {
 
       if (search) {
         params.append('search', search)
+      }
+
+      if (location) {
+        params.append('location', location)
       }
 
       const response = await fetch(`/api/developers?${params}`)
@@ -50,14 +54,14 @@ const useInfiniteScroll = (initialData = [], searchTerm = '') => {
 
   const loadMore = useCallback(() => {
     if (!loading && hasMore) {
-      fetchDevelopers(page + 1, searchTerm, false)
+      fetchDevelopers(page + 1, searchTerm, locationTerm, false)
     }
-  }, [loading, hasMore, page, searchTerm, fetchDevelopers])
+  }, [loading, hasMore, page, searchTerm, locationTerm, fetchDevelopers])
 
-  const search = useCallback((term) => {
+  const search = useCallback((term, location = '') => {
     setPage(1)
     setHasMore(true)
-    fetchDevelopers(1, term, true)
+    fetchDevelopers(1, term, location, true)
   }, [fetchDevelopers])
 
   const reset = useCallback(() => {
@@ -70,9 +74,9 @@ const useInfiniteScroll = (initialData = [], searchTerm = '') => {
   useEffect(() => {
     // Initial load
     if (developers.length === 0) {
-      fetchDevelopers(1, searchTerm, true)
+      fetchDevelopers(1, searchTerm, locationTerm, true)
     }
-  }, [fetchDevelopers, searchTerm, developers.length])
+  }, [fetchDevelopers, searchTerm, locationTerm, developers.length])
 
   return {
     developers,

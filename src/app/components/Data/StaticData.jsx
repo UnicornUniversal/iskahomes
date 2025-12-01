@@ -758,6 +758,8 @@ export const dynamicImages = [
 
 
 
+
+
 export const listings=[
   {
     "id": "bb77d569-2a5d-4ae9-a549-5bc6ce7735d0",
@@ -3412,5 +3414,32 @@ It is a long established fact that a reader will be distracted by the readable c
     "leads_breakdown": {}
   }
 ]
+
+
+export const dynamic_images = [
+  {
+    id: 1,
+    imageClasses: 'p w-full h-[20em]  mx-auto lg:w-[30em] lg:h-[30em] break-inside-avoid  ',
+  },
+  {
+    id: 2,
+    imageClasses: 'p w-full h-[30em] mx-auto md:w-[25em] md:h-[20em] break-inside-avoid  ',
+  },
+  {
+    id: 3,
+    imageClasses: 'p w-full h-[25em] mx-auto md:w-[25em] md:h-[15em] break-inside-avoid  ',
+  },
+  {
+    id: 4,
+    imageClasses: 'p w-full h-[15em] mx-auto md:w-[20em] md:h-[20em] break-inside-avoid ',
+  }
+]
 export default propertySpecificationsData;
+
+
+
+
+
+
+
 

@@ -2,7 +2,7 @@
 
 import React from 'react'
 import SecondaryListingCard from './SecondaryListingCard'
-import { dynamicImages } from '@/app/components/Data/StaticData'
+import { dynamic_images } from '@/app/components/Data/StaticData'
 
 const ListingList = ({ listings = [], loading = false, error = null }) => {
   if (loading) {
@@ -45,20 +45,19 @@ const ListingList = ({ listings = [], loading = false, error = null }) => {
 
   return (
     <div className="w-full">
-      <div className="md:columns-2 lg:columns-3 md:gap-4">
+      <div className="flex flex-col md:flex-row flex-wrap gap-4 justify-center lg:justify-between items-center  xl:columns-3 w-full">
         {listings.map((listing, index) => {
-          // Randomly select one of the 5 image size configurations
-          const randomIndex = Math.floor(Math.random() * dynamicImages.length)
-          const imageConfig = dynamicImages[randomIndex]
+          const randomIndex = Math.floor(Math.random() * dynamic_images.length)
+          const imageClasses = dynamic_images[randomIndex].imageClasses
           
           return (
             <div 
               key={listing.id || index} 
-              className={`${index % 2 === 0 ? 'md:col-span-2' : 'md:col-span-1'} break-inside-avoid mb-4`}
+              className=""
             >
               <SecondaryListingCard 
                 listing={listing} 
-                // imageConfig={imageConfig}
+                imageClasses={imageClasses}
               />
             </div>
           )

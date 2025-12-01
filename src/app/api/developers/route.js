@@ -7,19 +7,27 @@ export async function GET(request) {
     const page = parseInt(searchParams.get('page')) || 1
     const limit = parseInt(searchParams.get('limit')) || 10
     const search = searchParams.get('search') || ''
+    const location = searchParams.get('location') || ''
     const featured = searchParams.get('featured') === 'true'
     const offset = (page - 1) * limit
 
     // Build query for developers only
     // Only show developers with active or approved account status
+    // Only fetch necessary fields for the card display
     let query = supabase
       .from('developers')
       .select(`
         name,
         slug,
         cover_image,
+        profile_image,
+        company_locations,
+        city,
+        region,
+        country,
         total_units,
-        total_developments
+        total_developments,
+        account_status
       `)
       .in('account_status', ['active', 'approved'])
       .order('created_at', { ascending: false })
@@ -29,9 +37,14 @@ export async function GET(request) {
       query = query.not('cover_image', 'is', null)
     }
 
-    // Apply search filter if provided
+    // Apply search filter if provided (name search)
     if (search) {
       query = query.ilike('name', `%${search}%`)
+    }
+
+    // Apply location filter if provided (searches city, region, country, and company_locations)
+    if (location) {
+      query = query.or(`city.ilike.%${location}%,region.ilike.%${location}%,country.ilike.%${location}%`)
     }
 
     // Apply pagination
@@ -55,6 +68,10 @@ export async function GET(request) {
 
     if (search) {
       countQuery = countQuery.ilike('name', `%${search}%`)
+    }
+
+    if (location) {
+      countQuery = countQuery.or(`city.ilike.%${location}%,region.ilike.%${location}%,country.ilike.%${location}%`)
     }
 
     const { count: totalCount } = await countQuery

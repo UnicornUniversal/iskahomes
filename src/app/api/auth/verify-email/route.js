@@ -84,15 +84,27 @@ export async function POST(request) {
     }
 
     if (tableName) {
+      // Build update data based on table type
+      const updateData = {
+        is_verified: true,
+        email_verified_at: new Date().toISOString(),
+        is_active: true
+      }
+      
+      // Use account_status for developers, status for others
+      if (tableName === 'developers') {
+        updateData.account_status = 'active'
+      } else {
+        updateData.status = 'active'
+      }
+      
+      // Use developer_id for developers, user_id for others
+      const idField = tableName === 'developers' ? 'developer_id' : 'user_id'
+      
       const { error: profileUpdateError } = await supabaseAdmin
         .from(tableName)
-        .update({
-          is_verified: true,
-          email_verified_at: new Date().toISOString(),
-          status: 'active', // Change from 'pending' to 'active'
-          is_active: true
-        })
-        .eq('user_id', user.id)
+        .update(updateData)
+        .eq(idField, user.id)
 
       if (profileUpdateError) {
         console.error('Error updating profile:', profileUpdateError)

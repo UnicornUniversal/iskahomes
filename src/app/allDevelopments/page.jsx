@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { MapPin, Building2, Calendar, Search, Filter, ArrowRight } from 'lucide-react'
-
+import Nav from '@/app/components/Nav'
 const AllDevelopmentsPage = () => {
   const [developments, setDevelopments] = useState([])
   const [loading, setLoading] = useState(true)
@@ -111,6 +111,8 @@ const AllDevelopmentsPage = () => {
   }
 
   return (
+    <>
+    <Nav />
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-20">
@@ -357,6 +359,7 @@ const AllDevelopmentsPage = () => {
         )}
       </div>
     </div>
+    </>
   )
 }
 

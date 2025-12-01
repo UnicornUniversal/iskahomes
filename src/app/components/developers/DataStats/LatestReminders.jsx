@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { FiCalendar, FiClock, FiAlertCircle, FiCheckCircle, FiXCircle, FiUser, FiMapPin, FiImage } from 'react-icons/fi'
 import { useAuth } from '@/contexts/AuthContext'
 
 const LatestReminders = ({ limit = 10 }) => {
@@ -47,245 +46,148 @@ const LatestReminders = ({ limit = 10 }) => {
     }
   }
 
-  // Format date for display
-  const formatDate = (dateStr) => {
-    if (!dateStr) return 'No date'
+  // Format date as "3 - 12 - 2024"
+  const formatDate = (dateString) => {
+    if (!dateString) return ''
+    const date = new Date(dateString)
+    const day = date.getDate()
+    const month = date.getMonth() + 1
+    const year = date.getFullYear()
+    return `${day} - ${month} - ${year}`
+  }
+
+  // Format time as "10:00 PM"
+  const formatTime = (timeString) => {
+    if (!timeString) return null
     try {
-      const date = new Date(dateStr)
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      })
+      const [hours, minutes] = timeString.split(':')
+      const hour = parseInt(hours)
+      const ampm = hour >= 12 ? 'PM' : 'AM'
+      const displayHour = hour % 12 || 12
+      return `${displayHour}:${minutes.padStart(2, '0')} ${ampm}`
     } catch (e) {
-      return dateStr
+      return null
     }
   }
 
-  // Format time for display
-  const formatTime = (timeStr) => {
-    if (!timeStr) return null
-    try {
-      const [hours, minutes] = timeStr.split(':')
-      const date = new Date()
-      date.setHours(parseInt(hours), parseInt(minutes))
-      return date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      })
-    } catch (e) {
-      return timeStr
-    }
+  // Get status text
+  const getStatusText = (reminder) => {
+    if (reminder.status === 'completed') return 'Completed'
+    if (reminder.status === 'cancelled') return 'Cancelled'
+    if (reminder.is_overdue) return 'Overdue'
+    return 'Uncompleted'
   }
 
-  // Get priority color
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'urgent':
-        return 'bg-red-100 border-red-200'
-      case 'high':
-        return 'bg-orange-100 border-orange-200'
-      case 'normal':
-        return 'bg-blue-100 border-blue-200'
-      case 'low':
-        return 'bg-gray-100 border-gray-200'
-      default:
-        return 'bg-gray-100 border-gray-200'
-    }
-  }
-
-  // Get listing image
-  const getListingImage = (listing) => {
-    if (!listing) return null
+  // Get property title with size
+  const getPropertyTitle = (reminder) => {
+    if (!reminder.listing) return null
+    const title = reminder.listing.title || ''
     
-    // Check for images array
-    if (listing.images && Array.isArray(listing.images) && listing.images.length > 0) {
-      // If images is array of strings (URLs)
-      if (typeof listing.images[0] === 'string') {
-        return listing.images[0]
-      }
-      // If images is array of objects with url property
-      if (listing.images[0]?.url) {
-        return listing.images[0].url
-      }
+    // Try to get bedrooms from specifications
+    let bedrooms = null
+    if (reminder.listing.specifications) {
+      const specs = typeof reminder.listing.specifications === 'string' 
+        ? JSON.parse(reminder.listing.specifications) 
+        : reminder.listing.specifications
+      bedrooms = specs?.bedrooms || specs?.number_of_bedrooms || specs?.bedroom
     }
     
-    return null
+    // Fallback to size field
+    const size = bedrooms || reminder.listing.size
+    
+    if (size) {
+      // Format: "3 Bedroom" or just the size value
+      const bedroomText = typeof size === 'number' ? `${size} Bedroom${size > 1 ? 's' : ''}` : size
+      return `${bedroomText} ${title}`.trim()
+    }
+    return title
   }
 
-  if (loading) {
-    return (
-      <div className=" rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-          <span className="ml-2">Loading reminders...</span>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className=" rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="text-center py-8">
-          <p>{error}</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (reminders.length === 0) {
-    return (
-      <div className=" rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold mb-4">Latest Reminders</h3>
-        <div className="text-center py-8">
-          <FiCalendar className="w-12 h-12 mx-auto mb-3" />
-          <p>No reminders found</p>
-        </div>
-      </div>
-    )
+  // Get location string
+  const getLocation = (reminder) => {
+    if (!reminder.listing) return null
+    const { town, city, state, country } = reminder.listing
+    const parts = [town, city, state, country].filter(Boolean)
+    return parts.length > 0 ? parts.join(', ') : null
   }
 
   return (
-    <div className=" rounded-lg shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Latest Reminders</h3>
-        <span className="text-sm">{reminders.length} reminder{reminders.length !== 1 ? 's' : ''}</span>
+    <div className="w-full space-y-4 text-primary_color secondary_bg !p-[1em] ">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-secondary_color-900">Latest Reminders</h3>
+        <div className="text-sm text-secondary_color-500">
+          Total: <span className="font-medium text-secondary_color-900">{reminders.length}</span>
+        </div>
       </div>
 
-      <div className="space-y-4">
-        {reminders.map((reminder) => {
-          const reminderDate = new Date(reminder.reminder_date)
-          const now = new Date()
-          const isToday = reminderDate.toDateString() === now.toDateString()
-          const isTomorrow = reminderDate.toDateString() === new Date(now.getTime() + 24 * 60 * 60 * 1000).toDateString()
-          const listingImage = getListingImage(reminder.listing)
-
-          return (
-            <div
-              key={reminder.id}
-              className={`rounded-lg border overflow-hidden ${
-                reminder.is_overdue
-                  ? 'bg-red-50 border-red-200'
-                  : isToday
-                  ? 'bg-yellow-50 border-yellow-200'
-                  : ' border-gray-200'
-              } hover:shadow-md transition-shadow`}
-            >
-              {/* Listing Info at Top */}
-              {reminder.listing && (
-                <div className=" border-b border-gray-200">
-                  <div className="flex gap-4 p-4">
-                    {/* Listing Image */}
-                    <div className="flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-gray-100">
-                      {listingImage ? (
-                        <img
-                          src={listingImage}
-                          alt={reminder.listing.title || 'Listing'}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                          <FiImage className="w-8 h-8 text-white opacity-70" />
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Listing Details */}
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold mb-1 line-clamp-1">
-                        {reminder.listing.title || 'Listing'}
-                      </h4>
-                      {reminder.listing.location && (
-                        <div className="flex items-center gap-1 text-sm mb-1">
-                          <FiMapPin className="w-4 h-4 flex-shrink-0" />
-                          <span className="truncate">{reminder.listing.location}</span>
-                        </div>
-                      )}
-                      {reminder.listing.property_type && (
-                        <span className="inline-block text-xs bg-gray-100 px-2 py-0.5 rounded">
-                          {reminder.listing.property_type}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+      {/* Swiper Container */}
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          <span className="ml-2 text-secondary_color-600">Loading reminders...</span>
+        </div>
+      ) : error ? (
+        <div className="text-center py-8 text-secondary_color-500 text-sm">
+          {error}
+        </div>
+      ) : reminders.length > 0 ? (
+        <div className="flex flex-col gap-4">
+          {reminders.map((reminder) => (
+            <div key={reminder.id} className="default_bg rounded-lg max-w-full border border-white/50 p-4 flex flex-col">
+              {/* Date and Time and Status */}
+              <div className="mb-3 flex items-center justify-between">
+                <div className="text-sm font-medium text-secondary_color-900 mb-1">
+                  {formatDate(reminder.reminder_date)}
                 </div>
-              )}
-
-              {/* Reminder Details Below */}
-              <div className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    {/* Reminder Text */}
-                    <p className="text-sm font-medium mb-3">{reminder.note_text}</p>
-
-                    {/* Date and Time */}
-                    <div className="flex items-center gap-4 text-xs mb-3">
-                      <div className="flex items-center gap-1">
-                        <FiCalendar className="w-3 h-3" />
-                        <span>
-                          {isToday
-                            ? 'Today'
-                            : isTomorrow
-                            ? 'Tomorrow'
-                            : formatDate(reminder.reminder_date)}
-                        </span>
-                      </div>
-                      {reminder.reminder_time && (
-                        <div className="flex items-center gap-1">
-                          <FiClock className="w-3 h-3" />
-                          <span>{formatTime(reminder.reminder_time)}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Lead Info */}
-                    {reminder.lead?.seeker_id && (
-                      <div className="flex items-center gap-1 text-xs mb-3">
-                        <FiUser className="w-3 h-3" />
-                        <span>Lead Score: {reminder.lead.lead_score || 0}</span>
-                      </div>
-                    )}
-
-                    {/* Priority and Status Badges */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${getPriorityColor(
-                          reminder.priority
-                        )}`}
-                      >
-                        {reminder.priority || 'normal'}
-                      </span>
-                      {reminder.is_overdue && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 border border-red-200">
-                          <FiAlertCircle className="w-3 h-3" />
-                          Overdue
-                        </span>
-                      )}
-                      {isToday && !reminder.is_overdue && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 border border-yellow-200">
-                          <FiClock className="w-3 h-3" />
-                          Today
-                        </span>
-                      )}
-                    </div>
+                {reminder.reminder_time && (
+                  <div className="text-sm text-secondary_color-600">
+                    {formatTime(reminder.reminder_time)}
                   </div>
+                )}
+
+                {/* Status */}
+                <div className="mb-3">
+                  <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
+                    reminder.status === 'completed' 
+                      ? 'bg-green-100 text-green-800' 
+                      : reminder.is_overdue 
+                        ? 'bg-red-100 text-red-800' 
+                        : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {getStatusText(reminder)}
+                  </span>
                 </div>
               </div>
-            </div>
-          )
-        })}
-      </div>
 
-      {reminders.length >= limit && (
-        <div className="mt-4 text-center">
-          <button
-            onClick={loadReminders}
-            className="text-sm font-medium"
-          >
-            Refresh
-          </button>
+              {/* Note */}
+              <div className="mb-4 flex-1">
+                <p className="text-xs text-secondary_color-500 mb-1">Note</p>
+                <p className="text-sm text-secondary_color-900 leading-relaxed">
+                  {reminder.note_text}
+                </p>
+              </div>
+
+              {/* Property Information */}
+              {reminder.listing && (
+                <div className="mt-auto pt-3 border-t border-white/30">
+                  {getPropertyTitle(reminder) && (
+                    <p className="text-sm font-medium text-secondary_color-900 mb-1">
+                      {getPropertyTitle(reminder)}
+                    </p>
+                  )}
+                  {getLocation(reminder) && (
+                    <p className="text-xs text-secondary_color-600">
+                      {getLocation(reminder)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-8 text-secondary_color-500 text-sm">
+          no reminders found
         </div>
       )}
     </div>

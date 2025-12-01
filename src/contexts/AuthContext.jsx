@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { verifyToken } from '@/lib/jwt';
 import { supabase } from '@/lib/supabase';
 import posthog from 'posthog-js';
+import { handleAuthFailure } from '@/lib/authFailureHandler';
 
 const AuthContext = createContext();
 
@@ -124,9 +125,43 @@ export const AuthProvider = ({ children }) => {
 
   const loadUser = async () => {
     try {
-      // Check for developer token first
+      // Check for all possible token types
       const developerTokenValue = localStorage.getItem('developer_token');
       const propertySeekerTokenValue = localStorage.getItem('property_seeker_token');
+      const agentTokenValue = localStorage.getItem('agent_token');
+      const adminTokenValue = localStorage.getItem('admin_token');
+      
+      // Also check for generic 'token' key and migrate it if found
+      const genericToken = localStorage.getItem('token');
+      if (genericToken && !developerTokenValue && !propertySeekerTokenValue && !agentTokenValue && !adminTokenValue) {
+        console.warn('Found generic "token" key, attempting to migrate...');
+        // Try to decode and determine type
+        const decoded = verifyToken(genericToken);
+        if (decoded) {
+          if (decoded.developer_id) {
+            localStorage.setItem('developer_token', genericToken);
+            localStorage.removeItem('token');
+          } else if (decoded.user_type === 'property_seeker') {
+            localStorage.setItem('property_seeker_token', genericToken);
+            localStorage.removeItem('token');
+          } else if (decoded.user_type === 'agent') {
+            localStorage.setItem('agent_token', genericToken);
+            localStorage.removeItem('token');
+          } else if (decoded.user_type === 'admin') {
+            localStorage.setItem('admin_token', genericToken);
+            localStorage.removeItem('token');
+          } else {
+            // Unknown token type, remove it
+            localStorage.removeItem('token');
+          }
+        } else {
+          // Invalid token, remove it
+          localStorage.removeItem('token');
+        }
+        // Reload after migration
+        window.location.reload();
+        return;
+      }
       
       if (developerTokenValue) {
         // Verify developer token
@@ -144,10 +179,16 @@ export const AuthProvider = ({ children }) => {
             .single();
 
           if (error) {
-            if (error.code === 'PGRST301' || error.message.includes('permission')) {
-              localStorage.removeItem('developer_token');
-              setDeveloperToken('');
+            // Auth failure - logout and redirect
+            console.error('Auth failure - Developer profile fetch error:', error);
+            localStorage.removeItem('developer_token');
+            setDeveloperToken('');
+            setUser(null);
+            // Handle auth failure (logout, clear storage, redirect)
+            if (typeof window !== 'undefined') {
+              handleAuthFailure('/signin');
             }
+            return;
           } else if (userData) {
             // Enrich stats with category names
             const enrichedProfile = await enrichDeveloperStats(userData);
@@ -159,12 +200,32 @@ export const AuthProvider = ({ children }) => {
               profile: enrichedProfile // Store enriched developer profile
             });
           } else {
+            // No user data found - auth failure
+            console.error('Auth failure - Developer profile not found');
             localStorage.removeItem('developer_token');
             setDeveloperToken('');
+            setUser(null);
+            if (typeof window !== 'undefined') {
+              if (handleAuthFailure) {
+                handleAuthFailure('/signin');
+              } else {
+                window.location.href = '/signin';
+              }
+            }
+            return;
           }
         } else {
+          // Invalid token - auth failure
+          console.error('Auth failure - Invalid developer token');
           localStorage.removeItem('developer_token');
           setDeveloperToken('');
+          setUser(null);
+          if (handleAuthFailure) {
+            handleAuthFailure('/signin');
+          } else {
+            window.location.href = '/signin';
+          }
+          return;
         }
       } else if (propertySeekerTokenValue) {
         // Verify property seeker token
@@ -182,10 +243,16 @@ export const AuthProvider = ({ children }) => {
             .single();
 
           if (error) {
-            if (error.code === 'PGRST301' || error.message.includes('permission')) {
-              localStorage.removeItem('property_seeker_token');
-              setPropertySeekerToken('');
+            // Auth failure - logout and redirect
+            console.error('Auth failure - Property seeker profile fetch error:', error);
+            localStorage.removeItem('property_seeker_token');
+            setPropertySeekerToken('');
+            setUser(null);
+            // Handle auth failure (logout, clear storage, redirect)
+            if (typeof window !== 'undefined') {
+              handleAuthFailure('/signin');
             }
+            return;
           } else if (userData) {
             console.log('🔍 Property Seeker Auth - User data:', userData)
             console.log('🔍 Property Seeker Auth - Token:', propertySeekerTokenValue)
@@ -202,20 +269,81 @@ export const AuthProvider = ({ children }) => {
               }
             });
           } else {
+            // No user data found - auth failure
+            console.error('Auth failure - Property seeker profile not found');
             localStorage.removeItem('property_seeker_token');
             setPropertySeekerToken('');
+            setUser(null);
+            if (typeof window !== 'undefined') {
+              if (handleAuthFailure) {
+                handleAuthFailure('/signin');
+              } else {
+                window.location.href = '/signin';
+              }
+            }
+            return;
           }
         } else {
+          // Invalid token - auth failure
+          console.error('Auth failure - Invalid property seeker token');
           localStorage.removeItem('property_seeker_token');
           setPropertySeekerToken('');
+          setUser(null);
+          if (handleAuthFailure) {
+            handleAuthFailure('/signin');
+          } else {
+            window.location.href = '/signin';
+          }
+          return;
+        }
+      } else {
+        // No token found at all - user is not authenticated
+        console.log('No authentication token found');
+        setUser(null);
+        setDeveloperToken('');
+        setPropertySeekerToken('');
+        
+        // Check if we're on a protected route
+        if (typeof window !== 'undefined') {
+          const path = window.location.pathname;
+          const protectedRoutes = ['/developer/', '/agents/', '/admin/', '/propertySeeker/', '/homeowner/', '/homeSeeker/'];
+          const isProtectedRoute = protectedRoutes.some(route => path.startsWith(route));
+          const isPublicRoute = path === '/signin' || path === '/signup' || path === '/' || path.startsWith('/property/');
+          
+          // Only redirect if on a protected route (don't redirect from public pages)
+          if (isProtectedRoute && !isPublicRoute) {
+            console.log('No token found on protected route, redirecting to signin');
+            handleAuthFailure('/signin');
+            return;
+          }
         }
       }
     } catch (error) {
+      console.error('Auth failure - Error loading user:', error);
       if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+        // Token error - clear everything and logout
         localStorage.removeItem('developer_token');
         localStorage.removeItem('property_seeker_token');
         setDeveloperToken('');
         setPropertySeekerToken('');
+        setUser(null);
+        if (handleAuthFailure) {
+          handleAuthFailure('/signin');
+        } else {
+          window.location.href = '/signin';
+        }
+      } else {
+        // Other errors - also logout for security
+        localStorage.removeItem('developer_token');
+        localStorage.removeItem('property_seeker_token');
+        setDeveloperToken('');
+        setPropertySeekerToken('');
+        setUser(null);
+        if (handleAuthFailure) {
+          handleAuthFailure('/signin');
+        } else {
+          window.location.href = '/signin';
+        }
       }
     } finally {
       setLoading(false);
@@ -245,6 +373,13 @@ export const AuthProvider = ({ children }) => {
         const data = await response.json();
         
         if (data.user && data.token) {
+          // Clear any old tokens first
+          localStorage.removeItem('token'); // Remove generic token if exists
+          localStorage.removeItem('developer_token');
+          localStorage.removeItem('property_seeker_token');
+          localStorage.removeItem('agent_token');
+          localStorage.removeItem('admin_token');
+          
           // Handle different user types
           if (data.user.user_type === 'developer') {
             // Store developer token
@@ -287,11 +422,46 @@ export const AuthProvider = ({ children }) => {
             });
             
             return { success: true, user: data.user };
+          } else if (data.user.user_type === 'agent') {
+            // Store agent token
+            localStorage.setItem('agent_token', data.token);
+            setUser(data.user);
+            
+            posthog.identify(data.user.id, {
+              email: data.user.email,
+              user_type: data.user.user_type,
+              name: data.user.profile?.name
+            });
+            
+            posthog.capture('user_logged_in', {
+              user_type: data.user.user_type,
+              login_method: 'email'
+            });
+            
+            return { success: true, user: data.user };
+          } else if (data.user.user_type === 'admin') {
+            // Store admin token
+            localStorage.setItem('admin_token', data.token);
+            setUser(data.user);
+            
+            posthog.identify(data.user.id, {
+              email: data.user.email,
+              user_type: data.user.user_type
+            });
+            
+            posthog.capture('user_logged_in', {
+              user_type: data.user.user_type,
+              login_method: 'email'
+            });
+            
+            return { success: true, user: data.user };
           } else {
             return { success: false, error: 'Invalid user type' };
           }
         } else {
-          return { success: false, error: 'Profile not found. Please contact support.' };
+          // No token returned - login failed
+          console.error('Login failed: No token in response');
+          return { success: false, error: 'Login failed: No authentication token received. Please try again.' };
         }
       } else {
         const errorData = await response.json();
@@ -327,8 +497,13 @@ export const AuthProvider = ({ children }) => {
       }
       
       // Clear client-side tokens and state
+      localStorage.removeItem('token'); // Remove generic token if exists
       localStorage.removeItem('developer_token');
       localStorage.removeItem('property_seeker_token');
+      localStorage.removeItem('agent_token');
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('homeowner_token');
+      localStorage.removeItem('homeseeker_token');
       setDeveloperToken('');
       setPropertySeekerToken('');
       setUser(null);
@@ -338,8 +513,13 @@ export const AuthProvider = ({ children }) => {
       console.error('Logout error:', error);
       
       // Even if there's an error, clear local state to prevent stuck sessions
+      localStorage.removeItem('token'); // Remove generic token if exists
       localStorage.removeItem('developer_token');
       localStorage.removeItem('property_seeker_token');
+      localStorage.removeItem('agent_token');
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('homeowner_token');
+      localStorage.removeItem('homeseeker_token');
       setDeveloperToken('');
       setPropertySeekerToken('');
       setUser(null);

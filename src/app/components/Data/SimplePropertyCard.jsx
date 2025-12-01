@@ -21,12 +21,15 @@ const SimplePropertyCard = (props) => {
       {/* Specifications */}
       {specifications.length > 0 && (
         <div className="flex items-center gap-4 flex-wrap mb-4">
-          {specifications.map((spec, idx) => (
-            <span key={idx} className="flex items-center gap-1.5 text-sm">
-              <span>{spec.emoji}</span>
-              <span>{spec.label}</span>
-            </span>
-          ))}
+          {specifications.map((spec, idx) => {
+            const IconComponent = spec.icon
+            return (
+              <span key={idx} className="flex items-center gap-1.5 text-sm">
+                {IconComponent && <IconComponent className="w-4 h-4" />}
+                <span>{spec.label}</span>
+              </span>
+            )
+          })}
         </div>
       )}
     </div>

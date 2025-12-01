@@ -36,18 +36,20 @@ export async function GET(request, { params }) {
         customer_care,
         account_status,
         slug,
-      
+        slogan,
+        company_gallery,
+        company_locations,
+        company_statistics,
         total_units,
         total_developments,
         specialization,
         company_size,
         founded_year,
-        
+        license_number,
         verified,
         state,
         latitude,
         longitude,
-      
         created_at
       `)
       .eq('slug', developerslug)
@@ -137,6 +139,10 @@ export async function GET(request, { params }) {
           customer_care: developer.customer_care,
           account_status: developer.account_status,
           slug: developer.slug,
+          slogan: developer.slogan,
+          company_gallery: developer.company_gallery,
+          company_locations: developer.company_locations,
+          company_statistics: developer.company_statistics,
           profile_completion_percentage: developer.profile_completion_percentage,
           total_units: developer.total_units,
           total_developments: developer.total_developments,

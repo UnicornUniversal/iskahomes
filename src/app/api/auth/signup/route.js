@@ -57,14 +57,29 @@ export async function POST(request) {
     try {
       switch (userType) {
         case 'developer':
+          // Generate slug from company name (matching signin pattern)
+          const slug = (userData.fullName || `developer-${newUser.id.slice(0, 8)}`)
+            .toLowerCase()
+            .replace(/\s+/g, '-')
+            .replace(/[^a-z0-9-]/g, '') // Remove special characters
+            .replace(/-+/g, '-') // Replace multiple dashes with single dash
+            .replace(/^-+|-+$/g, '') // Remove leading/trailing dashes
+          
           const developerProfile = {
-            user_id: newUser.id,
+            developer_id: newUser.id,
             name: userData.fullName || '',
             email: email,
             phone: userData.phone || '',
             website: userData.companyWebsite || '',
-            license: userData.registrationNumber || '',
-            status: 'active'
+            license_number: userData.registrationNumber || '',
+            account_status: 'active',
+            slug: slug,
+            profile_completion_percentage: 0,
+            total_units: 0,
+            total_developments: 0,
+            social_media: [],
+            customer_care: [],
+            registration_files: []
           }
           const { data: devData, error: devError } = await supabaseAdmin
             .from('developers')

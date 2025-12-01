@@ -65,19 +65,22 @@ const HomeProperties = () => {
     <div className='w-full h-full'>
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center justify-between w-full">
-          <h2 className="font md:text-[3em] w-full text-left text-primary_color">
+        <div className="flex  items-start justify-start w-full">
+          <h1 className="font md:text-[2em] max-w-4xl w-full text-left text-primary_color">
             Discover our main properties
-          </h2>
+          </h1>
+          {/* <p className="text-sm text-gray-500">
+            Discover our main properties and find your dream home
+          </p> */}
         </div>
       </div>
 
       {/* Sticky Filter */}
-      <div className="mb-6 sticky top-20 z-10 flex flex-col items-start">
+      {/* <div className="mb-6 sticky top-20 z-10 flex flex-col items-start">
         <div className="rounded-md p-4 inline-block">
           <Filter filters={filters} setFilters={setFilters} totalProperties={listings.length} />
         </div>
-      </div>
+      </div> */}
 
       {/* Properties List */}
       <ListingList listings={listings} loading={loading} error={error} />

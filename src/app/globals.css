@@ -448,6 +448,14 @@ padding: 10px;
   box-shadow: 0 2px 8px rgba(67, 97, 190, 0.08);
 }
 
+.auto-responsive-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 1rem;
+  justify-items: center;
+  align-items: start;
+  width: 100%;
+}
 
 .template_body_bg{
   background: linear-gradient(

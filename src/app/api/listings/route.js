@@ -767,8 +767,12 @@ export async function POST(request) {
     // Verify the token and get user info
     const decoded = verifyToken(token)
     if (!decoded || !decoded.user_id) {
+      // Auth failure - return response that will trigger client-side logout
       return NextResponse.json(
-        { error: 'Invalid token' },
+        { 
+          error: 'Invalid or expired token',
+          auth_failed: true // Flag to trigger logout on client
+        },
         { status: 401 }
       )
     }

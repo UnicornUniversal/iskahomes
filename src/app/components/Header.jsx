@@ -12,6 +12,8 @@ import 'swiper/css/pagination';
 import 'swiper/css/effect-fade';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
+import { Bed, Bath, Square } from 'lucide-react';
+import { getSpecificationDataByTypeId, getFieldDataByKey } from '@/app/components/Data/StaticData';
 
 const dummyImage = "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?q=80&w=735&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
 
@@ -111,64 +113,114 @@ const Header = () => {
               ? locationParts.join(', ') 
               : listing.full_address || 'Ghana'
 
-            // Extract and format specifications - get first 3 with appropriate emojis
+            // Extract and format specifications - get first 3 with icons from StaticData
             const getSpecifications = () => {
               if (!listing.specifications) return []
               
-              const specs = typeof listing.specifications === 'string' 
-                ? JSON.parse(listing.specifications) 
-                : listing.specifications
-              
-              const listingType = listing.listing_type || 'unit'
-              const specArray = []
-              
-              // Emoji mapping for different specification types
-              const specEmojiMap = {
-                bedrooms: { emoji: '🛏️', format: (v) => `${v} Bed${v > 1 ? 's' : ''}` },
-                bathrooms: { emoji: '🚿', format: (v) => `${v} Bath${v > 1 ? 's' : ''}` },
-                property_size: { emoji: '📐', format: (v) => `${v} ${listingType === 'unit' ? 'sq ft' : 'sq m'}` },
-                size: { emoji: '📐', format: (v) => `${v} ${listingType === 'unit' ? 'sq ft' : 'sq m'}` },
-                floor_level: { emoji: '🏢', format: (v) => `Floor ${v}` },
-                floors: { emoji: '🏢', format: (v) => `${v} Floor${v > 1 ? 's' : ''}` },
-                living_rooms: { emoji: '🛋️', format: (v) => `${v} Living Room${v > 1 ? 's' : ''}` },
-                kitchen: { emoji: '🍳', format: (v) => `${v} Kitchen${v > 1 ? 's' : ''}` },
-                furnishing: { emoji: '🪑', format: (v) => v.charAt(0).toUpperCase() + v.slice(1) },
-                property_age: { emoji: '🏗️', format: (v) => `${v} years` },
-                number_of_balconies: { emoji: '🏡', format: (v) => `${v} Balcony${v > 1 ? 'ies' : ''}` },
-                toilets: { emoji: '🚽', format: (v) => `${v} Toilet${v > 1 ? 's' : ''}` },
-                compound_type: { emoji: '🏘️', format: (v) => v.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) },
-                building_style: { emoji: '🏛️', format: (v) => v.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) },
-                property_condition: { emoji: '✅', format: (v) => v.charAt(0).toUpperCase() + v.slice(1) }
+              // Parse specifications JSON if it's a string
+              let parsedSpecs = {}
+              try {
+                parsedSpecs = typeof listing.specifications === 'string' 
+                  ? JSON.parse(listing.specifications) 
+                  : listing.specifications
+              } catch (e) {
+                console.error('Error parsing specifications:', e)
+                return []
               }
-              
-              // Priority order for specifications (first 3 will be selected)
-              const priorityOrder = [
-                'bedrooms', 'bathrooms', 'property_size', 'size', 
-                'floor_level', 'floors', 'living_rooms', 'kitchen',
-                'furnishing', 'number_of_balconies', 'toilets',
-                'property_age', 'compound_type', 'building_style', 'property_condition'
-              ]
-              
-              // Extract first 3 valid specifications
-              for (const key of priorityOrder) {
-                if (specArray.length >= 3) break
+
+              // Get property type ID from types array
+              let typeId = null
+              try {
+                const typesArray = typeof listing.types === 'string' 
+                  ? JSON.parse(listing.types) 
+                  : listing.types
+                if (Array.isArray(typesArray) && typesArray.length > 0) {
+                  typeId = typesArray[0]
+                }
+              } catch (e) {
+                console.error('Error parsing types:', e)
+              }
+
+              // Get specification fields from StaticData based on type ID
+              const specFields = typeId ? getSpecificationDataByTypeId(typeId) : null
+              const fieldsToShow = []
+
+              if (specFields && specFields.fields) {
+                // Get common fields that are likely to be displayed (first 3)
+                const commonFields = ['bedrooms', 'bathrooms', 'property_size', 'size', 'floor_level', 'living_rooms']
                 
-                const value = specs[key]
-                if (value !== null && value !== undefined && value !== '') {
-                  // Check if it's a number > 0 or a non-empty string
-                  if ((typeof value === 'number' && value > 0) || (typeof value === 'string' && value.trim() !== '')) {
-                    const emojiConfig = specEmojiMap[key]
-                    if (emojiConfig) {
-                      specArray.push({
-                        emoji: emojiConfig.emoji,
-                        label: emojiConfig.format(value)
-                      })
+                specFields.fields.forEach(field => {
+                  if (fieldsToShow.length >= 3) return
+                  
+                  if (commonFields.includes(field.key) && parsedSpecs[field.key] !== undefined && parsedSpecs[field.key] !== null) {
+                    const value = parsedSpecs[field.key]
+                    // Check if it's a number > 0 or a non-empty string
+                    if ((typeof value === 'number' && value > 0) || (typeof value === 'string' && value.trim() !== '')) {
+                      const fieldData = getFieldDataByKey(typeId, field.key)
+                      if (fieldData) {
+                        // Format the value based on field type
+                        const listingType = listing.listing_type || 'unit'
+                        let formattedLabel = ''
+                        if (field.type === 'number') {
+                          if (field.key === 'property_size' || field.key === 'size') {
+                            formattedLabel = `${value} ${listingType === 'unit' ? 'sq ft' : 'sq m'}`
+                          } else if (field.key === 'bedrooms') {
+                            formattedLabel = `${value} Bed${value > 1 ? 's' : ''}`
+                          } else if (field.key === 'bathrooms') {
+                            formattedLabel = `${value} Bath${value > 1 ? 's' : ''}`
+                          } else if (field.key === 'floor_level') {
+                            formattedLabel = `Floor ${value}`
+                          } else if (field.key === 'living_rooms') {
+                            formattedLabel = `${value} Living Room${value > 1 ? 's' : ''}`
+                          } else {
+                            formattedLabel = value.toString()
+                          }
+                        } else if (field.type === 'select' && fieldData.options) {
+                          const option = fieldData.options.find(opt => opt.value === value)
+                          formattedLabel = option ? option.label : value
+                        } else {
+                          formattedLabel = typeof value === 'string' 
+                            ? value.charAt(0).toUpperCase() + value.slice(1)
+                            : value.toString()
+                        }
+                        
+                        fieldsToShow.push({
+                          icon: field.icon,
+                          label: formattedLabel
+                        })
+                      }
                     }
+                  }
+                })
+              }
+
+              // Fallback to basic specs if no type-specific fields found
+              const listingType = listing.listing_type || 'unit'
+              if (fieldsToShow.length === 0) {
+                if (parsedSpecs.bedrooms !== undefined && parsedSpecs.bedrooms > 0) {
+                  fieldsToShow.push({
+                    icon: Bed,
+                    label: `${parsedSpecs.bedrooms} Bed${parsedSpecs.bedrooms > 1 ? 's' : ''}`
+                  })
+                }
+                if (fieldsToShow.length < 3 && parsedSpecs.bathrooms !== undefined && parsedSpecs.bathrooms > 0) {
+                  fieldsToShow.push({
+                    icon: Bath,
+                    label: `${parsedSpecs.bathrooms} Bath${parsedSpecs.bathrooms > 1 ? 's' : ''}`
+                  })
+                }
+                if (fieldsToShow.length < 3 && (parsedSpecs.property_size !== undefined || parsedSpecs.size !== undefined)) {
+                  const sizeValue = parsedSpecs.property_size || parsedSpecs.size
+                  if (sizeValue > 0) {
+                    fieldsToShow.push({
+                      icon: Square,
+                      label: `${sizeValue} ${listingType === 'unit' ? 'sq ft' : 'sq m'}`
+                    })
                   }
                 }
               }
               
-              return specArray
+              return fieldsToShow
             }
 
             const specifications = getSpecifications()
@@ -231,7 +283,7 @@ const Header = () => {
             <DataCard title="Happy Customers   " data="60K+" />
           </motion.div>
           <motion.div variants={itemVariants}>
-            <button>Explore Now</button>
+            <button className="secondary_button">Explore Now</button>
           </motion.div>
         </motion.div>
 

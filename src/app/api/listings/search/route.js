@@ -22,6 +22,8 @@ export async function GET(request) {
     const town = searchParams.get('town')
     const priceMin = searchParams.get('price_min')
     const priceMax = searchParams.get('price_max')
+    const bedrooms = searchParams.get('bedrooms')
+    const bathrooms = searchParams.get('bathrooms')
     const specificationsParam = searchParams.get('specifications') // JSON string of specifications object
     const page = parseInt(searchParams.get('page')) || 1
     const limit = parseInt(searchParams.get('limit')) || 15
@@ -132,6 +134,18 @@ export async function GET(request) {
     
     if (priceMax) {
       query = query.lte('price', parseFloat(priceMax))
+    }
+    
+    // Filter by bedrooms if provided (check both direct parameter and specifications)
+    if (bedrooms) {
+      const bedroomsValue = parseFloat(bedrooms)
+      query = query.gte('specifications->bedrooms', bedroomsValue)
+    }
+    
+    // Filter by bathrooms if provided (check both direct parameter and specifications)
+    if (bathrooms) {
+      const bathroomsValue = parseFloat(bathrooms)
+      query = query.gte('specifications->bathrooms', bathroomsValue)
     }
     
     // Filter by specifications object if provided

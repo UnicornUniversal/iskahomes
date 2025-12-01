@@ -10,6 +10,7 @@ import { useAnalytics } from '@/hooks/useAnalytics'
 import { useAuth } from '@/contexts/AuthContext'
 import ShareModal from '@/app/components/ui/ShareModal'
 import { toast } from 'react-toastify'
+import Nav from '@/app/components/Nav'  
 
 const DevelopmentPage = () => {
   const params = useParams()
@@ -23,6 +24,7 @@ const DevelopmentPage = () => {
   const [error, setError] = useState(null)
   const [activeImageIndex, setActiveImageIndex] = useState(0)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [isFavorite, setIsFavorite] = useState(false)
 
   useEffect(() => {
     const fetchDevelopment = async () => {
@@ -168,7 +170,7 @@ const DevelopmentPage = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="animate-spin -full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
     )
   }
@@ -200,64 +202,177 @@ const DevelopmentPage = () => {
     ...(development.media_files || [])
   ].filter(Boolean)
 
+  const handleFavoriteClick = () => {
+    // TODO: Implement favorite functionality for developments
+    setIsFavorite(!isFavorite)
+    toast.info('Favorite functionality coming soon')
+  }
+
   return (
-    <div className="min-h-screen bg-white">
-      {/* Hero Section - Banner Image Only */}
-      <div className="relative">
-        <div className="relative h-[70vh] min-h-[500px] overflow-hidden">
-          {development.banner ? (
-            <Image
-              src={development.banner.url}
-              alt={development.title}
-              fill
-              className="object-cover"
-              priority
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
-          )}
-          <div className="absolute inset-0 bg-black/20" />
+    <div className="min-h-screen text-primary_color">
+      <Nav />
+      {/* Hero Section - New Layout */}
+      <div className="">
+        <div className=" mx-auto px-6 py-4">
+          <div className="flex flex-col gap-2">
+            {/* Left Side - Content */}
+            <div className="flex flex-col gap-2">
+              {/* Title */}
+              <p>Weclome to </p>
+              <h1 className="text-5xl md:text-6xl font-light tracking-tight ">
+                {development.title} Development
+              </h1>
+
+              {/* Location, Status, and Actions */}
+              <div className="flex flex-wrap items-center justify-around  gap-4">
+                {/* Location */}
+                <div className="flex items-center space-x-2 ">
+                  <MapPin className="w-5 h-5" />
+                  <span className="text-sm">
+                    {development.town ? `${development.town}, ` : ''}
+                    {development.city}, {development.country}
+                  </span>
+                </div>
+
+                {/* Status Button */}
+                <button className="px-4 py-2 bg-primary_color rounded-full text-white -md text-sm transition-colors">
+                  {development.status}
+                </button>
+
+                {/* Action Icons */}
+                <div className="flex items-center space-x-3 ml-auto">
+                  <button
+                    onClick={handleFavoriteClick}
+                    className={`p-2 box_holder transition-colors ${
+                      isFavorite 
+                        ? 'text-red-500 hover:bg-red-50' 
+                        : ' hover:bg-slate-100'
+                    }`}
+                    aria-label="Add to favorites"
+                  >
+                    <Heart className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowShareModal(true)
+                      handleShareClick('modal')
+                    }}
+                    className="p-2 box_holder  hover:bg-slate-100 transition-colors"
+                    aria-label="Share development"
+                  >
+                    <Share2 className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Developer Info */}
+              {developer && (
+                <div className="flex items-start space-x-4 pt-4 ">
+                  {developer.profile_image ? (
+                    <Image
+                      src={developer.profile_image.url}
+                      alt={developer.name}
+                      width={64}
+                      height={64}
+                      className="-lg object-cover aspect-square rounded-md"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 bg-slate-200 -lg flex items-center justify-center flex-shrink-0">
+                      <Building2 className="w-8 h-8 " />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <p className="text-sm font-medium ">{developer.name}</p>
+                    <p className="text-sm  uppercase tracking-wider">Developer</p>
+                    {(developer.city || developer.region || developer.state || developer.country) && (
+                      <p className="text-sm  mt-1">
+                        {developer.city ? `${developer.city}, ` : ''}
+                        {developer.region || developer.state || ''}
+                        {developer.region || developer.state ? ', ' : ''}
+                        {developer.country}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Tagline Section */}
+              {/* {development.tagline && (
+                <div className="pt-8 border-t border-slate-200">
+                  <p className="text-sm  uppercase tracking-wider mb-2">--Tagline--</p>
+                  <p className="text-4xl md:text-5xl font-light tracking-tight ">
+                    {development.tagline}
+                  </p>
+                </div>
+              )} */}
+
+
+
+
+
+              
+            </div>
+
+
+          <div className="flex w-full ">
+          <div className="self-end top-0 right-0 ">
+              <p className="text-sm  uppercase tracking-wider mb-2">--Tagline--</p>
+              <p className="text-4xl md:text-5xl font-light tracking-tight ">
+                {development.tagline}
+              </p>
+            </div>
+
+            
+            {/* Right Side - Image and tagline */}
+            <div className="relative self-end h-[300px] md:w-2/3 lg:h-[700px] max-h-[350px] overflow-hidden">
+            
+            
+              {development.banner ? (
+                <Image
+                  src={development.banner.url}
+                  alt={development.title}
+                  fill
+                  className="object-cover"
+                  priority
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
+              )}
+            </div>
+          </div>
+
+            {/* tagline */}
           
-          {/* Status Badge */}
-          <div className="absolute top-6 right-6">
-            <span className="px-4 py-2 bg-white/90 backdrop-blur-sm text-slate-700 rounded-full text-sm font-medium">
-              {development.status}
-            </span>
+
+
+
+
           </div>
         </div>
       </div>
 
-      {/* Development Details - RIGHT UNDER BANNER */}
-      <div className="bg-white py-16">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-light tracking-tight text-slate-900 mb-6">
-              {development.title}
-            </h1>
-            <p className="text-xl text-slate-600 max-w-4xl mx-auto leading-relaxed mb-8">
+      {/* Development Details - Stats Section */}
+      <div className=" border-t border-slate-200">
+        <div className="max-w-7xl mx-auto px-6 py-12">
+          <div className="text-center mb-8">
+            <p className="text-xl  max-w-4xl mx-auto leading-relaxed">
               {development.description}
             </p>
-            
-            {/* Location */}
-            <div className="flex items-center justify-center space-x-4 text-slate-600 mb-8">
-              <MapPin className="w-5 h-5" />
-              <span className="text-lg">{development.city}, {development.country}</span>
-            </div>
+          </div>
 
-            {/* Key Stats */}
-            <div className="flex flex-wrap justify-center gap-12 text-slate-600 mb-12">
-              <div className="text-center">
-                <div className="text-3xl font-light text-slate-900">{development.number_of_buildings}</div>
-                <div className="text-sm uppercase tracking-wider">Buildings</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-light text-slate-900">{development.total_units}</div>
-                <div className="text-sm uppercase tracking-wider">Units</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-light text-slate-900">{development.size}</div>
-                <div className="text-sm uppercase tracking-wider">Size</div>
-              </div>
+          {/* Key Stats */}
+          <div className="flex flex-wrap justify-center gap-12 ">
+            <div className="text-center">
+              <div className="text-3xl font-light ">{development.number_of_buildings}</div>
+              <div className="text-sm uppercase tracking-wider">Buildings</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-light ">{development.total_units}</div>
+              <div className="text-sm uppercase tracking-wider">Units</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-light ">{development.size}</div>
+              <div className="text-sm uppercase tracking-wider">Size</div>
             </div>
           </div>
         </div>
@@ -271,10 +386,10 @@ const DevelopmentPage = () => {
             {/* Image Gallery */}
             {allImages.length > 0 && (
               <div>
-                <h2 className="text-2xl font-light text-slate-900 mb-6">Gallery</h2>
+                <h2 className="text-2xl font-light  mb-6">Gallery</h2>
                 <div className="space-y-4">
                   {/* Main Image */}
-                  <div className="relative h-96 rounded-2xl overflow-hidden">
+                  <div className="relative h-96 -2xl overflow-hidden">
                     <Image
                       src={allImages[activeImageIndex]?.url}
                       alt={development.title}
@@ -290,7 +405,7 @@ const DevelopmentPage = () => {
                         <button
                           key={index}
                           onClick={() => setActiveImageIndex(index)}
-                          className={`relative h-24 rounded-lg overflow-hidden ${
+                          className={`relative h-24 -lg overflow-hidden ${
                             activeImageIndex === index ? 'ring-2 ring-blue-500' : ''
                           }`}
                         >
@@ -310,30 +425,30 @@ const DevelopmentPage = () => {
 
             {/* Development Details */}
             <div>
-              <h2 className="text-2xl font-light text-slate-900 mb-6">Development Details</h2>
+              <h2 className="text-2xl font-light  mb-6">Development Details</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Status</h3>
-                    <p className="text-lg text-slate-900">{development.status}</p>
+                    <h3 className="text-sm font-medium  uppercase tracking-wider">Status</h3>
+                    <p className="text-lg ">{development.status}</p>
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Size</h3>
-                    <p className="text-lg text-slate-900">{development.size}</p>
+                    <h3 className="text-sm font-medium  uppercase tracking-wider">Size</h3>
+                    <p className="text-lg ">{development.size}</p>
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Buildings</h3>
-                    <p className="text-lg text-slate-900">{development.number_of_buildings}</p>
+                    <h3 className="text-sm font-medium  uppercase tracking-wider">Buildings</h3>
+                    <p className="text-lg ">{development.number_of_buildings}</p>
                   </div>
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Total Units</h3>
-                    <p className="text-lg text-slate-900">{development.total_units}</p>
+                    <h3 className="text-sm font-medium  uppercase tracking-wider">Total Units</h3>
+                    <p className="text-lg ">{development.total_units}</p>
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Location</h3>
-                    <p className="text-lg text-slate-900">{development.full_address || `${development.city}, ${development.country}`}</p>
+                    <h3 className="text-sm font-medium  uppercase tracking-wider">Location</h3>
+                    <p className="text-lg ">{development.full_address || `${development.city}, ${development.country}`}</p>
                   </div>
                 </div>
               </div>
@@ -342,14 +457,14 @@ const DevelopmentPage = () => {
             {/* Purposes & Types */}
             {(development.purposes?.length > 0 || development.types?.length > 0 || development.categories?.length > 0) && (
               <div>
-                <h2 className="text-2xl font-light text-slate-900 mb-6">Categories</h2>
+                <h2 className="text-2xl font-light  mb-6">Categories</h2>
                 <div className="space-y-6">
                   {development.purposes?.length > 0 && (
                     <div>
-                      <h3 className="text-lg font-medium text-slate-900 mb-3">Purposes</h3>
+                      <h3 className="text-lg font-medium  mb-3">Purposes</h3>
                       <div className="flex flex-wrap gap-2">
                         {development.purposes.map((purpose, index) => (
-                          <span key={index} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-full text-sm font-medium">
+                          <span key={index} className="px-4 py-2 bg-slate-100 text-slate-700 -full text-sm font-medium">
                             {typeof purpose === 'string' ? purpose : purpose.name}
                           </span>
                         ))}
@@ -359,10 +474,10 @@ const DevelopmentPage = () => {
                   
                   {development.types?.length > 0 && (
                     <div>
-                      <h3 className="text-lg font-medium text-slate-900 mb-3">Types</h3>
+                      <h3 className="text-lg font-medium  mb-3">Types</h3>
                       <div className="flex flex-wrap gap-2">
                         {development.types.map((type, index) => (
-                          <span key={index} className="px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                          <span key={index} className="px-4 py-2 bg-blue-100 text-blue-700 -full text-sm font-medium">
                             {typeof type === 'string' ? type : type.name}
                           </span>
                         ))}
@@ -372,10 +487,10 @@ const DevelopmentPage = () => {
                   
                   {development.categories?.length > 0 && (
                     <div>
-                      <h3 className="text-lg font-medium text-slate-900 mb-3">Categories</h3>
+                      <h3 className="text-lg font-medium  mb-3">Categories</h3>
                       <div className="flex flex-wrap gap-2">
                         {development.categories.map((category, index) => (
-                          <span key={index} className="px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                          <span key={index} className="px-4 py-2 bg-green-100 text-green-700 -full text-sm font-medium">
                             {typeof category === 'string' ? category : category.name}
                           </span>
                         ))}
@@ -389,13 +504,13 @@ const DevelopmentPage = () => {
             {/* Unit Types */}
             {development.unit_types?.database?.length > 0 && (
               <div>
-                <h2 className="text-2xl font-light text-slate-900 mb-6">Available Unit Types</h2>
+                <h2 className="text-2xl font-light  mb-6">Available Unit Types</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {development.unit_types.database.map((unitType, index) => (
-                    <div key={index} className="p-4 bg-slate-50 rounded-lg">
-                      <h3 className="font-medium text-slate-900">{unitType.name}</h3>
+                    <div key={index} className="p-4 bg-slate-50 -lg">
+                      <h3 className="font-medium ">{unitType.name}</h3>
                       {unitType.description && (
-                        <p className="text-sm text-slate-600 mt-1">{unitType.description}</p>
+                        <p className="text-sm  mt-1">{unitType.description}</p>
                       )}
                     </div>
                   ))}
@@ -404,10 +519,10 @@ const DevelopmentPage = () => {
             )}
 
             {/* Units/Listings - USING LISTING CARD COMPONENT */}
-            <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-8">
+            <div className="bg-gradient-to-br from-slate-50 to-slate-100 -2xl p-8">
               <div className="text-center mb-8">
-                <h2 className="text-3xl font-light text-slate-900 mb-4">Available Units</h2>
-                <p className="text-lg text-slate-600">
+                <h2 className="text-3xl font-light  mb-4">Available Units</h2>
+                <p className="text-lg ">
                   {units.length > 0 
                     ? `Explore ${units.length} unit${units.length !== 1 ? 's' : ''} available in this development`
                     : 'No units available yet'
@@ -426,8 +541,8 @@ const DevelopmentPage = () => {
               ) : (
                 <div className="text-center py-12">
                   <Building2 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-slate-900 mb-2">No Units Available Yet</h3>
-                  <p className="text-slate-500">Units will be added to this development soon.</p>
+                  <h3 className="text-lg font-medium  mb-2">No Units Available Yet</h3>
+                  <p className="">Units will be added to this development soon.</p>
                 </div>
               )}
             </div>
@@ -435,23 +550,23 @@ const DevelopmentPage = () => {
             {/* Supporting Files */}
             {development.additional_files && development.additional_files.length > 0 && (
               <div>
-                <h2 className="text-2xl font-light text-slate-900 mb-6">Supporting Documents</h2>
+                <h2 className="text-2xl font-light  mb-6">Supporting Documents</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {development.additional_files.map((file, index) => (
-                    <div key={index} className="bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg transition-shadow">
+                    <div key={index} className=" border border-slate-200 -2xl p-6 hover:shadow-lg transition-shadow">
                       <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                        <div className="w-12 h-12 bg-slate-100 -lg flex items-center justify-center">
                           {file.type?.includes('pdf') ? (
                             <ExternalLink className="w-6 h-6 text-red-600" />
                           ) : file.type?.includes('image') ? (
                             <Image className="w-6 h-6 text-blue-600" />
                           ) : (
-                            <ExternalLink className="w-6 h-6 text-slate-600" />
+                            <ExternalLink className="w-6 h-6 " />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-slate-900 truncate">{file.name || file.filename}</h3>
-                          <p className="text-sm text-slate-500">
+                          <h3 className="font-medium  truncate">{file.name || file.filename}</h3>
+                          <p className="text-sm ">
                             {file.type} • {file.size ? `${(file.size / 1024).toFixed(1)} KB` : 'Unknown size'}
                           </p>
                         </div>
@@ -460,7 +575,7 @@ const DevelopmentPage = () => {
                         href={file.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-4 w-full bg-slate-900 text-white py-2 px-4 rounded-lg hover:bg-slate-800 transition-colors duration-200 text-sm font-medium text-center block"
+                        className="mt-4 w-full bg-slate-900 text-white py-2 px-4 -lg hover:bg-slate-800 transition-colors duration-200 text-sm font-medium text-center block"
                       >
                         Download
                       </a>
@@ -473,8 +588,8 @@ const DevelopmentPage = () => {
             {/* Location Map */}
             {development.latitude && development.longitude && (
               <div>
-                <h2 className="text-2xl font-light text-slate-900 mb-6">Location</h2>
-                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                <h2 className="text-2xl font-light  mb-6">Location</h2>
+                <div className=" -2xl border border-slate-200 overflow-hidden">
                   <div className="h-96 w-full">
                     <iframe
                       src={`https://www.openstreetmap.org/export/embed.html?bbox=${development.longitude - 0.01},${development.latitude - 0.01},${development.longitude + 0.01},${development.latitude + 0.01}&layer=mapnik&marker=${development.latitude},${development.longitude}`}
@@ -493,10 +608,10 @@ const DevelopmentPage = () => {
 
             {/* Other Developments by Same Developer - PROMINENT DISPLAY */}
             {relatedDevelopments.length > 0 && (
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8">
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 -2xl p-8">
                 <div className="text-center mb-8">
-                  <h2 className="text-3xl font-light text-slate-900 mb-4">Other Developments by {developer?.name}</h2>
-                  <p className="text-lg text-slate-600">
+                  <h2 className="text-3xl font-light  mb-4">Other Developments by {developer?.name}</h2>
+                  <p className="text-lg ">
                     Explore more projects from this developer
                   </p>
                 </div>
@@ -509,7 +624,7 @@ const DevelopmentPage = () => {
                       onClick={() => handleRelatedDevelopmentClick(related)}
                     >
                       <div className="group cursor-pointer">
-                        <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 hover:shadow-xl transition-all duration-300">
+                        <div className="relative overflow-hidden -2xl  border border-slate-200 hover:shadow-xl transition-all duration-300">
                           {related.banner ? (
                             <div className="relative h-64 overflow-hidden">
                               <Image
@@ -519,7 +634,7 @@ const DevelopmentPage = () => {
                                 className="object-cover group-hover:scale-105 transition-transform duration-300"
                               />
                               <div className="absolute top-4 right-4">
-                                <span className="px-3 py-1 bg-white/90 backdrop-blur-sm text-slate-700 rounded-full text-xs font-medium">
+                                <span className="px-3 py-1 /90 backdrop-blur-sm text-slate-700 -full text-xs font-medium">
                                   {related.status}
                                 </span>
                               </div>
@@ -531,28 +646,28 @@ const DevelopmentPage = () => {
                           )}
                           
                           <div className="p-6">
-                            <h3 className="text-xl font-medium text-slate-900 mb-3 group-hover:text-slate-700 transition-colors">
+                            <h3 className="text-xl font-medium  mb-3 group-hover:text-slate-700 transition-colors">
                               {related.title}
                             </h3>
-                            <p className="text-slate-600 text-sm mb-4 line-clamp-2 leading-relaxed">
+                            <p className=" text-sm mb-4 line-clamp-2 leading-relaxed">
                               {related.description}
                             </p>
                             
                             {/* Location */}
-                            <div className="flex items-center text-sm text-slate-500 mb-4">
+                            <div className="flex items-center text-sm  mb-4">
                               <MapPin className="w-4 h-4 mr-2" />
                               <span>{related.city}, {related.country}</span>
                             </div>
 
                             {/* Development Stats */}
                             <div className="grid grid-cols-2 gap-4 mb-6">
-                              <div className="text-center py-2 bg-slate-50 rounded-lg">
-                                <div className="text-lg font-semibold text-slate-900">{related.number_of_buildings}</div>
-                                <div className="text-xs text-slate-500 uppercase tracking-wider">Buildings</div>
+                              <div className="text-center py-2 bg-slate-50 -lg">
+                                <div className="text-lg font-semibold ">{related.number_of_buildings}</div>
+                                <div className="text-xs  uppercase tracking-wider">Buildings</div>
                               </div>
-                              <div className="text-center py-2 bg-slate-50 rounded-lg">
-                                <div className="text-lg font-semibold text-slate-900">{related.total_units}</div>
-                                <div className="text-xs text-slate-500 uppercase tracking-wider">Units</div>
+                              <div className="text-center py-2 bg-slate-50 -lg">
+                                <div className="text-lg font-semibold ">{related.total_units}</div>
+                                <div className="text-xs  uppercase tracking-wider">Units</div>
                               </div>
                             </div>
 
@@ -561,12 +676,12 @@ const DevelopmentPage = () => {
                               <div className="mb-6">
                                 <div className="flex flex-wrap gap-2">
                                   {related.purposes.slice(0, 2).map((purpose, index) => (
-                                    <span key={index} className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-medium">
+                                    <span key={index} className="px-3 py-1 bg-slate-100 text-slate-700 -full text-xs font-medium">
                                       {typeof purpose === 'string' ? purpose : purpose.name}
                                     </span>
                                   ))}
                                   {related.purposes.length > 2 && (
-                                    <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-medium">
+                                    <span className="px-3 py-1 bg-slate-100 text-slate-700 -full text-xs font-medium">
                                       +{related.purposes.length - 2} more
                                     </span>
                                   )}
@@ -575,7 +690,7 @@ const DevelopmentPage = () => {
                             )}
 
                             {/* Action Button */}
-                            <div className="flex items-center justify-center space-x-2 text-slate-600 group-hover:text-slate-900 transition-colors">
+                            <div className="flex items-center justify-center space-x-2  group-hover: transition-colors">
                               <span className="text-sm font-medium">View Details</span>
                               <ArrowRight className="w-4 h-4" />
                             </div>
@@ -593,8 +708,8 @@ const DevelopmentPage = () => {
           <div className="space-y-8">
             {/* Developer Info */}
             {developer && (
-              <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                <h3 className="text-lg font-medium text-slate-900 mb-4">Developer</h3>
+              <div className=" -2xl border border-slate-200 p-6">
+                <h3 className="text-lg font-medium  mb-4">Developer</h3>
                 <div className="flex items-center space-x-3 mb-4">
                   {developer.profile_image ? (
                     <Image
@@ -602,15 +717,15 @@ const DevelopmentPage = () => {
                       alt={developer.name}
                       width={48}
                       height={48}
-                      className="rounded-full"
+                      className="-full"
                     />
                   ) : (
-                    <div className="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center">
-                      <Building2 className="w-6 h-6 text-slate-500" />
+                    <div className="w-12 h-12 bg-slate-200 -full flex items-center justify-center">
+                      <Building2 className="w-6 h-6 " />
                     </div>
                   )}
     <div>
-                    <h4 className="font-medium text-slate-900">{developer.name}</h4>
+                    <h4 className="font-medium ">{developer.name}</h4>
                     {developer.verified && (
                       <span className="text-xs text-green-600">Verified</span>
                     )}
@@ -618,12 +733,12 @@ const DevelopmentPage = () => {
                 </div>
                 
                 {developer.description && (
-                  <p className="text-sm text-slate-600 mb-4">{developer.description}</p>
+                  <p className="text-sm  mb-4">{developer.description}</p>
                 )}
 
                 <div className="space-y-2 mb-6">
                   {developer.phone && (
-                    <div className="flex items-center space-x-2 text-sm text-slate-600">
+                    <div className="flex items-center space-x-2 text-sm ">
                       <Phone className="w-4 h-4" />
                       <button
                         onClick={() => handlePhoneClick(developer.phone, 'development')}
@@ -635,7 +750,7 @@ const DevelopmentPage = () => {
                     </div>
                   )}
                   {developer.email && (
-                    <div className="flex items-center space-x-2 text-sm text-slate-600">
+                    <div className="flex items-center space-x-2 text-sm ">
                       <Mail className="w-4 h-4" />
                       <button
                         onClick={() => handleEmailClick(developer.email, 'development')}
@@ -647,7 +762,7 @@ const DevelopmentPage = () => {
                     </div>
                   )}
                   {developer.website && (
-                    <div className="flex items-center justify-between text-sm text-slate-600">
+                    <div className="flex items-center justify-between text-sm ">
                       <div className="flex items-center space-x-2">
                         <Globe className="w-4 h-4" />
                         <span>Website</span>
@@ -677,14 +792,14 @@ const DevelopmentPage = () => {
                       setShowShareModal(true)
                       handleShareClick('modal')
                     }}
-                    className="w-full bg-blue-600 text-white py-3 px-4 rounded-full hover:bg-blue-700 transition-colors duration-200 text-sm font-medium text-center"
+                    className="w-full bg-blue-600 text-white py-3 px-4 -full hover:bg-blue-700 transition-colors duration-200 text-sm font-medium text-center"
                   >
                     <Share2 className="w-4 h-4 mr-2 inline" />
                     Share Development
                   </button>
                   <Link 
                     href={`/allDevelopers/${developer.slug}`}
-                    className="w-full bg-slate-100 text-slate-900 py-3 px-4 rounded-full hover:bg-slate-200 transition-colors duration-200 text-sm font-medium text-center block"
+                    className="w-full bg-slate-100  py-3 px-4 -full hover:bg-slate-200 transition-colors duration-200 text-sm font-medium text-center block"
                   >
                     View Developer Profile
                   </Link>
@@ -701,14 +816,14 @@ const DevelopmentPage = () => {
         <div className="bg-slate-50 py-16">
           <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-12">
-              <h2 className="text-3xl font-light text-slate-900 mb-4">Project Video</h2>
-              <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+              <h2 className="text-3xl font-light  mb-4">Project Video</h2>
+              <p className="text-lg  max-w-2xl mx-auto">
                 Watch our video to get a better understanding of this development
               </p>
             </div>
             
             <div className="relative max-w-5xl mx-auto">
-              <div className="relative aspect-video rounded-2xl overflow-hidden shadow-2xl">
+              <div className="relative aspect-video -2xl overflow-hidden shadow-2xl">
                 <video
                   src={development.video.url}
                   className="w-full h-full object-cover"
