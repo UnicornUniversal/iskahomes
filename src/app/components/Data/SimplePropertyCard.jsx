@@ -24,10 +24,10 @@ const SimplePropertyCard = (props) => {
           {specifications.map((spec, idx) => {
             const IconComponent = spec.icon
             return (
-              <span key={idx} className="flex items-center gap-1.5 text-sm">
+            <span key={idx} className="flex items-center gap-1.5 text-sm">
                 {IconComponent && <IconComponent className="w-4 h-4" />}
-                <span>{spec.label}</span>
-              </span>
+              <span>{spec.label}</span>
+            </span>
             )
           })}
         </div>

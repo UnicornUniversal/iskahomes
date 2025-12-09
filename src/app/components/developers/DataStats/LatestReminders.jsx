@@ -89,7 +89,7 @@ const LatestReminders = ({ limit = 10 }) => {
       const specs = typeof reminder.listing.specifications === 'string' 
         ? JSON.parse(reminder.listing.specifications) 
         : reminder.listing.specifications
-      bedrooms = specs?.bedrooms || specs?.number_of_bedrooms || specs?.bedroom
+      bedrooms = specs?.bedrooms || specs?.nuer_of_bedrooms || specs?.bedroom
     }
     
     // Fallback to size field
@@ -97,7 +97,7 @@ const LatestReminders = ({ limit = 10 }) => {
     
     if (size) {
       // Format: "3 Bedroom" or just the size value
-      const bedroomText = typeof size === 'number' ? `${size} Bedroom${size > 1 ? 's' : ''}` : size
+      const bedroomText = typeof size === 'nuer' ? `${size} Bedroom${size > 1 ? 's' : ''}` : size
       return `${bedroomText} ${title}`.trim()
     }
     return title
@@ -135,8 +135,8 @@ const LatestReminders = ({ limit = 10 }) => {
           {reminders.map((reminder) => (
             <div key={reminder.id} className="default_bg rounded-lg max-w-full border border-white/50 p-4 flex flex-col">
               {/* Date and Time and Status */}
-              <div className="mb-3 flex items-center justify-between">
-                <div className="text-sm font-medium text-secondary_color-900 mb-1">
+              <div className=" flex items-center justify-between">
+                <div className="text-sm font-medium text-secondary_color-900 -1">
                   {formatDate(reminder.reminder_date)}
                 </div>
                 {reminder.reminder_time && (
@@ -146,7 +146,7 @@ const LatestReminders = ({ limit = 10 }) => {
                 )}
 
                 {/* Status */}
-                <div className="mb-3">
+                <div className="-3">
                   <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
                     reminder.status === 'completed' 
                       ? 'bg-green-100 text-green-800' 
@@ -160,8 +160,8 @@ const LatestReminders = ({ limit = 10 }) => {
               </div>
 
               {/* Note */}
-              <div className="mb-4 flex-1">
-                <p className="text-xs text-secondary_color-500 mb-1">Note</p>
+              <div className="-4 flex-1">
+                <p className="text-xs text-secondary_color-500 -1">Note</p>
                 <p className="text-sm text-secondary_color-900 leading-relaxed">
                   {reminder.note_text}
                 </p>
@@ -171,7 +171,7 @@ const LatestReminders = ({ limit = 10 }) => {
               {reminder.listing && (
                 <div className="mt-auto pt-3 border-t border-white/30">
                   {getPropertyTitle(reminder) && (
-                    <p className="text-sm font-medium text-secondary_color-900 mb-1">
+                    <p className="text-sm font-medium text-secondary_color-900 -1">
                       {getPropertyTitle(reminder)}
                     </p>
                   )}

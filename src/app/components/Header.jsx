@@ -121,8 +121,8 @@ const Header = () => {
               let parsedSpecs = {}
               try {
                 parsedSpecs = typeof listing.specifications === 'string' 
-                  ? JSON.parse(listing.specifications) 
-                  : listing.specifications
+                ? JSON.parse(listing.specifications) 
+                : listing.specifications
               } catch (e) {
                 console.error('Error parsing specifications:', e)
                 return []
@@ -154,8 +154,8 @@ const Header = () => {
                   
                   if (commonFields.includes(field.key) && parsedSpecs[field.key] !== undefined && parsedSpecs[field.key] !== null) {
                     const value = parsedSpecs[field.key]
-                    // Check if it's a number > 0 or a non-empty string
-                    if ((typeof value === 'number' && value > 0) || (typeof value === 'string' && value.trim() !== '')) {
+                  // Check if it's a number > 0 or a non-empty string
+                  if ((typeof value === 'number' && value > 0) || (typeof value === 'string' && value.trim() !== '')) {
                       const fieldData = getFieldDataByKey(typeId, field.key)
                       if (fieldData) {
                         // Format the value based on field type

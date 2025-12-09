@@ -14,10 +14,10 @@ export async function PATCH(request, { params }) {
       )
     }
 
-    // First, fetch the lead record to get seeker_id and listing_id
+    // First, fetch the lead record to get seeker_id, listing_id, and context_type
     const { data: leadRecord, error: fetchError } = await supabaseAdmin
       .from('leads')
-      .select('seeker_id, listing_id, status, status_tracker')
+      .select('seeker_id, listing_id, status, status_tracker, context_type')
       .eq('id', id)
       .single()
 

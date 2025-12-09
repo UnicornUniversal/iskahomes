@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Image from 'next/image'
 import { MapPin, Phone, Mail, Globe, Building2, Calendar, Users, CheckCircle, Facebook, Instagram, Linkedin, MessageCircle, Star, Award, Clock, Users2, Map, Share2 } from 'lucide-react'
-import ScheduleATour from '@/app/components/ScheduleATour'
+import LeadContactForm from '@/app/components/LeadContactForm'
 import { useAnalytics } from '@/hooks/useAnalytics'
 import { useAuth } from '@/contexts/AuthContext'
 import ShareModal from '@/app/components/ui/ShareModal'
@@ -724,11 +724,12 @@ const DeveloperPage = () => {
           {/* Right Side - Sticky Appointment Booking */}
           <div className="lg:col-span-1">
             <div className="sticky top-8">
-              <ScheduleATour 
-                propertyId={developer.developer_id}
-                propertyTitle={`Consultation with ${developer.name}`}
-                propertyType="developer"
+              <LeadContactForm 
+                contextType="profile"
+                profileId={developer.developer_id}
+                profile={developer}
                 developer={developer}
+                propertyTitle={`Consultation with ${developer.name}`}
               />
             </div>
           </div>

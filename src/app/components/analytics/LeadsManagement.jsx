@@ -1,13 +1,14 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { FiMessageCircle, FiEdit3, FiTrash2, FiPlus, FiX, FiSend, FiUser, FiCalendar, FiPhone, FiMail, FiImage, FiStar, FiSettings } from 'react-icons/fi'
+import { FiMessageCircle, FiEdit3, FiTrash2, FiPlus, FiX, FiSend, FiUser, FiCalendar, FiPhone, FiMail, FiImage, FiStar } from 'react-icons/fi'
 import { BarChart3, MessageCircle, Phone, Calendar, TrendingUp } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import DataCard from '@/app/components/developers/DataCard'
 import { toast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import Reminders from './Reminders'
+import CustomDropdown from '@/app/components/propertyManagement/modules/CustomDropdown'
 
 // Helper function to get lead category from score
 function getLeadCategory(score) {
@@ -118,7 +119,17 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
 
   function updateLeadStatusLocally(leadId, newStatus) {
     // Update locally (will be saved when user clicks "Save Changes")
-    setSelectedLead(prev => prev && prev.id === leadId ? { ...prev, status: newStatus } : prev)
+    // Store previous status for comparison when saving
+    setSelectedLead(prev => {
+      if (prev && prev.id === leadId) {
+        return { 
+          ...prev, 
+          status: newStatus,
+          _previousStatus: prev.status // Store previous status for comparison
+        }
+      }
+      return prev
+    })
     setHasChanges(true)
   }
 
@@ -343,6 +354,11 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
       // Ensure notes is always an array
       const notesToSave = Array.isArray(selectedLead.notes) ? selectedLead.notes : []
 
+      // Get previous status before update (from status_tracker or stored _previousStatus)
+      const previousStatus = selectedLead._previousStatus || selectedLead.status_tracker?.[selectedLead.status_tracker.length - 1] || selectedLead.status
+      const statusChangedToClosed = selectedLead.status === 'closed' && previousStatus !== 'closed'
+      const isListingContext = selectedLead.context_type === 'listing' && selectedLead.listing_id
+
       // Include user_id and user_type when saving reminders
       const response = await fetch(`/api/leads/${selectedLead.id}`, {
         method: 'PATCH',
@@ -358,6 +374,41 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
 
       const result = await response.json()
       if (response.ok && result.success) {
+        // If status changed to 'closed' and context_type is 'listing', update listing status to 'Sold'
+        if (statusChangedToClosed && isListingContext && selectedLead.listing_id) {
+          try {
+            // Fetch the listing to get its current status
+            const listingResponse = await fetch(`/api/listings/${selectedLead.listing_id}`)
+            const listingData = await listingResponse.json()
+            
+            if (listingData.success && listingData.data) {
+              const currentListing = listingData.data
+              // Only update if listing is not already sold/rented
+              if (currentListing.listing_status !== 'sold' && currentListing.listing_status !== 'rented') {
+                // Update listing status to 'sold' (or 'taken' if preferred)
+                const updateResponse = await fetch(`/api/listings/${selectedLead.listing_id}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    listing_status: 'sold',
+                    status: 'sold'
+                  })
+                })
+                
+                if (updateResponse.ok) {
+                  toast.success('Lead closed and listing marked as sold! Revenue updated.')
+                } else {
+                  const errorData = await updateResponse.json()
+                  console.error('Failed to update listing status:', errorData)
+                  toast.warning('Lead closed, but failed to update listing status')
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Error updating listing status:', err)
+            // Don't fail the lead update if listing update fails
+          }
+        }
         // Update local state with saved data
         if (result.data) {
           // Update selectedLead with the saved data (including notes)
@@ -365,7 +416,8 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
             ...prev,
             notes: result.data.notes || prev.notes || [],
             status: result.data.status || prev.status,
-            status_tracker: result.data.status_tracker || prev.status_tracker || []
+            status_tracker: result.data.status_tracker || prev.status_tracker || [],
+            _previousStatus: undefined // Clear stored previous status
           }))
         }
         
@@ -581,32 +633,36 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium text-secondary_color-700 mb-1">Status</label>
-            <select 
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-              value={statusFilter} 
-              onChange={(e) => { setPage(0); setStatusFilter(e.target.value) }}
-            >
-              <option value="">All Status</option>
-              <option value="new">New</option>
-              <option value="contacted">Contacted</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="responded">Responded</option>
-              <option value="closed">Closed</option>
-            </select>
+            <CustomDropdown
+              options={[
+                { value: '', label: 'All Status' },
+                { value: 'new', label: 'New' },
+                { value: 'contacted', label: 'Contacted' },
+                { value: 'scheduled', label: 'Scheduled' },
+                { value: 'responded', label: 'Responded' },
+                { value: 'closed', label: 'Closed' },
+                { value: 'cold_lead', label: 'Cold Lead' },
+                { value: 'abandoned', label: 'Abandoned' }
+              ]}
+              value={statusFilter}
+              onChange={(value) => { setPage(0); setStatusFilter(value) }}
+              placeholder="All Status"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-secondary_color-700 mb-1">Action Type</label>
-            <select 
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-              value={actionFilter} 
-              onChange={(e) => { setPage(0); setActionFilter(e.target.value) }}
-            >
-              <option value="">All Actions</option>
-              <option value="lead_phone">Phone</option>
-              <option value="lead_message">Message</option>
-              <option value="lead_appointment">Appointment</option>
-              <option value="lead_email">Email</option>
-            </select>
+            <CustomDropdown
+              options={[
+                { value: '', label: 'All Actions' },
+                { value: 'lead_phone', label: 'Phone' },
+                { value: 'lead_message', label: 'Message' },
+                { value: 'lead_appointment', label: 'Appointment' },
+                { value: 'lead_email', label: 'Email' }
+              ]}
+              value={actionFilter}
+              onChange={(value) => { setPage(0); setActionFilter(value) }}
+              placeholder="All Actions"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-secondary_color-700 mb-1">From Date</label>
@@ -671,32 +727,36 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-secondary_color-700 mb-1">Status</label>
-                    <select 
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-                      value={statusFilter} 
-                      onChange={(e) => { setPage(0); setStatusFilter(e.target.value) }}
-                    >
-                      <option value="">All Status</option>
-                      <option value="new">New</option>
-                      <option value="contacted">Contacted</option>
-                      <option value="scheduled">Scheduled</option>
-                      <option value="responded">Responded</option>
-                      <option value="closed">Closed</option>
-                    </select>
+                    <CustomDropdown
+                      options={[
+                        { value: '', label: 'All Status' },
+                        { value: 'new', label: 'New' },
+                        { value: 'contacted', label: 'Contacted' },
+                        { value: 'scheduled', label: 'Scheduled' },
+                        { value: 'responded', label: 'Responded' },
+                        { value: 'closed', label: 'Closed' },
+                        { value: 'cold_lead', label: 'Cold Lead' },
+                        { value: 'abandoned', label: 'Abandoned' }
+                      ]}
+                      value={statusFilter}
+                      onChange={(value) => { setPage(0); setStatusFilter(value) }}
+                      placeholder="All Status"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-secondary_color-700 mb-1">Action Type</label>
-                    <select 
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-                      value={actionFilter} 
-                      onChange={(e) => { setPage(0); setActionFilter(e.target.value) }}
-                    >
-                      <option value="">All Actions</option>
-                      <option value="lead_phone">Phone</option>
-                      <option value="lead_message">Message</option>
-                      <option value="lead_appointment">Appointment</option>
-                      <option value="lead_email">Email</option>
-                    </select>
+                    <CustomDropdown
+                      options={[
+                        { value: '', label: 'All Actions' },
+                        { value: 'lead_phone', label: 'Phone' },
+                        { value: 'lead_message', label: 'Message' },
+                        { value: 'lead_appointment', label: 'Appointment' },
+                        { value: 'lead_email', label: 'Email' }
+                      ]}
+                      value={actionFilter}
+                      onChange={(value) => { setPage(0); setActionFilter(value) }}
+                      placeholder="All Actions"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-secondary_color-700 mb-1">From Date</label>
@@ -797,37 +857,32 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                 </tr>
               )}
               {filteredLeads.map((lead) => (
-                <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center gap-2">
-                      <button
-                        className="text-blue-600 hover:text-blue-900 transition-colors relative"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          // Generate default message with listing link
-                          const listingLink = lead.listing_id && lead.listing_slug && lead.listing_type
-                            ? `${window.location.origin}/property/${lead.listing_type}/${lead.listing_slug}/${lead.listing_id}`
-                            : null
-                          const defaultMessage = listingLink
-                            ? `Hi! I noticed your interest in ${lead.listing_title || 'this property'}. Here's the link: ${listingLink}`
-                            : `Hi! I noticed your interest in ${lead.listing_title || 'this property'}. How can I help you?`
-                          setChatMessage(defaultMessage)
-                          setMessageBoxLead(lead)
-                        }}
-                        title="Message"
-                      >
-                        <FiMessageCircle className="box_holder border-1 border-primary_color w-8 h-8" />
-                      </button>
-                      <button
-                        className="text-secondary_color-600 hover:text-secondary_color-900 transition-colors"
-                        onClick={() => setSelectedLead(lead)}
-                        title="Manage Lead"
-                      >
-                        <FiSettings className="box_holder w-8 h-8 border-1 border-primary_color" />
-                      </button>
-                    </div>
+                <tr 
+                  key={lead.id} 
+                  className="hover:bg-gray-50 transition-colors cursor-pointer"
+                  onClick={() => setSelectedLead(lead)}
+                >
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                    <button
+                      className="text-blue-600 hover:text-blue-900 transition-colors relative"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        // Generate default message with listing link
+                        const listingLink = lead.listing_id && lead.listing_slug && lead.listing_type
+                          ? `${window.location.origin}/property/${lead.listing_type}/${lead.listing_slug}/${lead.listing_id}`
+                          : null
+                        const defaultMessage = listingLink
+                          ? `Hi! I noticed your interest in ${lead.listing_title || 'this property'}. Here's the link: ${listingLink}`
+                          : `Hi! I noticed your interest in ${lead.listing_title || 'this property'}. How can I help you?`
+                        setChatMessage(defaultMessage)
+                        setMessageBoxLead(lead)
+                      }}
+                      title="Message"
+                    >
+                      <FiMessageCircle className="box_holder border-1 border-primary_color w-8 h-8" />
+                    </button>
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <div className="flex-shrink-0 h-8 w-8">
                         <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
@@ -838,13 +893,13 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                         <div className="text-sm font-medium text-secondary_color-900 truncate">
                           {lead.seeker_name || lead.seeker_id}
                         </div>
-                        <div className="text-xs text-secondary_color-500">
+                        <div className="text-xs text-secondary_color-500 mt-0.5">
                           {lead.total_actions} actions
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       {lead.listing_image ? (
                         <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 border border-gray-200">
@@ -882,8 +937,8 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-4">
-                    <div className="flex flex-col gap-2">
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col gap-1.5">
                       <div className="flex items-center gap-2">
                         {/* <FiStar className="w-10 h-10 text-yellow-500" /> */}
                         <span className="text-sm font-semibold text-secondary_color-900">{lead.lead_score || 0}</span>
@@ -915,32 +970,64 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <select
-                      className="px-2 py-1 text-xs border border-gray-300 rounded default_bg focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                      value={lead.status || 'new'}
-                      onChange={async (e) => {
-                        // For table view, save immediately
-                        try {
-                          const response = await fetch(`/api/leads/${lead.id}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ status: e.target.value })
-                          })
-                          if (response.ok) {
-                            loadLeads()
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="w-32">
+                      <CustomDropdown
+                        options={[
+                          { value: 'new', label: 'New' },
+                          { value: 'contacted', label: 'Contacted' },
+                          { value: 'scheduled', label: 'Scheduled' },
+                          { value: 'responded', label: 'Responded' },
+                          { value: 'closed', label: 'Closed' },
+                          { value: 'cold_lead', label: 'Cold Lead' },
+                          { value: 'abandoned', label: 'Abandoned' }
+                        ]}
+                        value={lead.status || 'new'}
+                        onChange={async (newStatus) => {
+                          // For table view, save immediately
+                          try {
+                            const previousStatus = lead.status || 'new'
+                            const response = await fetch(`/api/leads/${lead.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ status: newStatus })
+                            })
+                            if (response.ok) {
+                              const result = await response.json()
+                              // If status changed to 'closed' and context_type is 'listing', update listing
+                              if (newStatus === 'closed' && previousStatus !== 'closed' && lead.context_type === 'listing' && lead.listing_id) {
+                                try {
+                                  const listingResponse = await fetch(`/api/listings/${lead.listing_id}`)
+                                  const listingData = await listingResponse.json()
+                                  
+                                  if (listingData.success && listingData.data) {
+                                    const currentListing = listingData.data
+                                    if (currentListing.listing_status !== 'sold' && currentListing.listing_status !== 'rented') {
+                                      await fetch(`/api/listings/${lead.listing_id}`, {
+                                        method: 'PUT',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                          listing_status: 'sold',
+                                          status: 'sold'
+                                        })
+                                      })
+                                      toast.success('Lead closed and listing marked as sold!')
+                                    }
+                                  }
+                                } catch (err) {
+                                  console.error('Error updating listing status:', err)
+                                }
+                              }
+                              loadLeads()
+                            }
+                          } catch (err) {
+                            console.error('Error updating status:', err)
+                            toast.error('Failed to update lead status')
                           }
-                        } catch (err) {
-                          console.error('Error updating status:', err)
-                        }
-                      }}
-                    >
-                      <option value="new">New</option>
-                      <option value="contacted">Contacted</option>
-                      <option value="scheduled">Scheduled</option>
-                      <option value="responded">Responded</option>
-                      <option value="closed">Closed</option>
-                    </select>
+                        }}
+                        placeholder="Select Status"
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -987,12 +1074,12 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="bg-white/40 backdrop-blur-lg md:mt-[4em] ounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-200  flex-shrink-0">
-              <div className="flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-secondary_color-900">Lead Details</h3>
                   <p className="text-sm text-secondary_color-600 mt-1">
-                    {selectedLead.seeker_name || selectedLead.seeker_id} • {selectedLead.listing_title || selectedLead.listing_id}
+                    {selectedLead.seeker_name || selectedLead.seeker_id}
                   </p>
                 </div>
                 <button 
@@ -1031,19 +1118,24 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                         <FiCalendar className="w-5 h-5 text-secondary_color-500" />
                         <span className="text-sm text-secondary_color-700">{selectedLead.first_action_date}</span>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className=" w-full">
                         <span className="text-sm text-secondary_color-500">Status:</span>
-                        <select
-                          className="px-2 py-1 text-sm border border-gray-300 rounded default_bg focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                          value={selectedLead.status || 'new'}
-                          onChange={(e) => updateLeadStatusLocally(selectedLead.id, e.target.value)}
-                        >
-                          <option value="new">New</option>
-                          <option value="contacted">Contacted</option>
-                          <option value="scheduled">Scheduled</option>
-                          <option value="responded">Responded</option>
-                          <option value="closed">Closed</option>
-                        </select>
+                        <div className="max-w-[300px]">
+                          <CustomDropdown
+                            options={[
+                              { value: 'new', label: 'New' },
+                              { value: 'contacted', label: 'Contacted' },
+                              { value: 'scheduled', label: 'Scheduled' },
+                              { value: 'responded', label: 'Responded' },
+                              { value: 'closed', label: 'Closed' },
+                              { value: 'cold_lead', label: 'Cold Lead' },
+                              { value: 'abandoned', label: 'Abandoned' }
+                            ]}
+                            value={selectedLead.status || 'new'}
+                            onChange={(value) => updateLeadStatusLocally(selectedLead.id, value)}
+                            placeholder="Select Status"
+                          />
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-secondary_color-500">Actions:</span>
@@ -1062,6 +1154,124 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                           )
                         })()}
                       </div>
+                      
+                      {/* Listing Details (for listing leads) */}
+                      {(selectedLead.context_type === 'listing' && selectedLead.listing_id) && (
+                        <div className="pt-3 mt-3 border-t border-gray-300">
+                          <div className="flex items-start gap-3">
+                            {/* Image on the left */}
+                            <div className="flex-shrink-0">
+                              {selectedLead.listing_image ? (
+                                <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+                                  <img 
+                                    src={selectedLead.listing_image} 
+                                    alt={selectedLead.listing_title || 'Listing'} 
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.target.style.display = 'none'
+                                      const placeholder = e.target.nextElementSibling
+                                      if (placeholder) placeholder.style.display = 'flex'
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 w-16 h-16 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0 hidden">
+                                    <FiImage className="w-5 h-5 text-secondary_color-400" />
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="w-16 h-16 rounded-lg bg-gray-200 flex items-center justify-center border border-gray-300">
+                                  <FiImage className="w-5 h-5 text-secondary_color-400" />
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Details on the right */}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold text-secondary_color-900 mb-1 ">
+                                {selectedLead.listing_title || 'Untitled Property'}
+                              </div>
+                              {selectedLead.listing_location && (
+                                <div className="text-xs text-secondary_color-600 mb-1.5 ">
+                                  {selectedLead.listing_location}
+                                </div>
+                              )}
+                              {selectedLead.listing_status_display && (
+                                <div className="inline-flex">
+                                  <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium capitalize ${
+                                    selectedLead.listing_status_display?.toLowerCase() === 'sold' || selectedLead.listing_status_display?.toLowerCase() === 'taken'
+                                      ? 'bg-green-100 text-green-800 border border-green-200' 
+                                      : selectedLead.listing_status_display?.toLowerCase() === 'available'
+                                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                      : 'bg-gray-100 text-gray-800 border border-gray-200'
+                                  }`}>
+                                    {selectedLead.listing_status_display}
+                                  </span>
+                                </div>
+                              )}
+                              {!selectedLead.listing_status_display && selectedLead.listing_status && (
+                                <div className="inline-flex">
+                                  <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium capitalize bg-gray-100 text-gray-800 border border-gray-200">
+                                    {selectedLead.listing_status}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Development Details (for development leads) */}
+                      {selectedLead.context_type === 'development' && selectedLead.development_id && (
+                        <div className="pt-3 mt-3 border-t border-gray-300">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0">
+                              <div className="w-16 h-16 rounded-lg bg-gray-200 flex items-center justify-center border border-gray-300">
+                                <FiImage className="w-5 h-5 text-secondary_color-400" />
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold text-secondary_color-900 mb-1 truncate">
+                                {selectedLead.development_name || 'Development'}
+                              </div>
+                              {selectedLead.development_location && (
+                                <div className="text-xs text-secondary_color-600 mb-1.5 truncate">
+                                  {selectedLead.development_location}
+                                </div>
+                              )}
+                              <div className="inline-flex">
+                                <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                                  Development
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Profile Details (for profile leads) */}
+                      {selectedLead.context_type === 'profile' && (
+                        <div className="pt-3 mt-3 border-t border-gray-300">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0">
+                              <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center border border-blue-200">
+                                <FiUser className="w-6 h-6 text-blue-600" />
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold text-secondary_color-900 mb-1">
+                                Profile Inquiry
+                              </div>
+                              <div className="text-xs text-secondary_color-600 mb-1.5">
+                                Lead from developer/agent profile
+                              </div>
+                              <div className="inline-flex">
+                                <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                                  Profile Lead
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1149,7 +1359,6 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                               )}
                             </div>
                             <div className="flex items-center gap-2 text-xs text-secondary_color-500">
-                              <FiCalendar className="w-3 h-3" />
                               <span>{formattedDate}</span>
                               {formattedTime && (
                                 <>

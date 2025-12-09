@@ -1,7 +1,9 @@
 'use client'
 import React from 'react'
 import AlbumGallery from '../components/propertyManagement/modules/AlbumGallery'
-
+import IskaServices from '../components/general/IskaServices'
+import SimpleServices from '../components/general/SimpleServices'
+import Notifications from '../components/general/Notifications'
 const page = () => {
   const container1 = 'bg-white w-full h-[20em]  mx-auto lg:w-[30em] lg:h-[30em] break-inside-avoid border border-primary_color/10 p-4'
   const container2 = 'bg-white w-full h-[30em] mx-auto md:w-[15em] md:h-[20em] break-inside-avoid border border-secondary_color/20 p-4'
@@ -10,8 +12,16 @@ const page = () => {
 
   return (
     <div className='w-full min-h-screen p-4'>
+
+      {/* <IskaServices /> */}
+<div className="max-w-[500px] ">
+
+  <SimpleServices />
+  <Notifications />
+</div>
+
       {/* Truly automatic grid - browser decides everything */}
-      <div className='flex flex-wrap gap-4  items-center justify-center'>
+      {/* <div className='flex flex-wrap gap-4  items-center justify-center'>
         <div className={container1}>
           <p>Container 1</p>
         </div>
@@ -61,7 +71,7 @@ const page = () => {
           <p>Container 2</p>
         </div>
 
-      </div>
+      </div> */}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { MapPin, Building2, Calendar, Users, CheckCircle, Phone, Mail, Globe, ArrowRight, Play, ExternalLink, Star, Heart, Share2 } from 'lucide-react'
-import ScheduleATour from '@/app/components/ScheduleATour'
+import LeadContactForm from '@/app/components/LeadContactForm'
 import ListingCard from '@/app/components/Listing/ListingCard'
 import { useAnalytics } from '@/hooks/useAnalytics'
 import { useAuth } from '@/contexts/AuthContext'
@@ -781,11 +781,12 @@ const DevelopmentPage = () => {
                 </div>
 
                 <div className="space-y-3">
-                  <ScheduleATour 
-                    propertyId={development.id}
-                    propertyTitle={`Consultation for ${development.title}`}
-                    propertyType="development"
+                  <LeadContactForm 
+                    contextType="development"
+                    developmentId={development.id}
+                    development={development}
                     developer={developer}
+                    propertyTitle={`Consultation for ${development.title}`}
                   />
                   <button 
                     onClick={() => {

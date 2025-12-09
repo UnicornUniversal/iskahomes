@@ -329,9 +329,10 @@ async function processEventChunk(chunk, aggregates, offset = 0, errorTracker = n
     switch (eventName) {
 
       case 'listing_impression': {
-        // listing_impression is for detailed impression tracking (engagement/interaction)
-        // This is separate from property_view - it tracks impressions, NOT views
-        // Views are tracked separately via property_view event
+        // UPDATED: listing_impression is NOT an impression - it's just a view with more metadata
+        // Impressions = Engagement = Interactions only (saves, shares, website clicks, social media clicks)
+        // Views (property_view, listing_impression, profile_view) are tracked separately and do NOT count as impressions
+        // This event is kept for backward compatibility but does NOT increment impressions
         if (!listingId) {
           break
         }
@@ -342,10 +343,8 @@ async function processEventChunk(chunk, aggregates, offset = 0, errorTracker = n
           }
           break
         }
-        // Only increment impressions, NOT views (views are tracked via property_view)
-        listing.total_impressions++
-        // Note: We don't increment total_views here to avoid double-counting
-        // property_view already tracks views, listing_impression tracks impressions/engagement
+        // DO NOT increment impressions - this is just a view, not an interaction
+        // Views are tracked via property_view, impressions are only for interactions (saves, shares, clicks)
         
         // CRITICAL FIX: Ensure lister is tracked in aggregates.users for user_analytics
         // This ensures users with only listing events (no profile events) are still processed
@@ -1621,7 +1620,8 @@ export async function POST(request) {
     const allListingRows = []
     const allUserRows = []
     const allDevelopmentRows = []
-    const allLeadRows = []
+    // COMMENTED OUT: allLeadRows - leads are now created in real-time via /api/leads/create
+    // const allLeadRows = []
     let totalEventsProcessed = 0
     
     // Accumulate data across all hours for final updates
@@ -1635,9 +1635,10 @@ export async function POST(request) {
     // The leads table has `date` and `hour` fields that represent when the event happened,
     // NOT `created_at` which is when the cron created the record
     // This ensures we get leads for the correct date, aggregating across all hours
+    // UPDATED: Now includes development_id for development leads (created in real-time)
     const { data: currentDateLeads } = await supabaseAdmin
       .from('leads')
-      .select('seeker_id, lister_id, lister_type, listing_id, lead_actions, date, hour')
+      .select('seeker_id, lister_id, lister_type, listing_id, development_id, context_type, lead_actions, date, hour')
       .eq('date', cal.date)
       // REMOVED: .eq('hour', cal.hour) - Now aggregate ALL hours for the date (like listing_analytics)
     
@@ -2156,7 +2157,9 @@ export async function POST(request) {
           } else if (event.event === 'lead') {
             listingAnalyticsFromPostHog[listingId].total_leads++
           } else if (event.event === 'listing_impression') {
-            listingAnalyticsFromPostHog[listingId].total_impressions++
+            // UPDATED: listing_impression is NOT an impression - it's just a view with metadata
+            // Do NOT increment total_impressions here - impressions are only for interactions
+            // This event is kept for backward compatibility but doesn't count as impression
           } else if (event.event === 'impression_social_media') {
             listingAnalyticsFromPostHog[listingId].impression_social_media++
             listingAnalyticsFromPostHog[listingId].total_impressions++
@@ -2368,10 +2371,13 @@ export async function POST(request) {
               userLeadsInitiated++
             }
             
-            // CRITICAL FIX: Count impressions only where user matches (same as comparison tool)
-            if (eventName === 'listing_impression') {
-              userTotalImpressions++
-            }
+            // UPDATED: Impressions = Engagement = Interactions only
+            // listing_impression and property_view are NOT impressions - they are views
+            // Only interaction-based events count as impressions:
+            // - impression_social_media (social media clicks)
+            // - impression_website_visit (website clicks)
+            // - impression_share (shares)
+            // - impression_saved_listing (saves)
             if (eventName === 'impression_social_media') {
               userImpressionSocialMedia++
               userTotalImpressions++
@@ -2460,22 +2466,24 @@ export async function POST(request) {
         }
         
         // Calculate profile leads from TWO sources:
-        // 1. PostHog events (aggregates.users.profile_leads) - PRIMARY SOURCE (real-time, per-hour)
-        // 2. Leads table (profileLeadsByLister) - FALLBACK/VERIFICATION (persisted data)
-        // Prefer PostHog events as source of truth (like listing leads), use leads table as fallback
-        const profile_leads_from_posthog = user.profile_leads || 0 // From PostHog events (aggregates.users)
-        const profile_leads_from_db = profileLeadsByLister[listerKey] || 0 // From leads table
-        // Use PostHog as primary source, but log if there's a discrepancy
-        const profile_leads = profile_leads_from_posthog || profile_leads_from_db
-        if (profile_leads_from_posthog !== profile_leads_from_db) {
+        // 1. Leads table (profileLeadsByLister) - PRIMARY SOURCE (real-time, persisted data)
+        // 2. PostHog events (aggregates.users.profile_leads) - FALLBACK/VERIFICATION (analytics only)
+        // UPDATED: Prefer leads table as source of truth since leads are now created in real-time via /api/leads/create
+        const profile_leads_from_db = profileLeadsByLister[listerKey] || 0 // From leads table (real-time)
+        const profile_leads_from_posthog = user.profile_leads || 0 // From PostHog events (analytics)
+        // Use leads table as primary source (real-time data), PostHog as fallback
+        const profile_leads = profile_leads_from_db || profile_leads_from_posthog
+        if (profile_leads_from_posthog !== profile_leads_from_db && profile_leads_from_posthog > 0) {
           errorTracker.addWarning('USER_ANALYTICS', `Profile leads mismatch for user ${userId}`, { userId, posthog: profile_leads_from_posthog, db: profile_leads_from_db })
         }
         
-        // CRITICAL FIX: total_leads = total_listing_leads (from PostHog events) + profile_leads (from PostHog events)
-        // This ensures consistency: BOTH listing leads AND profile leads come from PostHog (source of truth)
-        // total_listing_leads is already calculated from listingsMap (line 2361) - it's the sum of all listing leads from PostHog events
-        // profile_leads is now from aggregates.users.profile_leads - it's the sum of all profile leads from PostHog events
-        const total_leads = total_listing_leads + profile_leads
+        // UPDATED: total_leads = total_listing_leads (from leads table) + profile_leads (from leads table)
+        // Since leads are now created in real-time, the leads table is the source of truth
+        // Get listing leads from leads table (aggregated by listerKey)
+        const listing_leads_from_db = listerLeads?.total_leads || 0
+        // Use leads table as primary source, PostHog as fallback for listing leads
+        const total_listing_leads_final = listing_leads_from_db || total_listing_leads
+        const total_leads = total_listing_leads_final + profile_leads
         
 
         // NOTE: Profile-based impressions are already included in the filtered counts above
@@ -2734,7 +2742,12 @@ export async function POST(request) {
       const unique_leads = dev.unique_leads.size
       // Note: total_sales and lead_to_sale_rate removed - sales are tracked in sales_listings table, not via PostHog
       const conversion_rate = total_views > 0 ? Number(((total_leads / total_views) * 100).toFixed(2)) : 0
-      const engagement_rate = total_views > 0 ? Number((((dev.total_shares + dev.saved_count + dev.social_media_clicks) / total_views) * 100).toFixed(2)) : 0
+      
+      // Calculate total impressions (engagement/interactions only)
+      // Impressions = social_media_clicks + website_visits + shares + saves
+      // Note: website_visits are tracked as social_media_clicks in development_interaction (line 1127)
+      const total_impressions = dev.social_media_clicks + dev.total_shares + dev.saved_count
+      const engagement_rate = total_views > 0 ? Number(((total_impressions / total_views) * 100).toFixed(2)) : 0
 
       developmentRows.push({
         development_id: developmentId,
@@ -2765,14 +2778,17 @@ export async function POST(request) {
         total_shares: dev.total_shares,
         saved_count: dev.saved_count,
         social_media_clicks: dev.social_media_clicks,
+        total_impressions: total_impressions, // Total impressions (engagement/interactions)
         // total_interactions: dev.total_interactions, // Column doesn't exist in schema
         engagement_rate
       })
     }
 
     // 9. Build leads rows (time series - new record per cron run)
-    // Each cron run creates a new lead record, allowing time series tracking
-    // Actions within the same run are merged together
+    // COMMENTED OUT: Leads are now created in real-time via /api/leads/create endpoint
+    // The cron job no longer inserts leads - it only aggregates from existing leads table for user_analytics
+    // This ensures leads are created immediately when actions occur, not waiting for hourly cron
+    /*
     const leadRows = []
     
     if (leadsMap.size === 0) {
@@ -2902,12 +2918,14 @@ export async function POST(request) {
     if (leadRows.length === 0 && leadsMap.size > 0) {
       errorTracker.addWarning('LEADS', 'No lead rows built despite leads in aggregates - lister_id resolution may have failed', { leadsMapSize: leadsMap.size })
     }
+    */
 
     // Collect rows for this hour into the all* arrays
     allListingRows.push(...listingRows)
     allUserRows.push(...userRows)
     allDevelopmentRows.push(...developmentRows)
-    allLeadRows.push(...leadRows)
+    // COMMENTED OUT: Lead rows are no longer collected (leads created in real-time)
+    // allLeadRows.push(...leadRows)
     } // End of hour processing loop
 
     // 10. Write to database (using all* arrays that contain rows from all hours)
@@ -3169,12 +3187,123 @@ export async function POST(request) {
           const insertedCount = allDevelopmentRows.length
           logSuccess(`Upserted ${insertedCount} development analytics records`)
           insertResults.developments.inserted = insertedCount
+          
+          // Update developments table with cumulative totals and impressions breakdown
+          if (insertedCount > 0) {
+            try {
+              // Get all unique development IDs
+              const developmentIdsToUpdate = [...new Set(allDevelopmentRows.map(row => row.development_id))]
+              
+              // Aggregate development_analytics for impressions breakdown
+              const { data: allDevelopmentAnalytics, error: devAnalyticsError } = await supabaseAdmin
+                .from('development_analytics')
+                .select('development_id, total_views, total_leads, total_impressions, social_media_clicks, total_shares, saved_count')
+                .in('development_id', developmentIdsToUpdate)
+              
+              if (!devAnalyticsError && allDevelopmentAnalytics && allDevelopmentAnalytics.length > 0) {
+                // Aggregate by development_id
+                const devAggregates = {}
+                for (const row of allDevelopmentAnalytics) {
+                  const devId = row.development_id
+                  if (!devAggregates[devId]) {
+                    devAggregates[devId] = {
+                      total_views: 0,
+                      total_leads: 0,
+                      total_impressions: 0,
+                      social_media_clicks: 0,
+                      total_shares: 0,
+                      saved_count: 0
+                    }
+                  }
+                  devAggregates[devId].total_views += Number(row.total_views) || 0
+                  devAggregates[devId].total_leads += Number(row.total_leads) || 0
+                  devAggregates[devId].total_impressions += Number(row.total_impressions) || 0
+                  devAggregates[devId].social_media_clicks += Number(row.social_media_clicks) || 0
+                  devAggregates[devId].total_shares += Number(row.total_shares) || 0
+                  devAggregates[devId].saved_count += Number(row.saved_count) || 0
+                }
+                
+                // Build impressions breakdown and update developments table
+                const developmentUpdates = []
+                for (const devId of developmentIdsToUpdate) {
+                  const agg = devAggregates[devId]
+                  if (!agg) continue
+                  
+                  // Calculate impressions breakdown with percentages
+                  const impressionsBreakdown = {
+                    social_media: {
+                      total: agg.social_media_clicks || 0,
+                      percentage: agg.total_impressions > 0 ? Number(((agg.social_media_clicks || 0) / agg.total_impressions) * 100).toFixed(2) : 0
+                    },
+                    website_visit: {
+                      total: 0, // Website visits are tracked as social_media_clicks for developments
+                      percentage: 0
+                    },
+                    share: {
+                      total: agg.total_shares || 0,
+                      percentage: agg.total_impressions > 0 ? Number(((agg.total_shares || 0) / agg.total_impressions) * 100).toFixed(2) : 0
+                    },
+                    saved: {
+                      total: agg.saved_count || 0,
+                      percentage: agg.total_impressions > 0 ? Number(((agg.saved_count || 0) / agg.total_impressions) * 100).toFixed(2) : 0
+                    }
+                  }
+                  
+                  developmentUpdates.push({
+                    id: devId,
+                    total_views: agg.total_views,
+                    total_leads: agg.total_leads,
+                    total_impressions: agg.total_impressions,
+                    impressions_breakdown: impressionsBreakdown
+                  })
+                }
+                
+                // Batch update developments table
+                if (developmentUpdates.length > 0) {
+                  const updatePromises = developmentUpdates.map(update =>
+                    supabaseAdmin
+                      .from('developments')
+                      .update({
+                        total_views: update.total_views,
+                        total_leads: update.total_leads,
+                        total_impressions: update.total_impressions,
+                        impressions_breakdown: update.impressions_breakdown
+                      })
+                      .eq('id', update.id)
+                      .then(({ error }) => ({ id: update.id, error }))
+                      .catch(error => ({ id: update.id, error }))
+                  )
+                  
+                  const updateResults = await Promise.all(updatePromises)
+                  const successCount = updateResults.filter(r => !r.error).length
+                  const errorCount = updateResults.filter(r => r.error).length
+                  
+                  if (errorCount > 0) {
+                    errorTracker.addError('DEVELOPMENTS', `Error updating ${errorCount} developments`, {
+                      errors: updateResults.filter(r => r.error).map(r => ({ id: r.id, error: r.error?.message }))
+                    })
+                  }
+                  
+                  if (successCount > 0) {
+                    logSuccess(`Updated ${successCount} developments with impressions breakdown`)
+                  }
+                }
+              }
+            } catch (err) {
+              errorTracker.addError('DEVELOPMENTS', 'Exception updating developments table', { error: err.message, stack: err.stack })
+            }
+          }
         }
       } catch (err) {
         insertResults.developments.errors.push(err.message)
       }
     }
 
+    // COMMENTED OUT: Lead insertion - leads are now created in real-time via /api/leads/create
+    // The cron job no longer inserts leads into the database
+    // Leads are created immediately when user actions occur (phone, message, appointment clicks)
+    // The cron job will read from the leads table for aggregation into user_analytics
+    /*
     // Insert leads (time series - always insert new records)
     // The unique constraint on (listing_id, seeker_id) has been removed
     // This allows multiple lead records for the same seeker+listing combination
@@ -3216,6 +3345,9 @@ export async function POST(request) {
         ]
       })
     }
+    */
+    // NOTE: The above commented section was the old lead insertion logic
+    // Leads are now created in real-time via /api/leads/create endpoint
 
     // 11. Aggregate breakdowns and update listings table with cumulative totals
     // Only update listings that had events in this run
@@ -3229,11 +3361,11 @@ export async function POST(request) {
         // No listings found in events to update
       } else {
 
-        // Aggregate share_breakdown and leads_breakdown from all listing_analytics records
+        // Aggregate share_breakdown, leads_breakdown, and impressions breakdown from all listing_analytics records
         // Aggregating breakdowns for listings
         const { data: allListingAnalytics, error: breakdownError } = await supabaseAdmin
           .from('listing_analytics')
-          .select('listing_id, share_breakdown, leads_breakdown, impression_share, total_leads')
+          .select('listing_id, share_breakdown, leads_breakdown, impression_share, impression_social_media, impression_website_visit, impression_saved_listing, total_impressions, total_leads')
           .in('listing_id', listingIdsToUpdate)
 
         if (breakdownError) {
@@ -3255,8 +3387,15 @@ export async function POST(request) {
                   phone: 0, whatsapp: 0, direct_message: 0,
                   email: 0, appointment: 0, website: 0
                 },
+                impressions_breakdown: {
+                  social_media: 0,
+                  website_visit: 0,
+                  share: 0,
+                  saved_listing: 0
+                },
                 total_shares: 0,
-                total_leads: 0
+                total_leads: 0,
+                total_impressions: 0
               }
             }
 
@@ -3270,6 +3409,13 @@ export async function POST(request) {
               }
             }
             breakdownAggregates[listingId].total_shares += row.impression_share || 0
+
+            // Aggregate impressions breakdown (engagement/interactions only)
+            breakdownAggregates[listingId].impressions_breakdown.social_media += row.impression_social_media || 0
+            breakdownAggregates[listingId].impressions_breakdown.website_visit += row.impression_website_visit || 0
+            breakdownAggregates[listingId].impressions_breakdown.share += row.impression_share || 0
+            breakdownAggregates[listingId].impressions_breakdown.saved_listing += row.impression_saved_listing || 0
+            breakdownAggregates[listingId].total_impressions += row.total_impressions || 0
 
             // Aggregate leads breakdown - handle both nested messaging structure and flat structure
             if (row.leads_breakdown && typeof row.leads_breakdown === 'object') {
@@ -3320,6 +3466,26 @@ export async function POST(request) {
           for (const [platform, total] of Object.entries(agg.share_breakdown)) {
             const percentage = agg.total_shares > 0 ? Number(((total / agg.total_shares) * 100).toFixed(2)) : 0
             shareBreakdown[platform] = { total, percentage }
+          }
+
+          // Build impressions breakdown with percentages
+          const impressionsBreakdown = {
+            social_media: {
+              total: agg.impressions_breakdown.social_media || 0,
+              percentage: agg.total_impressions > 0 ? Number(((agg.impressions_breakdown.social_media || 0) / agg.total_impressions) * 100).toFixed(2) : 0
+            },
+            website_visit: {
+              total: agg.impressions_breakdown.website_visit || 0,
+              percentage: agg.total_impressions > 0 ? Number(((agg.impressions_breakdown.website_visit || 0) / agg.total_impressions) * 100).toFixed(2) : 0
+            },
+            share: {
+              total: agg.impressions_breakdown.share || 0,
+              percentage: agg.total_impressions > 0 ? Number(((agg.impressions_breakdown.share || 0) / agg.total_impressions) * 100).toFixed(2) : 0
+            },
+            saved_listing: {
+              total: agg.impressions_breakdown.saved_listing || 0,
+              percentage: agg.total_impressions > 0 ? Number(((agg.impressions_breakdown.saved_listing || 0) / agg.total_impressions) * 100).toFixed(2) : 0
+            }
           }
 
           // Build leads breakdown with percentages and nested messaging structure
@@ -3373,7 +3539,8 @@ export async function POST(request) {
 
           finalBreakdowns[listingId] = {
             listing_share_breakdown: shareBreakdown,
-            listing_leads_breakdown: leadsBreakdown
+            listing_leads_breakdown: leadsBreakdown,
+            listing_impressions_breakdown: impressionsBreakdown
           }
         }
 
@@ -3409,21 +3576,24 @@ export async function POST(request) {
             const totals = listingTotals[listingId]
             const breakdowns = finalBreakdowns[listingId] || {
               listing_share_breakdown: {},
-              listing_leads_breakdown: {}
+              listing_leads_breakdown: {},
+              listing_impressions_breakdown: {}
             }
             listingUpdates.push({
               id: listingId,
               total_views: totals.total_views,
               total_leads: totals.total_leads,
               listing_share_breakdown: breakdowns.listing_share_breakdown,
-              listing_leads_breakdown: breakdowns.listing_leads_breakdown
+              listing_leads_breakdown: breakdowns.listing_leads_breakdown,
+              listing_impressions_breakdown: breakdowns.listing_impressions_breakdown
             })
             // Store for response
             listingUpdatesData[listingId] = {
               total_views: totals.total_views,
               total_leads: totals.total_leads,
               share_breakdown: breakdowns.listing_share_breakdown,
-              leads_breakdown: breakdowns.listing_leads_breakdown
+              leads_breakdown: breakdowns.listing_leads_breakdown,
+              impressions_breakdown: breakdowns.listing_impressions_breakdown
             }
           }
 
@@ -3443,7 +3613,8 @@ export async function POST(request) {
                   total_views: update.total_views,
                   total_leads: update.total_leads,
                   listing_share_breakdown: update.listing_share_breakdown,
-                  listing_leads_breakdown: update.listing_leads_breakdown
+                  listing_leads_breakdown: update.listing_leads_breakdown,
+                  listing_impressions_breakdown: update.listing_impressions_breakdown
                 })
                 .eq('id', update.id)
                   .then(({ error }) => ({ id: update.id, error }))
@@ -3717,17 +3888,20 @@ export async function POST(request) {
         
         // CRITICAL FIX: Calculate cumulative totals from user_analytics table (atomic recalculation)
         // This ensures data integrity by recalculating from scratch, not adding to potentially wrong DB values
-        // Similar to how cumulative_listing_views is calculated from listing_analytics
+        // Use total_views directly from user_analytics (which already = total_listing_views + profile_views)
         const developerIdsForCumulative = Object.keys(allDeveloperTotals)
-        let cumulativeUserAnalytics = {} // Map<developerId, {profile_views, total_leads, total_impressions}>
+        let cumulativeUserAnalytics = {} // Map<developerId, {total_views, total_listing_views, profile_views, total_leads, total_impressions}>
         
         if (developerIdsForCumulative.length > 0) {
           try {
             // Use SQL aggregation to get cumulative totals from user_analytics table
             // This sums ALL historical data, ensuring atomic recalculation
+            // IMPORTANT: Fetch total_views directly (it already contains listing + profile views)
+            // Also fetch total_listing_views and profile_views separately for breakdown display
+            // Fetch impressions breakdown fields for impressions_breakdown calculation
             const { data: cumulativeData, error: cumulativeError } = await supabaseAdmin
               .from('user_analytics')
-              .select('user_id, profile_views, total_leads, total_impressions_received')
+              .select('user_id, total_views, total_listing_views, profile_views, total_leads, total_impressions_received, impression_social_media_received, impression_website_visit_received, impression_share_received, impression_saved_listing_received')
               .in('user_id', developerIdsForCumulative)
               .eq('user_type', 'developer')
             
@@ -3739,14 +3913,31 @@ export async function POST(request) {
                 const userId = row.user_id
                 if (!cumulativeUserAnalytics[userId]) {
                   cumulativeUserAnalytics[userId] = {
+                    total_views: 0,
+                    total_listing_views: 0,
                     profile_views: 0,
                     total_leads: 0,
-                    total_impressions: 0
+                    total_impressions: 0,
+                    impressions_breakdown: {
+                      social_media: 0,
+                      website_visit: 0,
+                      share: 0,
+                      saved_listing: 0
+                    }
                   }
                 }
+                // Use total_views directly from user_analytics (source of truth)
+                cumulativeUserAnalytics[userId].total_views += Number(row.total_views) || 0
+                // Also track breakdown for display purposes
+                cumulativeUserAnalytics[userId].total_listing_views += Number(row.total_listing_views) || 0
                 cumulativeUserAnalytics[userId].profile_views += Number(row.profile_views) || 0
                 cumulativeUserAnalytics[userId].total_leads += Number(row.total_leads) || 0
                 cumulativeUserAnalytics[userId].total_impressions += Number(row.total_impressions_received) || 0
+                // Aggregate impressions breakdown
+                cumulativeUserAnalytics[userId].impressions_breakdown.social_media += Number(row.impression_social_media_received) || 0
+                cumulativeUserAnalytics[userId].impressions_breakdown.website_visit += Number(row.impression_website_visit_received) || 0
+                cumulativeUserAnalytics[userId].impressions_breakdown.share += Number(row.impression_share_received) || 0
+                cumulativeUserAnalytics[userId].impressions_breakdown.saved_listing += Number(row.impression_saved_listing_received) || 0
               }
               logSuccess(`Calculated cumulative totals from user_analytics for ${Object.keys(cumulativeUserAnalytics).length} developers`)
             }
@@ -3764,23 +3955,37 @@ export async function POST(request) {
           // DO NOT reference current DB values - recalculate from scratch to ensure data integrity
           // This fixes the compounding error issue where wrong DB values would stay wrong
           const cumulative = cumulativeUserAnalytics[developerId] || {
+            total_views: 0,
+            total_listing_views: 0,
             profile_views: 0,
             total_leads: 0,
-            total_impressions: 0
+            total_impressions: 0,
+            impressions_breakdown: {
+              social_media: 0,
+              website_visit: 0,
+              share: 0,
+              saved_listing: 0
+            }
           }
           
-          // For total_listings_views: use cumulative value from ALL historical listing_analytics data
-          // This ensures we have the complete sum of all views across all time periods
-          const newTotalListingViews = hourly.cumulative_listing_views !== undefined 
-            ? hourly.cumulative_listing_views  // Use cumulative value from all listing_analytics
-            : 0 // If no cumulative value, use 0 (don't add to potentially wrong DB value)
+          // CRITICAL FIX: Use total_views directly from user_analytics (source of truth)
+          // user_analytics.total_views already = total_listing_views + profile_views per row
+          // Summing all total_views from user_analytics ensures consistency and fixes discrepancies
+          // This is the authoritative source - don't recalculate from listing_analytics + profile_views
+          // because that can lead to mismatches if the two sources get out of sync
+          const newTotalViews = cumulative.total_views
+          
+          // For breakdown display: use cumulative values from user_analytics
+          // Prefer user_analytics values over listing_analytics to ensure consistency
+          const newTotalListingViews = cumulative.total_listing_views > 0
+            ? cumulative.total_listing_views  // Use from user_analytics (source of truth)
+            : (hourly.cumulative_listing_views !== undefined 
+                ? hourly.cumulative_listing_views  // Fallback to listing_analytics if user_analytics is 0
+                : 0)
           
           // CRITICAL FIX: Use cumulative profile_views from user_analytics (not current DB + hourly)
           // This ensures atomic recalculation - if DB was wrong, it gets corrected
           const newTotalProfileViews = cumulative.profile_views
-          
-          // Total views = listing views + profile views (both from cumulative sources)
-          const newTotalViews = newTotalListingViews + newTotalProfileViews
           
           // CRITICAL FIX: Use cumulative total_leads from user_analytics (not current DB + hourly)
           const newTotalLeads = cumulative.total_leads
@@ -3806,6 +4011,27 @@ export async function POST(request) {
             impressions_change: hourly.impressions_change || 0
           }
           
+          // Calculate impressions breakdown with percentages
+          const totalImpressions = cumulative.total_impressions || 0
+          const impressionsBreakdown = {
+            social_media: {
+              total: cumulative.impressions_breakdown.social_media || 0,
+              percentage: totalImpressions > 0 ? Number(((cumulative.impressions_breakdown.social_media || 0) / totalImpressions) * 100).toFixed(2) : 0
+            },
+            website_visit: {
+              total: cumulative.impressions_breakdown.website_visit || 0,
+              percentage: totalImpressions > 0 ? Number(((cumulative.impressions_breakdown.website_visit || 0) / totalImpressions) * 100).toFixed(2) : 0
+            },
+            share: {
+              total: cumulative.impressions_breakdown.share || 0,
+              percentage: totalImpressions > 0 ? Number(((cumulative.impressions_breakdown.share || 0) / totalImpressions) * 100).toFixed(2) : 0
+            },
+            saved_listing: {
+              total: cumulative.impressions_breakdown.saved_listing || 0,
+              percentage: totalImpressions > 0 ? Number(((cumulative.impressions_breakdown.saved_listing || 0) / totalImpressions) * 100).toFixed(2) : 0
+            }
+          }
+
           // Get leads breakdown for this developer (cumulative from ALL leads in leads table)
           // This aggregates all leads across all time, not just the current run
           const leadsBreakdown = leadsBreakdownMap[developerId] || {
@@ -3846,7 +4072,8 @@ export async function POST(request) {
                 views_change: hourly.views_change || 0,
                 leads_change: hourly.leads_change || 0,
                 impressions_change: hourly.impressions_change || 0,
-                leads_breakdown: leadsBreakdown // This aggregates ALL leads from leads table
+                leads_breakdown: leadsBreakdown, // This aggregates ALL leads from leads table
+                impressions_breakdown: impressionsBreakdown // This aggregates ALL impressions from user_analytics
             })
             .eq('developer_id', developerId)
               .then(({ error, data }) => {
@@ -4498,11 +4725,11 @@ export async function POST(request) {
       listings_processed: allListingRows.length,
       users_processed: allUserRows.length,
       developments_processed: allDevelopmentRows.length,
-      leads_processed: allLeadRows.length,
+      leads_processed: 0, // COMMENTED OUT: allLeadRows.length - leads are now created in real-time, not in cron
       listings_inserted: insertResults.listings.inserted,
       users_inserted: insertResults.users.inserted,
       developments_inserted: insertResults.developments.inserted,
-      leads_inserted: insertResults.leads.inserted,
+      leads_inserted: 0, // COMMENTED OUT: insertResults.leads.inserted - leads are now created in real-time
       ...(testTimeSeries ? { metadata: { lastProcessedDate: simulatedDate, hoursProcessed: hoursToProcess.length } } : {})
     })
 
@@ -4523,7 +4750,9 @@ export async function POST(request) {
 
     // Serialize development and lead rows (no Sets in these, but ensure they're serializable)
     const serializeDevelopmentRows = allDevelopmentRows.map(row => ({ ...row }))
-    const serializeLeadRows = allLeadRows.map(row => ({ ...row }))
+    // COMMENTED OUT: serializeLeadRows - leads are now created in real-time, not in cron
+    // const serializeLeadRows = allLeadRows.map(row => ({ ...row }))
+    const serializeLeadRows = [] // Empty array since leads are created in real-time
 
     return NextResponse.json({
       success: true,
@@ -4554,7 +4783,7 @@ export async function POST(request) {
         listings: allListingRows.length,
         users: allUserRows.length,
         developments: allDevelopmentRows.length,
-        leads: allLeadRows.length
+        leads: 0 // COMMENTED OUT: allLeadRows.length - leads are now created in real-time
       },
       inserted: insertResults,
       posthog: {

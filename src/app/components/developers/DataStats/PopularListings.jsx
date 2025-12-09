@@ -144,12 +144,12 @@ const PopularListings = ({ limit = 7 }) => {
                     </div>
 
                     <div className="flex-1 flex flex-col">
-                      <h6 className="text-lg font-semibold leading-tight line-clamp-2 mb-2">
+                      <h6 className="text-sm font-medium leading-tight line-clamp-2 mb-2">
                         {listing.title}
                       </h6>
                       <div className="flex items-center gap-2 text-sm mb-3">
                         <MapPin className="w-3 h-3" />
-                        <span className="truncate">{formatLocation(listing)}</span>
+                        <span className="truncate text-[0.8em]">{formatLocation(listing)}</span>
                       </div>
 
                       <div className="mt-auto">

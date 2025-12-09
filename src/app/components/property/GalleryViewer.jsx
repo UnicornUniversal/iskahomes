@@ -125,7 +125,7 @@ const GalleryViewer = ({ media }) => {
                   // Width is handled by Swiper/breakpoints. Height is handled by aspect ratio.
                   <SwiperSlide key={image?.id || index}>
                     <div className="block w-full">
-                      <div className="relative w-full aspect-square overflow-hidden rounded-2xl border border-gray-200 bg-gray-100">
+                      <div className="relative w-full aspect-square overflow-hidden  border border-gray-200 bg-gray-100">
                         <img
                           src={imageSrc}
                           alt={`Gallery ${index + 1}`}

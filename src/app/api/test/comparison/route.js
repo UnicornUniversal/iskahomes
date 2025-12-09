@@ -138,8 +138,9 @@ function aggregateEventsForUser(events, userId) {
         dayEntry.total_views++
         break
       case 'listing_impression':
-        totals.total_impressions_received++
-        dayEntry.total_impressions++
+        // UPDATED: listing_impression is NOT an impression - it's just a view with metadata
+        // Impressions = Engagement = Interactions only (saves, shares, website clicks, social media clicks)
+        // Do NOT count as impression - views are tracked separately
         break
       case 'impression_social_media':
         totals.impression_social_media_received++

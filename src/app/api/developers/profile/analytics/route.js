@@ -18,6 +18,42 @@ function getDateNDaysAgo(days) {
   return date.toISOString().split('T')[0]
 }
 
+function getStartDateForRange(range) {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  
+  switch (range) {
+    case 'today':
+      return today.toISOString().split('T')[0]
+    
+    case 'week': {
+      const dayOfWeek = today.getDay()
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+      const monday = new Date(today)
+      monday.setUTCDate(today.getUTCDate() - daysToMonday)
+      return monday.toISOString().split('T')[0]
+    }
+    
+    case 'month': {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+      return firstDay.toISOString().split('T')[0]
+    }
+    
+    case 'year': {
+      const firstDayOfYear = new Date(today.getFullYear(), 0, 1)
+      return firstDayOfYear.toISOString().split('T')[0]
+    }
+    
+    case 'all':
+      return '2020-01-01' // Early date to get all data
+    
+    default:
+      // Default to this month
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+      return firstDay.toISOString().split('T')[0]
+  }
+}
+
 function aggregateUserAnalytics(rows) {
   const totals = {
     profile_views: 0,
@@ -112,12 +148,17 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const rangeDays = parseInt(searchParams.get('range') || '30', 10)
-    const clampedRange = Number.isNaN(rangeDays) ? 30 : Math.min(Math.max(rangeDays, 7), 180)
-    const startDate = getDateNDaysAgo(clampedRange)
+    const range = searchParams.get('range') || 'month'
+    const startDate = getStartDateForRange(range)
     const endDate = new Date().toISOString().split('T')[0]
     const startDateTime = `${startDate}T00:00:00Z`
     const endDateTime = `${endDate}T23:59:59Z`
+    
+    // Calculate range_days for display purposes
+    const startDateObj = new Date(startDate)
+    const endDateObj = new Date(endDate)
+    const diffTime = Math.abs(endDateObj - startDateObj)
+    const rangeDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
 
     const developerId = decoded.user_id
 
@@ -132,7 +173,8 @@ export async function GET(request) {
           developer_id,
           name,
           slug,
-          leads_breakdown
+          leads_breakdown,
+          impressions_breakdown
         `)
         .eq('developer_id', developerId)
         .single(),
@@ -242,16 +284,22 @@ export async function GET(request) {
           total_impressions: totals.total_impressions,
           total_saved: savedPropertiesCount,
           total_appointments: appointmentsCount,
-          leads_breakdown: parseJSON(developer?.leads_breakdown, {})
+          leads_breakdown: parseJSON(developer?.leads_breakdown, {}),
+          impressions_breakdown: parseJSON(developer?.impressions_breakdown, {})
         },
         summary: {
-          range_days: clampedRange,
+          range_days: rangeDays,
+          range_type: range,
           profile_views: totals.profile_views,
           unique_profile_viewers: totals.unique_profile_viewers,
-        profile_views_from_home: totals.profile_views_from_home,
-        profile_views_from_listings: totals.profile_views_from_listings,
-        profile_views_from_search: totals.profile_views_from_search,
+          profile_views_from_home: totals.profile_views_from_home,
+          profile_views_from_listings: totals.profile_views_from_listings,
+          profile_views_from_search: totals.profile_views_from_search,
           total_impressions: totals.total_impressions,
+          impression_social_media: totals.impression_social_media,
+          impression_website: totals.impression_website,
+          impression_share: totals.impression_share,
+          impression_saved: totals.impression_saved,
           appointments_booked: appointmentsCount,
           properties_saved: savedPropertiesCount
         },

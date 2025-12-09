@@ -75,6 +75,7 @@ export function useAnalytics() {
     // Normalize property names - handle both camelCase and snake_case
     const listingId = additionalContext.listingId || additionalContext.listing_id
     const profileId = additionalContext.profileId || additionalContext.profile_id
+    const developmentId = additionalContext.developmentId || additionalContext.development_id
     const contextType = additionalContext.contextType || additionalContext.context_type
     const messageType = additionalContext.messageType || additionalContext.message_type
     const appointmentType = additionalContext.appointmentType || additionalContext.appointment_type
@@ -95,6 +96,8 @@ export function useAnalytics() {
       listing_id: listingId, // Also set snake_case version
       profileId: profileId,
       profile_id: profileId, // Also set snake_case version
+      developmentId: developmentId,
+      development_id: developmentId, // Also set snake_case version
       contextType: contextType,
       context_type: contextType, // Also set snake_case version
       messageType: messageType,
@@ -283,16 +286,18 @@ export function useAnalytics() {
    * @param {string} phoneAction - 'click' or 'copy'
    * @param {object} context - Context data
    */
-  const trackPhoneInteraction = useCallback((phoneAction, context = {}) => {
+  const trackPhoneInteraction = useCallback(async (phoneAction, context = {}) => {
     const seekerContext = getSeekerContext(context)
     const listerContext = getListerContext(context)
     
+    // Send to PostHog for analytics
     captureAndQueue('lead', {
       lead_type: 'phone', // Unified lead event with lead_type
       action: phoneAction, // 'click' or 'copy'
-      context_type: seekerContext.contextType, // 'profile' or 'listing'
+      context_type: seekerContext.contextType, // 'profile', 'listing', or 'development'
       listing_id: seekerContext.listingId,
       profile_id: seekerContext.profileId,
+      development_id: seekerContext.developmentId,
       lister_id: listerContext.lister_id,
       lister_type: listerContext.lister_type,
       phone_number: seekerContext.phoneNumber, // Optional: store hashed or masked version
@@ -300,21 +305,49 @@ export function useAnalytics() {
       is_logged_in: seekerContext.is_logged_in,
       timestamp: nowIso()
     })
-  }, [posthog, getSeekerContext, getListerContext])
+
+    // Create lead in database immediately (real-time)
+    if (listerContext.lister_id && listerContext.lister_type && seekerContext.seekerId) {
+      try {
+        await fetch('/api/leads/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lead_type: 'phone',
+            context_type: seekerContext.contextType || 'listing',
+            listing_id: seekerContext.listingId,
+            development_id: seekerContext.developmentId,
+            lister_id: listerContext.lister_id,
+            lister_type: listerContext.lister_type,
+            seeker_id: seekerContext.seekerId,
+            action: phoneAction,
+            phone_number: seekerContext.phoneNumber,
+            is_logged_in: seekerContext.is_logged_in,
+            timestamp: nowIso()
+          })
+        })
+      } catch (error) {
+        console.error('Error creating lead:', error)
+        // Don't throw - analytics should not break the app
+      }
+    }
+  }, [posthog, getSeekerContext, getListerContext, captureAndQueue])
 
   /**
    * Track when user clicks on messages/chat
    * @param {object} context - Context data
    */
-  const trackMessageClick = useCallback((context = {}) => {
+  const trackMessageClick = useCallback(async (context = {}) => {
     const seekerContext = getSeekerContext(context)
     const listerContext = getListerContext(context)
     
+    // Send to PostHog for analytics
     captureAndQueue('lead', {
       lead_type: 'message', // Unified lead event with lead_type
-      context_type: seekerContext.contextType, // 'profile' or 'listing'
+      context_type: seekerContext.contextType, // 'profile', 'listing', or 'development'
       listing_id: seekerContext.listingId,
       profile_id: seekerContext.profileId,
+      development_id: seekerContext.developmentId,
       lister_id: listerContext.lister_id,
       lister_type: listerContext.lister_type,
       message_type: seekerContext.messageType, // 'direct_message', 'whatsapp', 'email'
@@ -322,21 +355,48 @@ export function useAnalytics() {
       is_logged_in: seekerContext.is_logged_in,
       timestamp: nowIso()
     })
-  }, [posthog, getSeekerContext, getListerContext])
+
+    // Create lead in database immediately (real-time)
+    if (listerContext.lister_id && listerContext.lister_type && seekerContext.seekerId) {
+      try {
+        await fetch('/api/leads/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lead_type: 'message',
+            context_type: seekerContext.contextType || 'listing',
+            listing_id: seekerContext.listingId,
+            development_id: seekerContext.developmentId,
+            lister_id: listerContext.lister_id,
+            lister_type: listerContext.lister_type,
+            seeker_id: seekerContext.seekerId,
+            message_type: seekerContext.messageType || 'direct_message',
+            is_logged_in: seekerContext.is_logged_in,
+            timestamp: nowIso()
+          })
+        })
+      } catch (error) {
+        console.error('Error creating lead:', error)
+        // Don't throw - analytics should not break the app
+      }
+    }
+  }, [posthog, getSeekerContext, getListerContext, captureAndQueue])
 
   /**
    * Track when user clicks to book an appointment
    * @param {object} context - Context data
    */
-  const trackAppointmentClick = useCallback((context = {}) => {
+  const trackAppointmentClick = useCallback(async (context = {}) => {
     const seekerContext = getSeekerContext(context)
     const listerContext = getListerContext(context)
     
+    // Send to PostHog for analytics
     captureAndQueue('lead', {
       lead_type: 'appointment', // Unified lead event with lead_type
-      context_type: seekerContext.contextType, // 'profile' or 'listing'
+      context_type: seekerContext.contextType, // 'profile', 'listing', or 'development'
       listing_id: seekerContext.listingId,
       profile_id: seekerContext.profileId,
+      development_id: seekerContext.developmentId,
       lister_id: listerContext.lister_id,
       lister_type: listerContext.lister_type,
       appointment_type: seekerContext.appointmentType, // 'viewing', 'consultation', etc.
@@ -344,7 +404,32 @@ export function useAnalytics() {
       is_logged_in: seekerContext.is_logged_in,
       timestamp: nowIso()
     })
-  }, [posthog, getSeekerContext, getListerContext])
+
+    // Create lead in database immediately (real-time)
+    if (listerContext.lister_id && listerContext.lister_type && seekerContext.seekerId) {
+      try {
+        await fetch('/api/leads/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lead_type: 'appointment',
+            context_type: seekerContext.contextType || 'listing',
+            listing_id: seekerContext.listingId,
+            development_id: seekerContext.developmentId,
+            lister_id: listerContext.lister_id,
+            lister_type: listerContext.lister_type,
+            seeker_id: seekerContext.seekerId,
+            appointment_type: seekerContext.appointmentType || 'viewing',
+            is_logged_in: seekerContext.is_logged_in,
+            timestamp: nowIso()
+          })
+        })
+      } catch (error) {
+        console.error('Error creating lead:', error)
+        // Don't throw - analytics should not break the app
+      }
+    }
+  }, [posthog, getSeekerContext, getListerContext, captureAndQueue])
 
   // ============================================
   // ADDITIONAL UTILITY EVENTS
@@ -508,21 +593,64 @@ export function useAnalytics() {
   /**
    * Track development lead (inquiries, contact forms, etc.)
    * @param {string} developmentId - The development ID
-   * @param {string} leadType - Type of lead
+   * @param {string} leadType - Type of lead ('phone', 'message', 'appointment')
    * @param {object} context - Additional context
    */
-  const trackDevelopmentLead = useCallback((developmentId, leadType, context = {}) => {
+  const trackDevelopmentLead = useCallback(async (developmentId, leadType, context = {}) => {
     const listerContext = getListerContext(context)
+    const seekerContext = getSeekerContext(context)
     
+    // Send to PostHog for analytics
     captureAndQueue('development_lead', {
       development_id: developmentId,
-      lead_type: leadType, // 'inquiry', 'contact_form', 'phone', 'email'
+      lead_type: leadType, // 'phone', 'message', 'appointment'
       lister_id: listerContext.lister_id,
       lister_type: listerContext.lister_type,
       contact_method: context.contactMethod,
+      seeker_id: seekerContext.seekerId,
+      is_logged_in: seekerContext.is_logged_in,
       timestamp: nowIso()
     })
-  }, [posthog, getListerContext])
+
+    // Create lead in database immediately (real-time)
+    if (listerContext.lister_id && listerContext.lister_type && seekerContext.seekerId) {
+      try {
+        // Map development lead types to standard lead types
+        const leadTypeMap = {
+          'phone': 'phone',
+          'email': 'message',
+          'message': 'message',
+          'appointment': 'appointment',
+          'inquiry': 'message',
+          'contact_form': 'message'
+        }
+        const mappedLeadType = leadTypeMap[leadType] || 'message'
+        
+        await fetch('/api/leads/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lead_type: mappedLeadType,
+            context_type: 'development',
+            development_id: developmentId,
+            lister_id: listerContext.lister_id,
+            lister_type: listerContext.lister_type,
+            seeker_id: seekerContext.seekerId,
+            action: leadType === 'phone' ? 'click' : undefined,
+            message_type: (leadType === 'email' || leadType === 'message' || leadType === 'inquiry' || leadType === 'contact_form') 
+              ? (context.contactMethod === 'email' ? 'email' : 'direct_message') 
+              : undefined,
+            appointment_type: leadType === 'appointment' ? (context.appointmentType || 'viewing') : undefined,
+            is_logged_in: seekerContext.is_logged_in,
+            timestamp: nowIso()
+          })
+        })
+      } catch (error) {
+        console.error('Error creating development lead:', error)
+        // Don't throw - analytics should not break the app
+      }
+    }
+  }, [posthog, getListerContext, getSeekerContext, captureAndQueue])
 
   return {
     // Core Analytics (Main 4 categories)

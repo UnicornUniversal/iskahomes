@@ -15,34 +15,34 @@ const SearchProperties = ({ filters = {} }) => {
 
   // Helper function to build API params - use useCallback to memoize
   const buildParams = useCallback((offset = 0, limit = 15) => {
-    const params = new URLSearchParams();
-    
-    // Map filters from Filters component to API parameters
-    if (filters.purposeIds && filters.purposeIds.length > 0) {
-      filters.purposeIds.forEach(id => params.append('purpose_id', id));
-    }
-    
-    if (filters.typeId) {
-      params.append('property_type_id', filters.typeId);
-    }
-    
-    if (filters.subtypeIds && filters.subtypeIds.length > 0) {
-      filters.subtypeIds.forEach(id => params.append('subtype_id', id));
-    }
-    
-    if (filters.country) params.append('country', filters.country);
-    if (filters.state) params.append('state', filters.state);
-    if (filters.city) params.append('city', filters.city);
-    if (filters.town) params.append('town', filters.town);
-    if (filters.priceMin) params.append('price_min', filters.priceMin);
-    if (filters.priceMax) params.append('price_max', filters.priceMax);
-    if (filters.bedrooms) params.append('bedrooms', filters.bedrooms);
-    if (filters.bathrooms) params.append('bathrooms', filters.bathrooms);
-    
-    if (filters.specifications && Object.keys(filters.specifications).length > 0) {
-      params.append('specifications', JSON.stringify(filters.specifications));
-    }
-    
+        const params = new URLSearchParams();
+        
+        // Map filters from Filters component to API parameters
+        if (filters.purposeIds && filters.purposeIds.length > 0) {
+          filters.purposeIds.forEach(id => params.append('purpose_id', id));
+        }
+        
+        if (filters.typeId) {
+          params.append('property_type_id', filters.typeId);
+        }
+        
+        if (filters.subtypeIds && filters.subtypeIds.length > 0) {
+          filters.subtypeIds.forEach(id => params.append('subtype_id', id));
+        }
+        
+        if (filters.country) params.append('country', filters.country);
+        if (filters.state) params.append('state', filters.state);
+        if (filters.city) params.append('city', filters.city);
+        if (filters.town) params.append('town', filters.town);
+        if (filters.priceMin) params.append('price_min', filters.priceMin);
+        if (filters.priceMax) params.append('price_max', filters.priceMax);
+        if (filters.bedrooms) params.append('bedrooms', filters.bedrooms);
+        if (filters.bathrooms) params.append('bathrooms', filters.bathrooms);
+        
+        if (filters.specifications && Object.keys(filters.specifications).length > 0) {
+          params.append('specifications', JSON.stringify(filters.specifications));
+        }
+        
     params.append('offset', offset.toString());
     params.append('limit', limit.toString());
     
@@ -243,10 +243,10 @@ const SearchProperties = ({ filters = {} }) => {
           <>
             {/* Desktop - Vertical Cards (lg and above) */}
             <div className="hidden lg:grid grid-cols-1 gap-5">
-              {listings.map((listing) => (
-                <SecondaryListingCard key={listing.id} listing={listing} />
-              ))}
-            </div>
+            {listings.map((listing) => (
+              <SecondaryListingCard key={listing.id} listing={listing} />
+            ))}
+          </div>
 
             {/* Mobile/Tablet - Horizontal Cards (below lg) */}
             <div className="lg:hidden flex flex-col gap-3">

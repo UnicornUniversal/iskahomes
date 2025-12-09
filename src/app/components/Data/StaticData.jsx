@@ -24,6 +24,10 @@ import {
   FaWater,
   FaExclamationTriangle,
   FaMicrophone,
+  // Additional Icons for Services
+  FaVideo,
+  FaCube,
+  FaChartLine,
 } from 'react-icons/fa';
 import {
   // Material Design Icons
@@ -3434,6 +3438,42 @@ export const dynamic_images = [
     imageClasses: 'p w-full h-[15em] mx-auto md:w-[20em] md:h-[20em] break-inside-avoid ',
   }
 ]
+// Iska Services Data
+export const iskaServices = [
+  {
+    id: 1,
+    title: "Virtual Tours",
+    excerpt: "Experience properties from anywhere with immersive 360° virtual tours",
+    description: "Our cutting-edge virtual tour technology allows you to explore properties in stunning detail from the comfort of your home. Walk through every room, examine finishes, and get a true sense of space and layout. Perfect for remote viewing, international clients, or when you want to preview multiple properties efficiently.",
+    image: "https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=800&h=600&fit=crop",
+    icon: FaVideo
+  },
+  {
+    id: 2,
+    title: "3D Visualization",
+    excerpt: "See your dream property come to life with photorealistic 3D renderings",
+    description: "Transform your vision into reality with our professional 3D visualization services. Whether you're planning a new build, renovation, or interior design project, our team creates stunning photorealistic renderings that help you visualize the final result before construction begins. Make informed decisions and ensure your project meets your expectations.",
+    image: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&h=600&fit=crop",
+    icon: FaCube
+  },
+  {
+    id: 3,
+    title: "Smart Home Installation",
+    excerpt: "Transform your property into an intelligent, connected living space",
+    description: "Upgrade your home with state-of-the-art smart home technology. Our expert installation team integrates smart lighting, climate control, security systems, voice assistants, and automated appliances to create a seamless, energy-efficient living experience. Control your entire home from your smartphone and enjoy the convenience of modern living.",
+    image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=600&fit=crop",
+    icon: FaHome
+  },
+  {
+    id: 4,
+    title: "Smart Planning Consultation",
+    excerpt: "Expert guidance to make informed decisions about your property investment",
+    description: "Get personalized advice from our experienced property consultants. We help you understand market trends, evaluate investment opportunities, plan your property development, and navigate legal requirements. Our comprehensive consultation services ensure you make smart decisions that align with your goals, budget, and timeline.",
+    image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&h=600&fit=crop",
+    icon: FaChartLine
+  }
+];
+
 export default propertySpecificationsData;
 
 

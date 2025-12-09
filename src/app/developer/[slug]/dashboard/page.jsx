@@ -17,7 +17,8 @@ import RecentSales from '@/app/components/developers/DataStats/RecentSales'
 import PopularListings from '@/app/components/developers/DataStats/PopularListings'
 import LatestReminders from '@/app/components/developers/DataStats/LatestReminders'
 import { formatCurrency } from '@/lib/utils'
-
+import Notifications from '@/app/components/general/Notifications'    
+import SimpleServices from '@/app/components/general/SimpleServices'
 const page = () => {
   const { user } = useAuth()
 
@@ -102,10 +103,17 @@ const page = () => {
         </div>
    
 
+
+<div className='w-full flex items-start   gap-4'>
+
+
+
+{/* this si the main content of the dashboard */}
       <div className='w-full flex flex-col gap-4'>
-        <div className='\p-4 rounded-2xl shadow-sm'>
+        <div className='p-4 rounded-2xl shadow-sm'>
           <StatisticsView />
         </div>
+
 
      
 
@@ -113,7 +121,7 @@ const page = () => {
             <RecentSales />
           </div>
 
-        <div className='w-full flex justify-between gap-4 flex-col md:grid md:grid-cols-3 gap-4'>
+        <div className='w-full flex justify-between gap-4 flex-col md:grid lg:grid-cols-3 gap-4'>
        
           <div className='secondary_bg p-4 rounded-2xl shadow-sm flex-1'>
             <RecentMessages />
@@ -141,7 +149,7 @@ const page = () => {
      </div>
 
 
-        <div className='secondary_bg p-4 rounded-2xl shadow-sm'>
+        <div className='secondary_bg   rounded-2xl shadow-sm'>
           <PopularListings limit={4} />
         </div>
         <LatestLeads />  
@@ -160,6 +168,18 @@ const page = () => {
  
     
       </div>
+
+
+
+
+         {/* notification and services  */}
+         {/* <div className='flex flex-col lg:w-[30%] scale-90 max-w-[500px] items-center justify-center  gap-4'>
+         <SimpleServices />
+          <Notifications />
+        </div> */}
+
+
+        </div>
     </div>
   )
 }

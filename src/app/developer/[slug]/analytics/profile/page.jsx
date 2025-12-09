@@ -11,7 +11,10 @@ import {
   Users,
   Share2,
   Bookmark,
-  Calendar
+  Calendar,
+  Globe,
+  Heart,
+  TrendingUp
 } from 'lucide-react'
 import {
   Chart as ChartJS,
@@ -22,9 +25,10 @@ import {
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
+  ArcElement
 } from 'chart.js'
-import { Line } from 'react-chartjs-2'
+import { Line, Doughnut } from 'react-chartjs-2'
 
 ChartJS.register(
   CategoryScale,
@@ -34,14 +38,16 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
+  ArcElement
 )
 
 const rangeOptions = [
-  { value: '7', label: 'Last 7 days' },
-  { value: '30', label: 'Last 30 days' },
-  { value: '90', label: 'Last 90 days' },
-  { value: '120', label: 'Last 120 days' }
+  { value: 'today', label: 'Today' },
+  { value: 'week', label: 'This Week' },
+  { value: 'month', label: 'This Month' },
+  { value: 'year', label: 'This Year' },
+  { value: 'all', label: 'All' }
 ]
 
 const formatNumber = (value) => {
@@ -69,28 +75,415 @@ const ChangeBadge = ({ change }) => {
   )
 }
 
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'top'
-    }
-  },
-  scales: {
-    y: {
-      beginAtZero: true
-    }
-  }
+// Summary Cards Component
+const SummaryCards = ({ developer }) => {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <DataCard
+        title="Profile Views"
+        value={formatNumber(developer?.total_profile_views)}
+        icon={Eye}
+        subtitle="Total visits"
+      />
+      <DataCard
+        title="Total Views"
+        value={formatNumber(developer?.total_views)}
+        icon={Eye}
+        subtitle="All views"
+      />
+      <DataCard
+        title="Impressions"
+        value={formatNumber(developer?.total_impressions)}
+        icon={Share2}
+        subtitle="All channels"
+      />
+      <DataCard
+        title="Appointments"
+        value={formatNumber(developer?.total_appointments)}
+        icon={Calendar}
+        subtitle="Booked via listings"
+      />
+    </div>
+  )
 }
 
+// Profile Views Chart Component
+const ProfileViewsChart = ({ profileSeries, latest }) => {
+  const chartData = useMemo(
+    () => ({
+      labels: profileSeries.map(entry =>
+        new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      ),
+      datasets: [
+        {
+          label: 'Profile Views',
+          data: profileSeries.map(entry => entry.total),
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37, 99, 235, 0.15)',
+          tension: 0.4,
+          fill: true
+        },
+        {
+          label: 'Unique Visitors',
+          data: profileSeries.map(entry => entry.unique),
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.15)',
+          tension: 0.4,
+          fill: true
+        }
+      ]
+    }),
+    [profileSeries]
+  )
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top'
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true
+      }
+    }
+  }
+
+  return (
+    <div className="secondary_bg p-6 border border-gray-200 rounded-2xl">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-lg font-semibold text-primary_color">Profile Views Trend</h3>
+          <p className="text-sm text-gray-500">Daily views vs unique visitors</p>
+        </div>
+        <ChangeBadge change={latest?.profile_views_change} />
+      </div>
+      {profileSeries.length > 0 ? (
+        <div className="h-80">
+          <Line data={chartData} options={chartOptions} />
+        </div>
+      ) : (
+        <div className="h-80 flex items-center justify-center text-gray-500 text-sm">
+          No profile activity recorded for this range.
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Impressions Chart Component
+const ImpressionsChart = ({ impressionsSeries, latest }) => {
+  const chartData = useMemo(
+    () => ({
+      labels: impressionsSeries.map(entry =>
+        new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      ),
+      datasets: [
+        {
+          label: 'Total Impressions',
+          data: impressionsSeries.map(entry => entry.total),
+          borderColor: '#f97316',
+          backgroundColor: 'rgba(249, 115, 22, 0.15)',
+          tension: 0.4,
+          fill: true
+        },
+        {
+          label: 'Social Media',
+          data: impressionsSeries.map(entry => entry.social),
+          borderColor: '#8b5cf6',
+          backgroundColor: 'rgba(139, 92, 246, 0.15)',
+          tension: 0.4,
+          fill: true
+        },
+        {
+          label: 'Website Visits',
+          data: impressionsSeries.map(entry => entry.website),
+          borderColor: '#0ea5e9',
+          backgroundColor: 'rgba(14, 165, 233, 0.15)',
+          tension: 0.4,
+          fill: true
+        },
+        {
+          label: 'Shares',
+          data: impressionsSeries.map(entry => entry.share),
+          borderColor: '#ec4899',
+          backgroundColor: 'rgba(236, 72, 153, 0.15)',
+          tension: 0.4,
+          fill: true
+        },
+        {
+          label: 'Saved',
+          data: impressionsSeries.map(entry => entry.saved),
+          borderColor: '#14b8a6',
+          backgroundColor: 'rgba(20, 184, 166, 0.15)',
+          tension: 0.4,
+          fill: true
+        }
+      ]
+    }),
+    [impressionsSeries]
+  )
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top'
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true
+      }
+    }
+  }
+
+  return (
+    <div className="secondary_bg p-6 border border-gray-200 rounded-2xl">
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold text-primary_color">Impressions & Reach</h3>
+        <p className="text-sm text-gray-500">Channel level breakdown over time</p>
+      </div>
+      {impressionsSeries.length > 0 ? (
+        <div className="h-80">
+          <Line data={chartData} options={chartOptions} />
+        </div>
+      ) : (
+        <div className="h-80 flex items-center justify-center text-gray-500 text-sm">
+          No impression data recorded for this range.
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Impressions Breakdown Component
+const ImpressionsBreakdown = ({ impressionsBreakdown, summary }) => {
+  if (!impressionsBreakdown || Object.keys(impressionsBreakdown).length === 0) {
+    // Fallback to summary data if breakdown not available
+    const total = summary?.total_impressions || 0
+    const social = summary?.impression_social_media || 0
+    const website = summary?.impression_website || 0
+    const share = summary?.impression_share || 0
+    const saved = summary?.impression_saved || 0
+
+    if (total === 0) {
+      return (
+        <div className="secondary_bg p-6 border border-gray-200 rounded-2xl">
+          <h3 className="text-lg font-semibold text-primary_color mb-4">Impressions Breakdown</h3>
+          <div className="text-center text-gray-500 py-8">No impressions data available</div>
+        </div>
+      )
+    }
+
+    const breakdownData = [
+      { label: 'Social Media', value: social, color: '#8b5cf6', icon: Share2 },
+      { label: 'Website Visits', value: website, color: '#0ea5e9', icon: Globe },
+      { label: 'Shares', value: share, color: '#ec4899', icon: Share2 },
+      { label: 'Saved', value: saved, color: '#14b8a6', icon: Heart }
+    ].filter(item => item.value > 0)
+
+    const chartData = {
+      labels: breakdownData.map(item => item.label),
+      datasets: [
+        {
+          data: breakdownData.map(item => item.value),
+          backgroundColor: breakdownData.map(item => item.color),
+          borderWidth: 0
+        }
+      ]
+    }
+
+    return (
+      <div className="secondary_bg p-6 border border-gray-200 rounded-2xl">
+        <h3 className="text-lg font-semibold text-primary_color mb-4">Impressions Breakdown</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="h-64 flex items-center justify-center">
+            <Doughnut
+              data={chartData}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: 'bottom'
+                  }
+                }
+              }}
+            />
+          </div>
+          <div className="space-y-4">
+            {breakdownData.map((item, idx) => {
+              const percentage = total > 0 ? ((item.value / total) * 100).toFixed(1) : 0
+              const Icon = item.icon
+              return (
+                <div key={idx}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Icon className="w-4 h-4" style={{ color: item.color }} />
+                      <p className="text-sm font-medium text-primary_color">{item.label}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-primary_color">{formatNumber(item.value)}</p>
+                      <p className="text-xs text-gray-500">{percentage}%</p>
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full"
+                      style={{
+                        width: `${percentage}%`,
+                        backgroundColor: item.color
+                      }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const breakdownItems = [
+    { key: 'social_media', label: 'Social Media', color: '#8b5cf6', icon: Share2 },
+    { key: 'website_visit', label: 'Website Visits', color: '#0ea5e9', icon: Globe },
+    { key: 'share', label: 'Shares', color: '#ec4899', icon: Share2 },
+    { key: 'saved_listing', label: 'Saved', color: '#14b8a6', icon: Heart }
+  ]
+
+  const chartData = {
+    labels: breakdownItems.map(item => item.label),
+    datasets: [
+      {
+        data: breakdownItems.map(item => impressionsBreakdown[item.key]?.total || 0),
+        backgroundColor: breakdownItems.map(item => item.color),
+        borderWidth: 0
+      }
+    ]
+  }
+
+  const total = breakdownItems.reduce((sum, item) => {
+    return sum + (impressionsBreakdown[item.key]?.total || 0)
+  }, 0)
+
+  return (
+    <div className="secondary_bg p-6 border border-gray-200 rounded-2xl">
+      <h3 className="text-lg font-semibold text-primary_color mb-4">Impressions Breakdown</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="h-64 flex items-center justify-center">
+          <Doughnut
+            data={chartData}
+            options={{
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: 'bottom'
+                }
+              }
+            }}
+          />
+        </div>
+        <div className="space-y-4">
+          {breakdownItems.map((item, idx) => {
+            const data = impressionsBreakdown[item.key] || { total: 0, percentage: 0 }
+            const Icon = item.icon
+            return (
+              <div key={idx}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Icon className="w-4 h-4" style={{ color: item.color }} />
+                    <p className="text-sm font-medium text-primary_color">{item.label}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-primary_color">{formatNumber(data.total)}</p>
+                    <p className="text-xs text-gray-500">{data.percentage}%</p>
+                  </div>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="h-2 rounded-full"
+                    style={{
+                      width: `${data.percentage}%`,
+                      backgroundColor: item.color
+                    }}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Traffic Sources Component
+const TrafficSources = ({ summary }) => {
+  const sourceBreakdown = [
+    {
+      label: 'From Listings',
+      value: summary?.profile_views_from_listings || 0,
+      color: 'bg-blue-500'
+    },
+    {
+      label: 'From Search',
+      value: summary?.profile_views_from_search || 0,
+      color: 'bg-indigo-500'
+    },
+    {
+      label: 'From Home',
+      value: summary?.profile_views_from_home || 0,
+      color: 'bg-teal-500'
+    }
+  ]
+
+  const total = summary?.profile_views || 0
+
+  return (
+    <div className="secondary_bg p-6 border border-gray-200 rounded-2xl">
+      <h3 className="text-lg font-semibold text-primary_color mb-4">Profile Traffic Sources</h3>
+      <div className="space-y-4">
+        {sourceBreakdown.map(source => {
+          const percentage = total > 0 ? ((source.value / total) * 100).toFixed(1) : 0
+          return (
+            <div key={source.label}>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-primary_color">{source.label}</p>
+                <p className="text-sm text-gray-500">{formatNumber(source.value)} ({percentage}%)</p>
+              </div>
+              <div className="mt-2 w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div
+                  className={`${source.color} h-2 rounded-full`}
+                  style={{
+                    width: `${Math.min(100, percentage)}%`
+                  }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// Main Component
 const ProfileAnalytics = () => {
   const params = useParams()
-  const { developerToken } = useAuth()
-  const [range, setRange] = useState('30')
+  const { developerToken, user } = useAuth()
+  const [range, setRange] = useState('month')
   const [analytics, setAnalytics] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  
+  // Get developer data from useAuth
+  const developer = user?.profile || null
 
   const fetchAnalytics = async (value) => {
     if (!developerToken) return
@@ -126,93 +519,23 @@ const ProfileAnalytics = () => {
 
   const profileSeries = analytics?.time_series?.profile_views || []
   const impressionsSeries = analytics?.time_series?.impressions || []
-
-  const profileChartData = useMemo(
-    () => ({
-      labels: profileSeries.map(entry =>
-        new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      ),
-      datasets: [
-        {
-          label: 'Profile Views',
-          data: profileSeries.map(entry => entry.total),
-          borderColor: '#2563eb',
-          backgroundColor: 'rgba(37, 99, 235, 0.15)',
-          tension: 0.4,
-          fill: true
-        },
-        {
-          label: 'Unique Visitors',
-          data: profileSeries.map(entry => entry.unique),
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16, 185, 129, 0.15)',
-          tension: 0.4,
-          fill: true
-        }
-      ]
-    }),
-    [profileSeries]
-  )
-
-  const impressionsChartData = useMemo(
-    () => ({
-      labels: impressionsSeries.map(entry =>
-        new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      ),
-      datasets: [
-        {
-          label: 'Total Impressions',
-          data: impressionsSeries.map(entry => entry.total),
-          borderColor: '#f97316',
-          backgroundColor: 'rgba(249, 115, 22, 0.15)',
-          tension: 0.4,
-          fill: true
-        },
-        {
-          label: 'Social Media',
-          data: impressionsSeries.map(entry => entry.social),
-          borderColor: '#8b5cf6',
-          backgroundColor: 'rgba(139, 92, 246, 0.15)',
-          tension: 0.4,
-          fill: true
-        },
-        {
-          label: 'Website Visits',
-          data: impressionsSeries.map(entry => entry.website),
-          borderColor: '#0ea5e9',
-          backgroundColor: 'rgba(14, 165, 233, 0.15)',
-          tension: 0.4,
-          fill: true
-        }
-      ]
-    }),
-    [impressionsSeries]
-  )
-
   const summary = analytics?.summary
   const latest = analytics?.latest
-  const sourceBreakdown = [
-    {
-      label: 'From Listings',
-      value: summary?.profile_views_from_listings || 0,
-      color: 'bg-blue-500'
-    },
-    {
-      label: 'From Search',
-      value: summary?.profile_views_from_search || 0,
-      color: 'bg-indigo-500'
-    },
-    {
-      label: 'From Home',
-      value: summary?.profile_views_from_home || 0,
-      color: 'bg-teal-500'
-    }
-  ]
+  // Use impressions_breakdown from developer data (useAuth) if available, otherwise from API
+  const impressionsBreakdown = developer?.impressions_breakdown 
+    ? (typeof developer.impressions_breakdown === 'string' 
+        ? JSON.parse(developer.impressions_breakdown || '{}') 
+        : developer.impressions_breakdown)
+    : (analytics?.developer?.impressions_breakdown 
+        ? (typeof analytics.developer.impressions_breakdown === 'string'
+            ? JSON.parse(analytics.developer.impressions_breakdown || '{}')
+            : analytics.developer.impressions_breakdown)
+        : {})
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen  p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex flex-col gap-4">
+        {/* <div className="flex flex-col gap-4">
           <Link
             href={`/developer/${params.slug}/analytics`}
             className="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm font-semibold"
@@ -221,143 +544,51 @@ const ProfileAnalytics = () => {
             Back to Analytics
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Profile & Brand Analytics</h1>
+            <h1 className="text-3xl font-bold text-primary_color">Profile & Brand Analytics</h1>
             <p className="text-gray-600">Track profile views, impressions, and engagement in real time</p>
           </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          {rangeOptions.map(option => (
-            <button
-              key={option.value}
-              onClick={() => setRange(option.value)}
-              className={`px-4 py-2 text-sm font-medium rounded-xl border ${
-                range === option.value ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-          <button
-            onClick={() => fetchAnalytics(range)}
-            className="text-sm text-blue-600 hover:text-blue-800 font-semibold"
-          >
-            Refresh
-          </button>
-        </div>
+        </div> */}
 
         {loading ? (
           <div className="grid gap-4">
             <div className="h-4 bg-gray-200 rounded animate-pulse" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {[...Array(4)].map((_, idx) => (
-                <div key={idx} className="h-28 bg-white rounded-xl border border-gray-100 animate-pulse" />
+                <div key={idx} className="h-28 secondary_bg rounded-xl border border-gray-200 animate-pulse" />
               ))}
             </div>
-            <div className="h-80 bg-white rounded-2xl border border-gray-100 animate-pulse" />
+            <div className="h-80 secondary_bg rounded-2xl border border-gray-200 animate-pulse" />
           </div>
         ) : error ? (
           <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl">{error}</div>
         ) : analytics ? (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <DataCard
-                title="Profile Views"
-                value={formatNumber(summary?.profile_views)}
-                icon={Eye}
-                subtitle="Total visits"
-                extra={<ChangeBadge change={latest?.profile_views_change} />}
-              />
-              <DataCard
-                title="Unique Visitors"
-                value={formatNumber(summary?.unique_profile_viewers)}
-                icon={Users}
-                subtitle="Distinct viewers"
-              />
-              <DataCard
-                title="Impressions"
-                value={formatNumber(summary?.total_impressions)}
-                icon={Share2}
-                subtitle="All channels"
-                extra={<ChangeBadge change={latest?.impressions_change} />}
-              />
-            </div>
+            <SummaryCards developer={developer} />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <DataCard
-                title="Appointments"
-                value={formatNumber(summary?.appointments_booked)}
-                icon={Calendar}
-                subtitle="Booked via listings"
-              />
-              <DataCard
-                title="Saved Properties"
-                value={formatNumber(summary?.properties_saved)}
-                icon={Bookmark}
-                subtitle="Added to favourites"
-              />
+            <div className="flex flex-wrap items-center gap-3 mt-4">
+              {rangeOptions.map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => setRange(option.value)}
+                  className={`secondary_button px-4 py-2 text-sm font-medium rounded-xl ${
+                    range === option.value
+                      ? 'opacity-100'
+                      : 'opacity-60 hover:opacity-80'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="p-6 bg-white border border-gray-100 rounded-2xl">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Profile Views Trend</h3>
-                    <p className="text-sm text-gray-500">Daily views vs unique visitors</p>
-                  </div>
-                  <ChangeBadge change={latest?.profile_views_change} />
-                </div>
-                {profileSeries.length > 0 ? (
-                  <div className="h-80">
-                    <Line data={profileChartData} options={chartOptions} />
-                  </div>
-                ) : (
-                  <div className="h-80 flex items-center justify-center text-gray-500 text-sm">
-                    No profile activity recorded for this range.
-                  </div>
-                )}
-              </div>
-
-              <div className="p-6 bg-white border border-gray-100 rounded-2xl">
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Impressions & Reach</h3>
-                  <p className="text-sm text-gray-500">Channel level breakdown</p>
-                </div>
-                {impressionsSeries.length > 0 ? (
-                  <div className="h-80">
-                    <Line data={impressionsChartData} options={chartOptions} />
-                  </div>
-                ) : (
-                  <div className="h-80 flex items-center justify-center text-gray-500 text-sm">
-                    No impression data recorded for this range.
-                  </div>
-                )}
-              </div>
+              <ProfileViewsChart profileSeries={profileSeries} latest={latest} />
+              <ImpressionsChart impressionsSeries={impressionsSeries} latest={latest} />
             </div>
 
-            <div className="p-6 bg-white border border-gray-100 rounded-2xl">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Profile Traffic Sources</h3>
-              <div className="space-y-4">
-                {sourceBreakdown.map(source => (
-                  <div key={source.label}>
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-gray-800">{source.label}</p>
-                      <p className="text-sm text-gray-500">{formatNumber(source.value)}</p>
-                    </div>
-                    <div className="mt-2 w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                      <div
-                        className={`${source.color} h-2`}
-                        style={{
-                          width: summary?.profile_views
-                            ? `${Math.min(100, (source.value / summary.profile_views) * 100)}%`
-                            : '0%'
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ImpressionsBreakdown impressionsBreakdown={impressionsBreakdown} summary={summary} />
+
+            {/* <TrafficSources summary={summary} /> */}
           </>
         ) : (
           <div className="text-center text-gray-500 py-12">No analytics data available yet.</div>

@@ -160,7 +160,11 @@ const StatisticsView = () => {
   const [viewsData, setViewsData] = useState([])
   // const [impressionsData, setImpressionsData] = useState([]) // COMMENTED OUT: Impressions too slow
   const [loading, setLoading] = useState(true)
-  const [summary, setSummary] = useState({ total: 0, average: 0 })
+  const [summary, setSummary] = useState({ 
+    totalViews: 0, 
+    totalListingViews: 0, 
+    totalProfileViews: 0 
+  })
 
   useEffect(() => {
     if (!user?.id) {
@@ -175,22 +179,33 @@ const StatisticsView = () => {
         setLoading(true)
         const userType = user?.profile?.account_type || 'developer'
         
-        // Fetch data for the selected metric
+        // COMMENTED OUT: PostHog implementation (too slow, replaced with Supabase user_analytics table)
+        // NOTE: Now using Supabase user_analytics table instead of PostHog API
+        // The new route /api/analytics/statistics-db queries user_analytics table directly
+        // This is much faster and uses pre-aggregated data from the cron job
+        
+        // Old PostHog code (commented out):
         // NOTE: Impressions disabled - query is too slow (fetches 5 event types from PostHog)
         // Only fetching views for now (property_view events)
         // TODO: Optimize impressions query or use cached data from user_analytics table
-        if (selectedMetric === 'impressions') {
-          console.warn('Impressions metric is currently disabled due to performance issues')
-          if (isMounted) {
-            setViewsData([])
-            setSummary({ total: 0, average: 0 })
-            setLoading(false)
-          }
-          return
-        }
+        // if (selectedMetric === 'impressions') {
+        //   console.warn('Impressions metric is currently disabled due to performance issues')
+        //   if (isMounted) {
+        //     setViewsData([])
+        //     setSummary({ total: 0, average: 0 })
+        //     setLoading(false)
+        //   }
+        //   return
+        // }
 
+        // COMMENTED OUT: PostHog implementation (too slow)
+        // const response = await fetch(
+        //   `/api/analytics/statistics?user_id=${user.id}&user_type=${userType}&period=${selectedPeriod}&metric=${selectedMetric}`
+        // )
+        
+        // NEW: Use Supabase user_analytics table
         const response = await fetch(
-          `/api/analytics/statistics?user_id=${user.id}&user_type=${userType}&period=${selectedPeriod}&metric=${selectedMetric}`
+          `/api/analytics/statistics-db?user_id=${user.id}&user_type=${userType}&period=${selectedPeriod}&metric=${selectedMetric}`
         )
 
         if (response.ok) {
@@ -198,7 +213,11 @@ const StatisticsView = () => {
           
           if (isMounted) {
             setViewsData(result.data?.timeSeries || [])
-            setSummary(result.data?.summary || { total: 0, average: 0 })
+            setSummary(result.data?.summary || { 
+              totalViews: 0, 
+              totalListingViews: 0, 
+              totalProfileViews: 0 
+            })
             // if (selectedMetric === 'views') {
             //   setViewsData(result.data?.timeSeries || [])
             //   setSummary(result.data?.summary || { total: 0, average: 0 })
@@ -226,11 +245,28 @@ const StatisticsView = () => {
 
   // const currentData = selectedMetric === 'views' ? viewsData : impressionsData // COMMENTED OUT: Only views now
   const currentData = viewsData
-  const total = summary.total || 0
-  const average = summary.average || 0
+  const totalViews = summary.totalViews || 0
+  const totalListingViews = summary.totalListingViews || 0
+  const totalProfileViews = summary.totalProfileViews || 0
+
+  // Get period label for headings
+  const getPeriodLabel = () => {
+    switch (selectedPeriod) {
+      case 'today':
+        return 'Today'
+      case 'week':
+        return 'This Week'
+      case 'month':
+        return 'This Month'
+      case 'year':
+        return 'This Year'
+      default:
+        return 'Today'
+    }
+  }
 
   return (
-    <div className="secondary_bg text-primary_color overflow-hidden">
+    <div className="secondary_bg max-h- text-primary_color overflow-hidden">
       {/* Header with Toggle */}
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between flex-wrap gap-4">
@@ -315,45 +351,34 @@ const StatisticsView = () => {
       </div>
 
       {/* Summary Stats */}
-      <div className="px-6 py-4 grid grid-cols-4 gap-4 border-b border-gray-100">
+      <div className="px-6 py-4 grid grid-cols-3 gap-4 border-b border-gray-100">
         {/* Total Views */}
         <div className="flex flex-col">
           <span className="text-xs font-medium uppercase tracking-wide mb-1">
             Total Views
-            {/* Total {selectedMetric === 'views' ? 'Views' : 'Impressions'} */}
           </span>
           <h3 className="md:text-[3em]  ">
-            {loading ? '...' : total.toLocaleString()}
+            {loading ? '...' : totalViews.toLocaleString()}
           </h3>
         </div>
 
-     {/* Lisitngs Views */}
-     <div className="flex flex-col">
-          <span className="text-xs font-medium uppercase tracking-wide mb-1">
-            Listing Views {selectedPeriod === 'today' ? 'Hourly' : selectedPeriod === 'year' ? 'Monthly' : 'Daily'}
-          </span>
-          <h3 className="md:text-[3em]  ">
-            {loading ? '...' : average.toLocaleString()}
-          </h3>
-        </div>
-
-     {/* Average Views */}
-     <div className="flex flex-col">
-          <span className="text-xs font-medium uppercase tracking-wide mb-1">
-            Profile Views {selectedPeriod === 'today' ? 'Hourly' : selectedPeriod === 'year' ? 'Monthly' : 'Daily'}
-          </span>
-          <h3 className="md:text-[3em]  ">
-            {loading ? '...' : average.toLocaleString()}
-          </h3>
-        </div>
-
-        {/* Average Views */}
+        {/* Total Listing Views */}
         <div className="flex flex-col">
           <span className="text-xs font-medium uppercase tracking-wide mb-1">
-            Average {selectedPeriod === 'today' ? 'Hourly' : selectedPeriod === 'year' ? 'Monthly' : 'Daily'}
+            Total Listing Views
           </span>
           <h3 className="md:text-[3em]  ">
-            {loading ? '...' : average.toLocaleString()}
+            {loading ? '...' : totalListingViews.toLocaleString()}
+          </h3>
+        </div>
+
+        {/* Total Profile Views */}
+        <div className="flex flex-col">
+          <span className="text-xs font-medium uppercase tracking-wide mb-1">
+            Total Profile Views
+          </span>
+          <h3 className="md:text-[3em]  ">
+            {loading ? '...' : totalProfileViews.toLocaleString()}
           </h3>
         </div>
       </div>

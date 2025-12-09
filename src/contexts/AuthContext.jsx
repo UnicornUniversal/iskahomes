@@ -181,8 +181,8 @@ export const AuthProvider = ({ children }) => {
           if (error) {
             // Auth failure - logout and redirect
             console.error('Auth failure - Developer profile fetch error:', error);
-            localStorage.removeItem('developer_token');
-            setDeveloperToken('');
+              localStorage.removeItem('developer_token');
+              setDeveloperToken('');
             setUser(null);
             // Handle auth failure (logout, clear storage, redirect)
             if (typeof window !== 'undefined') {
@@ -245,8 +245,8 @@ export const AuthProvider = ({ children }) => {
           if (error) {
             // Auth failure - logout and redirect
             console.error('Auth failure - Property seeker profile fetch error:', error);
-            localStorage.removeItem('property_seeker_token');
-            setPropertySeekerToken('');
+              localStorage.removeItem('property_seeker_token');
+              setPropertySeekerToken('');
             setUser(null);
             // Handle auth failure (logout, clear storage, redirect)
             if (typeof window !== 'undefined') {

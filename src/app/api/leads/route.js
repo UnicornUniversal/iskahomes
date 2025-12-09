@@ -377,7 +377,7 @@ export async function GET(request) {
     if (listingIds.length > 0) {
       const { data: listings, error: listingsError } = await supabase
         .from('listings')
-        .select('id, title, slug, listing_type, listing_status, media, city, state, country, town, full_address')
+        .select('id, title, slug, listing_type, listing_status, status, media, city, state, country, town, full_address')
         .in('id', listingIds)
 
       if (!listingsError && listings) {
@@ -436,7 +436,8 @@ export async function GET(request) {
             id: listing.id,
             title: listing.title || 'Untitled Property',
             slug: listing.slug,
-            status: listing.listing_status,
+            listing_status: listing.listing_status, // Keep listing_status for reference
+            status: listing.status || null, // This is the display status (Available, Sold, Taken, etc.)
             image: imageUrl,
             city: listing.city,
             state: listing.state,
@@ -482,7 +483,8 @@ export async function GET(request) {
         listing_title: listing?.title || null,
         listing_slug: listing?.slug || null,
         listing_type: listing?.listing_type || null,
-        listing_status: listing?.status || null,
+        listing_status: listing?.listing_status || null, // Internal status (active, sold, rented)
+        listing_status_display: listing?.status || null, // Display status (Available, Sold, Taken, etc.) - any value
         listing_image: listing?.image || null,
         listing_location: listing ? [listing.town, listing.city, listing.state, listing.country].filter(Boolean).join(', ') : null,
         listing_full_address: listing?.full_address || null,

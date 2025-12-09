@@ -40,7 +40,7 @@ import {
 } from 'lucide-react'
 import Property3DViewer from '@/app/components/propertyManagement/modules/Property3DViewer'
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner'
-import PropertyContactForm from '@/app/components/PropertyContactForm'
+import LeadContactForm from '@/app/components/LeadContactForm'
 import NearbyAmenities from '@/app/components/Listing/NearbyAmenities'
 import ShareModal from '@/app/components/ui/ShareModal'
 import SectionTracker from '@/app/components/property/SectionTracker'
@@ -1105,11 +1105,12 @@ const PropertyDetailPage = () => {
              
             </div>
 
-            {/* Right Column - PropertyContactForm - Only on XL devices */}
+            {/* Right Column - LeadContactForm - Only on XL devices */}
             <div className="hidden xl:block xl:col-span-1">
               <div className="sticky top-2">
                 <div className=" rounded-2xl  p-6">
-                  <PropertyContactForm 
+                  <LeadContactForm 
+                    contextType="listing"
                     propertyId={id}
                     propertyTitle={title}
                     propertyType={listing_type}
@@ -1121,9 +1122,10 @@ const PropertyDetailPage = () => {
             </div>
           </div>
 
-          {/* PropertyContactForm at Bottom - For Small/Medium/Large devices (not XL) */}
+          {/* LeadContactForm at Bottom - For Small/Medium/Large devices (not XL) */}
           <div className="xl:hidden mt-8">
-            <PropertyContactForm 
+            <LeadContactForm 
+              contextType="listing"
               propertyId={id}
               propertyTitle={title}
               propertyType={listing_type}
@@ -1301,7 +1303,8 @@ const PropertyDetailPage = () => {
             
             {/* Modal Content */}
             <div className="flex-1 overflow-y-auto">
-              <PropertyContactForm 
+              <LeadContactForm 
+                contextType="listing"
                 propertyId={id}
                 propertyTitle={title}
                 propertyType={listing_type}
