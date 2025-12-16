@@ -1,52 +1,60 @@
 'use client'
 
-import React, { useState } from 'react'
-import Layout1 from '../../../layout/Layout1'
+import React, { useState, useEffect } from 'react'
 import HomeSeekerHeader from '../../../components/homeSeeker/HomeSeekerHeader'
-import { FiUser, FiMail, FiPhone, FiMapPin, FiEdit, FiSave, FiX, FiCamera, FiShield, FiSettings, FiHeart, FiHome } from 'react-icons/fi'
+import { useAuth } from '@/contexts/AuthContext'
+import { FiUser, FiMail, FiPhone, FiMapPin, FiEdit, FiSave, FiX, FiCamera, FiShield, FiSettings, FiHome, FiLock, FiEye, FiEyeOff } from 'react-icons/fi'
 
 const HomeSeekerProfile = () => {
+    const { user, propertySeekerToken } = useAuth()
     const [isEditing, setIsEditing] = useState(false)
     const [activeTab, setActiveTab] = useState('personal')
+    const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
+    const [userData, setUserData] = useState(null)
+    const [formData, setFormData] = useState(null)
+    const [showPassword, setShowPassword] = useState({
+        current: false,
+        new: false,
+        confirm: false
+    })
+    const [passwordData, setPasswordData] = useState({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+    })
+    const [changingPassword, setChangingPassword] = useState(false)
+    const [passwordError, setPasswordError] = useState('')
 
-    // Dummy user data
-    const [userData, setUserData] = useState({
-        firstName: "Sarah",
-        lastName: "Johnson",
-        email: "sarah.johnson@email.com",
-        phone: "+233 20 987 6543",
-        address: "456 Oak Street, East Legon, Accra",
-        dateOfBirth: "1990-07-22",
-        occupation: "Marketing Manager",
-        company: "Digital Solutions Ltd",
-        emergencyContact: {
-            name: "Michael Johnson",
-            relationship: "Spouse",
-            phone: "+233 24 123 4567"
-        },
-        preferences: {
-            notifications: {
-                email: true,
-                sms: true,
-                push: false
-            },
-            searchPreferences: {
-                preferredLocations: ["East Legon", "Airport Residential", "Cantonments"],
-                budgetRange: {
-                    min: 1500,
-                    max: 3500
-                },
-                propertyTypes: ["Apartment", "Villa", "Townhouse"],
-                bedrooms: [2, 3, 4]
-            },
-            privacy: {
-                profileVisibility: "public",
-                contactVisibility: "agents_only"
+    // Fetch property seeker profile data
+    useEffect(() => {
+        const fetchProfile = async () => {
+            if (!propertySeekerToken) return
+
+            setLoading(true)
+            try {
+                const response = await fetch('/api/property-seekers/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${propertySeekerToken}`
+                    }
+                })
+
+                if (response.ok) {
+                    const { data } = await response.json()
+                    setUserData(data)
+                    setFormData(data)
+                } else {
+                    console.error('Failed to fetch profile')
+                }
+            } catch (error) {
+                console.error('Error fetching profile:', error)
+            } finally {
+                setLoading(false)
             }
         }
-    })
 
-    const [formData, setFormData] = useState(userData)
+        fetchProfile()
+    }, [propertySeekerToken])
 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({
@@ -55,25 +63,128 @@ const HomeSeekerProfile = () => {
         }))
     }
 
-    const handleNestedChange = (parent, field, value) => {
+    const handleArrayChange = (field, value) => {
+        // Convert comma-separated string to array
+        const arrayValue = value ? value.split(',').map(item => item.trim()).filter(item => item) : []
         setFormData(prev => ({
             ...prev,
-            [parent]: {
-                ...prev[parent],
+            [field]: arrayValue
+        }))
+    }
+
+    const handleNotificationChange = (field, value) => {
+        setFormData(prev => ({
+            ...prev,
+            notification_preferences: {
+                ...(prev.notification_preferences || {}),
                 [field]: value
             }
         }))
     }
 
-    const handleSave = () => {
-        setUserData(formData)
+    const handleSave = async () => {
+        if (!propertySeekerToken) return
+
+        setSaving(true)
+        try {
+            const updatePayload = {
+                name: formData.name,
+                phone: formData.phone,
+                bio: formData.bio,
+                preferred_locations: formData.preferred_locations || [],
+                preferred_property_types: formData.preferred_property_types || [],
+                preferred_property_categories: formData.preferred_property_categories || [],
+                preferred_property_purposes: formData.preferred_property_purposes || [],
+                budget_min: formData.budget_min || null,
+                budget_max: formData.budget_max || null,
+                budget_currency: formData.budget_currency || 'GHS',
+                preferred_bedrooms_min: formData.preferred_bedrooms_min || null,
+                preferred_bedrooms_max: formData.preferred_bedrooms_max || null,
+                preferred_bathrooms_min: formData.preferred_bathrooms_min || null,
+                preferred_area_min: formData.preferred_area_min || null,
+                preferred_area_max: formData.preferred_area_max || null,
+                notification_preferences: formData.notification_preferences || {}
+            }
+
+            const response = await fetch('/api/property-seekers/profile', {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${propertySeekerToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updatePayload)
+            })
+
+            if (response.ok) {
+                const { data } = await response.json()
+                setUserData(data)
+                setFormData(data)
         setIsEditing(false)
-        // Here you would typically make an API call to save the data
+                alert('Profile updated successfully!')
+            } else {
+                const error = await response.json()
+                alert(error.error || 'Failed to update profile')
+            }
+        } catch (error) {
+            console.error('Error saving profile:', error)
+            alert('Error saving profile')
+        } finally {
+            setSaving(false)
+        }
     }
 
     const handleCancel = () => {
         setFormData(userData)
         setIsEditing(false)
+    }
+
+    const handlePasswordChange = async () => {
+        if (!propertySeekerToken) return
+
+        setPasswordError('')
+
+        if (passwordData.newPassword !== passwordData.confirmPassword) {
+            setPasswordError('New passwords do not match!')
+            return
+        }
+
+        if (passwordData.newPassword.length < 8) {
+            setPasswordError('Password must be at least 8 characters long!')
+            return
+        }
+
+        setChangingPassword(true)
+        try {
+            const response = await fetch('/api/auth/change-password', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${propertySeekerToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    currentPassword: passwordData.currentPassword,
+                    newPassword: passwordData.newPassword
+                })
+            })
+
+            if (response.ok) {
+                alert('Password changed successfully!')
+                setPasswordData({
+                    currentPassword: '',
+                    newPassword: '',
+                    confirmPassword: ''
+                })
+                setChangingPassword(false)
+            } else {
+                const error = await response.json()
+                setPasswordError(error.error || 'Failed to change password')
+            }
+        } catch (error) {
+            console.error('Error changing password:', error)
+            setPasswordError('Error changing password')
+        } finally {
+            setChangingPassword(false)
+        }
     }
 
     const tabs = [
@@ -84,26 +195,67 @@ const HomeSeekerProfile = () => {
         { id: 'security', label: 'Security', icon: FiShield }
     ]
 
+    if (loading) {
+        return (
+            <>
+                <HomeSeekerHeader />
+                <div className="mt-6 lg:mt-8 flex items-center justify-center min-h-[400px]">
+                    <p className="text-primary_color/60">Loading profile...</p>
+                </div>
+            </>
+        )
+    }
+
+    if (!userData || !formData) {
+        return (
+            <>
+                <HomeSeekerHeader />
+                <div className="mt-6 lg:mt-8 flex items-center justify-center min-h-[400px]">
+                    <p className="text-primary_color/60">Failed to load profile</p>
+                </div>
+            </>
+        )
+    }
+
+    // Parse notification preferences if it's a string
+    const notificationPrefs = typeof formData.notification_preferences === 'string' 
+        ? JSON.parse(formData.notification_preferences || '{}')
+        : (formData.notification_preferences || {})
+
+    // Format created date
+    const createdDate = formData.created_at 
+        ? new Date(formData.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        : 'N/A'
+
     return (
 <>
             <HomeSeekerHeader />
             
-            <div className="mt-8">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold text-gray-800">Profile Settings</h2>
-                            <div className="flex space-x-3">
+            <div className="mt-6 lg:mt-8">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+                    <div>
+                        <h2 className="text-2xl lg:text-3xl font-bold text-primary_color mb-2 flex items-center gap-3">
+                            <div className="p-2 bg-primary_color/10 rounded-lg">
+                                <FiUser className="w-6 h-6 text-primary_color" />
+                            </div>
+                            Profile Settings
+                        </h2>
+                        <p className="text-primary_color/60 text-sm">Manage your account information</p>
+                    </div>
+                    <div className="flex gap-3">
                                 {isEditing ? (
                                     <>
                                         <button
                                             onClick={handleSave}
-                                            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                    disabled={saving}
+                                    className="flex items-center gap-2 px-4 py-2 bg-primary_color text-white rounded-xl hover:bg-primary_color/90 transition-colors shadow-lg shadow-primary_color/20 font-medium disabled:opacity-50"
                                         >
                                             <FiSave className="w-4 h-4" />
-                                            <span>Save Changes</span>
+                                    <span>{saving ? 'Saving...' : 'Save Changes'}</span>
                                         </button>
                                         <button
                                             onClick={handleCancel}
-                                            className="flex items-center space-x-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                                    className="flex items-center gap-2 px-4 py-2 default_bg text-primary_color rounded-xl hover:bg-primary_color/10 transition-colors border border-primary_color/10 font-medium"
                                         >
                                             <FiX className="w-4 h-4" />
                                             <span>Cancel</span>
@@ -112,7 +264,7 @@ const HomeSeekerProfile = () => {
                                 ) : (
                                     <button
                                         onClick={() => setIsEditing(true)}
-                                        className="flex items-center space-x-2 px-4 py-2 bg-primary_color text-white rounded-lg hover:bg-primary_color/90 transition-colors"
+                                className="flex items-center gap-2 px-4 py-2 bg-primary_color text-white rounded-xl hover:bg-primary_color/90 transition-colors shadow-lg shadow-primary_color/20 font-medium"
                                     >
                                         <FiEdit className="w-4 h-4" />
                                         <span>Edit Profile</span>
@@ -122,107 +274,88 @@ const HomeSeekerProfile = () => {
                         </div>
 
                         {/* Profile Header */}
-                        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-                            <div className="flex items-center space-x-6">
+                <div className="default_bg rounded-2xl shadow-lg border border-primary_color/10 p-6 lg:p-8 mb-6">
+                    <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
                                 <div className="relative">
                                     <img
-                                        src="https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150"
+                                src={formData.profile_picture || 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150'}
                                         alt="Profile"
-                                        className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
+                                className="w-24 h-24 lg:w-28 lg:h-28 rounded-2xl object-cover border-4 border-primary_color/20 shadow-lg"
                                     />
                                     {isEditing && (
-                                        <button className="absolute bottom-0 right-0 bg-primary_color text-white p-2 rounded-full shadow-lg hover:bg-primary_color/90 transition-colors">
+                                <button className="absolute bottom-0 right-0 bg-primary_color text-white p-2.5 rounded-xl shadow-lg hover:bg-primary_color/90 transition-colors border-2 border-white">
                                             <FiCamera className="w-4 h-4" />
                                         </button>
                                     )}
                                 </div>
-                                <div>
-                                    <h3 className="text-2xl font-bold text-gray-800">
-                                        {userData.firstName} {userData.lastName}
+                        <div className="flex-1 text-center sm:text-left">
+                            <h3 className="text-2xl lg:text-3xl font-bold text-primary_color mb-2">
+                                {formData.name || 'Property Seeker'}
                                     </h3>
-                                    <p className="text-gray-600">{userData.occupation} at {userData.company}</p>
-                                    <p className="text-sm text-gray-500">HomeSeeker since March 2023</p>
+                            {formData.bio && (
+                                <p className="text-primary_color/70 text-base mb-1">{formData.bio}</p>
+                            )}
+                            <p className="text-sm text-primary_color/60">Property Seeker since {createdDate}</p>
+                            {formData.is_verified && (
+                                <span className="inline-block mt-2 px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                                    Verified
+                                </span>
+                            )}
                                 </div>
                             </div>
                         </div>
 
                         {/* Tabs */}
-                        <div className="bg-white rounded-xl shadow-lg">
-                            <div className="border-b border-gray-200">
-                                <nav className="flex space-x-8 px-6">
+                <div className="default_bg rounded-2xl shadow-lg border border-primary_color/10 overflow-hidden">
+                    <div className="border-b border-primary_color/10">
+                        <nav className="flex flex-wrap gap-2 px-4 lg:px-6 pt-4">
                                     {tabs.map((tab) => {
                                         const IconComponent = tab.icon
                                         return (
-                                            <span
+                                    <button
                                                 key={tab.id}
                                                 onClick={() => setActiveTab(tab.id)}
-                                                className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                                        className={`flex items-center gap-2 py-3 px-4 rounded-xl font-medium text-sm transition-all duration-300 ${
                                                     activeTab === tab.id
-                                                        ? 'border-primary_color text-primary_color'
-                                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                                ? 'bg-primary_color text-white shadow-lg shadow-primary_color/20'
+                                                : 'text-primary_color hover:bg-primary_color/10'
                                                 }`}
                                             >
                                                 <IconComponent className="w-4 h-4" />
                                                 <span>{tab.label}</span>
-                                            </span>
+                                    </button>
                                         )
                                     })}
                                 </nav>
                             </div>
 
-                            <div className="p-6">
+                    <div className="p-6 lg:p-8">
                                 {activeTab === 'personal' && (
                                     <div className="space-y-6">
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Personal Information</h3>
+                                <h3 className="text-xl font-bold text-primary_color mb-6 flex items-center gap-2">
+                                    <div className="w-1 h-6 bg-primary_color rounded-full"></div>
+                                    Personal Information
+                                </h3>
                                         <div className="grid md:grid-cols-2 gap-6">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-medium text-primary_color mb-2">Full Name</label>
                                                 <input
                                                     type="text"
-                                                    value={formData.firstName}
-                                                    onChange={(e) => handleInputChange('firstName', e.target.value)}
+                                            value={formData.name || ''}
+                                            onChange={(e) => handleInputChange('name', e.target.value)}
                                                     disabled={!isEditing}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-                                                <input
-                                                    type="text"
-                                                    value={formData.lastName}
-                                                    onChange={(e) => handleInputChange('lastName', e.target.value)}
-                                                    disabled={!isEditing}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Date of Birth</label>
-                                                <input
-                                                    type="date"
-                                                    value={formData.dateOfBirth}
-                                                    onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
-                                                    disabled={!isEditing}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Occupation</label>
-                                                <input
-                                                    type="text"
-                                                    value={formData.occupation}
-                                                    onChange={(e) => handleInputChange('occupation', e.target.value)}
-                                                    disabled={!isEditing}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
+                                            className="w-full px-4 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color disabled:opacity-50"
                                                 />
                                             </div>
                                             <div className="md:col-span-2">
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Company</label>
-                                                <input
-                                                    type="text"
-                                                    value={formData.company}
-                                                    onChange={(e) => handleInputChange('company', e.target.value)}
+                                        <label className="block text-sm font-medium text-primary_color mb-2">Bio</label>
+                                        <textarea
+                                            value={formData.bio || ''}
+                                            onChange={(e) => handleInputChange('bio', e.target.value)}
                                                     disabled={!isEditing}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
+                                            rows={4}
+                                            className="w-full px-4 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color disabled:opacity-50"
+                                            placeholder="Tell us about yourself..."
                                                 />
                                             </div>
                                         </div>
@@ -231,73 +364,30 @@ const HomeSeekerProfile = () => {
 
                                 {activeTab === 'contact' && (
                                     <div className="space-y-6">
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Contact Details</h3>
+                                <h3 className="text-xl font-bold text-primary_color mb-6 flex items-center gap-2">
+                                    <div className="w-1 h-6 bg-primary_color rounded-full"></div>
+                                    Contact Details
+                                </h3>
                                         <div className="grid md:grid-cols-2 gap-6">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                                        <label className="block text-sm font-medium text-primary_color mb-2">Email Address</label>
                                                 <input
                                                     type="email"
-                                                    value={formData.email}
-                                                    onChange={(e) => handleInputChange('email', e.target.value)}
-                                                    disabled={!isEditing}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
-                                                />
+                                            value={formData.email || ''}
+                                            disabled
+                                            className="w-full px-4 py-3 border border-primary_color/20 rounded-xl default_bg text-primary_color/50 opacity-50 cursor-not-allowed"
+                                        />
+                                        <p className="text-xs text-primary_color/60 mt-1">Email cannot be changed</p>
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                                        <label className="block text-sm font-medium text-primary_color mb-2">Phone Number</label>
                                                 <input
                                                     type="tel"
-                                                    value={formData.phone}
+                                            value={formData.phone || ''}
                                                     onChange={(e) => handleInputChange('phone', e.target.value)}
                                                     disabled={!isEditing}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
-                                                />
-                                            </div>
-                                            <div className="md:col-span-2">
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
-                                                <textarea
-                                                    value={formData.address}
-                                                    onChange={(e) => handleInputChange('address', e.target.value)}
-                                                    disabled={!isEditing}
-                                                    rows={3}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="border-t pt-6">
-                                            <h4 className="text-md font-semibold text-gray-800 mb-4">Emergency Contact</h4>
-                                            <div className="grid md:grid-cols-3 gap-6">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-                                                    <input
-                                                        type="text"
-                                                        value={formData.emergencyContact.name}
-                                                        onChange={(e) => handleNestedChange('emergencyContact', 'name', e.target.value)}
-                                                        disabled={!isEditing}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Relationship</label>
-                                                    <input
-                                                        type="text"
-                                                        value={formData.emergencyContact.relationship}
-                                                        onChange={(e) => handleNestedChange('emergencyContact', 'relationship', e.target.value)}
-                                                        disabled={!isEditing}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
-                                                    <input
-                                                        type="tel"
-                                                        value={formData.emergencyContact.phone}
-                                                        onChange={(e) => handleNestedChange('emergencyContact', 'phone', e.target.value)}
-                                                        disabled={!isEditing}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
-                                                    />
-                                                </div>
+                                            className="w-full px-4 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color disabled:opacity-50"
+                                        />
                                             </div>
                                         </div>
                                     </div>
@@ -305,216 +395,318 @@ const HomeSeekerProfile = () => {
 
                                 {activeTab === 'preferences' && (
                                     <div className="space-y-6">
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Search Preferences</h3>
+                                <h3 className="text-xl font-bold text-primary_color mb-6 flex items-center gap-2">
+                                    <div className="w-1 h-6 bg-primary_color rounded-full"></div>
+                                    Search Preferences
+                                </h3>
                                         
                                         <div className="grid md:grid-cols-2 gap-6">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Locations</label>
+                                        <label className="block text-sm font-medium text-primary_color mb-2">Preferred Locations</label>
                                                 <textarea
-                                                    value={formData.preferences.searchPreferences.preferredLocations.join(', ')}
-                                                    onChange={(e) => handleNestedChange('preferences', 'searchPreferences', {
-                                                        ...formData.preferences.searchPreferences,
-                                                        preferredLocations: e.target.value.split(',').map(loc => loc.trim())
-                                                    })}
+                                            value={(formData.preferred_locations || []).join(', ')}
+                                            onChange={(e) => handleArrayChange('preferred_locations', e.target.value)}
                                                     disabled={!isEditing}
                                                     rows={3}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
+                                            className="w-full px-4 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color disabled:opacity-50"
                                                     placeholder="East Legon, Airport Residential, Cantonments"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Property Types</label>
+                                        <label className="block text-sm font-medium text-primary_color mb-2">Property Types</label>
                                                 <textarea
-                                                    value={formData.preferences.searchPreferences.propertyTypes.join(', ')}
-                                                    onChange={(e) => handleNestedChange('preferences', 'searchPreferences', {
-                                                        ...formData.preferences.searchPreferences,
-                                                        propertyTypes: e.target.value.split(',').map(type => type.trim())
-                                                    })}
+                                            value={(formData.preferred_property_types || []).join(', ')}
+                                            onChange={(e) => handleArrayChange('preferred_property_types', e.target.value)}
                                                     disabled={!isEditing}
                                                     rows={3}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
+                                            className="w-full px-4 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color disabled:opacity-50"
                                                     placeholder="Apartment, Villa, Townhouse"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Budget Range (Monthly)</label>
-                                                <div className="flex space-x-2">
+                                        <label className="block text-sm font-medium text-primary_color mb-2">Budget Range ({formData.budget_currency || 'GHS'})</label>
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="number"
+                                                value={formData.budget_min || ''}
+                                                onChange={(e) => handleInputChange('budget_min', e.target.value ? parseFloat(e.target.value) : null)}
+                                                disabled={!isEditing}
+                                                className="flex-1 px-4 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color disabled:opacity-50"
+                                                placeholder="Min"
+                                            />
+                                            <span className="text-primary_color/60 font-medium">to</span>
+                                            <input
+                                                type="number"
+                                                value={formData.budget_max || ''}
+                                                onChange={(e) => handleInputChange('budget_max', e.target.value ? parseFloat(e.target.value) : null)}
+                                                disabled={!isEditing}
+                                                className="flex-1 px-4 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color disabled:opacity-50"
+                                                placeholder="Max"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-primary_color mb-2">Bedrooms</label>
+                                        <div className="flex items-center gap-3">
                                                     <input
                                                         type="number"
-                                                        value={formData.preferences.searchPreferences.budgetRange.min}
-                                                        onChange={(e) => handleNestedChange('preferences', 'searchPreferences', {
-                                                            ...formData.preferences.searchPreferences,
-                                                            budgetRange: {
-                                                                ...formData.preferences.searchPreferences.budgetRange,
-                                                                min: parseInt(e.target.value)
-                                                            }
-                                                        })}
+                                                value={formData.preferred_bedrooms_min || ''}
+                                                onChange={(e) => handleInputChange('preferred_bedrooms_min', e.target.value ? parseInt(e.target.value) : null)}
                                                         disabled={!isEditing}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
+                                                className="flex-1 px-4 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color disabled:opacity-50"
                                                         placeholder="Min"
                                                     />
-                                                    <span className="flex items-center text-gray-500">to</span>
+                                            <span className="text-primary_color/60 font-medium">to</span>
                                                     <input
                                                         type="number"
-                                                        value={formData.preferences.searchPreferences.budgetRange.max}
-                                                        onChange={(e) => handleNestedChange('preferences', 'searchPreferences', {
-                                                            ...formData.preferences.searchPreferences,
-                                                            budgetRange: {
-                                                                ...formData.preferences.searchPreferences.budgetRange,
-                                                                max: parseInt(e.target.value)
-                                                            }
-                                                        })}
+                                                value={formData.preferred_bedrooms_max || ''}
+                                                onChange={(e) => handleInputChange('preferred_bedrooms_max', e.target.value ? parseInt(e.target.value) : null)}
                                                         disabled={!isEditing}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
+                                                className="flex-1 px-4 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color disabled:opacity-50"
                                                         placeholder="Max"
                                                     />
                                                 </div>
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Number of Bedrooms</label>
+                                        <label className="block text-sm font-medium text-primary_color mb-2">Bathrooms (Min)</label>
                                                 <input
-                                                    type="text"
-                                                    value={formData.preferences.searchPreferences.bedrooms.join(', ')}
-                                                    onChange={(e) => handleNestedChange('preferences', 'searchPreferences', {
-                                                        ...formData.preferences.searchPreferences,
-                                                        bedrooms: e.target.value.split(',').map(num => parseInt(num.trim()))
-                                                    })}
+                                            type="number"
+                                            value={formData.preferred_bathrooms_min || ''}
+                                            onChange={(e) => handleInputChange('preferred_bathrooms_min', e.target.value ? parseInt(e.target.value) : null)}
                                                     disabled={!isEditing}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
-                                                    placeholder="2, 3, 4"
+                                            className="w-full px-4 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color disabled:opacity-50"
+                                            placeholder="Minimum bathrooms"
                                                 />
                                             </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-primary_color mb-2">Area (sq ft)</label>
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="number"
+                                                value={formData.preferred_area_min || ''}
+                                                onChange={(e) => handleInputChange('preferred_area_min', e.target.value ? parseFloat(e.target.value) : null)}
+                                                disabled={!isEditing}
+                                                className="flex-1 px-4 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color disabled:opacity-50"
+                                                placeholder="Min"
+                                            />
+                                            <span className="text-primary_color/60 font-medium">to</span>
+                                            <input
+                                                type="number"
+                                                value={formData.preferred_area_max || ''}
+                                                onChange={(e) => handleInputChange('preferred_area_max', e.target.value ? parseFloat(e.target.value) : null)}
+                                                disabled={!isEditing}
+                                                className="flex-1 px-4 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color disabled:opacity-50"
+                                                placeholder="Max"
+                                            />
+                                        </div>
+                                    </div>
                                         </div>
                                     </div>
                                 )}
 
                                 {activeTab === 'settings' && (
                                     <div className="space-y-6">
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Notification Preferences</h3>
+                                <h3 className="text-xl font-bold text-primary_color mb-6 flex items-center gap-2">
+                                    <div className="w-1 h-6 bg-primary_color rounded-full"></div>
+                                    Notification Preferences
+                                </h3>
                                         <div className="space-y-4">
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <h4 className="font-medium text-gray-800">Email Notifications</h4>
-                                                    <p className="text-sm text-gray-600">Receive updates via email</p>
-                                                </div>
-                                                <label className="relative inline-flex items-center cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={formData.preferences.notifications.email}
-                                                        onChange={(e) => handleNestedChange('preferences', 'notifications', {
-                                                            ...formData.preferences.notifications,
-                                                            email: e.target.checked
-                                                        })}
-                                                        disabled={!isEditing}
-                                                        className="sr-only peer"
-                                                    />
-                                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary_color/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary_color"></div>
-                                                </label>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <h4 className="font-medium text-gray-800">SMS Notifications</h4>
-                                                    <p className="text-sm text-gray-600">Receive updates via SMS</p>
-                                                </div>
-                                                <label className="relative inline-flex items-center cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={formData.preferences.notifications.sms}
-                                                        onChange={(e) => handleNestedChange('preferences', 'notifications', {
-                                                            ...formData.preferences.notifications,
-                                                            sms: e.target.checked
-                                                        })}
-                                                        disabled={!isEditing}
-                                                        className="sr-only peer"
-                                                    />
-                                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary_color/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary_color"></div>
-                                                </label>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <h4 className="font-medium text-gray-800">Push Notifications</h4>
-                                                    <p className="text-sm text-gray-600">Receive updates via push notifications</p>
-                                                </div>
-                                                <label className="relative inline-flex items-center cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={formData.preferences.notifications.push}
-                                                        onChange={(e) => handleNestedChange('preferences', 'notifications', {
-                                                            ...formData.preferences.notifications,
-                                                            push: e.target.checked
-                                                        })}
-                                                        disabled={!isEditing}
-                                                        className="sr-only peer"
-                                                    />
-                                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary_color/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary_color"></div>
-                                                </label>
-                                            </div>
+                                    <div className="flex items-center justify-between default_bg p-4 rounded-xl border border-primary_color/10">
+                                        <div>
+                                            <h4 className="font-bold text-primary_color">Email Notifications</h4>
+                                            <p className="text-sm text-primary_color/60">Receive updates via email</p>
                                         </div>
-
-                                        <div className="border-t pt-6">
-                                            <h4 className="text-md font-semibold text-gray-800 mb-4">Privacy Settings</h4>
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Profile Visibility</label>
-                                                    <select
-                                                        value={formData.preferences.privacy.profileVisibility}
-                                                        onChange={(e) => handleNestedChange('preferences', 'privacy', {
-                                                            ...formData.preferences.privacy,
-                                                            profileVisibility: e.target.value
-                                                        })}
-                                                        disabled={!isEditing}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
-                                                    >
-                                                        <option value="public">Public</option>
-                                                        <option value="private">Private</option>
-                                                        <option value="agents_only">Agents Only</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Contact Visibility</label>
-                                                    <select
-                                                        value={formData.preferences.privacy.contactVisibility}
-                                                        onChange={(e) => handleNestedChange('preferences', 'privacy', {
-                                                            ...formData.preferences.privacy,
-                                                            contactVisibility: e.target.value
-                                                        })}
-                                                        disabled={!isEditing}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent disabled:bg-gray-100"
-                                                    >
-                                                        <option value="public">Public</option>
-                                                        <option value="agents_only">Agents Only</option>
-                                                        <option value="private">Private</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={notificationPrefs.email_notifications || false}
+                                                onChange={(e) => handleNotificationChange('email_notifications', e.target.checked)}
+                                                disabled={!isEditing}
+                                                className="sr-only peer"
+                                            />
+                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary_color/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary_color"></div>
+                                        </label>
                                     </div>
-                                )}
+                                    <div className="flex items-center justify-between default_bg p-4 rounded-xl border border-primary_color/10">
+                                        <div>
+                                            <h4 className="font-bold text-primary_color">SMS Notifications</h4>
+                                            <p className="text-sm text-primary_color/60">Receive updates via SMS</p>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={notificationPrefs.sms_notifications || false}
+                                                onChange={(e) => handleNotificationChange('sms_notifications', e.target.checked)}
+                                                disabled={!isEditing}
+                                                className="sr-only peer"
+                                            />
+                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary_color/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary_color"></div>
+                                        </label>
+                                    </div>
+                                    <div className="flex items-center justify-between default_bg p-4 rounded-xl border border-primary_color/10">
+                                        <div>
+                                            <h4 className="font-bold text-primary_color">Push Notifications</h4>
+                                            <p className="text-sm text-primary_color/60">Receive updates via push notifications</p>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={notificationPrefs.push_notifications || false}
+                                                onChange={(e) => handleNotificationChange('push_notifications', e.target.checked)}
+                                                disabled={!isEditing}
+                                                className="sr-only peer"
+                                            />
+                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary_color/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary_color"></div>
+                                        </label>
+                                    </div>
+                                    <div className="flex items-center justify-between default_bg p-4 rounded-xl border border-primary_color/10">
+                                                <div>
+                                            <h4 className="font-bold text-primary_color">Price Drops</h4>
+                                            <p className="text-sm text-primary_color/60">Get notified when prices drop</p>
+                                                </div>
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                checked={notificationPrefs.price_drops || false}
+                                                onChange={(e) => handleNotificationChange('price_drops', e.target.checked)}
+                                                        disabled={!isEditing}
+                                                        className="sr-only peer"
+                                                    />
+                                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary_color/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary_color"></div>
+                                                </label>
+                                            </div>
+                                    <div className="flex items-center justify-between default_bg p-4 rounded-xl border border-primary_color/10">
+                                                <div>
+                                            <h4 className="font-bold text-primary_color">New Listings</h4>
+                                            <p className="text-sm text-primary_color/60">Get notified about new listings</p>
+                                                </div>
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                checked={notificationPrefs.new_listings || false}
+                                                onChange={(e) => handleNotificationChange('new_listings', e.target.checked)}
+                                                        disabled={!isEditing}
+                                                        className="sr-only peer"
+                                                    />
+                                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary_color/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary_color"></div>
+                                                </label>
+                                            </div>
+                                    <div className="flex items-center justify-between default_bg p-4 rounded-xl border border-primary_color/10">
+                                                <div>
+                                            <h4 className="font-bold text-primary_color">Saved Searches</h4>
+                                            <p className="text-sm text-primary_color/60">Get notified about saved searches</p>
+                                                </div>
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                checked={notificationPrefs.saved_searches || false}
+                                                onChange={(e) => handleNotificationChange('saved_searches', e.target.checked)}
+                                                        disabled={!isEditing}
+                                                        className="sr-only peer"
+                                                    />
+                                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary_color/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary_color"></div>
+                                                </label>
+                                            </div>
+                                        </div>
+                            </div>
+                        )}
 
-                                {activeTab === 'security' && (
-                                    <div className="space-y-6">
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Security Settings</h3>
-                                        <div className="space-y-4">
-                                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                                                <h4 className="font-medium text-yellow-800 mb-2">Change Password</h4>
-                                                <p className="text-sm text-yellow-700 mb-3">Keep your account secure by using a strong password.</p>
-                                                <button className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors">
-                                                    Change Password
-                                                </button>
+                        {activeTab === 'security' && (
+                            <div className="space-y-6">
+                                <h3 className="text-xl font-bold text-primary_color mb-6 flex items-center gap-2">
+                                    <div className="w-1 h-6 bg-primary_color rounded-full"></div>
+                                    Security Settings
+                                </h3>
+                                            <div className="space-y-4">
+                                    <div className="default_bg border border-secondary_color/20 rounded-xl p-5 bg-secondary_color/5">
+                                        <h4 className="font-bold text-primary_color mb-2">Change Password</h4>
+                                        <p className="text-sm text-primary_color/70 mb-4">Keep your account secure by using a strong password.</p>
+                                        
+                                        <div className="space-y-4 mt-4">
+                                                {passwordError && (
+                                                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+                                                        {passwordError}
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <label className="block text-sm font-medium text-primary_color mb-2">Current Password</label>
+                                                    <div className="relative">
+                                                        <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary_color/50 w-5 h-5" />
+                                                        <input
+                                                            type={showPassword.current ? 'text' : 'password'}
+                                                            value={passwordData.currentPassword}
+                                                            onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                                                            className="w-full pl-10 pr-12 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color"
+                                                            placeholder="Enter current password"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowPassword(prev => ({ ...prev, current: !prev.current }))}
+                                                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-primary_color/50 hover:text-primary_color"
+                                                        >
+                                                            {showPassword.current ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-primary_color mb-2">New Password</label>
+                                                    <div className="relative">
+                                                        <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary_color/50 w-5 h-5" />
+                                                        <input
+                                                            type={showPassword.new ? 'text' : 'password'}
+                                                            value={passwordData.newPassword}
+                                                            onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                                                            className="w-full pl-10 pr-12 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color"
+                                                            placeholder="Enter new password"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowPassword(prev => ({ ...prev, new: !prev.new }))}
+                                                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-primary_color/50 hover:text-primary_color"
+                                                        >
+                                                            {showPassword.new ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-primary_color mb-2">Confirm New Password</label>
+                                                    <div className="relative">
+                                                        <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary_color/50 w-5 h-5" />
+                                                        <input
+                                                            type={showPassword.confirm ? 'text' : 'password'}
+                                                            value={passwordData.confirmPassword}
+                                                            onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                                                            className="w-full pl-10 pr-12 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color"
+                                                            placeholder="Confirm new password"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowPassword(prev => ({ ...prev, confirm: !prev.confirm }))}
+                                                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-primary_color/50 hover:text-primary_color"
+                                                        >
+                                                            {showPassword.confirm ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-3">
+                                                    <button
+                                                        onClick={handlePasswordChange}
+                                                        disabled={changingPassword}
+                                                        className="flex-1 px-4 py-2 bg-secondary_color text-white rounded-xl hover:bg-secondary_color/90 transition-colors font-medium shadow-lg shadow-secondary_color/20 disabled:opacity-50"
+                                                    >
+                                                        {changingPassword ? 'Changing...' : 'Update Password'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+                                                            setPasswordError('')
+                                                        }}
+                                                        className="px-4 py-2 default_bg text-primary_color rounded-xl hover:bg-primary_color/10 transition-colors border border-primary_color/10 font-medium"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                                <h4 className="font-medium text-blue-800 mb-2">Two-Factor Authentication</h4>
-                                                <p className="text-sm text-blue-700 mb-3">Add an extra layer of security to your account.</p>
-                                                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                                                    Enable 2FA
-                                                </button>
-                                            </div>
-                                            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                                                <h4 className="font-medium text-red-800 mb-2">Delete Account</h4>
-                                                <p className="text-sm text-red-700 mb-3">Permanently delete your account and all associated data.</p>
-                                                <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
-                                                    Delete Account
-                                                </button>
                                             </div>
                                         </div>
                                     </div>

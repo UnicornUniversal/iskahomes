@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Input } from '../../ui/input'
 import { cn } from '@/lib/utils'
+import { toast } from 'react-toastify'
 
 const DevelopmentMedia = ({ formData, updateFormData, isEditMode }) => {
   const [localMediaData, setLocalMediaData] = useState({
@@ -56,12 +57,12 @@ const DevelopmentMedia = ({ formData, updateFormData, isEditMode }) => {
         const file = fileArray[0];
         // Check file size (5MB = 5 * 1024 * 1024 bytes)
         if (file.size > 5 * 1024 * 1024) {
-          alert('Banner image size must be less than 5MB');
+          toast.error('Banner image size must be less than 5MB');
           return;
         }
         // Check file type
         if (!file.type.startsWith('image/')) {
-          alert('Please select an image file for the banner');
+          toast.error('Please select an image file for the banner');
           return;
         }
         const newMediaData = {
@@ -78,12 +79,12 @@ const DevelopmentMedia = ({ formData, updateFormData, isEditMode }) => {
         const file = fileArray[0]
         // Check file size (50MB = 50 * 1024 * 1024 bytes)
         if (file.size > 50 * 1024 * 1024) {
-          alert('Video file size must be less than 50MB')
+          toast.error('Video file size must be less than 50MB')
           return
         }
         // Check file type
         if (!file.type.startsWith('video/')) {
-          alert('Please select a video file');
+          toast.error('Please select a video file');
           return;
         }
         const newMediaData = {

@@ -51,6 +51,70 @@ export async function GET(request) {
       }
     }
 
+    // Get all unique other user IDs and types to fetch their info
+    const otherUsersMap = {}
+    const otherUserIdsByType = {
+      property_seeker: [],
+      developer: [],
+      agent: []
+    }
+
+    conversations?.forEach(conv => {
+      const isUser1 = conv.user1_id === userId && conv.user1_type === userType
+      const otherUserId = isUser1 ? conv.user2_id : conv.user1_id
+      const otherUserType = isUser1 ? conv.user2_type : conv.user1_type
+      
+      if (otherUserId && otherUserType && !otherUsersMap[`${otherUserType}_${otherUserId}`]) {
+        otherUsersMap[`${otherUserType}_${otherUserId}`] = { id: otherUserId, type: otherUserType }
+        if (otherUserIdsByType[otherUserType]) {
+          otherUserIdsByType[otherUserType].push(otherUserId)
+        }
+      }
+    })
+
+    // Fetch all other users' info in parallel
+    const [seekersData, developersData, agentsData] = await Promise.all([
+      otherUserIdsByType.property_seeker.length > 0
+        ? supabase
+            .from('property_seekers')
+            .select('id, name, profile_picture')
+            .in('id', otherUserIdsByType.property_seeker)
+        : { data: [] },
+      otherUserIdsByType.developer.length > 0
+        ? supabase
+            .from('developers')
+            .select('developer_id, name, profile_image')
+            .in('developer_id', otherUserIdsByType.developer)
+        : { data: [] },
+      otherUserIdsByType.agent.length > 0
+        ? supabase
+            .from('agents')
+            .select('agent_id, name, profile_image')
+            .in('agent_id', otherUserIdsByType.agent)
+        : { data: [] }
+    ])
+
+    // Create a map of other user info
+    const otherUsersInfoMap = {}
+    seekersData.data?.forEach(seeker => {
+      otherUsersInfoMap[`property_seeker_${seeker.id}`] = {
+        name: seeker.name || 'Property Seeker',
+        profileImage: seeker.profile_picture || null
+      }
+    })
+    developersData.data?.forEach(developer => {
+      otherUsersInfoMap[`developer_${developer.developer_id}`] = {
+        name: developer.name || 'Developer',
+        profileImage: developer.profile_image || null
+      }
+    })
+    agentsData.data?.forEach(agent => {
+      otherUsersInfoMap[`agent_${agent.agent_id}`] = {
+        name: agent.name || 'Agent',
+        profileImage: agent.profile_image || null
+      }
+    })
+
     // Transform the data and filter for unread conversations only
     const transformedMessages = conversations
       ?.map(conv => {
@@ -67,12 +131,18 @@ export async function GET(request) {
         if (unreadCount === 0) return null
         
         const listing = conv.listing_id ? listingsMap[conv.listing_id] || null : null
+        const otherUserInfo = otherUsersInfoMap[`${otherUserType}_${otherUserId}`] || {
+          name: 'User',
+          profileImage: null
+        }
 
         return {
           id: conv.id,
           conversationId: conv.id,
           otherUserId,
           otherUserType,
+          otherUserName: otherUserInfo.name,
+          otherUserProfileImage: otherUserInfo.profileImage,
           listingId: conv.listing_id,
           lastMessage: conv.last_message_text,
           lastMessageAt: conv.last_message_at,

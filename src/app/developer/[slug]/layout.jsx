@@ -24,14 +24,14 @@ export default function DeveloperLayout({ children }) {
       
       if (!hasDeveloperToken || !isAuthenticated || user?.user_type !== 'developer') {
         console.log('Developer route protection: No valid developer token, redirecting to signin')
-        handleAuthFailure('/signin')
+        handleAuthFailure('/home/signin')
         return
       }
       
       // Verify token is valid
       if (!developerToken && !hasDeveloperToken) {
         console.log('Developer route protection: Token missing, redirecting to signin')
-        handleAuthFailure('/signin')
+        handleAuthFailure('/home/signin')
         return
       }
     }
@@ -59,7 +59,7 @@ export default function DeveloperLayout({ children }) {
     <div className='flex gap-[1em] md:px-[1em] overflow-hidden template_body_bg'>
     
       <DeveloperNav />
-      <div className='flex-1 flex flex-col p-2  default_bg md:!p-[2em] mt-[3em] h-full md:mt-[7em] overflow-hidden lg:transition-all lg:duration-300' style={{marginLeft: 'clamp(0px, var(--nav-width, 0px), 300px)'}}>
+      <div className='flex-1 flex flex-col p-2  default_bg md:!p-[2em] mt-[3em] h-full min-h-[700px]  md:mt-[7em] overflow-hidden lg:transition-all lg:duration-300' style={{marginLeft: 'clamp(0px, var(--nav-width, 0px), 300px)'}}>
     
 
         {children}

@@ -22,7 +22,8 @@ import {
     FiChevronDown,
     FiChevronRight,
     FiChevronLeft,
-    FiChevronUp
+    FiChevronUp,
+    FiShield
 } from 'react-icons/fi'
 
 const DeveloperNav = () => {
@@ -86,16 +87,21 @@ const DeveloperNav = () => {
             icon: FiUsers
         },
         {
+            label: 'Team',
+            href: `/developer/${developerSlug}/team`,
+            icon: FiShield
+        },
+        {
             label: 'Analytics',
             href: `/developer/${developerSlug}/analytics`,
             icon: FiBarChart2,
             hasSubmenu: true,
             submenu: [
-                {
-                    label: 'Overview',
-                    href: `/developer/${developerSlug}/analytics`,
-                    icon: FiTrendingUp
-                },
+                // {
+                //     label: 'Overview',
+                //     href: `/developer/${developerSlug}/analytics`,
+                //     icon: FiTrendingUp
+                // },
                 {
                     label: 'Properties',
                     href: `/developer/${developerSlug}/analytics/properties`,
@@ -272,7 +278,7 @@ const DeveloperNav = () => {
         <>
             {/* Only render after client-side hydration to prevent hydration mismatches */}
             {!isClient ? (
-                <div className="fixed rounded-sm border-primary_color lg:fixed flex flex-col bg-gradient-to-b from-white to-gray-50 h-auto lg:max-h-[calc(100vh-7rem)] py-4 pb-8 px-[1em] shadow-lg border border-gray-100 z-50 w-[85vw] max-w-[300px] lg:w-[300px] top-16 bottom-2 lg:top-28 left-2 overflow-x-hidden overflow-y-auto">
+                <div className="fixed rounded-sm border-primary_color lg:fixed flex flex-col bg-gradient-to-b from-white to-gray-50 h-auto lg:max-h-[calc(100vh-7rem)] py-4 pb-8 px-[1em] shadow-lg border border-gray-100 z-50 w-[85vw] min-w-[300px] max-w-[300px] lg:w-[300px] lg:min-w-[300px] top-16 bottom-2 lg:top-28 left-2 overflow-x-hidden overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                     {/* <div className="mb-4 flex items-center justify-between">
                         <div>
                             <h5 className="mb-2">Developer </h5>
@@ -309,12 +315,12 @@ const DeveloperNav = () => {
 
                     {/* Navigation Menu - Only render on large devices or when mobile menu is open */}
                     {(isMobileMenuOpen || !isMobile) && (
-                        <nav className={`fixed rounded-sm border-primary_color bg-white/95 lg:bg-gradient-to-b lg:from-white lg:to-gray-50 flex flex-col h-auto lg:max-h-[calc(100vh-7rem)] py-4 pb-8 px-[1em] shadow-lg border border-gray-100 z-[50] transition-all duration-300 ease-in-out top-16 lg:top-28 left-2 overflow-x-hidden overflow-y-auto ${
+                        <nav className={`fixed rounded-sm border-primary_color bg-white/95 lg:bg-gradient-to-b lg:from-white lg:to-gray-50 flex flex-col h-auto lg:max-h-[calc(100vh-7rem)] py-4 pb-8 px-[1em] shadow-lg border border-gray-100 z-[50] transition-all duration-300 ease-in-out top-16 lg:top-28 left-2 overflow-x-hidden overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${
                             isMobileMenuOpen 
                                 ? 'translate-x-0' 
                                 : '-translate-x-full lg:translate-x-0'
                         } ${
-                            isCollapsed ? 'w-[85vw] max-w-[80px] lg:w-[80px]' : 'w-[85vw] max-w-[300px] lg:w-[300px]'
+                            isCollapsed ? 'w-[85vw] min-w-[80px] max-w-[80px] lg:w-[80px] lg:min-w-[80px]' : 'w-[85vw] min-w-[300px] max-w-[300px] lg:w-[300px] lg:min-w-[300px]'
                         }`}>
                 <div className="mb-4 flex items-center justify-between">
                     {!isCollapsed && (
@@ -322,6 +328,8 @@ const DeveloperNav = () => {
                             <h5 className="mb-2">Developer </h5>
                             <h3 className="mb-2">Dashboard</h3>
                             <div className="w-12 h-1 bg-primary_color rounded-full"></div>
+                    
+                    
                         </div>
                     )}
                     
@@ -339,7 +347,7 @@ const DeveloperNav = () => {
                     </button>
                 </div>
                 
-                <div className="space-y-2 w-full flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                <div className="space-y-2 w-full flex-1 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                     {navItems.map((item, index) => {
                         const IconComponent = item.icon
                         // Check if current pathname matches this nav item

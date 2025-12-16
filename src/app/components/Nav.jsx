@@ -9,6 +9,7 @@ import {
   FaSearch, 
   FaHandshake, 
   FaBuilding, 
+  FaCity,
   FaUsers, 
   FaInfoCircle, 
   FaUserPlus, 
@@ -28,19 +29,20 @@ const Nav = () => {
     const nav_options = [
     { nav_name: "Home", nav_icon: FaHome, nav_link: "/" },
    
-    { nav_name: "All Services", nav_icon: FaCogs, nav_link: "/", sub_menu:[
+    { nav_name: "All Services", nav_icon: FaCogs, nav_link: "/home/allServices", sub_menu:[
       {"sub_link_name":"Virtual Tour", "sub_link_link":"/virtual-tour"  },
       {"sub_link_name":"3D Visualization", "sub_link_link":"/3d-visualization"  },
       {"sub_link_name":"Interior Design", "sub_link_link":"/interior-design"  },
       {"sub_link_name":"Smart Home Installation", "sub_link_link":"/smart-home-installation"  },
       {"sub_link_name":"Space Planning Consultation", "sub_link_link":"/space-planning-consultation"  },
     ] },  
-    { nav_name: "Explore Properties", nav_icon: FaSearch, nav_link: "/exploreProperties" },
+    { nav_name: "Explore Properties", nav_icon: FaSearch, nav_link: "/home/exploreProperties" },
     // { nav_name: "Sell A Property", nav_icon: FaHandshake, nav_link: "/projects" },
-    { nav_name: "Developers", nav_icon: FaBuilding, nav_link: "/allDevelopers" },
-    { nav_name: "Agents", nav_icon: FaUsers, nav_link: "/allAgents" },
-    { nav_name: "About Us", nav_icon: FaInfoCircle, nav_link: "/aboutUs" },
-    { nav_name: "Contact Us", nav_icon: FaEnvelope, nav_link: "/contactUs" },
+    { nav_name: "Developers", nav_icon: FaBuilding, nav_link: "/home/allDevelopers" },
+    { nav_name: "All Developments", nav_icon: FaCity, nav_link: "/home/allDevelopments" },
+    { nav_name: "Agents", nav_icon: FaUsers, nav_link: "/home/allAgents" },
+    { nav_name: "About Us", nav_icon: FaInfoCircle, nav_link: "/home/aboutUs" },
+    { nav_name: "Contact Us", nav_icon: FaEnvelope, nav_link: "/home/contactUs" },
 
 
   
@@ -48,8 +50,8 @@ const Nav = () => {
 
 
 const button_options = [
-  { nav_name: "Sign Up", nav_icon: FaUserPlus, nav_link: "/signup", isButton: true },
-  { nav_name: "Login", nav_icon: FaSignInAlt, nav_link: "/signin", isButton: true },
+  { nav_name: "Sign Up", nav_icon: FaUserPlus, nav_link: "/home/signup", isButton: true },
+  { nav_name: "Login", nav_icon: FaSignInAlt, nav_link: "/home/signin", isButton: true },
 ];
 
 const handleLogout = () => {

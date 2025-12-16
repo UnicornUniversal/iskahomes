@@ -48,7 +48,7 @@ Redirect to dashboard
 
 ### 2. User Signin Flow
 ```
-User fills form → API call to /api/auth/signin → 
+User fills form → API call to /api/auth/home/signin → 
 Supabase Auth validates → Get user profile → 
 Redirect to appropriate dashboard
 ```
@@ -93,7 +93,7 @@ src/
 3. **Create database tables** using the SQL schema
 4. **Start development server**: `npm run dev`
 5. **Test signup**: Go to `/signup` and select "Developer" tab
-6. **Test signin**: Go to `/signin` with created credentials
+6. **Test signin**: Go to `/home/signin` with created credentials
 
 ## 🔄 Next Steps
 

@@ -18,6 +18,9 @@ import {
   ArrowUpRight,
   ArrowDownRight
 } from 'lucide-react'
+import { DateRangePicker } from '@/app/components/ui/date-range-picker'
+import { ExportDropdown } from '@/app/components/ui/export-dropdown'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -45,20 +48,47 @@ ChartJS.register(
 
 const AnalyticsOverview = () => {
   const params = useParams()
+  const { user } = useAuth()
   const [loading, setLoading] = useState(false)
-  const [timeRange, setTimeRange] = useState('30d')
+  const [exporting, setExporting] = useState(false)
+  
+  // Initialize with current month as default
+  const getDefaultDateRange = () => {
+    const today = new Date()
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+    return {
+      startDate: startOfMonth.toISOString().split('T')[0],
+      endDate: today.toISOString().split('T')[0]
+    }
+  }
 
-  // Dummy analytics data based on development_analytics schema
+  const defaultRange = getDefaultDateRange()
+  const [dateRange, setDateRange] = useState(defaultRange)
+
+  // Get real data from user profile - use unique_leads + anonymous_leads instead of total_leads
+  const totalViews = user?.profile?.total_views || 0
+  const totalUniqueLeads = user?.profile?.total_unique_leads || 0 // Aggregate across all contexts
+  const totalAnonymousLeads = user?.profile?.total_anonymous_leads || 0 // Aggregate across all contexts
+  const totalLeads = totalUniqueLeads + totalAnonymousLeads // Total unique individuals
+  // Fallback to profile-specific if aggregate not available
+  const profileUniqueLeads = user?.profile?.unique_leads || 0
+  const profileAnonymousLeads = user?.profile?.anonymous_leads || 0
+  const profileTotalLeads = profileUniqueLeads + profileAnonymousLeads
+  const finalTotalLeads = totalLeads > 0 ? totalLeads : (profileTotalLeads > 0 ? profileTotalLeads : (user?.profile?.total_leads || 0))
+  const totalImpressions = user?.profile?.total_impressions || 0
+  const conversionRate = totalViews > 0 ? ((finalTotalLeads / totalViews) * 100) : 0
+
+  // Dummy analytics data based on development_analytics schema (for charts and other metrics)
   const analyticsData = {
     overview: {
-      totalViews: 2847,
-      totalLeads: 156,
-      totalImpressions: 892,
-      conversionRate: 5.5,
-      viewsChange: 12.3,
-      leadsChange: 8.7,
-      impressionsChange: 15.2,
-      conversionChange: -2.1
+      totalViews: totalViews,
+      totalLeads: finalTotalLeads,
+      totalImpressions: totalImpressions,
+      conversionRate: parseFloat(conversionRate.toFixed(2)),
+      viewsChange: 12.3, // TODO: Calculate from previous period
+      leadsChange: 8.7, // TODO: Calculate from previous period
+      impressionsChange: 15.2, // TODO: Calculate from previous period
+      conversionChange: -2.1 // TODO: Calculate from previous period
     },
     performance: {
       labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
@@ -306,7 +336,65 @@ const AnalyticsOverview = () => {
 
         {/* Overview Chart */}
         <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Overview</h3>
+          <div className="flex items-center flex-wrap justify-between mb-4 gap-4">
+            <h3 className="text-lg font-semibold text-gray-900">Performance Overview</h3>
+            <div className="flex items-center gap-2">
+              <DateRangePicker
+                startDate={dateRange.startDate}
+                endDate={dateRange.endDate}
+                onChange={setDateRange}
+                className="w-[280px]"
+              />
+              <ExportDropdown
+                onExport={async (format) => {
+                  if (!dateRange.startDate || !dateRange.endDate || exporting) return
+                  
+                  setExporting(true)
+                  try {
+                    const exportData = [
+                      ['Period', 'Views', 'Leads'],
+                      ...performanceLabels.map((label, index) => [
+                        label,
+                        performanceViews[index] || 0,
+                        performanceLeads[index] || 0
+                      ])
+                    ]
+                    
+                    if (format === 'csv') {
+                      const csvContent = exportData.map(row => row.join(',')).join('\n')
+                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+                      const link = document.createElement('a')
+                      const url = URL.createObjectURL(blob)
+                      link.setAttribute('href', url)
+                      link.setAttribute('download', `performance-overview-${dateRange.startDate}-to-${dateRange.endDate}.csv`)
+                      link.style.visibility = 'hidden'
+                      document.body.appendChild(link)
+                      link.click()
+                      document.body.removeChild(link)
+                    } else if (format === 'excel') {
+                      const BOM = '\uFEFF'
+                      const excelContent = BOM + exportData.map(row => row.join('\t')).join('\n')
+                      const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+                      const link = document.createElement('a')
+                      const url = URL.createObjectURL(blob)
+                      link.setAttribute('href', url)
+                      link.setAttribute('download', `performance-overview-${dateRange.startDate}-to-${dateRange.endDate}.xls`)
+                      link.style.visibility = 'hidden'
+                      document.body.appendChild(link)
+                      link.click()
+                      document.body.removeChild(link)
+                    }
+                  } catch (error) {
+                    console.error('Error exporting data:', error)
+                    alert('Failed to export data. Please try again.')
+                  } finally {
+                    setExporting(false)
+                  }
+                }}
+                disabled={exporting || !dateRange.startDate || !dateRange.endDate}
+              />
+            </div>
+          </div>
           <div className="h-80">
             <Line data={overviewChartData} options={chartOptions} />
           </div>

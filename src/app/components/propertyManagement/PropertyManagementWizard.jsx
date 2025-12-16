@@ -45,29 +45,53 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
   } = useDevelopments(user?.profile?.developer_id)
 
   const [currentStep, setCurrentStep] = useState(0)
-  const [formData, setFormData] = useState({})
+  // Initialize formData with default empty arrays to prevent undefined errors
+  const [formData, setFormData] = useState({
+    purposes: [],
+    types: [],
+    categories: [],
+    listing_types: { database: [], inbuilt: [], custom: [] }
+  })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [hasFetched, setHasFetched] = useState(false)
   const [completedSteps, setCompletedSteps] = useState(new Set())
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [showFinalizingModal, setShowFinalizingModal] = useState(false)
   const [draftListingId, setDraftListingId] = useState(propertyId) // Track draft ID for new listings
-  const [listingStatus, setListingStatus] = useState('draft') // Track listing status
+  const [listingStatus, setListingStatus] = useState('active') // Track listing status
+  const [startedInAddMode, setStartedInAddMode] = useState(slug === 'addNewUnit' || slug === 'addNewProperty') // Track if we started in add mode
 
-  // Determine if it's add mode
-  const isAddMode = slug === 'addNewUnit' || slug === 'addNewProperty'
+  // Determine if it's add mode - check slug prop directly to prevent mode switching issues
+  // Also check if we started in add mode to prevent fetching existing data when URL changes
+  const isAddMode = (slug === 'addNewUnit' || slug === 'addNewProperty') || startedInAddMode
   const isEditMode = !isAddMode
   
   // Use draftListingId if available, otherwise use propertyId
   const effectiveListingId = draftListingId || propertyId
 
-  // Fetch existing listing data if in edit mode
+  // Reset hasFetched when slug changes from add to edit mode to prevent stale data
   useEffect(() => {
-    if (!isAddMode && effectiveListingId && user && !hasFetched) {
+    if (isAddMode) {
+      setHasFetched(false)
+    }
+  }, [slug, isAddMode])
+
+  // Fetch existing listing data if in edit mode
+  // IMPORTANT: Only fetch if we're NOT in add mode and we didn't start in add mode
+  // This prevents fetching when URL changes but we're still adding a new unit
+  useEffect(() => {
+    // Only fetch if:
+    // 1. We're NOT in add mode (slug is NOT addNewUnit/addNewProperty AND we didn't start in add mode)
+    // 2. We have an effectiveListingId
+    // 3. User is available
+    // 4. We haven't fetched yet
+    // 5. We didn't start in add mode (prevents fetching when URL changes during add flow)
+    if (!isAddMode && !startedInAddMode && effectiveListingId && user && !hasFetched) {
       fetchListingData()
     }
-  }, [isAddMode, effectiveListingId, user, hasFetched])
+  }, [isAddMode, startedInAddMode, effectiveListingId, user, hasFetched])
 
   const fetchListingData = async () => {
     setLoading(true)
@@ -144,7 +168,9 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
           floor_plan: data.floor_plan || null,
           virtual_tour_link: data.virtual_tour_link || '',
           property_status: data.listing_status || 'active',
-          listing_status: data.listing_status || 'draft',
+          listing_status: data.listing_status || 'active',
+          published_at: data.published_at || null,
+          published_status: data.published_status || null,
           social_amenities: data.social_amenities || {
             schools: [],
             hospitals: [],
@@ -155,7 +181,7 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
           }
         })
         // Update listing status state
-        setListingStatus(data.listing_status || 'draft')
+        setListingStatus(data.listing_status || 'active')
       } else {
         toast.error('Failed to fetch listing data')
       }
@@ -474,11 +500,12 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
     }
 
     setSaving(true)
+    setShowFinalizingModal(true) // Show finalizing modal
 
     try {
       const token = localStorage.getItem(`${accountType}_token`)
       
-      // Update listing status to active and mark as completed
+      // Update listing status to active and mark as published
       const response = await fetch(`/api/listings/${effectiveListingId}`, {
         method: 'PUT',
         headers: {
@@ -486,29 +513,51 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          listing_status: formData.property_status || 'active',
+          listing_status: 'active',
+          published_at: new Date().toISOString(),
+          published_status: 'published',
           listing_condition: 'completed',
           upload_status: 'completed'
         })
       })
 
       if (response.ok) {
-        toast.success('Listing finalized and published successfully!')
+        const result = await response.json()
         
-        // Redirect to the listing page or dashboard
+        // Update local state to reflect published status
+        setListingStatus('active')
+        setFormData(prev => ({
+          ...prev,
+          listing_status: 'active',
+          property_status: 'active',
+          published_at: new Date().toISOString(),
+          published_status: 'published'
+        }))
+        
+        // Hide modal first, then show toast
+        setShowFinalizingModal(false)
+        
+        // Small delay to ensure modal is hidden before showing toast
         setTimeout(() => {
-          if (accountType === 'developer') {
-            window.location.href = `/developer/${user.profile?.slug || user.profile.id}/units/${effectiveListingId}`
-          } else {
-            window.location.href = `/agent/${user.profile?.slug || user.profile.id}/properties/${effectiveListingId}`
-          }
-        }, 2000)
+          toast.success('Listing finalized and published successfully!')
+          
+          // Redirect to the listing page or dashboard
+          setTimeout(() => {
+            if (accountType === 'developer') {
+              window.location.href = `/developer/${user.profile?.slug || user.profile.id}/units/${effectiveListingId}`
+            } else {
+              window.location.href = `/agent/${user.profile?.slug || user.profile.id}/properties/${effectiveListingId}`
+            }
+          }, 2000)
+        }, 300)
       } else {
         const error = await response.json()
+        setShowFinalizingModal(false)
         toast.error(error.error || 'Failed to finalize listing')
       }
     } catch (error) {
       console.error('Error finalizing listing:', error)
+      setShowFinalizingModal(false)
       toast.error('Error finalizing listing')
     } finally {
       setSaving(false)
@@ -543,7 +592,7 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
         
         setTimeout(() => {
           if (accountType === 'developer') {
-            window.location.href = `/developer/${user.profile?.slug || user.profile.id}/developments`
+            window.location.href = `/developer/${user.profile?.slug || user.profile.id}/units`
           } else {
             window.location.href = `/agent/${user.profile?.slug || user.profile.id}/listings`
           }
@@ -584,12 +633,13 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
                 ? (accountType === 'developer' ? 'Add New Unit' : 'Add New Property')
                 : 'Edit Property'}
             </h1>
-            {/* Draft Status Badge */}
-            {(listingStatus === 'draft' || formData.listing_status === 'draft') && (
+            {/* Draft Status Badge - Show if not published (no published_at or published_status !== 'published') */}
+            {(!formData.published_at && !formData.published_status) || 
+             (formData.published_status && formData.published_status !== 'published') ? (
               <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium border border-yellow-300">
                 Draft
               </span>
-            )}
+            ) : null}
           </div>
           <p className="text-sm text-gray-500 mt-1">
             Step {currentStep + 1} of {STEPS.length}: {currentStepData.label}
@@ -742,6 +792,21 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
         itemType={accountType === 'developer' ? 'unit' : 'property'}
         isLoading={isDeleting}
       />
+
+      {/* Finalizing Modal */}
+      {showFinalizingModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
+            <div className="flex flex-col items-center justify-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary_color mb-4"></div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Finalizing...</h3>
+              <p className="text-sm text-gray-600 text-center">
+                Please wait while we finalize and publish your listing.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Container */}
       <ToastContainer

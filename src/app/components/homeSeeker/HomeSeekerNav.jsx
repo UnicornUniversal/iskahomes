@@ -5,21 +5,13 @@ import { useAuth } from '@/contexts/AuthContext'
 import { 
     FiHome, 
     FiCalendar, 
-    FiUsers, 
-    FiMapPin, 
     FiHeart, 
     FiMessageSquare, 
     FiUser, 
-    FiCreditCard, 
-    FiGrid,
     FiLogOut,
     FiMenu,
-    FiX,
-    FiFileText,
-    FiBell,
-    FiStar,
-    FiDollarSign,
-    FiCheckCircle
+    FiX
+    // FiFileText
 } from 'react-icons/fi'
 
 const HomeSeekerNav = ({ pathname }) => {
@@ -42,6 +34,12 @@ const HomeSeekerNav = ({ pathname }) => {
             icon: FiHeart,
             pathMatch: '/saved-listings'
         },
+        // {
+        //     label: 'Applications',
+        //     href: `/propertySeeker/${userId}/applications`,
+        //     icon: FiFileText,
+        //     pathMatch: '/applications'
+        // },
         {
             label: 'Bookings',
             href: `/propertySeeker/${userId}/bookings`,
@@ -68,40 +66,49 @@ const HomeSeekerNav = ({ pathname }) => {
 
     return (
         <>
-            {/* Mobile Menu Toggle Button - Only visible on mobile */}
+            {/* Mobile Menu Toggle Button */}
             <button
                 onClick={toggleMobileMenu}
-                className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-primary_color text-white rounded-lg shadow-lg hover:bg-primary_color/90 transition-all duration-300"
+                className="lg:hidden fixed top-4 left-4 z-50 p-3 bg-primary_color text-white rounded-xl shadow-lg hover:bg-primary_color/90 transition-all duration-300 hover:scale-105"
                 aria-label="Toggle navigation menu"
             >
                 {isMobileMenuOpen ? (
-                    <FiX className="w-6 h-6" />
+                    <FiX className="w-5 h-5" />
                 ) : (
-                    <FiMenu className="w-6 h-6" />
+                    <FiMenu className="w-5 h-5" />
                 )}
             </button>
 
             {/* Mobile Overlay */}
             {isMobileMenuOpen && (
                 <div 
-                    className="lg:hidden fixed inset-0 bg-primary_color/40 backdrop-blur-sm bg-opacity-10 z-40"
+                    className="lg:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
                     onClick={toggleMobileMenu}
                 />
             )}
 
             {/* Navigation Menu */}
-            <nav className={`fixed lg:relative flex flex-col bg-gradient-to-b from-blue-50 max-h-screen to-indigo-50 min-h-screen py-8 w-[85vw] max-w-[300px] px-[1em] shadow-lg border-r border-blue-100 z-50 transition-transform duration-300 ease-in-out ${
+            <nav className={`fixed lg:sticky lg:top-0 flex flex-col default_bg min-h-screen py-6 lg:py-8 w-[85vw] max-w-[280px] px-4 lg:px-6 shadow-xl border-r border-primary_color/10 z-50 transition-transform duration-300 ease-in-out ${
                 isMobileMenuOpen 
                     ? 'translate-x-0' 
                     : '-translate-x-full lg:translate-x-0'
-            } lg:translate-x-0`}>
-                <div className="mb-8">
-                    <h5 className="mb-2 text-blue-600">propertySeeker</h5>
-                    <h3 className="mb-2 text-blue-900">Dashboard</h3>
-                    <div className="w-12 h-1 bg-blue-600 rounded-full"></div>
+            }`}>
+                {/* Logo/Header Section */}
+                <div className="mb-8 pb-6 border-b border-primary_color/10">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary_color to-primary_color/80 flex items-center justify-center shadow-lg">
+                            <FiHome className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                            <h5 className="text-xs font-semibold text-primary_color/70 uppercase tracking-wider">Property Seeker</h5>
+                            <h3 className="text-lg font-bold text-primary_color">Dashboard</h3>
+                        </div>
+                    </div>
+                    <div className="w-16 h-1 bg-gradient-to-r from-primary_color to-secondary_color rounded-full"></div>
                 </div>
                 
-                <div className="space-y-2 w-full">
+                {/* Navigation Items */}
+                <div className="space-y-1.5 flex-1">
                     {navItems.map((item, index) => {
                         const IconComponent = item.icon
                         const isActive = pathname?.includes(item.pathMatch)
@@ -111,22 +118,22 @@ const HomeSeekerNav = ({ pathname }) => {
                                 key={index}
                                 href={item.href}
                                 onClick={() => setIsMobileMenuOpen(false)}
-                                className={`group relative text-[0.8em] flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 ease-in-out transform hover:scale-105 ${
+                                className={`group relative flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 ${
                                     isActive
-                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
-                                        : 'text-blue-700 hover:text-blue-600 hover:bg-white hover:shadow-md'
+                                        ? 'bg-primary_color text-white shadow-lg shadow-primary_color/30'
+                                        : 'text-primary_color hover:bg-primary_color/10 hover:text-primary_color'
                                 }`}
                             >
                                 {/* Active indicator */}
                                 {isActive && (
-                                    <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-white rounded-r-full"></div>
+                                    <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-10 bg-secondary_color rounded-r-full"></div>
                                 )}
                                 
                                 {/* Icon */}
                                 <div className={`flex-shrink-0 transition-all duration-300 ${
                                     isActive 
                                         ? 'text-white' 
-                                        : 'text-blue-400 group-hover:text-blue-600'
+                                        : 'text-primary_color/60 group-hover:text-primary_color'
                                 }`}>
                                     {IconComponent && (
                                         <IconComponent className="w-5 h-5" />
@@ -134,43 +141,36 @@ const HomeSeekerNav = ({ pathname }) => {
                                 </div>
                                 
                                 {/* Label */}
-                                <span className={`font-medium transition-all duration-300 ${
+                                <span className={`text-sm font-medium transition-all duration-300 ${
                                     isActive 
                                         ? 'text-white' 
-                                        : 'text-blue-800 group-hover:text-blue-600'
+                                        : 'text-primary_color group-hover:text-primary_color'
                                 }`}>
                                     {item.label}
                                 </span>
                                 
                                 {/* Hover effect */}
                                 {!isActive && (
-                                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                    <div className="absolute inset-0 bg-gradient-to-r from-primary_color/5 to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                                 )}
                             </a>
                         )
                     })}
                 </div>
 
-                {/* Logout */}
-                <br/>
-                <div className="mb-4 space-y-2 w-full rounded-xl shadow-red-500/25 bg-red-500 cursor-pointer">
+                {/* Logout Button */}
+                <div className="mt-6 pt-6 border-t border-primary_color/10">
                     <button
                         onClick={() => {
                             setIsMobileMenuOpen(false)
                             logout()
                         }}
-                        className={`group relative text-[0.8em] flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 ease-in-out transform hover:scale-105`}
+                        className="group relative flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 bg-red-500/10 hover:bg-red-500 text-red-600 hover:text-white hover:shadow-lg hover:shadow-red-500/30"
                     >
-                        {/* Icon */}
-                        <FiLogOut color='white' className="w-5 h-5" />
-                        {/* Label */}
-                        <span className={`font-medium transition-all duration-300 text-white`}>
-                            Logout
-                        </span>
+                        <FiLogOut className="w-5 h-5" />
+                        <span className="text-sm font-medium">Logout</span>
                     </button>
                 </div>
-
-                <br/>
             </nav>
         </>
     )

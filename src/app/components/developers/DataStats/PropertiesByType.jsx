@@ -38,7 +38,7 @@ const PropertiesByType = () => {
 
   if (!types || types.length === 0) {
     return (
-      <div className="p-6 bg-white rounded-2xl shadow-xl flex flex-col items-center justify-center">
+      <div className="p-6 rounded-2xl shadow-xl flex flex-col items-center justify-center">
         <div className="text-primary_color text-4xl mb-3">🏢</div>
         <p className="text-primary_color text-center">No property types data available</p>
       </div>

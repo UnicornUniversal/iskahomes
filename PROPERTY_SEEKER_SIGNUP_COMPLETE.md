@@ -107,7 +107,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 6. **Sign in:**
    ```
-   http://localhost:3000/signin
+   http://localhost:3000/home/signin
    ```
    - Use the email and password
    - Should successfully log in
@@ -159,7 +159,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
    - Sends welcome email
 
 6. **User can now sign in**:
-   - Go to `/signin`
+   - Go to `/home/signin`
    - Enter email + password
    - Supabase Auth validates
    - User is logged in

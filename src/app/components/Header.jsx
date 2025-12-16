@@ -44,6 +44,27 @@ const titleVariants = {
 const Header = () => {
   const [headerProperties, setHeaderProperties] = useState([])
   const [loading, setLoading] = useState(true)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+
+  // 5 real estate images from Unsplash
+  const loadingImages = [
+    "https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0",
+    "https://images.unsplash.com/photo-1568605114967-8130f3a36994?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0",
+    "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0",
+    "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0",
+    "https://images.unsplash.com/photo-1568605117034-6095e1e87e1e?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0"
+  ]
+
+  // Cross-fade through images while loading
+  useEffect(() => {
+    if (loading) {
+      const interval = setInterval(() => {
+        setCurrentImageIndex((prev) => (prev + 1) % loadingImages.length)
+      }, 2000) // Change image every 2 seconds
+
+      return () => clearInterval(interval)
+    }
+  }, [loading, loadingImages.length])
 
   useEffect(() => {
     const fetchFeaturedListings = async () => {
@@ -274,68 +295,128 @@ const Header = () => {
           <motion.div variants={itemVariants}>
             <h4 className=''>Your Dream Property Awaits You</h4>
           </motion.div>
+          {/* <p className='text-sm text-gray-500 leading-relaxed max-w-2xl'>
+            Iska Homes is your trusted partner in finding the perfect property. We connect property seekers with verified developers and experienced agents across Ghana and beyond. 
+            <br className="hidden sm:block" />
+            Explore thousands of verified listings, from cozy apartments to grand developments, all in one place. 
+            <br className="hidden sm:block" />
+            Whether you're buying, renting, or investing, we make your property journey seamless and successful.
+          </p> */}
           <motion.div variants={itemVariants} className='w-full'>
             <SearchGeneral />
           </motion.div>
+          {/* 
           <motion.div variants={itemVariants} className='grid grid-cols-3 gap-4 w-full'>
             <DataCard title="Total Properties" data="1000" />
             <DataCard title="Total Agents" data="60+" />
             <DataCard title="Happy Customers   " data="60K+" />
+          </motion.div> */}
+
+
+       <div className='flex items-center gap-4'>
+       <motion.div variants={itemVariants}>
+            <button className="secondary_button">Get Started </button>
           </motion.div>
-          <motion.div variants={itemVariants}>
-            <button className="secondary_button">Explore Now</button>
+       <motion.div variants={itemVariants}>
+            <button className="secondary_button">Explore Properties</button>
           </motion.div>
+       
+       </div>
+
         </motion.div>
 
         {/* right side - Swiper carousel */}
         <div className="w-full md:w-1/2 h-96 md:h-[500px] relative">
           {loading ? (
-            <div className="h-full w-full flex items-center justify-center">
-              <div className="text-gray-500">Loading featured properties...</div>
-            </div>
-          ) : headerProperties.length > 0 ? (
-            <Swiper
-              modules={[Autoplay, Pagination, EffectCoverflow]}
-              autoplay={{ delay: 3000, disableOnInteraction: false }}
-              loop={true}
-              spaceBetween={0}
-              slidesPerView={1}
-              effect="coverflow"
-              coverflowEffect={{
-                rotate: 30,
-                stretch: 0,
-                depth: 100,
-                modifier: 1,
-                slideShadows: true,
+            <motion.div
+              initial={{ scale: 0.7, opacity: 0 }}
+              animate={{ scale: 0.7, opacity: 1 }}
+              exit={{ scale: 1, opacity: 0 }}
+              transition={{ duration: 0.5 }}
+              className="h-full w-full relative rounded-xl overflow-hidden shadow-lg border-t-4"
+              style={{
+                borderTopColor: 'var(--color-primary_color)',
               }}
-              pagination={{ clickable: true }}
-              className="h-full w-full rounded-xl overflow-hidden shadow-lg"
             >
-              {headerProperties.map((property, idx) => (
-                <SwiperSlide key={property.id || idx} className='relative h-full w-full'>
-                  <div className='relative h-full w-full'>
-                    <Image 
-                      src={property.property_images[0]} 
-                      alt={property.propertyName} 
-                      fill 
-                      className='object-cover'
+              {/* Background with blur and primary color overlay */}
+              <div className="absolute inset-0 bg-primary_color/50 backdrop-blur-sm z-0" />
+              
+              {/* Cross-fading images */}
+              <div className="relative h-full w-full">
+                {loadingImages.map((image, idx) => (
+                  <motion.div
+                    key={idx}
+                    className="absolute inset-0"
+                    initial={{ opacity: 0 }}
+                    animate={{
+                      opacity: idx === currentImageIndex ? 1 : 0,
+                    }}
+                    transition={{
+                      duration: 1,
+                      ease: "easeInOut"
+                    }}
+                  >
+                    <Image
+                      src={image}
+                      alt={`Real estate ${idx + 1}`}
+                      fill
+                      className="object-cover"
                       priority={idx === 0}
                     />
-                    <div className="absolute bottom-8 left-8  min-w-[320px] max-w-[90vw] flex flex-col gap-3 z-10">
-                      <SimplePropertyCard
-                        propertyType={property.propertyType}
-                        propertyName={property.propertyName}
-                        propertyPrice={property.propertyPrice}
-                        propertyLocation={property.propertyLocation}
-                        propertyBedrooms={property.propertyBedrooms}
-                        Availability={property.Availability}
-                        specifications={property.specifications}
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          ) : headerProperties.length > 0 ? (
+            <motion.div
+              initial={{ scale: 0.7, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className="h-full w-full"
+            >
+              <Swiper
+                modules={[Autoplay, Pagination, EffectCoverflow]}
+                autoplay={{ delay: 3000, disableOnInteraction: false }}
+                loop={true}
+                spaceBetween={0}
+                slidesPerView={1}
+                effect="coverflow"
+                coverflowEffect={{
+                  rotate: 30,
+                  stretch: 0,
+                  depth: 100,
+                  modifier: 1,
+                  slideShadows: true,
+                }}
+                pagination={{ clickable: true }}
+                className="h-full w-full rounded-xl overflow-hidden shadow-lg"
+              >
+                {headerProperties.map((property, idx) => (
+                  <SwiperSlide key={property.id || idx} className='relative h-full w-full'>
+                    <div className='relative h-full w-full'>
+                      <Image 
+                        src={property.property_images[0]} 
+                        alt={property.propertyName} 
+                        fill 
+                        className='object-cover'
+                        priority={idx === 0}
                       />
+                      <div className="absolute bottom-8 left-8  min-w-[320px] max-w-[90vw] flex flex-col gap-3 z-10">
+                        <SimplePropertyCard
+                          propertyType={property.propertyType}
+                          propertyName={property.propertyName}
+                          propertyPrice={property.propertyPrice}
+                          propertyLocation={property.propertyLocation}
+                          propertyBedrooms={property.propertyBedrooms}
+                          Availability={property.Availability}
+                          specifications={property.specifications}
+                        />
+                      </div>
                     </div>
-                  </div>
-                </SwiperSlide>
-              ))}
-            </Swiper>
+                  </SwiperSlide>
+                ))}
+              </Swiper>
+            </motion.div>
           ) : (
             <div className="h-full w-full flex items-center justify-center">
               <div className="text-gray-500">No featured properties available</div>

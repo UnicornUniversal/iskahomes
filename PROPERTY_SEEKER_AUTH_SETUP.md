@@ -25,7 +25,7 @@ Property seekers have a separate authentication flow from developers and agents,
 - Welcome email sent
 
 ### 3. **Sign In**
-- User signs in at `/signin`
+- User signs in at `/home/signin`
 - Credentials verified with Supabase Auth
 - Profile fetched from `property_seekers` table
 - JWT token generated with:
@@ -116,7 +116,7 @@ const [propertySeekerToken, setPropertySeekerToken] = useState('')
 - Updates profile `is_verified` and `status`
 - Sends welcome email
 
-### `/api/auth/signin`
+### `/api/auth/home/signin`
 - Verifies credentials with Supabase Auth
 - Fetches profile from `property_seekers` table
 - Generates JWT token with profile `id`
@@ -199,7 +199,7 @@ posthog.reset()
    - Updated `logout()` to clear both tokens
    - Updated context value
 
-2. `src/app/api/auth/signin/route.js`
+2. `src/app/api/auth/home/signin/route.js`
    - Added property_seeker case
    - Fetches from property_seekers table
    - Generates JWT with profile.id
@@ -214,7 +214,7 @@ posthog.reset()
    - Removed email parameter requirement
    - Only uses token parameter
 
-5. `src/app/signin/page.jsx`
+5. `src/app/home/signin/page.jsx`
    - Added property_seeker redirect case
    - Redirects to `/propertySeeker/${id}/dashboard`
 

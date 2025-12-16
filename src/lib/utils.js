@@ -58,4 +58,26 @@ export function formatCurrency(amount, currencyCode = 'USD') {
     // For amounts less than 1000, use regular formatting with commas
     return `${currencyCode} ${number.toLocaleString('en-US')}`
   }
+}
+
+/**
+ * Formats a date string into "23 December 2025" format
+ * @param {string|Date} dateString - The date to format
+ * @returns {string} - Formatted date string (e.g., "23 December 2025")
+ */
+export function formatFullDate(dateString) {
+  if (!dateString) return ''
+  
+  const date = new Date(dateString)
+  if (isNaN(date.getTime())) return ''
+  
+  const day = date.getDate()
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ]
+  const month = monthNames[date.getMonth()]
+  const year = date.getFullYear()
+  
+  return `${day} ${month} ${year}`
 } 

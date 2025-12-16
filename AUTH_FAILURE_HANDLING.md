@@ -7,7 +7,7 @@ This document describes the authentication failure handling system that automati
 When authentication fails anywhere in the application, the system will:
 1. **Logout the user** - Clear user session
 2. **Clear all tokens** - Remove all authentication tokens from localStorage
-3. **Redirect to login** - Automatically redirect to `/signin` page
+3. **Redirect to login** - Automatically redirect to `/home/signin` page
 
 ## Implementation
 
@@ -21,7 +21,7 @@ The `handleAuthFailure()` function handles client-side auth failures:
 import { handleAuthFailure } from '@/lib/authFailureHandler';
 
 // When auth fails, call this function
-await handleAuthFailure('/signin');
+await handleAuthFailure('/home/signin');
 ```
 
 This function:
@@ -139,7 +139,7 @@ To test auth failure handling:
 3. **User Deleted**: Delete user from database, then try to use the app
 4. **API 401 Response**: Make an API call with invalid token
 
-All scenarios should automatically logout and redirect to `/signin`.
+All scenarios should automatically logout and redirect to `/home/signin`.
 
 ## Customization
 

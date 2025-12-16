@@ -232,8 +232,18 @@ async function processEventChunk(chunk, aggregates, offset = 0, errorTracker = n
   }
 
   for (const event of chunk) {
+    // Declare variables outside try block so they're available in catch
+    let eventName = null
+    let properties = {}
+    let distinct_id = null
+    let timestamp = null
+    
     try {
-    const { event: eventName, properties = {}, distinct_id, timestamp } = event
+      // Destructure event properties
+      eventName = event.event
+      properties = event.properties || {}
+      distinct_id = event.distinct_id
+      timestamp = event.timestamp
       
       // Validate event structure
       if (!eventName || !timestamp) {
@@ -320,6 +330,7 @@ async function processEventChunk(chunk, aggregates, offset = 0, errorTracker = n
           website: 0
         },
         unique_leads: new Set(),
+        anonymous_leads: new Set(),
         unique_leads_count: 0 // Counter for unique leads
         // Note: total_sales removed - sales are tracked in sales_listings table, not via PostHog
       })
@@ -687,7 +698,8 @@ async function processEventChunk(chunk, aggregates, offset = 0, errorTracker = n
             email_leads: 0,
             appointment_leads: 0,
             website_leads: 0,
-            unique_leads: new Set()
+            unique_leads: new Set(),
+            anonymous_leads: new Set()
             // Note: total_sales removed - sales are tracked in sales_listings table, not via PostHog
           })
         }
@@ -695,12 +707,22 @@ async function processEventChunk(chunk, aggregates, offset = 0, errorTracker = n
         const listing = aggregates.listings.get(finalListingId)
         if (!listing) break
         
+        // Get is_logged_in from event properties
+        const isLoggedIn = properties.is_logged_in === true || properties.is_logged_in === 'true' || properties.isLoggedIn === true || properties.isLoggedIn === 'true'
+        
         // Process based on lead_type
         if (leadType === 'phone') {
         listing.phone_leads++
         listing.lead_types.phone++
         listing.total_leads++
-        if (seekerId) listing.unique_leads.add(seekerId)
+        // Track unique_leads (logged-in) or anonymous_leads (anonymous) separately
+        if (seekerId) {
+          if (isLoggedIn) {
+            listing.unique_leads.add(seekerId)
+          } else {
+            listing.anonymous_leads.add(seekerId)
+          }
+        }
           
           // Track leads initiated for property_seekers
           if (seekerId) {
@@ -765,7 +787,14 @@ async function processEventChunk(chunk, aggregates, offset = 0, errorTracker = n
           listing.lead_types.direct_message++
         }
         listing.total_leads++
-        if (seekerId) listing.unique_leads.add(seekerId)
+        // Track unique_leads (logged-in) or anonymous_leads (anonymous) separately
+        if (seekerId) {
+          if (isLoggedIn) {
+            listing.unique_leads.add(seekerId)
+          } else {
+            listing.anonymous_leads.add(seekerId)
+          }
+        }
         
           // Track leads initiated for property_seekers
           if (seekerId) {
@@ -819,7 +848,14 @@ async function processEventChunk(chunk, aggregates, offset = 0, errorTracker = n
         listing.appointment_leads++
         listing.lead_types.appointment++
         listing.total_leads++
-        if (seekerId) listing.unique_leads.add(seekerId)
+        // Track unique_leads (logged-in) or anonymous_leads (anonymous) separately
+        if (seekerId) {
+          if (isLoggedIn) {
+            listing.unique_leads.add(seekerId)
+          } else {
+            listing.anonymous_leads.add(seekerId)
+          }
+        }
         
           // Track appointments booked and leads initiated for property_seekers
           if (seekerId) {
@@ -1039,6 +1075,7 @@ async function processEventChunk(chunk, aggregates, offset = 0, errorTracker = n
             appointment_leads: 0,
             website_leads: 0,
             unique_leads: new Set(),
+            anonymous_leads: new Set(),
             // Note: total_sales removed - sales are tracked in sales_listings table, not via PostHog
             total_shares: 0,
             saved_count: 0,
@@ -1105,6 +1142,7 @@ async function processEventChunk(chunk, aggregates, offset = 0, errorTracker = n
             appointment_leads: 0,
             website_leads: 0,
             unique_leads: new Set(),
+            anonymous_leads: new Set(),
             // Note: total_sales removed - sales are tracked in sales_listings table, not via PostHog
             total_shares: 0,
             saved_count: 0,
@@ -1149,8 +1187,18 @@ async function processEventChunk(chunk, aggregates, offset = 0, errorTracker = n
         else if (leadType === 'website') dev.website_leads++
         else dev.message_leads++
         
+        // Get is_logged_in from event properties (same as listing leads)
+        const isLoggedInDev = properties.is_logged_in === true || properties.is_logged_in === 'true' || properties.isLoggedIn === true || properties.isLoggedIn === 'true'
+        
         dev.total_leads++
-        if (seekerId) dev.unique_leads.add(seekerId)
+        // Track unique_leads (logged-in) or anonymous_leads (anonymous) separately
+        if (seekerId) {
+          if (isLoggedInDev) {
+            dev.unique_leads.add(seekerId)
+          } else {
+            dev.anonymous_leads.add(seekerId)
+          }
+        }
         break
       }
       
@@ -1767,6 +1815,19 @@ export async function POST(request) {
     // This ensures we capture all activity, even if a listing is temporarily inactive
     const allListingIds = new Set([...listing_ids, ...Array.from(listingsMap.keys())])
     
+    // Fetch listings with total_appointments to use for appointment leads breakdown
+    const { data: listingsWithAppointments } = await supabaseAdmin
+      .from('listings')
+      .select('id, total_appointments')
+      .in('id', Array.from(allListingIds))
+    
+    const listingAppointmentsMap = {}
+    if (listingsWithAppointments) {
+      for (const listing of listingsWithAppointments) {
+        listingAppointmentsMap[listing.id] = listing.total_appointments || 0
+      }
+    }
+    
     // Get previous period's listing_analytics for change calculations
     // For hourly tracking: get previous hour (or same day previous hour, or previous day if hour 0)
     const previousHour = cal.hour > 0 ? cal.hour - 1 : 23
@@ -1818,7 +1879,8 @@ export async function POST(request) {
           phone: 0, whatsapp: 0, direct_message: 0,
           email: 0, appointment: 0, website: 0
         },
-        unique_leads: new Set()
+        unique_leads: new Set(), // Logged-in users only
+        anonymous_leads: new Set() // Anonymous users only
         // Note: total_sales removed - sales are tracked in sales_listings table, not via PostHog
       }
 
@@ -1842,6 +1904,7 @@ export async function POST(request) {
       const unique_views = listing.unique_views instanceof Set ? listing.unique_views.size : (listing.unique_views || 0)
       const total_leads = listing.total_leads
       const unique_leads = listing.unique_leads instanceof Set ? listing.unique_leads.size : (listing.unique_leads || 0)
+      const anonymous_leads = listing.anonymous_leads instanceof Set ? listing.anonymous_leads.size : (listing.anonymous_leads || 0)
       // Note: total_sales and lead_to_sale_rate removed - sales are tracked in sales_listings table, not via PostHog
       const conversion_rate = total_views > 0 ? Number(((total_leads / total_views) * 100).toFixed(2)) : 0
 
@@ -1866,6 +1929,10 @@ export async function POST(request) {
         phone: 0, whatsapp: 0, direct_message: 0,
         email: 0, appointment: 0, website: 0
       }
+      
+      // CRITICAL FIX: Use total_appointments from listings table instead of just counting from lead_actions
+      // This ensures appointments created directly (not through lead_actions) are included
+      const appointmentLeadsTotal = listingAppointmentsMap[listingId] || 0
       
       const whatsappTotal = leadTypes.whatsapp || 0
       const directMessageTotal = leadTypes.direct_message || 0
@@ -1901,8 +1968,8 @@ export async function POST(request) {
           percentage: total_leads > 0 ? Number(((leadTypes.email || 0) / total_leads) * 100).toFixed(2) : 0
         },
         appointment: {
-          total: leadTypes.appointment || 0,
-          percentage: total_leads > 0 ? Number(((leadTypes.appointment || 0) / total_leads) * 100).toFixed(2) : 0
+          total: appointmentLeadsTotal,
+          percentage: total_leads > 0 ? Number(((appointmentLeadsTotal / total_leads) * 100).toFixed(2)) : 0
         },
         website: {
           total: leadTypes.website || 0,
@@ -1970,7 +2037,8 @@ export async function POST(request) {
         appointment_leads: listing.appointment_leads, // Appointment leads in this hour
         website_leads: listing.website_leads, // Website leads in this hour
         leads_breakdown: leadsBreakdown, // JSONB breakdown by lead type for this hour
-        unique_leads, // Unique leads in this hour
+        unique_leads, // Unique logged-in leads in this hour
+        anonymous_leads, // Unique anonymous leads in this hour
         // Note: total_sales, lead_to_sale_rate, and avg_days_to_sale removed - sales are tracked in sales_listings table
         conversion_rate, // Conversion rate for THIS HOUR: (total_leads / total_views) * 100
         views_change: {
@@ -2737,9 +2805,10 @@ export async function POST(request) {
       const devData = { developer_id: developerIdByDevelopmentId[developmentId] || null }
 
       const total_views = dev.total_views
-      const unique_views = dev.unique_views.size
+      const unique_views = dev.unique_views instanceof Set ? dev.unique_views.size : (dev.unique_views || 0)
       const total_leads = dev.total_leads
-      const unique_leads = dev.unique_leads.size
+      const unique_leads = dev.unique_leads instanceof Set ? dev.unique_leads.size : (dev.unique_leads || 0)
+      const anonymous_leads = dev.anonymous_leads instanceof Set ? dev.anonymous_leads.size : (dev.anonymous_leads || 0)
       // Note: total_sales and lead_to_sale_rate removed - sales are tracked in sales_listings table, not via PostHog
       const conversion_rate = total_views > 0 ? Number(((total_leads / total_views) * 100).toFixed(2)) : 0
       
@@ -2772,7 +2841,8 @@ export async function POST(request) {
         email_leads: dev.email_leads,
         appointment_leads: dev.appointment_leads,
         website_leads: dev.website_leads,
-        unique_leads,
+        unique_leads, // Unique logged-in leads
+        anonymous_leads, // Unique anonymous leads
         // Note: total_sales, lead_to_sale_rate, and avg_days_to_sale removed - sales are tracked in sales_listings table
         conversion_rate,
         total_shares: dev.total_shares,
@@ -3055,7 +3125,7 @@ export async function POST(request) {
               // Query listing_analytics for ALL hours of this date and aggregate by listing_id
               const { data: dailyListingAnalytics } = await supabaseAdmin
                 .from('listing_analytics')
-                .select('listing_id, total_views, total_leads, total_impressions, impression_social_media, impression_website_visit, impression_share, impression_saved_listing')
+                .select('listing_id, total_views, total_leads, unique_leads, anonymous_leads, total_impressions, impression_social_media, impression_website_visit, impression_share, impression_saved_listing')
                 .in('listing_id', allUserListingIds)
                 .eq('date', date)
               
@@ -3068,6 +3138,8 @@ export async function POST(request) {
                   aggregatedByListing[analytics.listing_id] = {
                     total_views: 0,
                     total_leads: 0,
+                    unique_leads: 0,
+                    anonymous_leads: 0,
                     total_impressions: 0,
                     impression_social_media: 0,
                     impression_website_visit: 0,
@@ -3077,6 +3149,8 @@ export async function POST(request) {
                 }
                 aggregatedByListing[analytics.listing_id].total_views += analytics.total_views || 0
                 aggregatedByListing[analytics.listing_id].total_leads += analytics.total_leads || 0
+                aggregatedByListing[analytics.listing_id].unique_leads += analytics.unique_leads || 0
+                aggregatedByListing[analytics.listing_id].anonymous_leads += analytics.anonymous_leads || 0
                 aggregatedByListing[analytics.listing_id].total_impressions += analytics.total_impressions || 0
                 aggregatedByListing[analytics.listing_id].impression_social_media += analytics.impression_social_media || 0
                 aggregatedByListing[analytics.listing_id].impression_website_visit += analytics.impression_website_visit || 0
@@ -3089,6 +3163,8 @@ export async function POST(request) {
                 const userListings = listingsByUserId[userId] || []
                 let total_listing_views = 0
                 let total_listing_leads = 0
+                let total_listing_unique_leads = 0
+                let total_listing_anonymous_leads = 0
                 let total_impressions_received = 0
                 let impression_social_media_received = 0
                 let impression_website_visit_received = 0
@@ -3100,6 +3176,8 @@ export async function POST(request) {
                   if (aggregated) {
                     total_listing_views += aggregated.total_views
                     total_listing_leads += aggregated.total_leads
+                    total_listing_unique_leads += aggregated.unique_leads
+                    total_listing_anonymous_leads += aggregated.anonymous_leads
                     total_impressions_received += aggregated.total_impressions
                     impression_social_media_received += aggregated.impression_social_media
                     impression_website_visit_received += aggregated.impression_website_visit
@@ -3107,6 +3185,35 @@ export async function POST(request) {
                     impression_saved_listing_received += aggregated.impression_saved_listing
                   }
                 }
+                
+                // Also get profile unique_leads and anonymous_leads from leads table
+                // Query leads table for profile leads (where listing_id is null and lister_id = userId)
+                const { data: profileLeadsData } = await supabaseAdmin
+                  .from('leads')
+                  .select('seeker_id, is_anonymous')
+                  .eq('lister_id', userId)
+                  .eq('context_type', 'profile')
+                  .is('listing_id', null)
+                  .is('development_id', null)
+                
+                const profileUniqueSeekers = new Set()
+                const profileAnonymousSeekers = new Set()
+                if (profileLeadsData) {
+                  for (const lead of profileLeadsData) {
+                    if (lead.is_anonymous) {
+                      profileAnonymousSeekers.add(lead.seeker_id)
+                    } else {
+                      profileUniqueSeekers.add(lead.seeker_id)
+                    }
+                  }
+                }
+                
+                const total_profile_unique_leads = profileUniqueSeekers.size
+                const total_profile_anonymous_leads = profileAnonymousSeekers.size
+                
+                // Total unique_leads and anonymous_leads = listing + profile
+                const total_unique_leads = total_listing_unique_leads + total_profile_unique_leads
+                const total_anonymous_leads = total_listing_anonymous_leads + total_profile_anonymous_leads
                 
                 // Get profile data from existing user_analytics rows (sum across all hours)
                 const userRowsForDate = allUserRows.filter(r => r.user_id === userId && r.date === date)
@@ -3130,6 +3237,8 @@ export async function POST(request) {
                     total_listing_leads: total_listing_leads,
                     total_views: total_views,
                     total_leads: total_leads,
+                    unique_leads: total_unique_leads,
+                    anonymous_leads: total_anonymous_leads,
                     total_impressions_received: total_impressions_received,
                     impression_social_media_received: impression_social_media_received,
                     impression_website_visit_received: impression_website_visit_received,
@@ -3188,7 +3297,7 @@ export async function POST(request) {
           logSuccess(`Upserted ${insertedCount} development analytics records`)
           insertResults.developments.inserted = insertedCount
           
-          // Update developments table with cumulative totals and impressions breakdown
+          // Update developments table with cumulative totals, impressions breakdown, and leads breakdown
           if (insertedCount > 0) {
             try {
               // Get all unique development IDs
@@ -3223,38 +3332,276 @@ export async function POST(request) {
                   devAggregates[devId].saved_count += Number(row.saved_count) || 0
                 }
                 
+                // Calculate leads breakdown for developments from leads table
+                let developmentLeadsBreakdownMap = {}
+                try {
+                  // Fetch all leads for these developments
+                  const { data: developmentLeads, error: leadsError } = await supabaseAdmin
+                    .from('leads')
+                    .select('development_id, lead_actions')
+                    .in('development_id', developmentIdsToUpdate)
+                    .not('development_id', 'is', null)
+                    .eq('context_type', 'development')
+                  
+                  if (leadsError) {
+                    errorTracker.addError('DEVELOPMENTS', 'Error fetching development leads for breakdown', { error: leadsError.message })
+                  } else if (developmentLeads && developmentLeads.length > 0) {
+                    // Aggregate leads by development_id
+                    const leadsByDevelopment = {}
+                    for (const lead of developmentLeads) {
+                      const devId = lead.development_id
+                      if (!leadsByDevelopment[devId]) {
+                        leadsByDevelopment[devId] = []
+                      }
+                      if (Array.isArray(lead.lead_actions)) {
+                        leadsByDevelopment[devId].push(...lead.lead_actions)
+                      }
+                    }
+                    
+                    // Calculate breakdown for each development
+                    for (const devId of developmentIdsToUpdate) {
+                      const actions = leadsByDevelopment[devId] || []
+                      let phoneTotal = 0
+                      let whatsappTotal = 0
+                      let directMessageTotal = 0
+                      let emailTotal = 0
+                      let appointmentTotal = 0
+                      let websiteTotal = 0
+                      
+                      for (const action of actions) {
+                        const actionType = action?.action_type || ''
+                        const metadata = action?.action_metadata || {}
+                        
+                        if (actionType === 'lead_phone') {
+                          phoneTotal++
+                        } else if (actionType === 'lead_message') {
+                          const messageType = String(metadata.message_type || metadata.messageType || 'direct_message').toLowerCase()
+                          if (messageType === 'whatsapp') {
+                            whatsappTotal++
+                          } else if (messageType === 'email') {
+                            emailTotal++
+                          } else {
+                            directMessageTotal++
+                          }
+                        } else if (actionType === 'lead_email') {
+                          emailTotal++
+                        } else if (actionType === 'lead_appointment') {
+                          appointmentTotal++
+                        } else if (actionType === 'lead_website') {
+                          websiteTotal++
+                        }
+                      }
+                      
+                      const messageTotal = whatsappTotal + directMessageTotal
+                      const totalLeads = phoneTotal + messageTotal + emailTotal + appointmentTotal + websiteTotal
+                      
+                      developmentLeadsBreakdownMap[devId] = {
+                        phone: {
+                          total: phoneTotal,
+                          percentage: totalLeads > 0 ? Number(((phoneTotal / totalLeads) * 100).toFixed(2)) : 0
+                        },
+                        messaging: {
+                          total: messageTotal,
+                          percentage: totalLeads > 0 ? Number(((messageTotal / totalLeads) * 100).toFixed(2)) : 0,
+                          direct_message: {
+                            total: directMessageTotal,
+                            percentage: totalLeads > 0 ? Number(((directMessageTotal / totalLeads) * 100).toFixed(2)) : 0
+                          },
+                          whatsapp: {
+                            total: whatsappTotal,
+                            percentage: totalLeads > 0 ? Number(((whatsappTotal / totalLeads) * 100).toFixed(2)) : 0
+                          }
+                        },
+                        whatsapp: {
+                          total: whatsappTotal,
+                          percentage: totalLeads > 0 ? Number(((whatsappTotal / totalLeads) * 100).toFixed(2)) : 0
+                        },
+                        direct_message: {
+                          total: directMessageTotal,
+                          percentage: totalLeads > 0 ? Number(((directMessageTotal / totalLeads) * 100).toFixed(2)) : 0
+                        },
+                        email: {
+                          total: emailTotal,
+                          percentage: totalLeads > 0 ? Number(((emailTotal / totalLeads) * 100).toFixed(2)) : 0
+                        },
+                        appointment: {
+                          total: appointmentTotal,
+                          percentage: totalLeads > 0 ? Number(((appointmentTotal / totalLeads) * 100).toFixed(2)) : 0
+                        },
+                        website: {
+                          total: websiteTotal,
+                          percentage: totalLeads > 0 ? Number(((websiteTotal / totalLeads) * 100).toFixed(2)) : 0
+                        },
+                        // Backward compatibility fields
+                        phone_leads: {
+                          total: phoneTotal,
+                          percentage: totalLeads > 0 ? Number(((phoneTotal / totalLeads) * 100).toFixed(2)) : 0
+                        },
+                        message_leads: {
+                          total: messageTotal,
+                          percentage: totalLeads > 0 ? Number(((messageTotal / totalLeads) * 100).toFixed(2)) : 0
+                        },
+                        website_leads: {
+                          total: websiteTotal,
+                          percentage: totalLeads > 0 ? Number(((websiteTotal / totalLeads) * 100).toFixed(2)) : 0
+                        },
+                        appointment_leads: {
+                          total: appointmentTotal,
+                          percentage: totalLeads > 0 ? Number(((appointmentTotal / totalLeads) * 100).toFixed(2)) : 0
+                        },
+                        email_leads: {
+                          total: emailTotal,
+                          percentage: totalLeads > 0 ? Number(((emailTotal / totalLeads) * 100).toFixed(2)) : 0
+                        },
+                        total_leads: totalLeads
+                      }
+                    }
+                    logSuccess(`Calculated leads breakdown for ${Object.keys(developmentLeadsBreakdownMap).length} developments`)
+                  } else {
+                    // No leads found - set empty breakdowns
+                    for (const devId of developmentIdsToUpdate) {
+                      developmentLeadsBreakdownMap[devId] = {
+                        phone: { total: 0, percentage: 0 },
+                        messaging: {
+                          total: 0,
+                          percentage: 0,
+                          direct_message: { total: 0, percentage: 0 },
+                          whatsapp: { total: 0, percentage: 0 }
+                        },
+                        whatsapp: { total: 0, percentage: 0 },
+                        direct_message: { total: 0, percentage: 0 },
+                        email: { total: 0, percentage: 0 },
+                        appointment: { total: 0, percentage: 0 },
+                        website: { total: 0, percentage: 0 },
+                        phone_leads: { total: 0, percentage: 0 },
+                        message_leads: { total: 0, percentage: 0 },
+                        website_leads: { total: 0, percentage: 0 },
+                        appointment_leads: { total: 0, percentage: 0 },
+                        email_leads: { total: 0, percentage: 0 },
+                        total_leads: 0
+                      }
+                    }
+                  }
+                } catch (err) {
+                  errorTracker.addError('DEVELOPMENTS', 'Exception calculating development leads breakdown', { error: err.message, stack: err.stack })
+                  // Fallback: set empty breakdowns
+                  for (const devId of developmentIdsToUpdate) {
+                    developmentLeadsBreakdownMap[devId] = {
+                      phone: { total: 0, percentage: 0 },
+                      messaging: {
+                        total: 0,
+                        percentage: 0,
+                        direct_message: { total: 0, percentage: 0 },
+                        whatsapp: { total: 0, percentage: 0 }
+                      },
+                      whatsapp: { total: 0, percentage: 0 },
+                      direct_message: { total: 0, percentage: 0 },
+                      email: { total: 0, percentage: 0 },
+                      appointment: { total: 0, percentage: 0 },
+                      website: { total: 0, percentage: 0 },
+                      phone_leads: { total: 0, percentage: 0 },
+                      message_leads: { total: 0, percentage: 0 },
+                      website_leads: { total: 0, percentage: 0 },
+                      appointment_leads: { total: 0, percentage: 0 },
+                      email_leads: { total: 0, percentage: 0 },
+                      total_leads: 0
+                    }
+                  }
+                }
+                
+                // Fetch unique_leads and anonymous_leads from leads table for developments
+                const developmentLeadsMap = {}
+                if (developmentIdsToUpdate.length > 0) {
+                  try {
+                    const { data: developmentLeadsData, error: developmentLeadsError } = await supabaseAdmin
+                      .from('leads')
+                      .select('development_id, seeker_id, is_anonymous')
+                      .in('development_id', developmentIdsToUpdate)
+                      .not('development_id', 'is', null)
+                    
+                    if (!developmentLeadsError && developmentLeadsData) {
+                      // Aggregate unique_leads and anonymous_leads per development
+                      for (const lead of developmentLeadsData) {
+                        if (!developmentLeadsMap[lead.development_id]) {
+                          developmentLeadsMap[lead.development_id] = {
+                            unique_seekers: new Set(),
+                            anonymous_seekers: new Set()
+                          }
+                        }
+                        if (lead.is_anonymous) {
+                          developmentLeadsMap[lead.development_id].anonymous_seekers.add(lead.seeker_id)
+                        } else {
+                          developmentLeadsMap[lead.development_id].unique_seekers.add(lead.seeker_id)
+                        }
+                      }
+                    }
+                  } catch (err) {
+                    errorTracker.addWarning('DEVELOPMENTS', 'Exception fetching development leads', { error: err.message })
+                  }
+                }
+                
                 // Build impressions breakdown and update developments table
                 const developmentUpdates = []
                 for (const devId of developmentIdsToUpdate) {
                   const agg = devAggregates[devId]
                   if (!agg) continue
                   
-                  // Calculate impressions breakdown with percentages
+                  // Get unique_leads and anonymous_leads from leads table
+                  const developmentLeads = developmentLeadsMap[devId]
+                  const uniqueLeads = developmentLeads ? developmentLeads.unique_seekers.size : 0
+                  const anonymousLeads = developmentLeads ? developmentLeads.anonymous_seekers.size : 0
+                  
+                  // Calculate impressions breakdown with percentages (matching sample data structure)
                   const impressionsBreakdown = {
+                    share: {
+                      total: agg.total_shares || 0,
+                      percentage: agg.total_impressions > 0 ? Number(((agg.total_shares || 0) / agg.total_impressions) * 100).toFixed(2) : "0"
+                    },
                     social_media: {
                       total: agg.social_media_clicks || 0,
-                      percentage: agg.total_impressions > 0 ? Number(((agg.social_media_clicks || 0) / agg.total_impressions) * 100).toFixed(2) : 0
+                      percentage: agg.total_impressions > 0 ? Number(((agg.social_media_clicks || 0) / agg.total_impressions) * 100).toFixed(2) : "0"
+                    },
+                    saved_listing: {
+                      total: agg.saved_count || 0,
+                      percentage: agg.total_impressions > 0 ? Number(((agg.saved_count || 0) / agg.total_impressions) * 100).toFixed(2) : "0"
                     },
                     website_visit: {
                       total: 0, // Website visits are tracked as social_media_clicks for developments
-                      percentage: 0
-                    },
-                    share: {
-                      total: agg.total_shares || 0,
-                      percentage: agg.total_impressions > 0 ? Number(((agg.total_shares || 0) / agg.total_impressions) * 100).toFixed(2) : 0
-                    },
-                    saved: {
-                      total: agg.saved_count || 0,
-                      percentage: agg.total_impressions > 0 ? Number(((agg.saved_count || 0) / agg.total_impressions) * 100).toFixed(2) : 0
+                      percentage: "0"
                     }
+                  }
+                  
+                  // Get leads breakdown for this development
+                  const leadsBreakdown = developmentLeadsBreakdownMap[devId] || {
+                    phone: { total: 0, percentage: 0 },
+                    messaging: {
+                      total: 0,
+                      percentage: 0,
+                      direct_message: { total: 0, percentage: 0 },
+                      whatsapp: { total: 0, percentage: 0 }
+                    },
+                    whatsapp: { total: 0, percentage: 0 },
+                    direct_message: { total: 0, percentage: 0 },
+                    email: { total: 0, percentage: 0 },
+                    appointment: { total: 0, percentage: 0 },
+                    website: { total: 0, percentage: 0 },
+                    phone_leads: { total: 0, percentage: 0 },
+                    message_leads: { total: 0, percentage: 0 },
+                    website_leads: { total: 0, percentage: 0 },
+                    appointment_leads: { total: 0, percentage: 0 },
+                    email_leads: { total: 0, percentage: 0 },
+                    total_leads: 0
                   }
                   
                   developmentUpdates.push({
                     id: devId,
                     total_views: agg.total_views,
                     total_leads: agg.total_leads,
+                    unique_leads: uniqueLeads,
+                    anonymous_leads: anonymousLeads,
                     total_impressions: agg.total_impressions,
-                    impressions_breakdown: impressionsBreakdown
+                    impressions_breakdown: impressionsBreakdown,
+                    leads_breakdown: leadsBreakdown
                   })
                 }
                 
@@ -3266,8 +3613,11 @@ export async function POST(request) {
                       .update({
                         total_views: update.total_views,
                         total_leads: update.total_leads,
+                        unique_leads: update.unique_leads,
+                        anonymous_leads: update.anonymous_leads,
                         total_impressions: update.total_impressions,
-                        impressions_breakdown: update.impressions_breakdown
+                        impressions_breakdown: update.impressions_breakdown,
+                        leads_breakdown: update.leads_breakdown
                       })
                       .eq('id', update.id)
                       .then(({ error }) => ({ id: update.id, error }))
@@ -3285,7 +3635,7 @@ export async function POST(request) {
                   }
                   
                   if (successCount > 0) {
-                    logSuccess(`Updated ${successCount} developments with impressions breakdown`)
+                    logSuccess(`Updated ${successCount} developments with impressions breakdown and leads breakdown`)
                   }
                 }
               }
@@ -3564,6 +3914,99 @@ export async function POST(request) {
             }
             logSuccess(`Fetched aggregated totals for ${aggregatedTotals.length} listings`)
           }
+          
+          // Fetch unique_leads and anonymous_leads from leads table
+          if (listingIdsToUpdate.length > 0) {
+            const { data: leadsData, error: leadsError } = await supabaseAdmin
+              .from('leads')
+              .select('listing_id, seeker_id, is_anonymous')
+              .in('listing_id', listingIdsToUpdate)
+              .not('listing_id', 'is', null)
+            
+            if (!leadsError && leadsData) {
+              // Aggregate unique_leads and anonymous_leads per listing
+              const leadsByListing = {}
+              for (const lead of leadsData) {
+                if (!leadsByListing[lead.listing_id]) {
+                  leadsByListing[lead.listing_id] = {
+                    unique_seekers: new Set(),
+                    anonymous_seekers: new Set()
+                  }
+                }
+                if (lead.is_anonymous) {
+                  leadsByListing[lead.listing_id].anonymous_seekers.add(lead.seeker_id)
+                } else {
+                  leadsByListing[lead.listing_id].unique_seekers.add(lead.seeker_id)
+                }
+              }
+              
+              // CRITICAL FIX: Also fetch appointments from appointments table
+              // Appointments created directly (not via PostHog) are stored in appointments table
+              // but may not be in leads table, so we need to include them in unique_leads/anonymous_leads
+              const { data: appointmentsData, error: appointmentsError } = await supabaseAdmin
+                .from('appointments')
+                .select('listing_id, seeker_id')
+                .in('listing_id', listingIdsToUpdate)
+                .not('listing_id', 'is', null)
+              
+              if (!appointmentsError && appointmentsData) {
+                // Check which seekers are logged-in (exist in users/property_seekers) vs anonymous
+                const seekerIds = [...new Set(appointmentsData.map(a => a.seeker_id).filter(Boolean))]
+                
+                if (seekerIds.length > 0) {
+                  // Check if seekers are logged-in users (exist in property_seekers or users table)
+                  const { data: propertySeekers } = await supabaseAdmin
+                    .from('property_seekers')
+                    .select('id')
+                    .in('id', seekerIds)
+                  
+                  const { data: users } = await supabaseAdmin
+                    .from('users')
+                    .select('id')
+                    .in('id', seekerIds)
+                  
+                  const loggedInSeekerIds = new Set()
+                  if (propertySeekers) {
+                    propertySeekers.forEach(ps => loggedInSeekerIds.add(ps.id))
+                  }
+                  if (users) {
+                    users.forEach(u => loggedInSeekerIds.add(u.id))
+                  }
+                  
+                  // Add appointment seekers to leadsByListing
+                  for (const appointment of appointmentsData) {
+                    if (!appointment.listing_id || !appointment.seeker_id) continue
+                    
+                    if (!leadsByListing[appointment.listing_id]) {
+                      leadsByListing[appointment.listing_id] = {
+                        unique_seekers: new Set(),
+                        anonymous_seekers: new Set()
+                      }
+                    }
+                    
+                    // If seeker_id exists in users/property_seekers, they're logged-in (unique), otherwise anonymous
+                    if (loggedInSeekerIds.has(appointment.seeker_id)) {
+                      leadsByListing[appointment.listing_id].unique_seekers.add(appointment.seeker_id)
+                    } else {
+                      leadsByListing[appointment.listing_id].anonymous_seekers.add(appointment.seeker_id)
+                    }
+                  }
+                }
+              }
+              
+              // Add unique_leads and anonymous_leads to listingTotals
+              for (const listingId in listingTotals) {
+                const leads = leadsByListing[listingId]
+                if (leads) {
+                  listingTotals[listingId].unique_leads = leads.unique_seekers.size
+                  listingTotals[listingId].anonymous_leads = leads.anonymous_seekers.size
+                } else {
+                  listingTotals[listingId].unique_leads = 0
+                  listingTotals[listingId].anonymous_leads = 0
+                }
+              }
+            }
+          }
         } catch (err) {
           errorTracker.addError('LISTINGS', 'Exception calling get_cumulative_listing_analytics', { error: err.message, stack: err.stack })
         }
@@ -3583,6 +4026,8 @@ export async function POST(request) {
               id: listingId,
               total_views: totals.total_views,
               total_leads: totals.total_leads,
+              unique_leads: totals.unique_leads || 0,
+              anonymous_leads: totals.anonymous_leads || 0,
               listing_share_breakdown: breakdowns.listing_share_breakdown,
               listing_leads_breakdown: breakdowns.listing_leads_breakdown,
               listing_impressions_breakdown: breakdowns.listing_impressions_breakdown
@@ -3612,6 +4057,8 @@ export async function POST(request) {
                 .update({
                   total_views: update.total_views,
                   total_leads: update.total_leads,
+                  unique_leads: update.unique_leads,
+                  anonymous_leads: update.anonymous_leads,
                   listing_share_breakdown: update.listing_share_breakdown,
                   listing_leads_breakdown: update.listing_leads_breakdown,
                   listing_impressions_breakdown: update.listing_impressions_breakdown
@@ -3946,6 +4393,247 @@ export async function POST(request) {
           }
         }
         
+        // Fetch unique_leads and anonymous_leads from leads table for developers
+        // HYBRID APPROACH: Calculate both profile-specific and aggregate (across all contexts)
+        const developerLeadsMap = {} // Profile-specific leads (context_type = 'profile')
+        const developerAggregateLeadsMap = {} // Aggregate leads (all contexts: profile + listings + developments)
+        
+        if (developerIdsForCumulative.length > 0) {
+          try {
+            // 1. Get profile-specific leads (context_type = 'profile')
+            const { data: developerLeadsData, error: developerLeadsError } = await supabaseAdmin
+              .from('leads')
+              .select('lister_id, seeker_id, is_anonymous')
+              .in('lister_id', developerIdsForCumulative)
+              .eq('lister_type', 'developer')
+              .eq('context_type', 'profile')
+            
+            if (!developerLeadsError && developerLeadsData) {
+              // Aggregate profile-specific unique_leads and anonymous_leads per developer
+              for (const lead of developerLeadsData) {
+                if (!developerLeadsMap[lead.lister_id]) {
+                  developerLeadsMap[lead.lister_id] = {
+                    unique_seekers: new Set(),
+                    anonymous_seekers: new Set()
+                  }
+                }
+                if (lead.is_anonymous) {
+                  developerLeadsMap[lead.lister_id].anonymous_seekers.add(lead.seeker_id)
+                } else {
+                  developerLeadsMap[lead.lister_id].unique_seekers.add(lead.seeker_id)
+                }
+              }
+            }
+            
+            // 2. Get aggregate leads across ALL contexts (profile + listings + developments)
+            // This includes:
+            //   - Profile leads (lister_id = developer_id, context_type = 'profile')
+            //   - Listing leads (where listing.user_id = developer_id)
+            //   - Development leads (where development.developer_id = developer_id)
+            
+            // First, get all listings and developments for these developers
+            const { data: developerListings } = await supabaseAdmin
+              .from('listings')
+              .select('id, user_id')
+              .in('user_id', developerIdsForCumulative)
+              .eq('account_type', 'developer')
+            
+            const { data: developerDevelopments } = await supabaseAdmin
+              .from('developments')
+              .select('id, developer_id')
+              .in('developer_id', developerIdsForCumulative)
+            
+            const listingIds = developerListings ? developerListings.map(l => l.id) : []
+            const developmentIds = developerDevelopments ? developerDevelopments.map(d => d.id) : []
+            
+            // Build query for all relevant leads
+            // Query leads that match any of:
+            // 1. Profile leads (lister_id = developer_id, context_type = 'profile')
+            // 2. Listing leads (listing_id in developer's listings OR null listing_id with lister_id = developer_id)
+            // 3. Development leads (development_id in developer's developments OR null development_id with lister_id = developer_id)
+            
+            // Fetch all relevant leads (profile + listing + development + unknown properties)
+            let allDeveloperLeadsData = []
+            let allDeveloperLeadsError = null
+            
+            // Fetch profile leads
+            if (developerIdsForCumulative.length > 0) {
+              const { data: profileLeads, error: profileError } = await supabaseAdmin
+                .from('leads')
+                .select('lister_id, lister_type, listing_id, development_id, seeker_id, is_anonymous, context_type')
+                .in('lister_id', developerIdsForCumulative)
+                .eq('lister_type', 'developer')
+                .eq('context_type', 'profile')
+              
+              if (!profileError && profileLeads) {
+                allDeveloperLeadsData.push(...profileLeads)
+              } else if (profileError) {
+                allDeveloperLeadsError = profileError
+              }
+            }
+            
+            // Fetch listing leads (known listings)
+            if (listingIds.length > 0) {
+              const { data: listingLeads, error: listingError } = await supabaseAdmin
+                .from('leads')
+                .select('lister_id, lister_type, listing_id, development_id, seeker_id, is_anonymous, context_type')
+                .in('listing_id', listingIds)
+                .eq('context_type', 'listing')
+              
+              if (!listingError && listingLeads) {
+                allDeveloperLeadsData.push(...listingLeads)
+              } else if (listingError) {
+                allDeveloperLeadsError = listingError
+              }
+            }
+            
+            // Fetch unknown property listing leads (null listing_id but lister_id = developer_id)
+            if (developerIdsForCumulative.length > 0) {
+              const { data: unknownListingLeads, error: unknownListingError } = await supabaseAdmin
+                .from('leads')
+                .select('lister_id, lister_type, listing_id, development_id, seeker_id, is_anonymous, context_type')
+                .in('lister_id', developerIdsForCumulative)
+                .eq('lister_type', 'developer')
+                .eq('context_type', 'listing')
+                .is('listing_id', null)
+              
+              if (!unknownListingError && unknownListingLeads) {
+                allDeveloperLeadsData.push(...unknownListingLeads)
+              } else if (unknownListingError) {
+                allDeveloperLeadsError = unknownListingError
+              }
+            }
+            
+            // Fetch development leads separately (handle text vs UUID type mismatch)
+            // OPTIMIZATION: Convert development IDs to strings for efficient filtering
+            const developmentIdsStr = developmentIds.map(id => String(id))
+            if (developmentIdsStr.length > 0) {
+              const { data: devLeadsData, error: devLeadsError } = await supabaseAdmin
+                .from('leads')
+                .select('lister_id, lister_type, listing_id, development_id, seeker_id, is_anonymous, context_type')
+                .not('development_id', 'is', null)
+                .eq('context_type', 'development')
+              
+              if (!devLeadsError && devLeadsData) {
+                // OPTIMIZATION: Use Set for O(1) lookup instead of array.includes() O(n)
+                const developmentIdsSet = new Set(developmentIdsStr)
+                // Filter to only include leads for our developers' developments
+                const devLeadsFiltered = devLeadsData.filter(lead => {
+                  if (!lead.development_id) return false
+                  return developmentIdsSet.has(String(lead.development_id))
+                })
+                allDeveloperLeadsData.push(...devLeadsFiltered)
+              } else if (devLeadsError && !allDeveloperLeadsError) {
+                allDeveloperLeadsError = devLeadsError
+              }
+            }
+            
+            // Fetch unknown development leads (null development_id but lister_id = developer_id)
+            if (developerIdsForCumulative.length > 0) {
+              const { data: unknownDevLeads, error: unknownDevError } = await supabaseAdmin
+                .from('leads')
+                .select('lister_id, lister_type, listing_id, development_id, seeker_id, is_anonymous, context_type')
+                .in('lister_id', developerIdsForCumulative)
+                .eq('lister_type', 'developer')
+                .eq('context_type', 'development')
+                .is('development_id', null)
+              
+              if (!unknownDevError && unknownDevLeads) {
+                allDeveloperLeadsData.push(...unknownDevLeads)
+              } else if (unknownDevError && !allDeveloperLeadsError) {
+                allDeveloperLeadsError = unknownDevError
+              }
+            }
+            
+            // Process aggregate leads if we have data
+            if (allDeveloperLeadsData.length > 0) {
+              // OPTIMIZATION: Build reverse lookup maps for O(1) access (much faster than nested loops)
+              // Map listing_id -> developer_id (for fast lookup: which developer owns this listing?)
+              const listingToDeveloperMap = {}
+              if (developerListings) {
+                for (const listing of developerListings) {
+                  listingToDeveloperMap[listing.id] = listing.user_id
+                }
+              }
+              
+              // Map development_id (string) -> developer_id (for fast lookup: which developer owns this development?)
+              const developmentToDeveloperMap = {}
+              if (developerDevelopments) {
+                for (const dev of developerDevelopments) {
+                  developmentToDeveloperMap[String(dev.id)] = dev.developer_id
+                }
+              }
+              
+              // OPTIMIZATION: Create Set for O(1) developer ID lookup instead of array.includes() O(n)
+              const developerIdsSet = new Set(developerIdsForCumulative)
+              
+              // Aggregate unique leads across all contexts per developer
+              // OPTIMIZATION: Single pass through leads with O(1) lookups (no nested loops = much faster)
+              for (const lead of allDeveloperLeadsData) {
+                // Determine which developer(s) this lead belongs to
+                const relevantDeveloperIds = new Set()
+                
+                // Profile leads - O(1) Set lookup
+                if (lead.lister_id && lead.lister_type === 'developer' && lead.context_type === 'profile') {
+                  if (developerIdsSet.has(lead.lister_id)) {
+                    relevantDeveloperIds.add(lead.lister_id)
+                  }
+                }
+                
+                // Listing leads - O(1) map lookup instead of O(n) loop
+                if (lead.context_type === 'listing') {
+                  if (lead.listing_id) {
+                    // Known listing - find owner via listing
+                    const ownerDeveloperId = listingToDeveloperMap[lead.listing_id]
+                    if (ownerDeveloperId && developerIdsSet.has(ownerDeveloperId)) {
+                      relevantDeveloperIds.add(ownerDeveloperId)
+                    }
+                  } else if (lead.lister_id && lead.lister_type === 'developer') {
+                    // Unknown property (null listing_id) - use lister_id directly
+                    if (developerIdsSet.has(lead.lister_id)) {
+                      relevantDeveloperIds.add(lead.lister_id)
+                    }
+                  }
+                }
+                
+                // Development leads - O(1) map lookup instead of O(n) loop
+                if (lead.context_type === 'development') {
+                  if (lead.development_id) {
+                    // Known development - find owner via development
+                    const developmentIdStr = String(lead.development_id)
+                    const ownerDeveloperId = developmentToDeveloperMap[developmentIdStr]
+                    if (ownerDeveloperId && developerIdsSet.has(ownerDeveloperId)) {
+                      relevantDeveloperIds.add(ownerDeveloperId)
+                    }
+                  } else if (lead.lister_id && lead.lister_type === 'developer') {
+                    // Unknown development (null development_id) - use lister_id directly
+                    if (developerIdsSet.has(lead.lister_id)) {
+                      relevantDeveloperIds.add(lead.lister_id)
+                    }
+                  }
+                }
+                
+                // Add to aggregate map for each relevant developer
+                for (const developerId of relevantDeveloperIds) {
+                  if (!developerAggregateLeadsMap[developerId]) {
+                    developerAggregateLeadsMap[developerId] = {
+                      unique_seekers: new Set(),
+                      anonymous_seekers: new Set()
+                    }
+                  }
+                  if (lead.is_anonymous) {
+                    developerAggregateLeadsMap[developerId].anonymous_seekers.add(lead.seeker_id)
+                  } else {
+                    developerAggregateLeadsMap[developerId].unique_seekers.add(lead.seeker_id)
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            errorTracker.addWarning('DEVELOPERS', 'Exception fetching developer leads', { error: err.message })
+          }
+        }
+        
         // OPTIMIZATION: Prepare all updates first, then execute in parallel using Promise.all
         const developerUpdatePromises = []
         for (const developerId in allDeveloperTotals) {
@@ -3967,6 +4655,16 @@ export async function POST(request) {
               saved_listing: 0
             }
           }
+          
+          // Get profile-specific unique_leads and anonymous_leads (context-specific)
+          const developerLeads = developerLeadsMap[developerId]
+          const uniqueLeads = developerLeads ? developerLeads.unique_seekers.size : 0
+          const anonymousLeads = developerLeads ? developerLeads.anonymous_seekers.size : 0
+          
+          // Get aggregate unique_leads and anonymous_leads (across all contexts: profile + listings + developments)
+          const developerAggregateLeads = developerAggregateLeadsMap[developerId]
+          const totalUniqueLeads = developerAggregateLeads ? developerAggregateLeads.unique_seekers.size : 0
+          const totalAnonymousLeads = developerAggregateLeads ? developerAggregateLeads.anonymous_seekers.size : 0
           
           // CRITICAL FIX: Use total_views directly from user_analytics (source of truth)
           // user_analytics.total_views already = total_listing_views + profile_views per row
@@ -4067,6 +4765,10 @@ export async function POST(request) {
                 total_listings_views: newTotalListingViews,
                 total_profile_views: newTotalProfileViews,
                 total_leads: newTotalLeads,
+                unique_leads: uniqueLeads, // Profile-specific (context-specific)
+                anonymous_leads: anonymousLeads, // Profile-specific (context-specific)
+                total_unique_leads: totalUniqueLeads, // Aggregate across all contexts (HYBRID APPROACH)
+                total_anonymous_leads: totalAnonymousLeads, // Aggregate across all contexts (HYBRID APPROACH)
                 total_impressions: newTotalImpressions,
                 conversion_rate: conversion_rate,
                 views_change: hourly.views_change || 0,

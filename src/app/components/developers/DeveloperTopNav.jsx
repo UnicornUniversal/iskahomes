@@ -4,16 +4,19 @@ import React, { useMemo, useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import Image from 'next/image'
 import Link from 'next/link'
-import { FiChevronDown, FiSearch, FiX } from 'react-icons/fi'
+import { useRouter } from 'next/navigation'
+import { FiChevronDown, FiSearch, FiX, FiUser, FiLogOut } from 'react-icons/fi'
 import { handleAuthFailure } from '@/lib/authFailureHandler'
 
 const DeveloperTopNav = ({ onSearch }) => {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
+  const router = useRouter()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [searchResults, setSearchResults] = useState(null)
   const [isSearching, setIsSearching] = useState(false)
   const [showResults, setShowResults] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const searchRef = useRef(null)
   const resultsRef = useRef(null)
 
@@ -29,6 +32,29 @@ const DeveloperTopNav = ({ onSearch }) => {
   const developerName = user?.profile?.name || user?.profile?.company_name || 'Developer'
   const accountStatus = user?.profile?.account_status || 'active'
   const email = user?.profile?.email || user?.email || 'N/A'
+  const developerSlug = user?.profile?.slug || user?.id || 'developer'
+  const subscription = user?.subscription
+  const packageName = subscription?.subscriptions_package?.name || 'No Package'
+  
+  // Format next billing date
+  const formatNextBillingDate = (endDate) => {
+    if (!endDate) return 'No billing date'
+    try {
+      const date = new Date(endDate)
+      const day = date.getDate()
+      const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ]
+      const month = monthNames[date.getMonth()]
+      const year = date.getFullYear()
+      return `${day} ${month} ${year}`
+    } catch (e) {
+      return 'Invalid date'
+    }
+  }
+  
+  const nextBillingDate = subscription?.end_date ? formatNextBillingDate(subscription.end_date) : 'No subscription'
 
   // Close results when clicking outside
   useEffect(() => {
@@ -110,7 +136,7 @@ const DeveloperTopNav = ({ onSearch }) => {
         if (response.status === 401) {
           const errorData = await response.json()
           if (errorData?.auth_failed) {
-            handleAuthFailure('/signin')
+            handleAuthFailure('/home/signin')
             return
           }
         }
@@ -203,6 +229,28 @@ const DeveloperTopNav = ({ onSearch }) => {
 
   const totalResults = (searchResults?.listings?.length || 0) + (searchResults?.developments?.length || 0)
 
+  const handleLogout = async () => {
+    if (isLoggingOut) return
+    
+    setIsLoggingOut(true)
+    setOpen(false)
+    
+    try {
+      const result = await logout()
+      if (result.success) {
+        router.push('/')
+      } else {
+        console.error('Logout failed:', result.error)
+        router.push('/')
+      }
+    } catch (error) {
+      console.error('Logout error:', error)
+      router.push('/')
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
+
   return (
     <div className="fixed top-0   w-full  left-1/2 -translate-x-1/2    overflow-y z-100 backdrop-blur-mdw-full shadow-sm bg-white/20 backdrop-blur-sm">
       <div className="">
@@ -210,7 +258,7 @@ const DeveloperTopNav = ({ onSearch }) => {
           {/* Logo / Branding */}
           <div className="flex items-center gap-3">
     <Link href="/">
-    <img src="/iska-dark.png" alt="logo" className='w-[100px]'></img>
+    <img src="/iska-dark.png" alt="logo" className='w-[60px]'></img>
      </Link>
             <div>
             
@@ -223,7 +271,7 @@ const DeveloperTopNav = ({ onSearch }) => {
               onSubmit={handleSubmit}
               className="flex items-center"
             >
-              <div className="flex w-full items-center rounded-full bg-primary_color px-4 py-2 border-white focus-within:ring-2 focus-within:ring-white/70">
+              <div className="flex w-full items-center rounded-full bg-primary_color px-3 py-1.5 focus-within:ring-1 focus-within:ring-white/50">
                 <FiSearch className="mr-2 text-white" />
                 <input
                   type="text"
@@ -233,7 +281,7 @@ const DeveloperTopNav = ({ onSearch }) => {
                   onFocus={() => {
                     if (hasResults) setShowResults(true)
                   }}
-                  className="flex-1 bg-transparent text-sm text-white placeholder:text-white/70 focus:outline-none"
+                  className="flex-1 bg-transparent !border-none text-sm text-white placeholder:text-white/70 focus:outline-none"
                 />
                 {query && (
                   <button
@@ -381,9 +429,9 @@ const DeveloperTopNav = ({ onSearch }) => {
           <div className="relative">
             <button
               onClick={() => setOpen((prev) => !prev)}
-              className="flex items-center gap-3 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 backdrop-blur transition hover:bg-white/20"
+              className="flex items-center gap-3 rounded-md border border-white/50 bg-white/40 px-3 py-1.5 transition hover:bg-white/20"
             >
-              <div className="relative h-10 w-10 overflow-hidden rounded-full border border-white/20">
+              <div className="relative h-10 w-10 overflow-hidden rounded-full md:rounded-md border border-white/20">
                 <Image
                   src={profileImage}
                   alt={developerName}
@@ -394,34 +442,64 @@ const DeveloperTopNav = ({ onSearch }) => {
                 />
               </div>
               <div className="hidden text-left text-sm md:block">
-                <p className='text-[0.8em]'>Welcome, </p>
-                <p className="font-semibold leading-tight text-sm">{developerName}</p>
+                
+                <p className=" leading-tight text-sm">{developerName}</p>
+                <p className='text-[0.8em] italic'>Developer </p>
                 {/* <p className="text-xs uppercase tracking-wide text-white/70">{accountStatus}</p> */}
               </div>
               <FiChevronDown className={`transition ${open ? 'rotate-180' : ''}`} />
             </button>
 
             {open && (
-              <div className="absolute right-0 mt-3 w-64 rounded-2xl border border-gray-100 bg-white p-4 text-gray-800 shadow-lg">
-                <div className="flex items-center gap-3">
-                  <div className="relative h-12 w-12 overflow-hidden rounded-full border border-gray-200">
-                    <Image
-                      src={profileImage}
-                      alt={developerName}
-                      fill
-                      sizes="48px"
-                      className="object-cover"
-                      unoptimized
-                    />
-                  </div>
-                  <div className='text-[0.7em]'>
-                    <p className=" font-semibold">{developerName}</p>
-                   <p className=' '> {user?.profile?.email || user?.email || 'N/A'}</p>
-                   <p className="font-medium  ">{accountStatus}</p>
-                    {/* <p className="text-xs uppercase tracking-wide text-gray-500">{accountStatus}</p> */}
-                  </div>
+              <div className="absolute right-0 mt-3 w-64 rounded-2xl border border-gray-100 bg-white p-4 text-gray-800 shadow-lg z-50">
+                {/* User Name */}
+                <div className="mb-3">
+                  <p className="text-sm font-">{developerName}</p>
+                  <p className="text-xs text-gray-600 capitalize">
+                    {user?.user_type || 'Developer'}, {accountStatus}
+                  </p>
                 </div>
-          
+
+                {/* Separator */}
+                <div className="border-t border-gray-200 my-3"></div>
+
+                {/* Next Billing Date and Package */}
+                <div className="mb-3 flex flex-col gap-2">
+          <span>
+          <p className="text-xs font-bold ">Package:</p>
+          <p className="text-sm ">{packageName}</p>
+          </span>
+                
+                <span>
+                <p className="text-xs font-bold ">Next Billing Date:</p>
+                  <p className="text-sm ">{nextBillingDate}</p>
+                 
+                </span>
+               
+                </div>
+
+                {/* Separator */}
+                <div className="border-t border-gray-200 my-3"></div>
+
+                {/* Profile Link */}
+                <Link
+                  href={`/developer/${developerSlug}/profile`}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors mb-2"
+                >
+                  <FiUser className="w-4 h-4" />
+                  <span className="text-sm">Profile</span>
+                </Link>
+
+                {/* Logout */}
+                <button
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-red-50 text-red-600 transition-colors w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FiLogOut className="w-4 h-4" />
+                  <span className="text-sm">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+                </button>
               </div>
             )}
           </div>

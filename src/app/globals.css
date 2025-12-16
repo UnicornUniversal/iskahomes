@@ -229,6 +229,45 @@ body {
   min-height: 100vh;
 }
 
+/* Hide vertical scrollbars while maintaining scroll functionality */
+* {
+  /* Firefox */
+  scrollbar-width: none;
+  /* IE and Edge */
+  -ms-overflow-style: none;
+}
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Specifically target vertical scrollbars */
+*::-webkit-scrollbar:vertical {
+  display: none;
+  width: 0;
+}
+
+html {
+  /* Firefox */
+  scrollbar-width: none;
+  /* IE and Edge */
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+html::-webkit-scrollbar:vertical {
+  display: none;
+  width: 0;
+}
+
 @layer base {
   .bg_blur{
     @apply backdrop-blur-md  lg:shadow-none ;
@@ -384,6 +423,17 @@ body {
 
   input{
     @apply bg-white/17 text-primary_color  rounded-md  px-4 py-[0.65em]  shadow-lg text-[0.9em] hover:bg-primary_color/10 hover:border-primary_color outline-none shadow-primary_color/20 font-medium border border-1 border-white duration-500;
+  }
+
+  /* Disable mouse wheel scroll on number inputs */
+  input[type="number"] {
+    -moz-appearance: textfield; /* Firefox */
+  }
+
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none; /* Chrome, Safari, Edge */
+    margin: 0;
   }
 
   select{

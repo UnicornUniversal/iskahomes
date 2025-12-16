@@ -1,18 +1,30 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { Doughnut } from 'react-chartjs-2'
+import { Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
-  ArcElement,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
   Tooltip,
   Legend,
+  Filler,
 } from 'chart.js'
 import { Building2, Loader2, Eye, TrendingUp, BarChart3 } from 'lucide-react'
 
 // Register ChartJS components
-ChartJS.register(ArcElement, Tooltip, Legend)
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend,
+  Filler
+)
 
 // Color palette for charts
 const chartColors = [
@@ -122,59 +134,111 @@ const DevelopmentStats = ({ developmentId, development }) => {
     }
   }
 
-  const createChartData = (data, labelKey = 'name') => {
-    if (!data || data.length === 0) return null
+  // Create time series chart data
+  const createTimeSeriesChartData = (timeSeries, category) => {
+    if (!timeSeries || timeSeries.length === 0) return null
+
+    const labels = timeSeries.map(item => {
+      const date = new Date(item.date)
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    })
+
+    let data = []
+    let label = ''
+    let color = '#3B82F6'
+
+    if (category === 'views') {
+      data = timeSeries.map(item => item.views || 0)
+      label = 'Views'
+      color = '#3B82F6' // Blue
+    } else if (category === 'leads') {
+      data = timeSeries.map(item => item.leads || 0)
+      label = 'Leads'
+      color = '#10B981' // Green
+    } else if (category === 'engagement') {
+      data = timeSeries.map(item => item.engagement || 0)
+      label = 'Engagement'
+      color = '#8B5CF6' // Purple
+    }
 
     return {
-      labels: data.map(item => item[labelKey] || item.label || 'Unknown'),
+      labels,
       datasets: [
         {
-          label: 'Count',
-          data: data.map(item => item.value || item.total_amount || item.count || 0),
-          backgroundColor: chartColors.slice(0, data.length),
-          borderColor: '#ffffff',
-          borderWidth: 2,
+          label,
+          data,
+          borderColor: color,
+          backgroundColor: `${color}20`,
+          tension: 0.4,
+          fill: true,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          pointBackgroundColor: color,
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
         },
       ],
     }
   }
 
-  const createChartOptions = (title, category) => ({
+  const createChartOptions = (category) => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'bottom',
-        labels: {
-          padding: 15,
-          font: {
-            size: 11,
-          },
-          usePointStyle: true,
-        },
+        display: false,
       },
       tooltip: {
         callbacks: {
           label: function(context) {
-            const label = context.label || ''
-            const value = context.parsed || 0
-            const total = context.dataset.data.reduce((a, b) => a + b, 0)
-            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0
-            const unit = category === 'views' ? 'views' : category === 'leads' ? 'leads' : ''
-            return `${label}: ${value.toLocaleString()} ${unit} (${percentage}%)`
+            const value = context.parsed.y || 0
+            const unit = category === 'views' ? 'views' : category === 'leads' ? 'leads' : 'engagement'
+            return `${value.toLocaleString()} ${unit}`
           }
         }
       }
     },
+    scales: {
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)',
+        },
+        ticks: {
+          font: {
+            size: 11,
+          },
+          color: '#6B7280',
+        },
+      },
+      x: {
+        grid: {
+          display: false,
+        },
+        ticks: {
+          font: {
+            size: 11,
+          },
+          color: '#6B7280',
+        },
+      },
+    },
   })
+
+  // Calculate chart data before early returns to maintain hook order
+  const timeSeries = stats?.time_series || []
+  const chartData = useMemo(() => 
+    createTimeSeriesChartData(timeSeries, selectedCategory),
+    [timeSeries, selectedCategory]
+  )
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+      <div className="rounded-lg shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
-            <p className="text-gray-500">Loading development statistics...</p>
+            <Loader2 className="w-8 h-8 animate-spin text-primary_color mx-auto mb-2" />
+            <p className="text-primary_color">Loading development statistics...</p>
           </div>
         </div>
       </div>
@@ -183,11 +247,11 @@ const DevelopmentStats = ({ developmentId, development }) => {
 
   if (error) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+      <div className="rounded-lg shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <p className="text-red-500 font-medium">Error loading statistics</p>
-            <p className="text-sm text-gray-500 mt-1">{error}</p>
+            <p className="text-sm text-primary_color mt-1">{error}</p>
           </div>
         </div>
       </div>
@@ -196,34 +260,33 @@ const DevelopmentStats = ({ developmentId, development }) => {
 
   if (!stats) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+      <div className="rounded-lg shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-center h-64">
-          <p className="text-gray-500">No statistics available</p>
+          <p className="text-primary_color">No statistics available</p>
         </div>
       </div>
     )
   }
 
   const categories = [
-    { id: 'views', label: 'Views', icon: Eye, data: stats.stats.views },
-    { id: 'leads', label: 'Leads', icon: TrendingUp, data: stats.stats.leads },
-    { id: 'engagement', label: 'Engagement', icon: BarChart3, data: stats.stats.engagement },
+    { id: 'views', label: 'Views', icon: Eye },
+    { id: 'leads', label: 'Leads', icon: TrendingUp },
+    { id: 'engagement', label: 'Engagement', icon: BarChart3 },
   ]
 
   const activeCategory = categories.find(c => c.id === selectedCategory)
-  const chartData = createChartData(activeCategory?.data)
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+    <div className="rounded-lg shadow-sm border border-gray-100 overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+      <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-blue-600" />
-            <h5 className="text-lg font-semibold text-gray-900">Development Statistics</h5>
+            <Building2 className="w-5 h-5 text-primary_color" />
+            <h5 className="text-lg font-semibold text-primary_color">Development Statistics</h5>
           </div>
           {stats.development && (
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-primary_color">
               <span className="font-medium">{stats.development.total_views?.toLocaleString() || 0}</span> total views
             </div>
           )}
@@ -233,31 +296,21 @@ const DevelopmentStats = ({ developmentId, development }) => {
         <div className="flex gap-2 overflow-x-auto">
           {categories.map((category) => {
             const Icon = category.icon
-            const hasData = category.data && category.data.length > 0
+            const hasTimeSeriesData = timeSeries && timeSeries.length > 0
             return (
               <button
                 key={category.id}
                 onClick={() => setSelectedCategory(category.id)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                   selectedCategory === category.id
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : hasData
-                    ? 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    ? 'bg-primary_color text-white shadow-sm'
+                    : hasTimeSeriesData
+                    ? 'text-primary_color hover:bg-gray-100 border border-gray-200'
+                    : 'text-primary_color opacity-60 hover:opacity-100 border border-gray-200'
                 }`}
-                disabled={!hasData}
               >
                 <Icon className="w-4 h-4" />
                 <span>{category.label}</span>
-                {hasData && (
-                  <span className={`px-2 py-0.5 rounded-full text-xs ${
-                    selectedCategory === category.id
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-200 text-gray-700'
-                  }`}>
-                    {category.data.length}
-                  </span>
-                )}
               </button>
             )
           })}
@@ -266,91 +319,73 @@ const DevelopmentStats = ({ developmentId, development }) => {
 
       {/* Chart Content */}
       <div className="p-6">
-        {!chartData ? (
+        {!chartData || !timeSeries || timeSeries.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <BarChart3 className="w-12 h-12 text-gray-300 mb-3" />
-            <p className="text-gray-500 font-medium">No {activeCategory?.label.toLowerCase()} data available</p>
-            <p className="text-sm text-gray-400 mt-1">Analytics data will appear here as developments receive views and leads</p>
+            <BarChart3 className="w-12 h-12 text-primary_color opacity-30 mb-3" />
+            <p className="text-primary_color font-medium">No {activeCategory?.label.toLowerCase()} time series data available</p>
+            {stats.development && (
+              <>
+                {activeCategory?.id === 'views' && (
+                  <div className="mt-4 text-center">
+                    <p className="text-sm text-primary_color">
+                      Total Views: <strong className="text-lg">{stats.development.total_views?.toLocaleString() || 0}</strong>
+                    </p>
+                    {stats.development.total_views > 0 && (
+                      <p className="text-xs text-primary_color opacity-60 mt-1">Time series data will appear as views are tracked over time</p>
+                    )}
+                  </div>
+                )}
+                {activeCategory?.id === 'leads' && (
+                  <div className="mt-4 text-center">
+                    <p className="text-sm text-primary_color">
+                      Total Leads: <strong className="text-lg">{stats.development.total_leads?.toLocaleString() || 0}</strong>
+                    </p>
+                    {stats.development.total_leads > 0 && (
+                      <p className="text-xs text-primary_color opacity-60 mt-1">Time series data will appear as leads are tracked over time</p>
+                    )}
+                  </div>
+                )}
+                {activeCategory?.id === 'engagement' && (
+                  <div className="mt-4 text-center">
+                    <p className="text-sm text-primary_color">
+                      Engagement metrics available in summary below
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+            {(!stats.development || 
+              (activeCategory?.id === 'views' && (!stats.development.total_views || stats.development.total_views === 0)) ||
+              (activeCategory?.id === 'leads' && (!stats.development.total_leads || stats.development.total_leads === 0))) && (
+              <p className="text-sm text-primary_color opacity-60 mt-1">Analytics data will appear here as developments receive views and leads</p>
+            )}
           </div>
         ) : (
-          <div className="space-y-6">
-            {/* Chart */}
-            <div className="h-[400px]">
-              <Doughnut data={chartData} options={createChartOptions(activeCategory?.label, selectedCategory)} />
-            </div>
-
-            {/* Stats Table */}
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                <h6 className="font-semibold text-gray-900">{activeCategory?.label} Breakdown</h6>
-              </div>
-              <div className="divide-y divide-gray-200">
-                {activeCategory.data.map((item, index) => {
-                  const itemValue = item.value || item.total_amount || item.count || 0
-                  const total = activeCategory.data.reduce((sum, i) => sum + (i.value || i.total_amount || i.count || 0), 0)
-                  const percentage = item.percentage || (total > 0 ? ((itemValue / total) * 100).toFixed(1) : 0)
-                  const unit = selectedCategory === 'views' ? 'views' : selectedCategory === 'leads' ? 'leads' : ''
-                  
-  return (
-                    <div key={index} className="px-4 py-3 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-4 h-4 rounded-full"
-                            style={{ backgroundColor: chartColors[index % chartColors.length] }}
-                          />
-                          <span className="font-medium text-gray-900">
-                            {item.name || item.label || 'Unknown'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-6">
-                          <span className="text-sm text-gray-600">
-                            {itemValue.toLocaleString()} {unit}
-                          </span>
-                          <span className="text-sm font-semibold text-blue-600 w-16 text-right">
-                            {typeof percentage === 'number' ? percentage.toFixed(1) : percentage}%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="mt-2">
-                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{
-                              width: `${typeof percentage === 'number' ? percentage : parseFloat(percentage)}%`,
-                              backgroundColor: chartColors[index % chartColors.length]
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+          <div className="h-[400px]">
+            <Line data={chartData} options={createChartOptions(selectedCategory)} />
           </div>
         )}
       </div>
 
-      {/* Summary Footer */}
+      {/* Summary Footer - Always show when stats exist */}
       {stats.development && (
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="px-6 py-4 border-t border-gray-200">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-              <span className="text-gray-600">Total Views: </span>
-              <strong className="text-gray-900">{stats.development.total_views?.toLocaleString() || 0}</strong>
+              <span className="text-primary_color">Total Views: </span>
+              <strong className="text-primary_color">{stats.development.total_views?.toLocaleString() || 0}</strong>
             </div>
             <div>
-              <span className="text-gray-600">Total Leads: </span>
-              <strong className="text-blue-600">{stats.development.total_leads?.toLocaleString() || 0}</strong>
+              <span className="text-primary_color">Total Leads: </span>
+              <strong className="text-primary_color">{stats.development.total_leads?.toLocaleString() || 0}</strong>
             </div>
             <div>
-              <span className="text-gray-600">Total Sales: </span>
-              <strong className="text-green-600">{stats.development.total_sales?.toLocaleString() || 0}</strong>
+              <span className="text-primary_color">Total Sales: </span>
+              <strong className="text-primary_color">{stats.development.total_sales?.toLocaleString() || 0}</strong>
             </div>
-    <div>
-              <span className="text-gray-600">Conversion Rate: </span>
-              <strong className="text-purple-600">{stats.development.conversion_rate?.toFixed(1) || 0}%</strong>
+            <div>
+              <span className="text-primary_color">Conversion Rate: </span>
+              <strong className="text-primary_color">{stats.development.conversion_rate?.toFixed(1) || 0}%</strong>
             </div>
           </div>
         </div>

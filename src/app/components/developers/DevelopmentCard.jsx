@@ -47,7 +47,7 @@ const DevelopmentCard = ({ development }) => {
 
   return (
     <Link href={`/developer/${params.slug}/developments/${development?.id}`}>
-      <div className='rounded-lg border border-black overflow-hidden hover:shadow-lg transition-shadow duration-300 cursor-pointer'>
+      <div className='rounded-lg border border-primary_color text-primary_color overflow-hidden hover:shadow-lg transition-shadow duration-300 cursor-pointer'>
         <div className='flex flex-col gap-2 md:flex-row '>
           {/* Development Image */}
           <div className='relative w-full md:w-80 lg:w-96 h-auto max-h-[200px] flex-shrink-0 flex items-center justify-center max-h-[300px]'>
@@ -77,7 +77,7 @@ const DevelopmentCard = ({ development }) => {
             {/* Top Row - Status and Views */}
             <div className='flex justify-between items-start mb-3'>
               {development.status && (
-                <div className='bg-black text-white px-3 py-1 rounded-full text-xs sm:text-sm font-medium'>
+                <div className='bg-primary_color text-white px-3 py-1 rounded-full text-xs sm:text-sm font-medium'>
                   {development.status.charAt(0).toUpperCase() + development.status.slice(1)}
                 </div>
               )}
@@ -112,34 +112,34 @@ const DevelopmentCard = ({ development }) => {
             {/* Separator Line */}
             <div className='flex items-center mb-4'>
               <div className='flex-1 h-px bg-gray-400'></div>
-              <div className='w-2 h-2 bg-black rounded-full ml-2'></div>
+              <div className='w-2 h-2 bg-primary_color rounded-full ml-2'></div>
             </div>
 
             {/* Development Details - Flex Wrap */}
             <div className='flex flex-wrap gap-4 mb-4'>
               <div>
                 <div className='text-xs mb-1'>Sizes</div>
-                <div className='font-medium text-sm'>
+                <p className='font-medium text-sm'>
                   {development.size || 'N/A'}
-                </div>
+                </p>
               </div>
               <div>
                 <div className='text-xs mb-1'>Buildings</div>
-                <div className='font-medium text-sm'>
+                <p className='font-medium text-sm'>
                   {development.number_of_buildings || '1'}
-                </div>
+                </p>
               </div>
               <div>
                 <div className='text-xs mb-1'>Total Units</div>
-                <div className='font-medium text-sm'>
+                <p className='font-medium text-sm'>
                   {development.total_units || '1'}
-                </div>
+                </p>
               </div>
               <div>
                 <div className='text-xs mb-1'>Revenue</div>
-                <div className='font-medium text-sm'>
+                <p className='font-medium text-sm'>
                   {formatRevenue(development.revenue || development.total_revenue || development.revenue_generated, development.currency)}
-                </div>
+                </p>
               </div>
             </div>
 
@@ -149,7 +149,7 @@ const DevelopmentCard = ({ development }) => {
                 <div className='text-xs mb-2'>Unit Types</div>
                 <div className='flex flex-wrap gap-2'>
                   {getUnitTypeNames().map((type, index) => (
-                    <span key={index} className='bg-black text-white px-3 py-1 rounded-full text-xs font-medium'>
+                    <span key={index} className='bg-primary_color text-white px-3 py-1 rounded-full text-xs font-medium'>
                       {type}
                     </span>
                   ))}

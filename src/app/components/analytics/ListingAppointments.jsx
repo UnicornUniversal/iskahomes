@@ -45,12 +45,12 @@ const ListingAppointments = ({ listingId, limit = 5 }) => {
   if (!listingId) return null
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div className="rounded-lg border border-gray-200 p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">Upcoming Appointments</h3>
+        <h3 className="text-lg font-semibold text-primary_color">Upcoming Appointments</h3>
         <button
           onClick={fetchAppointments}
-          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+          className="text-sm text-primary_color hover:text-primary_color/80 font-medium"
         >
           Refresh
         </button>
@@ -58,10 +58,10 @@ const ListingAppointments = ({ listingId, limit = 5 }) => {
 
       {loading ? (
         <div className="flex items-center justify-center py-10">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary_color"></div>
         </div>
       ) : error ? (
-        <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg">
+        <div className="border border-red-200 text-red-800 p-4 rounded-lg">
           <p className="text-sm">{error}</p>
         </div>
       ) : appointments.length === 0 ? (
@@ -77,7 +77,7 @@ const ListingAppointments = ({ listingId, limit = 5 }) => {
             >
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">
+                  <p className="text-sm font-semibold text-primary_color">
                     {appointment.client_name || 'Unnamed client'}
                   </p>
                   {appointment.client_phone && (

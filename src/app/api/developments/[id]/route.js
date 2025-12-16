@@ -107,6 +107,133 @@ export async function GET(request, { params }) {
   }
 }
 
+// Helper function to get developer's primary currency
+async function getDeveloperPrimaryCurrency(userId) {
+  try {
+    const { data: profile, error } = await supabaseAdmin
+      .from('developers')
+      .select('company_locations, default_currency')
+      .eq('developer_id', userId)
+      .single()
+
+    if (error || !profile) {
+      console.error('Error fetching developer currency:', error)
+      return 'USD' // Default
+    }
+
+    if (profile.company_locations && Array.isArray(profile.company_locations)) {
+      const primaryLocation = profile.company_locations.find(
+        loc => loc.primary_location === true
+      )
+      if (primaryLocation?.currency) {
+        return primaryLocation.currency
+      }
+    }
+
+    if (profile.default_currency?.code) {
+      return profile.default_currency.code
+    }
+
+    return 'USD' // Default
+  } catch (error) {
+    console.error('Error in getDeveloperPrimaryCurrency:', error)
+    return 'USD'
+  }
+}
+
+// Helper function to create sales_listings entry
+async function createSalesListingEntry(listingId, userId, listingData, saleType) {
+  try {
+    // Get primary currency
+    const primaryCurrency = await getDeveloperPrimaryCurrency(userId)
+    
+    // Extract estimated_revenue value (in primary currency)
+    const estimatedRevenue = listingData.estimated_revenue || {}
+    const salePrice = estimatedRevenue.estimated_revenue || estimatedRevenue.price || 0
+    
+    if (!salePrice || salePrice <= 0) {
+      console.error('No sale price available for sales_listings entry')
+      return null
+    }
+
+    const salesEntry = {
+      listing_id: listingId,
+      user_id: userId || null,
+      sale_price: parseFloat(salePrice.toFixed(2)),
+      currency: primaryCurrency,
+      sale_type: saleType, // 'sold' or 'rented'
+      sale_date: new Date().toISOString().split('T')[0], // Today's date
+      sale_timestamp: new Date().toISOString(),
+      sale_source: 'Iska Homes', // Default
+      buyer_name: null,
+      notes: null,
+      commission_rate: null,
+      commission_amount: null
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('sales_listings')
+      .insert([salesEntry])
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error creating sales_listings entry:', error)
+      return null
+    }
+
+    return data
+  } catch (error) {
+    console.error('Error in createSalesListingEntry:', error)
+    return null
+  }
+}
+
+// Helper function to recalculate developer totals from sales_listings
+async function recalculateDeveloperTotals(developerId) {
+  try {
+    // Get all sales for this developer from sales_listings
+    const { data: sales, error: salesError } = await supabaseAdmin
+      .from('sales_listings')
+      .select('sale_price')
+      .eq('user_id', developerId)
+
+    if (salesError) {
+      console.error('Error fetching sales for developer:', salesError)
+      return
+    }
+
+    // Calculate totals
+    const totalSales = sales?.length || 0
+    const totalRevenue = sales?.reduce((sum, sale) => {
+      const price = typeof sale.sale_price === 'number' ? sale.sale_price : parseFloat(sale.sale_price || 0)
+      return sum + price
+    }, 0) || 0
+
+    // Update developer table
+    const { error: updateError } = await supabaseAdmin
+      .from('developers')
+      .update({
+        total_sales: totalSales,
+        total_revenue: totalRevenue,
+        updated_at: new Date().toISOString()
+      })
+      .eq('developer_id', developerId)
+
+    if (updateError) {
+      console.error('Error updating developer totals:', updateError)
+    } else {
+      console.log('✅ Developer totals recalculated:', {
+        developer_id: developerId,
+        total_sales: totalSales,
+        total_revenue: totalRevenue
+      })
+    }
+  } catch (error) {
+    console.error('Error in recalculateDeveloperTotals:', error)
+  }
+}
+
 // PUT - Update a development
 export async function PUT(request, { params }) {
   try {
@@ -136,7 +263,7 @@ export async function PUT(request, { params }) {
     // First check if the development exists and belongs to the developer
     const { data: existingDevelopment, error: fetchError } = await supabase
       .from('developments')
-      .select('developer_id')
+      .select('developer_id, status')
       .eq('id', id)
       .single()
 
@@ -153,6 +280,9 @@ export async function PUT(request, { params }) {
         { status: 403 }
       )
     }
+
+    // Check if status is being changed to "Sold Out"
+    const isStatusChangingToSoldOut = body.status === 'Sold Out' && existingDevelopment.status !== 'Sold Out'
 
     // Update the development
     const { data: development, error } = await supabase
@@ -171,6 +301,99 @@ export async function PUT(request, { params }) {
         { error: 'Failed to update development' },
         { status: 500 }
       )
+    }
+
+    // If status changed to "Sold Out", update all listings and create sales records
+    if (isStatusChangingToSoldOut) {
+      try {
+        // Fetch all listings for this development that are NOT already Sold Out, Taken, or Rented Out
+        const { data: listings, error: listingsError } = await supabaseAdmin
+          .from('listings')
+          .select('id, purposes, estimated_revenue, status')
+          .eq('development_id', id)
+          .eq('account_type', 'developer')
+          .not('status', 'eq', 'Sold Out')
+          .not('status', 'eq', 'Taken')
+          .not('status', 'eq', 'Rented Out')
+
+        if (listingsError) {
+          console.error('Error fetching listings:', listingsError)
+        } else if (listings && listings.length > 0) {
+          let listingsUpdated = 0
+          let salesCreated = 0
+
+          // Process each listing
+          for (const listing of listings) {
+            // Check purposes array to determine if it's for sale or rent
+            const purposes = Array.isArray(listing.purposes) ? listing.purposes : []
+            const purposeIds = purposes.map(p => typeof p === 'object' ? p.id : p)
+            
+            let newStatus = null
+            let saleType = null
+
+            // Check if listing has 'pur-sale' purpose
+            if (purposeIds.includes('pur-sale')) {
+              newStatus = 'Sold Out'
+              saleType = 'sold'
+            }
+            // Check if listing has 'pur-rent' purpose
+            else if (purposeIds.includes('pur-rent')) {
+              newStatus = 'Rented Out'
+              saleType = 'rented'
+            }
+
+            // Update listing status if we determined a new status
+            if (newStatus && saleType) {
+              // Update listing status
+              const { error: updateError } = await supabaseAdmin
+                .from('listings')
+                .update({
+                  status: newStatus,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', listing.id)
+
+              if (!updateError) {
+                listingsUpdated++
+
+                // Create sales_listings entry
+                const salesEntry = await createSalesListingEntry(
+                  listing.id,
+                  decoded.developer_id,
+                  listing,
+                  saleType
+                )
+
+                if (salesEntry) {
+                  salesCreated++
+                }
+              } else {
+                console.error('Error updating listing status:', updateError)
+              }
+            }
+          }
+
+          // Recalculate developer totals from sales_listings table
+          await recalculateDeveloperTotals(decoded.developer_id)
+
+          console.log('✅ Development marked as Sold Out:', {
+            development_id: id,
+            listingsUpdated,
+            salesCreated
+          })
+
+          return NextResponse.json({ 
+            success: true, 
+            data: development,
+            message: 'Development updated successfully',
+            listingsUpdated,
+            salesCreated
+          })
+        }
+      } catch (error) {
+        console.error('Error processing sold out listings:', error)
+        // Don't fail the request, just log the error
+      }
     }
 
     return NextResponse.json({ 

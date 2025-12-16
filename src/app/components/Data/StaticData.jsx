@@ -3474,6 +3474,345 @@ export const iskaServices = [
   }
 ];
 
+// ============================================
+// Developer Roles and Permissions
+// ============================================
+// This object defines all available permissions and default role templates for developers
+// Permissions are structured to be stored as JSONB in the database
+
+export const developerRolesAndPermissions = {
+  // All available permissions grouped by feature/module
+  permissions: {
+    // Dashboard permissions
+    dashboard: {
+      view: 'dashboard.view',
+      export: 'dashboard.export'
+    },
+    
+    // Messages permissions
+    messages: {
+      view: 'messages.view',
+      send: 'messages.send',
+      reply: 'messages.reply',
+      delete: 'messages.delete',
+      manage: 'messages.manage' // Full management (mark as read/unread, archive, etc.)
+    },
+    
+    // Developments permissions
+    developments: {
+      view: 'developments.view',
+      create: 'developments.create',
+      edit: 'developments.edit',
+      delete: 'developments.delete',
+      publish: 'developments.publish',
+      unpublish: 'developments.unpublish',
+      manage: 'developments.manage' // Full management including settings
+    },
+    
+    // Units/Listings permissions
+    units: {
+      view: 'units.view',
+      create: 'units.create',
+      edit: 'units.edit',
+      delete: 'units.delete',
+      publish: 'units.publish',
+      unpublish: 'units.unpublish',
+      feature: 'units.feature', // Feature/unfeature units
+      view_analytics: 'units.view_analytics', // View unit-specific analytics
+      view_leads: 'units.view_leads', // View unit-specific leads
+      manage: 'units.manage' // Full management including media, pricing, etc.
+    },
+    
+    // Appointments permissions
+    appointments: {
+      view: 'appointments.view',
+      create: 'appointments.create',
+      edit: 'appointments.edit',
+      delete: 'appointments.delete',
+      cancel: 'appointments.cancel',
+      manage: 'appointments.manage' // Full management including rescheduling
+    },
+    
+    // Leads permissions
+    leads: {
+      view: 'leads.view',
+      view_all: 'leads.view_all', // View all leads vs only assigned
+      assign: 'leads.assign',
+      update: 'leads.update',
+      delete: 'leads.delete',
+      export: 'leads.export',
+      manage: 'leads.manage' // Full lead management
+    },
+    
+    // Team management permissions
+    team: {
+      view: 'team.view',
+      invite: 'team.invite',
+      edit: 'team.edit', // Edit team member details
+      remove: 'team.remove', // Remove team members
+      manage_roles: 'team.manage_roles', // Create/edit/delete roles
+      assign_roles: 'team.assign_roles', // Assign roles to members
+      manage_permissions: 'team.manage_permissions', // Customize permissions
+      manage: 'team.manage' // Full team management
+    },
+    
+    // Analytics permissions
+    analytics: {
+      view: 'analytics.view',
+      view_overview: 'analytics.view_overview',
+      view_properties: 'analytics.view_properties',
+      view_leads: 'analytics.view_leads',
+      view_sales: 'analytics.view_sales',
+      view_profile_brand: 'analytics.view_profile_brand',
+      view_appointments: 'analytics.view_appointments',
+      view_messages: 'analytics.view_messages',
+      view_market: 'analytics.view_market',
+      export: 'analytics.export',
+      manage: 'analytics.manage' // Full analytics access
+    },
+    
+    // Profile permissions
+    profile: {
+      view: 'profile.view',
+      edit: 'profile.edit',
+      manage_branding: 'profile.manage_branding', // Manage logo, colors, etc.
+      manage_settings: 'profile.manage_settings', // Manage account settings
+      manage: 'profile.manage' // Full profile management
+    },
+    
+    // Subscriptions permissions
+    subscriptions: {
+      view: 'subscriptions.view',
+      upgrade: 'subscriptions.upgrade',
+      downgrade: 'subscriptions.downgrade',
+      cancel: 'subscriptions.cancel',
+      manage: 'subscriptions.manage' // Full subscription management
+    },
+    
+    // Media permissions (for units/developments)
+    media: {
+      upload: 'media.upload',
+      delete: 'media.delete',
+      manage: 'media.manage' // Full media management
+    },
+    
+    // Financial permissions
+    financial: {
+      view: 'financial.view',
+      view_pricing: 'financial.view_pricing',
+      edit_pricing: 'financial.edit_pricing',
+      view_revenue: 'financial.view_revenue',
+      manage: 'financial.manage' // Full financial management
+    },
+    
+    // Agents permissions
+    agents: {
+      view: 'agents.view',
+      add: 'agents.add',
+      edit: 'agents.edit',
+      remove: 'agents.remove',
+      assign: 'agents.assign', // Assign agents to properties
+      manage: 'agents.manage' // Full agent management
+    },
+    
+    // Favorites permissions
+    favorites: {
+      view: 'favorites.view',
+      add: 'favorites.add',
+      remove: 'favorites.remove',
+      manage: 'favorites.manage' // Full favorites management
+    }
+  },
+  
+  // Default role templates with their permissions
+  defaultRoles: {
+    owner: {
+      name: 'Owner',
+      description: 'Full access to all features and settings. Cannot be removed or modified.',
+      isSystemRole: true,
+      isDefault: false,
+      permissions: {
+        // All permissions enabled
+        dashboard: ['view', 'export'],
+        messages: ['view', 'send', 'reply', 'delete', 'manage'],
+        developments: ['view', 'create', 'edit', 'delete', 'publish', 'unpublish', 'manage'],
+        units: ['view', 'create', 'edit', 'delete', 'publish', 'unpublish', 'feature', 'view_analytics', 'view_leads', 'manage'],
+        appointments: ['view', 'create', 'edit', 'delete', 'cancel', 'manage'],
+        leads: ['view', 'view_all', 'assign', 'update', 'delete', 'export', 'manage'],
+        team: ['view', 'invite', 'edit', 'remove', 'manage_roles', 'assign_roles', 'manage_permissions', 'manage'],
+        analytics: ['view', 'view_overview', 'view_properties', 'view_leads', 'view_sales', 'view_profile_brand', 'view_appointments', 'view_messages', 'view_market', 'export', 'manage'],
+        profile: ['view', 'edit', 'manage_branding', 'manage_settings', 'manage'],
+        subscriptions: ['view', 'upgrade', 'downgrade', 'cancel', 'manage'],
+        media: ['upload', 'delete', 'manage'],
+        financial: ['view', 'view_pricing', 'edit_pricing', 'view_revenue', 'manage'],
+        agents: ['view', 'add', 'edit', 'remove', 'assign', 'manage'],
+        favorites: ['view', 'add', 'remove', 'manage']
+      }
+    },
+    
+    admin: {
+      name: 'Admin',
+      description: 'Full administrative access except subscription management and team owner removal.',
+      isSystemRole: false,
+      isDefault: false,
+      permissions: {
+        dashboard: ['view', 'export'],
+        messages: ['view', 'send', 'reply', 'delete', 'manage'],
+        developments: ['view', 'create', 'edit', 'delete', 'publish', 'unpublish', 'manage'],
+        units: ['view', 'create', 'edit', 'delete', 'publish', 'unpublish', 'feature', 'view_analytics', 'view_leads', 'manage'],
+        appointments: ['view', 'create', 'edit', 'delete', 'cancel', 'manage'],
+        leads: ['view', 'view_all', 'assign', 'update', 'delete', 'export', 'manage'],
+        team: ['view', 'invite', 'edit', 'remove', 'manage_roles', 'assign_roles', 'manage_permissions'],
+        analytics: ['view', 'view_overview', 'view_properties', 'view_leads', 'view_sales', 'view_profile_brand', 'view_appointments', 'view_messages', 'view_market', 'export', 'manage'],
+        profile: ['view', 'edit', 'manage_branding', 'manage_settings', 'manage'],
+        subscriptions: ['view'], // Can view but not modify
+        media: ['upload', 'delete', 'manage'],
+        financial: ['view', 'view_pricing', 'edit_pricing', 'view_revenue', 'manage'],
+        agents: ['view', 'add', 'edit', 'remove', 'assign', 'manage'],
+        favorites: ['view', 'add', 'remove', 'manage']
+      }
+    },
+    
+    manager: {
+      name: 'Manager',
+      description: 'Can manage properties, leads, and appointments. Limited team and settings access.',
+      isSystemRole: false,
+      isDefault: true,
+      permissions: {
+        dashboard: ['view', 'export'],
+        messages: ['view', 'send', 'reply', 'manage'],
+        developments: ['view', 'create', 'edit', 'publish', 'unpublish'],
+        units: ['view', 'create', 'edit', 'publish', 'unpublish', 'feature', 'view_analytics', 'view_leads'],
+        appointments: ['view', 'create', 'edit', 'delete', 'cancel', 'manage'],
+        leads: ['view', 'view_all', 'assign', 'update', 'export'],
+        team: ['view'], // Can view team but not manage
+        analytics: ['view', 'view_overview', 'view_properties', 'view_leads', 'view_sales', 'view_profile_brand', 'view_appointments', 'view_messages'],
+        profile: ['view', 'edit'],
+        subscriptions: ['view'],
+        media: ['upload', 'delete', 'manage'],
+        financial: ['view', 'view_pricing', 'edit_pricing', 'view_revenue'],
+        agents: ['view', 'add', 'edit', 'assign'],
+        favorites: ['view', 'add', 'remove']
+      }
+    },
+    
+    editor: {
+      name: 'Editor',
+      description: 'Can create and edit properties and developments. Cannot delete or manage team.',
+      isSystemRole: false,
+      isDefault: false,
+      permissions: {
+        dashboard: ['view'],
+        messages: ['view', 'send', 'reply'],
+        developments: ['view', 'create', 'edit', 'publish'],
+        units: ['view', 'create', 'edit', 'publish', 'view_analytics', 'view_leads'],
+        appointments: ['view', 'create', 'edit'],
+        leads: ['view', 'update'],
+        team: ['view'],
+        analytics: ['view', 'view_overview', 'view_properties', 'view_leads'],
+        profile: ['view', 'edit'],
+        subscriptions: [],
+        media: ['upload', 'delete'],
+        financial: ['view', 'view_pricing', 'edit_pricing'],
+        agents: ['view'],
+        favorites: ['view', 'add', 'remove']
+      }
+    },
+    
+    viewer: {
+      name: 'Viewer',
+      description: 'Read-only access to view properties, developments, and analytics.',
+      isSystemRole: false,
+      isDefault: false,
+      permissions: {
+        dashboard: ['view'],
+        messages: ['view'],
+        developments: ['view'],
+        units: ['view', 'view_analytics', 'view_leads'],
+        appointments: ['view'],
+        leads: ['view'],
+        team: ['view'],
+        analytics: ['view', 'view_overview', 'view_properties', 'view_leads'],
+        profile: ['view'],
+        subscriptions: ['view'],
+        media: [],
+        financial: ['view'],
+        agents: ['view'],
+        favorites: ['view']
+      }
+    },
+    
+    sales: {
+      name: 'Sales',
+      description: 'Focused on managing leads, appointments, and customer interactions.',
+      isSystemRole: false,
+      isDefault: false,
+      permissions: {
+        dashboard: ['view'],
+        messages: ['view', 'send', 'reply', 'manage'],
+        developments: ['view'],
+        units: ['view', 'view_analytics', 'view_leads'],
+        appointments: ['view', 'create', 'edit', 'delete', 'cancel', 'manage'],
+        leads: ['view', 'view_all', 'assign', 'update', 'export'],
+        team: ['view'],
+        analytics: ['view', 'view_overview', 'view_leads', 'view_sales', 'view_appointments', 'view_messages'],
+        profile: ['view'],
+        subscriptions: [],
+        media: [],
+        financial: ['view'],
+        agents: ['view'],
+        favorites: ['view']
+      }
+    }
+  },
+  
+  // Helper function to get all permission keys as flat array
+  getAllPermissionKeys: () => {
+    const allKeys = []
+    const perms = developerRolesAndPermissions.permissions
+    Object.keys(perms).forEach(category => {
+      Object.keys(perms[category]).forEach(action => {
+        allKeys.push(perms[category][action])
+      })
+    })
+    return allKeys
+  },
+  
+  // Helper function to check if user has permission
+  hasPermission: (userPermissions, permissionKey) => {
+    if (!userPermissions || typeof userPermissions !== 'object') return false
+    
+    // Flatten permissions object to check
+    const flatPermissions = []
+    Object.keys(userPermissions).forEach(category => {
+      if (Array.isArray(userPermissions[category])) {
+        userPermissions[category].forEach(action => {
+          const key = developerRolesAndPermissions.permissions[category]?.[action]
+          if (key) flatPermissions.push(key)
+        })
+      }
+    })
+    
+    return flatPermissions.includes(permissionKey)
+  },
+  
+  // Helper function to get role permissions
+  getRolePermissions: (roleName) => {
+    const role = developerRolesAndPermissions.defaultRoles[roleName]
+    return role ? role.permissions : null
+  },
+  
+  // Helper function to merge permissions (for custom roles)
+  mergePermissions: (basePermissions, additionalPermissions) => {
+    const merged = { ...basePermissions }
+    Object.keys(additionalPermissions).forEach(category => {
+      if (!merged[category]) merged[category] = []
+      merged[category] = [...new Set([...merged[category], ...additionalPermissions[category]])]
+    })
+    return merged
+  }
+};
+
 export default propertySpecificationsData;
 
 

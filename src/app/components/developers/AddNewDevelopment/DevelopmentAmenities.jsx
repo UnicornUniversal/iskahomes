@@ -152,6 +152,117 @@ const DevelopmentAmenities = ({ formData, updateFormData, isEditMode }) => {
   const customAmenities = formData.amenities?.custom || [];
   const totalAmenities = selectedInbuiltAmenityIds.length + customAmenities.length;
 
+  // Get all available amenities (general + type-specific)
+  const allAvailableAmenities = useMemo(() => {
+    return [...GENERAL_AMENITIES, ...allTypeSpecificAmenities];
+  }, [allTypeSpecificAmenities]);
+
+  // Check if all amenities are selected
+  const areAllAmenitiesSelected = useMemo(() => {
+    if (allAvailableAmenities.length === 0) return false;
+    return allAvailableAmenities.every(amenity => 
+      selectedInbuiltAmenityIds.includes(amenity.id)
+    );
+  }, [allAvailableAmenities, selectedInbuiltAmenityIds]);
+
+  // Handle select/deselect all amenities
+  const handleSelectAllAmenities = () => {
+    const currentAmenities = formData.amenities || { inbuilt: [], custom: [] };
+    
+    if (areAllAmenitiesSelected) {
+      // Deselect all
+      updateFormData({
+        amenities: {
+          ...currentAmenities,
+          inbuilt: []
+        }
+      });
+    } else {
+      // Select all available amenities
+      const allAmenityIds = allAvailableAmenities.map(amenity => amenity.id);
+      updateFormData({
+        amenities: {
+          ...currentAmenities,
+          inbuilt: allAmenityIds
+        }
+      });
+    }
+  };
+
+  // Handle select/deselect all general amenities
+  const handleSelectAllGeneral = () => {
+    const currentAmenities = formData.amenities || { inbuilt: [], custom: [] };
+    const currentSelected = currentAmenities.inbuilt || [];
+    const generalIds = GENERAL_AMENITIES.map(a => a.id);
+    const selectedGeneralIds = currentSelected.filter(id => generalIds.includes(id));
+    const allGeneralSelected = selectedGeneralIds.length === GENERAL_AMENITIES.length;
+    
+    if (allGeneralSelected) {
+      // Deselect all general amenities
+      const updatedSelected = currentSelected.filter(id => !generalIds.includes(id));
+      updateFormData({
+        amenities: {
+          ...currentAmenities,
+          inbuilt: updatedSelected
+        }
+      });
+    } else {
+      // Select all general amenities
+      const updatedSelected = [...new Set([...currentSelected, ...generalIds])];
+      updateFormData({
+        amenities: {
+          ...currentAmenities,
+          inbuilt: updatedSelected
+        }
+      });
+    }
+  };
+
+  // Handle select/deselect all type-specific amenities
+  const handleSelectAllTypeSpecific = () => {
+    if (allTypeSpecificAmenities.length === 0) return;
+    
+    const currentAmenities = formData.amenities || { inbuilt: [], custom: [] };
+    const currentSelected = currentAmenities.inbuilt || [];
+    const typeSpecificIds = allTypeSpecificAmenities.map(a => a.id);
+    const selectedTypeSpecificIds = currentSelected.filter(id => typeSpecificIds.includes(id));
+    const allTypeSpecificSelected = selectedTypeSpecificIds.length === allTypeSpecificAmenities.length;
+    
+    if (allTypeSpecificSelected) {
+      // Deselect all type-specific amenities
+      const updatedSelected = currentSelected.filter(id => !typeSpecificIds.includes(id));
+      updateFormData({
+        amenities: {
+          ...currentAmenities,
+          inbuilt: updatedSelected
+        }
+      });
+    } else {
+      // Select all type-specific amenities
+      const updatedSelected = [...new Set([...currentSelected, ...typeSpecificIds])];
+      updateFormData({
+        amenities: {
+          ...currentAmenities,
+          inbuilt: updatedSelected
+        }
+      });
+    }
+  };
+
+  // Check if all general amenities are selected
+  const areAllGeneralSelected = useMemo(() => {
+    if (GENERAL_AMENITIES.length === 0) return false;
+    const generalIds = GENERAL_AMENITIES.map(a => a.id);
+    return generalIds.every(id => selectedInbuiltAmenityIds.includes(id));
+  }, [selectedInbuiltAmenityIds]);
+
+  // Check if all type-specific amenities are selected
+  const areAllTypeSpecificSelected = useMemo(() => {
+    if (allTypeSpecificAmenities.length === 0) return false;
+    const typeSpecificIds = allTypeSpecificAmenities.map(a => a.id);
+    return typeSpecificIds.every(id => selectedInbuiltAmenityIds.includes(id));
+  }, [allTypeSpecificAmenities, selectedInbuiltAmenityIds]);
+
   return (
     <div className="w-full">
       <div className="mb-6">
@@ -187,7 +298,18 @@ const DevelopmentAmenities = ({ formData, updateFormData, isEditMode }) => {
         {/* Selected Amenities Summary */}
         {totalAmenities > 0 && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="text-lg font-semibold  mb-3">Selected Amenities</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold ">Selected Amenities</h3>
+              {allAvailableAmenities.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleSelectAllAmenities}
+                  className="secondary_button text-sm"
+                >
+                  {areAllAmenitiesSelected ? 'Deselect All' : 'Select All'}
+                </button>
+              )}
+            </div>
             <div className="space-y-2 flex flex-wrap gap-2">
               {getSelectedAmenities().map(amenity => {
                 const IconComponent = amenity.icon;
@@ -216,13 +338,24 @@ const DevelopmentAmenities = ({ formData, updateFormData, isEditMode }) => {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold ">General Amenities</h3>
-            <button
-              type="button"
-              onClick={() => setShowGeneralAmenities(!showGeneralAmenities)}
-              className="secondary_button"
-            >
-              {showGeneralAmenities ? 'Hide' : 'Show'} General Amenities
-            </button>
+            <div className="flex items-center gap-2">
+              {showGeneralAmenities && (
+                <button
+                  type="button"
+                  onClick={handleSelectAllGeneral}
+                  className="secondary_button text-sm"
+                >
+                  {areAllGeneralSelected ? 'Deselect All' : 'Select All'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowGeneralAmenities(!showGeneralAmenities)}
+                className="secondary_button"
+              >
+                {showGeneralAmenities ? 'Hide' : 'Show'} General Amenities
+              </button>
+            </div>
           </div>
           
           {showGeneralAmenities && (
@@ -298,9 +431,18 @@ const DevelopmentAmenities = ({ formData, updateFormData, isEditMode }) => {
         {/* Type-Specific Amenities Section */}
         {formData.types && formData.types.length > 0 && allTypeSpecificAmenities.length > 0 && (
           <div>
-            <h3 className="text-lg font-semibold  mb-4">
-              {getPropertyTypeName()} Specific Amenities
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold ">
+                {getPropertyTypeName()} Specific Amenities
+              </h3>
+              <button
+                type="button"
+                onClick={handleSelectAllTypeSpecific}
+                className="secondary_button text-sm"
+              >
+                {areAllTypeSpecificSelected ? 'Deselect All' : 'Select All'}
+              </button>
+            </div>
             
             {(() => {
               const filteredTypeSpecific = searchQuery.trim()

@@ -67,7 +67,7 @@ const ListingAnalyticsPage = () => {
   if (loading || !unitSlug) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary_color"></div>
       </div>
     )
   }
@@ -75,7 +75,7 @@ const ListingAnalyticsPage = () => {
   if (metadataError) {
     return (
       <div className="p-6">
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-lg">
+        <div className="border border-yellow-200 text-yellow-800 p-4 rounded-lg">
           <p className="font-medium">Listing unavailable</p>
           <p className="text-sm">{metadataError}</p>
         </div>
@@ -86,7 +86,6 @@ const ListingAnalyticsPage = () => {
   return (
     <div className="p-6 space-y-6">
       <ListingAnalytics listingId={listingId} />
-      <ListingAppointments listingId={listingId} />
     </div>
   )
 }

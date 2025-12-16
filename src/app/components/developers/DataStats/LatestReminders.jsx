@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { Loader2 } from 'lucide-react'
+import { formatFullDate } from '@/lib/utils'
 
 const LatestReminders = ({ limit = 10 }) => {
   const { user } = useAuth()
@@ -46,16 +48,6 @@ const LatestReminders = ({ limit = 10 }) => {
     }
   }
 
-  // Format date as "3 - 12 - 2024"
-  const formatDate = (dateString) => {
-    if (!dateString) return ''
-    const date = new Date(dateString)
-    const day = date.getDate()
-    const month = date.getMonth() + 1
-    const year = date.getFullYear()
-    return `${day} - ${month} - ${year}`
-  }
-
   // Format time as "10:00 PM"
   const formatTime = (timeString) => {
     if (!timeString) return null
@@ -97,7 +89,7 @@ const LatestReminders = ({ limit = 10 }) => {
     
     if (size) {
       // Format: "3 Bedroom" or just the size value
-      const bedroomText = typeof size === 'nuer' ? `${size} Bedroom${size > 1 ? 's' : ''}` : size
+      const bedroomText = typeof size === 'number' ? `${size} Bedroom${size > 1 ? 's' : ''}` : size
       return `${bedroomText} ${title}`.trim()
     }
     return title
@@ -112,71 +104,67 @@ const LatestReminders = ({ limit = 10 }) => {
   }
 
   return (
-    <div className="w-full space-y-4 text-primary_color secondary_bg !p-[1em] ">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-secondary_color-900">Latest Reminders</h3>
-        <div className="text-sm text-secondary_color-500">
-          Total: <span className="font-medium text-secondary_color-900">{reminders.length}</span>
+    <div className="border  border-gray-200 rounded-lg p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-base">Latest Reminders</h3>
+        <div className="text-sm">
+          Total: {reminders.length}
         </div>
       </div>
 
-      {/* Swiper Container */}
       {loading ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-          <span className="ml-2 text-secondary_color-600">Loading reminders...</span>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-5 h-5 animate-spin" />
         </div>
       ) : error ? (
-        <div className="text-center py-8 text-secondary_color-500 text-sm">
+        <div className="text-center py-12 text-sm">
           {error}
         </div>
       ) : reminders.length > 0 ? (
         <div className="flex flex-col gap-4">
           {reminders.map((reminder) => (
-            <div key={reminder.id} className="default_bg rounded-lg max-w-full border border-white/50 p-4 flex flex-col">
-              {/* Date and Time and Status */}
-              <div className=" flex items-center justify-between">
-                <div className="text-sm font-medium text-secondary_color-900 -1">
-                  {formatDate(reminder.reminder_date)}
-                </div>
-                {reminder.reminder_time && (
-                  <div className="text-sm text-secondary_color-600">
-                    {formatTime(reminder.reminder_time)}
-                  </div>
-                )}
-
-                {/* Status */}
-                <div className="-3">
-                  <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
-                    reminder.status === 'completed' 
-                      ? 'bg-green-100 text-green-800' 
-                      : reminder.is_overdue 
-                        ? 'bg-red-100 text-red-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {getStatusText(reminder)}
-                  </span>
-                </div>
-              </div>
-
+            <div key={reminder.id} className="border-b border-gray-100 pb-2  last:border-b-0">
               {/* Note */}
-              <div className="-4 flex-1">
-                <p className="text-xs text-secondary_color-500 -1">Note</p>
-                <p className="text-sm text-secondary_color-900 leading-relaxed">
+              <div className="mb-3">
+                <p className="text-xs mb-1">Note</p>
+                <p className="text-sm leading-relaxed">
                   {reminder.note_text}
                 </p>
               </div>
 
+              {/* Date, Time and Status */}
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm">
+                  {formatFullDate(reminder.reminder_date)}
+                </p>
+                {reminder.reminder_time && (
+                  <p className="text-sm">
+                    {formatTime(reminder.reminder_time)}
+                  </p>
+                )}
+
+                {/* Status */}
+                <span className={`inline-flex px-2 py-1 rounded text-xs ${
+                  reminder.status === 'completed' 
+                    ? 'bg-gray-100' 
+                    : reminder.is_overdue 
+                      ? 'bg-red-50' 
+                      : 'bg-yellow-50'
+                }`}>
+                  {getStatusText(reminder)}
+                </span>
+              </div>
+
               {/* Property Information */}
               {reminder.listing && (
-                <div className="mt-auto pt-3 border-t border-white/30">
+                <div className="mt-3 pt-3 border-t border-gray-100">
                   {getPropertyTitle(reminder) && (
-                    <p className="text-sm font-medium text-secondary_color-900 -1">
+                    <p className="text-sm mb-1">
                       {getPropertyTitle(reminder)}
                     </p>
                   )}
                   {getLocation(reminder) && (
-                    <p className="text-xs text-secondary_color-600">
+                    <p className="text-xs">
                       {getLocation(reminder)}
                     </p>
                   )}
@@ -186,8 +174,8 @@ const LatestReminders = ({ limit = 10 }) => {
           ))}
         </div>
       ) : (
-        <div className="text-center py-8 text-secondary_color-500 text-sm">
-          no reminders found
+        <div className="text-center py-12 text-sm">
+          No reminders found
         </div>
       )}
     </div>

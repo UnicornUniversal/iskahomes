@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { verifyToken } from '@/lib/jwt';
 
 // GET all conversations for a user
@@ -262,6 +262,53 @@ export async function POST(request) {
 
       if (msgError) {
         console.error('Error sending first message:', msgError);
+      } else {
+        // Automatically update lead status from "New" to "Contacted" when sending a message
+        // Only update if the sender is a developer/agent (lister) and receiver is a property_seeker
+        if (userType === 'developer' && otherUserType === 'property_seeker') {
+          try {
+            // Find leads associated with this conversation
+            // Lead is identified by: seeker_id = otherUserId, lister_id = userId
+            let leadQuery = supabaseAdmin
+              .from('leads')
+              .select('id, status')
+              .eq('seeker_id', otherUserId)
+              .eq('lister_id', userId)
+              .eq('status', 'new');
+
+            // If there's a listing, filter by listing_id
+            if (listingId) {
+              leadQuery = leadQuery.eq('listing_id', listingId).eq('context_type', 'listing');
+            } else {
+              // For profile leads, listing_id should be null
+              leadQuery = leadQuery.is('listing_id', null).eq('context_type', 'profile');
+            }
+
+            const { data: leadsToUpdate, error: leadsError } = await leadQuery;
+
+            if (!leadsError && leadsToUpdate && leadsToUpdate.length > 0) {
+              // Update all matching leads from "New" to "Contacted"
+              const leadIds = leadsToUpdate.map(lead => lead.id);
+              const { error: updateError } = await supabaseAdmin
+                .from('leads')
+                .update({ 
+                  status: 'contacted',
+                  updated_at: new Date().toISOString()
+                })
+                .in('id', leadIds);
+
+              if (updateError) {
+                console.error('Error updating lead status:', updateError);
+                // Don't fail the request if lead update fails
+              } else {
+                console.log(`Updated ${leadIds.length} lead(s) from "New" to "Contacted"`);
+              }
+            }
+          } catch (leadUpdateErr) {
+            console.error('Error in lead status update logic:', leadUpdateErr);
+            // Don't fail the request if lead update fails
+          }
+        }
       }
     }
 

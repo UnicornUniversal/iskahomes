@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirm Your Iska Homes Account</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 600px; width: 100%;">
+          
+          <!-- Header with Logo and Gradient -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #17637C 0%, #1a7a94 100%); padding: 40px 20px; text-align: center; border-radius: 12px 12px 0 0;">
+              <!-- Logo -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center" style="padding-bottom: 20px;">
+                    <img src="https://iskahomes.vercel.app/iska-dark.png" alt="Iska Homes" style="max-width: 180px; height: auto; display: block;" />
+                  </td>
+                </tr>
+              </table>
+              <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: 700; letter-spacing: -0.5px;">Welcome to Iska Homes!</h1>
+              <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 16px; opacity: 0.95;">Your journey to finding the perfect home starts here</p>
+            </td>
+          </tr>
+          
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 50px 40px;">
+              <p style="font-size: 18px; color: #333333; line-height: 1.6; margin: 0 0 20px 0; font-weight: 500;">
+                Thank you for joining Iska Homes!
+              </p>
+              <p style="font-size: 16px; color: #555555; line-height: 1.7; margin: 0 0 30px 0;">
+                We're excited to have you as part of our community. To complete your registration and start exploring thousands of properties, please confirm your email address by clicking the button below.
+              </p>
+              
+              <!-- CTA Button -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0;">
+                <tr>
+                  <td align="center" style="padding: 10px 0;">
+                    <a href="{{ .ConfirmationURL }}" 
+                       style="display: inline-block; background-color: #17637C; 
+                              color: #ffffff; text-decoration: none; padding: 16px 48px; 
+                              border-radius: 8px; font-weight: 600; font-size: 16px;
+                              box-shadow: 0 4px 12px rgba(23, 99, 124, 0.3);
+                              transition: all 0.3s ease;">
+                      Confirm Your Email Address
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- Alternative Link -->
+              <div style="background-color: #f9f9f9; border-left: 4px solid #17637C; padding: 20px; border-radius: 6px; margin: 30px 0;">
+                <p style="font-size: 14px; color: #666666; line-height: 1.6; margin: 0 0 10px 0; font-weight: 500;">
+                  Button not working?
+                </p>
+                <p style="font-size: 13px; color: #888888; line-height: 1.6; margin: 0; word-break: break-all;">
+                  Copy and paste this link into your browser:<br>
+                  <a href="{{ .ConfirmationURL }}" style="color: #17637C; text-decoration: underline;">{{ .ConfirmationURL }}</a>
+                </p>
+              </div>
+              
+              <!-- Security Note -->
+              <div style="margin-top: 30px; padding-top: 30px; border-top: 1px solid #e0e0e0;">
+                <p style="font-size: 14px; color: #888888; line-height: 1.6; margin: 0;">
+                  <strong style="color: #666666;">🔒 Security Note:</strong> This confirmation link will expire in 24 hours for your security. If you didn't create an account with Iska Homes, please ignore this email.
+                </p>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9f9f9; padding: 40px 40px; text-align: center; border-radius: 0 0 12px 12px; border-top: 1px solid #e0e0e0;">
+              <!-- <p style="font-size: 14px; color: #666666; margin: 0 0 15px 0; line-height: 1.6;">
+                <strong style="color: #17637C;">Iska Homes</strong><br>
+                Your trusted partner in finding the perfect property
+              </p> -->
+              <p style="font-size: 12px; color: #999999; margin: 20px 0 0 0; line-height: 1.6;">
+                © {{ .Year }} Iska Homes. All rights reserved.<br>
+                This email was sent to confirm your account registration.
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { FiMessageCircle, FiEdit3, FiTrash2, FiPlus, FiX, FiSend, FiUser, FiCalendar, FiPhone, FiMail, FiImage, FiStar } from 'react-icons/fi'
-import { BarChart3, MessageCircle, Phone, Calendar, TrendingUp } from 'lucide-react'
+import { BarChart3, MessageCircle, Phone, Calendar, TrendingUp, UserX } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import DataCard from '@/app/components/developers/DataCard'
 import { toast, ToastContainer } from 'react-toastify'
@@ -48,6 +48,11 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
 
   async function loadLeads() {
     if (!listerId) return
+    
+    // If we're in listing-specific mode, wait for listingId
+    // (This check is for when viewing a specific listing's leads)
+    // Note: We allow loading all leads when listingId is null (main leads manager)
+    
     setLoading(true)
     setError(null)
     
@@ -61,6 +66,9 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
       
       if (listingId) {
         params.append('listing_id', listingId)
+        console.log('🔍 Loading leads for listing:', listingId)
+      } else {
+        console.log('🔍 Loading all leads for lister:', listerId)
       }
       
       if (statusFilter) {
@@ -85,6 +93,14 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
 
       const response = await fetch(`/api/leads?${params.toString()}`)
       const result = await response.json()
+
+      console.log('🔍 Leads API response:', {
+        success: result.success,
+        dataLength: result.data?.length || 0,
+        total: result.total || 0,
+        listingId: listingId,
+        url: `/api/leads?${params.toString()}`
+      })
 
       if (response.ok && result.success) {
         setLeads(result.data || [])
@@ -490,9 +506,19 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
 
       if (convResponse.ok) {
         const convResult = await convResponse.json()
+        
+        // Backend automatically updates lead status from "New" to "Contacted"
+        // Just refresh the leads list to show updated status
+        // Update local state if this lead is currently selected
+        if (selectedLead && selectedLead.id === lead.id && lead.status === 'new') {
+          setSelectedLead(prev => ({ ...prev, status: 'contacted' }))
+        }
+        
         setChatMessage('')
         setShowChat(false)
         setMessageBoxLead(null)
+        // Refresh leads list to show updated status (backend handles the update)
+        loadLeads()
         toast.success('Message sent successfully!')
       } else {
         const errorData = await convResponse.json()
@@ -508,11 +534,13 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
-  // Leads are already filtered by the API, so we use them directly
+  // Leads are already filtered and sorted by the API (by most recent action)
+  // No need to sort on frontend - backend handles it efficiently
   const filteredLeads = leads
 
   // Extract leads data for data cards
   const getTotalLeadsData = () => {
+    // Only use user-wide stats (data cards are hidden when listingId is provided)
     if (!user?.profile) return null
 
     // Parse leads_breakdown JSON
@@ -549,8 +577,28 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
     const appointmentLeads = user.profile.total_appointments ?? leadsBreakdown?.appointment?.total ?? leadsBreakdown?.appointment_leads?.total ?? 0
     const websiteLeads = leadsBreakdown?.website?.total ?? leadsBreakdown?.website_leads?.total ?? 0
 
+    // HYBRID APPROACH: Use aggregate total_unique_leads + total_anonymous_leads for developer-level display
+    // This shows unique individuals across ALL contexts (profile + listings + developments)
+    // For context-specific metrics, use unique_leads + anonymous_leads (profile-only)
+    const totalUniqueLeads = user.profile.total_unique_leads || 0 // Aggregate across all contexts
+    const totalAnonymousLeads = user.profile.total_anonymous_leads || 0 // Aggregate across all contexts
+    const totalLeads = totalUniqueLeads + totalAnonymousLeads // Total unique individuals across all contexts
+    
+    // Fallback to profile-specific if aggregate not available
+    const profileUniqueLeads = user.profile.unique_leads || 0 // Profile-specific only
+    const profileAnonymousLeads = user.profile.anonymous_leads || 0 // Profile-specific only
+    const profileTotalLeads = profileUniqueLeads + profileAnonymousLeads
+    
+    // Use aggregate if available, otherwise fallback to profile-specific, then to total_leads
+    const totalLeadsFallback = profileTotalLeads > 0 ? profileTotalLeads : (leadsBreakdown?.total_leads || user.profile.total_leads || 0)
+    const finalTotalLeads = totalLeads > 0 ? totalLeads : totalLeadsFallback
+    
     return {
-      total_leads: leadsBreakdown?.total_leads || user.profile.total_leads || 0,
+      total_leads: finalTotalLeads, // Aggregate across all contexts (HYBRID APPROACH)
+      unique_leads: totalUniqueLeads, // Aggregate unique logged-in leads
+      anonymous_leads: totalAnonymousLeads, // Aggregate anonymous leads
+      profile_unique_leads: profileUniqueLeads, // Profile-specific only (for reference)
+      profile_anonymous_leads: profileAnonymousLeads, // Profile-specific only (for reference)
       phone_leads: phoneLeads,
       messaging: messagingData, // Nested messaging structure
       whatsapp_leads: whatsappLeads,
@@ -569,9 +617,9 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
   return (
     <div className="w-full space-y-6 text-primary_color">
       <ToastContainer position="top-right" autoClose={3000} />
-      {/* Data Cards */}
-      {totalLeadsData && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+      {/* Data Cards - Only show when NOT viewing a specific listing (since it's shown in ListingLeadsInsights) */}
+      {!listingId && totalLeadsData && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
           <DataCard
             title="Total Leads"
             value={(totalLeadsData.total_leads || 0).toLocaleString()}
@@ -597,10 +645,15 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
             value={(totalLeadsData.appointment_leads || 0).toLocaleString()}
             icon={Calendar}
           />
+          <DataCard
+            title="Anonymous Leads"
+            value={(totalLeadsData.anonymous_leads || 0).toLocaleString()}
+            icon={UserX}
+          />
         </div>
       )}
       <br/>
-      <Reminders listerId={listerId} listerType={listerType} refreshKey={remindersRefreshKey} />
+      <Reminders listerId={listerId} listerType={listerType} listingId={listingId} refreshKey={remindersRefreshKey} />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -890,12 +943,28 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                         </div>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium text-secondary_color-900 truncate">
-                          {lead.seeker_name || lead.seeker_id}
-                        </div>
-                        <div className="text-xs text-secondary_color-500 mt-0.5">
-                          {lead.total_actions} actions
-                        </div>
+                        {lead.seeker_name && lead.seeker_name !== lead.seeker_id ? (
+                          <>
+                            <div className="text-sm font-medium text-secondary_color-900 truncate">
+                              {lead.seeker_name}
+                            </div>
+                            <div className="text-xs text-secondary_color-500 mt-0.5">
+                              {lead.total_actions} actions
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-sm font-medium text-secondary_color-900 truncate">
+                              Unknown Seeker
+                            </div>
+                            <div className="text-xs text-secondary_color-500 mt-0.5">
+                              {lead.seeker_id || 'Unknown ID'}
+                            </div>
+                            <div className="text-xs text-secondary_color-400 mt-0.5">
+                              {lead.total_actions} actions
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -1078,9 +1147,16 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
               <div className="flex items-center justify-between mb-4">
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-secondary_color-900">Lead Details</h3>
-                  <p className="text-sm text-secondary_color-600 mt-1">
-                    {selectedLead.seeker_name || selectedLead.seeker_id}
-                  </p>
+                  {selectedLead.seeker_name && selectedLead.seeker_name !== selectedLead.seeker_id ? (
+                    <p className="text-sm text-secondary_color-600 mt-1">
+                      {selectedLead.seeker_name}
+                    </p>
+                  ) : (
+                    <div className="mt-1">
+                      <p className="text-sm font-medium text-secondary_color-900">Unknown Seeker</p>
+                      <p className="text-xs text-secondary_color-500">{selectedLead.seeker_id || 'Unknown ID'}</p>
+                    </div>
+                  )}
                 </div>
                 <button 
                   className="px-4 py-2 text-sm font-medium text-secondary_color-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
@@ -1112,7 +1188,14 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
                         <FiUser className="w-5 h-5 text-secondary_color-500" />
-                        <span className="text-sm text-secondary_color-700">{selectedLead.seeker_name || selectedLead.seeker_id}</span>
+                        {selectedLead.seeker_name && selectedLead.seeker_name !== selectedLead.seeker_id ? (
+                          <span className="text-sm text-secondary_color-700">{selectedLead.seeker_name}</span>
+                        ) : (
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-secondary_color-900">Unknown Seeker</span>
+                            <span className="text-xs text-secondary_color-500">{selectedLead.seeker_id || 'Unknown ID'}</span>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <FiCalendar className="w-5 h-5 text-secondary_color-500" />
@@ -1756,7 +1839,14 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
             
             <div className="mb-4">
               <p className="text-sm text-secondary_color-600 mb-2">
-                To: <span className="font-medium">{messageBoxLead.seeker_name || messageBoxLead.seeker_id}</span>
+                To: {messageBoxLead.seeker_name && messageBoxLead.seeker_name !== messageBoxLead.seeker_id ? (
+                  <span className="font-medium">{messageBoxLead.seeker_name}</span>
+                ) : (
+                  <span>
+                    <span className="font-medium">Unknown Seeker</span>
+                    <span className="text-xs text-secondary_color-500 ml-1">({messageBoxLead.seeker_id || 'Unknown ID'})</span>
+                  </span>
+                )}
               </p>
               {messageBoxLead.listing_title && (
                 <p className="text-sm text-secondary_color-600">

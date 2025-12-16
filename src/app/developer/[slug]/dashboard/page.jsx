@@ -60,7 +60,7 @@ const page = () => {
   const totalImpressions = user?.profile?.total_impressions ?? 0
 
   return (
-    <div className=' w-full flex flex-col gap-4 px-[1rem] h-full overflow-y-auto'>
+    <div className=' w-full flex flex-col gap-4  h-full overflow-y-auto'>
       {/* <DeveloperHeader /> */}
 
         <h1 className=' text-primary_color mb-4'>Dashboard Overview</h1>
@@ -110,8 +110,13 @@ const page = () => {
 
 {/* this si the main content of the dashboard */}
       <div className='w-full flex flex-col gap-4'>
-        <div className='p-4 rounded-2xl shadow-sm'>
-          <StatisticsView />
+        <div className=' grid lg:grid-cols-3 gap-4'>
+          <div className="col-span-2">
+            <StatisticsView />
+          </div>
+          <div>
+            <SimpleServices />
+          </div>
         </div>
 
 
@@ -135,7 +140,7 @@ const page = () => {
         </div>
 
 
-        <div className='w-full flex justify-between gap-4 flex-col lg:flex-row'>
+        <div className='w-full grid grid-cols-1 lg:grid-cols-3 gap-4'>
          
          <PropertiesByCategories />
     

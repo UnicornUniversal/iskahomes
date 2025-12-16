@@ -238,15 +238,15 @@ const Chats = ({ onChatSelect, selectedChatId, onConversationDataChange }) => {
   };
 
   return (
-    <div className="w-80 border-r border-gray-200 bg-white flex flex-col h-screen shadow-sm rounded-xl overflow-hidden">
+    <div className="w-full h-full default_bg border-r border-primary_color/10 flex flex-col shadow-lg rounded-xl overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-gray-100 bg-gray-50">
-        <h2 className="text-xl font-semibold text-gray-900">Chats</h2>
-        <p className="text-sm text-gray-500 mt-1">{conversations.length} conversations</p>
+      <div className="p-4 border-b border-primary_color/10 default_bg">
+        <h2 className="text-xl font-bold text-primary_color">Chats</h2>
+        <p className="text-sm text-primary_color/60 mt-1">{conversations.length} conversations</p>
       </div>
 
       {/* Search */}
-      <div className="p-4 border-b border-gray-100 bg-gray-50">
+      <div className="p-4 border-b border-primary_color/10 default_bg">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
@@ -267,33 +267,33 @@ const Chats = ({ onChatSelect, selectedChatId, onConversationDataChange }) => {
             {[1, 2, 3, 4, 5].map((i) => (
               <div
                 key={i}
-                className="flex items-center p-3 rounded-lg border border-gray-100 animate-pulse"
+                className="flex items-center p-3 rounded-lg border border-primary_color/10 animate-pulse"
               >
                 {/* Avatar Skeleton */}
                 <div className="flex-shrink-0">
-                  <div className="h-12 w-12 bg-gray-200 rounded-full"></div>
+                  <div className="h-12 w-12 bg-primary_color/10 rounded-full"></div>
                 </div>
                 
                 {/* Content Skeleton */}
                 <div className="ml-3 flex-1 min-w-0">
                   {/* Name Skeleton */}
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                  <div className="h-4 bg-primary_color/10 rounded w-3/4 mb-2"></div>
                   {/* Message Skeleton */}
-                  <div className="h-3 bg-gray-200 rounded w-full mb-1"></div>
+                  <div className="h-3 bg-primary_color/10 rounded w-full mb-1"></div>
                   {/* Time Skeleton */}
-                  <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+                  <div className="h-3 bg-primary_color/10 rounded w-1/4"></div>
                 </div>
                 
                 {/* Unread Badge Skeleton */}
                 <div className="ml-2">
-                  <div className="h-5 w-5 bg-gray-200 rounded-full"></div>
+                  <div className="h-5 w-5 bg-primary_color/10 rounded-full"></div>
                 </div>
               </div>
             ))}
           </div>
         ) : filteredChats.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-gray-500">No conversations yet</p>
+            <p className="text-primary_color/60">No conversations yet</p>
           </div>
         ) : (
           <div className="p-2 space-y-1">
@@ -304,10 +304,10 @@ const Chats = ({ onChatSelect, selectedChatId, onConversationDataChange }) => {
                   onChatSelect && onChatSelect(conv.id);
                   onConversationDataChange && onConversationDataChange(conv);
                 }}
-                className={`flex items-center p-3 rounded-lg cursor-pointer transition-colors border border-transparent ${
+                className={`flex items-center p-3 rounded-lg cursor-pointer transition-colors border ${
                   selectedChatId === conv.id
-                    ? 'bg-blue-50 border-blue-400 shadow-sm'
-                    : 'hover:bg-gray-100'
+                    ? 'bg-primary_color/10 border-primary_color/30 shadow-sm'
+                    : 'border-transparent hover:bg-primary_color/5'
                 }`}
                 style={{ minHeight: 64 }}
               >
@@ -322,25 +322,27 @@ const Chats = ({ onChatSelect, selectedChatId, onConversationDataChange }) => {
                 
                 <div className="ml-3 flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-gray-900 truncate w-32 md:w-40 lg:w-48">
+                    <h3 className={`text-sm font-medium truncate w-32 md:w-40 lg:w-48 ${
+                      selectedChatId === conv.id ? 'text-primary_color' : 'text-primary_color'
+                    }`}>
                       {(conv.other_user || conv.otherUser)?.name || 'Unknown User'}
                     </h3>
                   </div>
-                  <p className="text-xs text-gray-600 truncate w-32 md:w-40 lg:w-48">
+                  <p className="text-xs text-primary_color/70 truncate w-32 md:w-40 lg:w-48">
                     {conv.last_message_text || 'No messages yet'}
                   </p>
-                  <span className="text-xs text-gray-500 flex-shrink-0">
+                  <span className="text-xs text-primary_color/50 flex-shrink-0">
                     {formatTimestamp(conv.last_message_at)}
                   </span>
                 </div>
 
                 <div className="ml-2 flex flex-col items-end">
                   {(conv.my_unread_count || conv.myUnreadCount) > 0 && (
-                    <div className="bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center mb-1">
+                    <div className="bg-secondary_color text-white text-xs rounded-full h-5 w-5 flex items-center justify-center mb-1 font-bold">
                       {conv.my_unread_count || conv.myUnreadCount}
                     </div>
                   )}
-                  <MoreVertical className="h-4 w-4 text-gray-400" />
+                  <MoreVertical className="h-4 w-4 text-primary_color/50" />
                 </div>
               </div>
             ))}

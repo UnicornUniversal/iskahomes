@@ -89,13 +89,13 @@ const HomeSeekerApplications = () => {
     const getStatusColor = (status) => {
         switch (status) {
             case 'approved':
-                return 'bg-green-100 text-green-800'
+                return 'bg-primary_color/10 text-primary_color border-primary_color/20'
             case 'pending':
-                return 'bg-yellow-100 text-yellow-800'
+                return 'bg-secondary_color/10 text-secondary_color border-secondary_color/20'
             case 'rejected':
-                return 'bg-red-100 text-red-800'
+                return 'bg-red-100 text-red-800 border-red-200'
             default:
-                return 'bg-gray-100 text-gray-800'
+                return 'bg-gray-100 text-gray-800 border-gray-200'
         }
     }
 
@@ -119,151 +119,161 @@ const HomeSeekerApplications = () => {
         : applications.filter(app => app.status === activeFilter)
 
     return (
-    
-            <div className="flex">
+        <>
+            <HomeSeekerHeader />
             
-                <div className="flex-1 p-8">
-                    <HomeSeekerHeader />
-                    
-                    <div className="mt-8">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold text-gray-800">My Applications</h2>
-                            <div className="flex space-x-2">
-                                {['all', 'pending', 'approved', 'rejected'].map((filter) => (
-                                    <button
-                                        key={filter}
-                                        onClick={() => setActiveFilter(filter)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                                            activeFilter === filter
-                                                ? 'bg-primary_color text-white'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                        }`}
-                                    >
-                                        {filter.charAt(0).toUpperCase() + filter.slice(1)}
-                                    </button>
-                                ))}
+            <div className="mt-6 lg:mt-8">
+                {/* Page Header */}
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+                    <div>
+                        <h2 className="text-2xl lg:text-3xl font-bold text-primary_color mb-2 flex items-center gap-3">
+                            <div className="p-2 bg-primary_color/10 rounded-lg">
+                                <FiFileText className="w-6 h-6 text-primary_color" />
                             </div>
-                        </div>
+                            My Applications
+                        </h2>
+                        <p className="text-primary_color/60 text-sm">Track your property applications</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {['all', 'pending', 'approved', 'rejected'].map((filter) => (
+                            <button
+                                key={filter}
+                                onClick={() => setActiveFilter(filter)}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                                    activeFilter === filter
+                                        ? 'bg-primary_color text-white shadow-lg shadow-primary_color/20'
+                                        : 'default_bg text-primary_color hover:bg-primary_color/10 border border-primary_color/10'
+                                }`}
+                            >
+                                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                            </button>
+                        ))}
+                    </div>
+                </div>
 
-                        <div className="grid gap-6">
-                            {filteredApplications.map((application) => (
-                                <div key={application.id} className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-                                    <div className="flex flex-col lg:flex-row gap-6">
-                                        {/* Property Image */}
-                                        <div className="lg:w-1/4">
-                                            <img
-                                                src={application.propertyImage}
-                                                alt={application.propertyName}
-                                                className="w-full h-48 lg:h-32 object-cover rounded-lg"
-                                            />
+                <div className="space-y-6">
+                    {filteredApplications.map((application) => (
+                        <div key={application.id} className="default_bg rounded-2xl shadow-lg p-6 border border-primary_color/10 hover:shadow-xl transition-all duration-300">
+                            <div className="flex flex-col lg:flex-row gap-6">
+                                {/* Property Image */}
+                                <div className="lg:w-1/4 flex-shrink-0">
+                                    <img
+                                        src={application.propertyImage}
+                                        alt={application.propertyName}
+                                        className="w-full h-48 lg:h-40 object-cover rounded-xl"
+                                    />
+                                </div>
+
+                                {/* Application Details */}
+                                <div className="lg:w-3/4 space-y-4 flex-1">
+                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+                                        <div className="flex-1">
+                                            <h3 className="text-xl font-bold text-primary_color mb-2">
+                                                {application.propertyName}
+                                            </h3>
+                                            <p className="text-primary_color/70 flex items-center mb-2">
+                                                <FiMapPin className="w-4 h-4 mr-1.5" />
+                                                {application.propertyAddress}
+                                            </p>
+                                            <span className="inline-block px-3 py-1 rounded-lg text-xs font-medium bg-primary_color/10 text-primary_color border border-primary_color/20">
+                                                {application.applicationType} Application
+                                            </span>
                                         </div>
+                                        <div className="flex items-center gap-2">
+                                            {getStatusIcon(application.status)}
+                                            <span className={`px-4 py-2 rounded-lg text-sm font-medium border ${getStatusColor(application.status)}`}>
+                                                {application.status.charAt(0).toUpperCase() + application.status.slice(1)}
+                                            </span>
+                                        </div>
+                                    </div>
 
-                                        {/* Application Details */}
-                                        <div className="lg:w-3/4 space-y-4">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h3 className="text-xl font-semibold text-gray-800 mb-1">
-                                                        {application.propertyName}
-                                                    </h3>
-                                                    <p className="text-gray-600 flex items-center">
-                                                        <FiMapPin className="w-4 h-4 mr-1" />
-                                                        {application.propertyAddress}
-                                                    </p>
-                                                    <p className="text-sm text-gray-500 mt-1">
-                                                        {application.applicationType} Application
-                                                    </p>
-                                                </div>
-                                                <div className="flex items-center space-x-2">
-                                                    {getStatusIcon(application.status)}
-                                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(application.status)}`}>
-                                                        {application.status.charAt(0).toUpperCase() + application.status.slice(1)}
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            {/* Application Info */}
-                                            <div className="grid md:grid-cols-2 gap-4">
-                                                <div className="bg-gray-50 rounded-lg p-4">
-                                                    <h4 className="font-semibold text-gray-800 mb-2">Application Details</h4>
-                                                    <div className="space-y-2 text-sm">
-                                                        <p><span className="font-medium">Submitted:</span> {new Date(application.submittedDate).toLocaleDateString()}</p>
-                                                        <p><span className="font-medium">Agent:</span> {application.agentName}</p>
-                                                        <p><span className="font-medium">Email:</span> {application.agentEmail}</p>
-                                                        {application.applicationType === "Rental" ? (
-                                                            <>
-                                                                <p><span className="font-medium">Monthly Rent:</span> {application.monthlyRent}</p>
-                                                                <p><span className="font-medium">Lease Term:</span> {application.leaseTerm}</p>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <p><span className="font-medium">Purchase Price:</span> {application.purchasePrice}</p>
-                                                                <p><span className="font-medium">Down Payment:</span> {application.downPayment}</p>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <div className="bg-blue-50 rounded-lg p-4">
-                                                    <h4 className="font-semibold text-gray-800 mb-2">Documents Status</h4>
-                                                    <div className="space-y-2">
-                                                        {application.documents.map((doc, index) => (
-                                                            <div key={index} className="flex items-center justify-between text-sm">
-                                                                <span className="text-gray-700">{doc.name}</span>
-                                                                {getDocumentStatusIcon(doc.status)}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Notes */}
-                                            {application.notes && (
-                                                <div className={`rounded-lg p-3 ${
-                                                    application.status === 'approved' ? 'bg-green-50' :
-                                                    application.status === 'rejected' ? 'bg-red-50' : 'bg-yellow-50'
-                                                }`}>
-                                                    <p className="text-sm text-gray-700">
-                                                        <span className="font-medium">Status Update:</span> {application.notes}
-                                                    </p>
-                                                </div>
-                                            )}
-
-                                            {/* Action Buttons */}
-                                            <div className="flex space-x-3">
-                                                <button className="flex items-center space-x-2 px-4 py-2 bg-primary_color text-white rounded-lg hover:bg-primary_color/90 transition-colors">
-                                                    <FiEye className="w-4 h-4" />
-                                                    <span>View Details</span>
-                                                </button>
-                                                <button className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                                                    <FiDownload className="w-4 h-4" />
-                                                    <span>Download Documents</span>
-                                                </button>
-                                                {application.status === 'pending' && (
-                                                    <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                                                        <FiFileText className="w-4 h-4" />
-                                                        <span>Upload Additional Docs</span>
-                                                    </button>
+                                    {/* Application Info */}
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        <div className="default_bg rounded-xl p-4 border border-primary_color/10">
+                                            <h4 className="font-bold text-primary_color mb-3 flex items-center gap-2">
+                                                <div className="w-1 h-4 bg-primary_color rounded-full"></div>
+                                                Application Details
+                                            </h4>
+                                            <div className="space-y-2 text-sm">
+                                                <p className="text-primary_color/80"><span className="font-medium text-primary_color">Submitted:</span> {new Date(application.submittedDate).toLocaleDateString()}</p>
+                                                <p className="text-primary_color/80"><span className="font-medium text-primary_color">Agent:</span> {application.agentName}</p>
+                                                <p className="text-primary_color/80"><span className="font-medium text-primary_color">Email:</span> {application.agentEmail}</p>
+                                                {application.applicationType === "Rental" ? (
+                                                    <>
+                                                        <p className="text-primary_color/80"><span className="font-medium text-primary_color">Monthly Rent:</span> {application.monthlyRent}</p>
+                                                        <p className="text-primary_color/80"><span className="font-medium text-primary_color">Lease Term:</span> {application.leaseTerm}</p>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <p className="text-primary_color/80"><span className="font-medium text-primary_color">Purchase Price:</span> {application.purchasePrice}</p>
+                                                        <p className="text-primary_color/80"><span className="font-medium text-primary_color">Down Payment:</span> {application.downPayment}</p>
+                                                    </>
                                                 )}
                                             </div>
                                         </div>
+
+                                        <div className="default_bg rounded-xl p-4 border border-secondary_color/10">
+                                            <h4 className="font-bold text-primary_color mb-3 flex items-center gap-2">
+                                                <div className="w-1 h-4 bg-secondary_color rounded-full"></div>
+                                                Documents Status
+                                            </h4>
+                                            <div className="space-y-2">
+                                                {application.documents.map((doc, index) => (
+                                                    <div key={index} className="flex items-center justify-between text-sm py-1">
+                                                        <span className="text-primary_color/80">{doc.name}</span>
+                                                        {getDocumentStatusIcon(doc.status)}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Notes */}
+                                    {application.notes && (
+                                        <div className={`rounded-xl p-4 border ${
+                                            application.status === 'approved' ? 'bg-primary_color/5 border-primary_color/20' :
+                                            application.status === 'rejected' ? 'bg-red-50 border-red-200' : 'bg-secondary_color/5 border-secondary_color/20'
+                                        }`}>
+                                            <p className="text-sm text-primary_color/80">
+                                                <span className="font-bold text-primary_color">Status Update:</span> {application.notes}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Action Buttons */}
+                                    <div className="flex flex-wrap gap-3 pt-2">
+                                        <button className="flex items-center gap-2 px-4 py-2 bg-primary_color text-white rounded-lg hover:bg-primary_color/90 transition-colors shadow-lg shadow-primary_color/20">
+                                            <FiEye className="w-4 h-4" />
+                                            <span>View Details</span>
+                                        </button>
+                                        <button className="flex items-center gap-2 px-4 py-2 default_bg text-primary_color rounded-lg hover:bg-primary_color/10 transition-colors border border-primary_color/10">
+                                            <FiDownload className="w-4 h-4" />
+                                            <span>Download Documents</span>
+                                        </button>
+                                        {application.status === 'pending' && (
+                                            <button className="flex items-center gap-2 px-4 py-2 bg-secondary_color text-white rounded-lg hover:bg-secondary_color/90 transition-colors shadow-lg shadow-secondary_color/20">
+                                                <FiFileText className="w-4 h-4" />
+                                                <span>Upload Additional Docs</span>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-
-                        {filteredApplications.length === 0 && (
-                            <div className="text-center py-12">
-                                <div className="text-gray-400 mb-4">
-                                    <FiFileText className="w-16 h-16 mx-auto" />
-                                </div>
-                                <h3 className="text-lg font-medium text-gray-600 mb-2">No applications found</h3>
-                                <p className="text-gray-500">There are no applications matching your current filter.</p>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    ))}
                 </div>
+
+                {filteredApplications.length === 0 && (
+                    <div className="text-center py-16 default_bg rounded-2xl border border-primary_color/10">
+                        <div className="text-primary_color/30 mb-4">
+                            <FiFileText className="w-20 h-20 mx-auto" />
+                        </div>
+                        <h3 className="text-xl font-bold text-primary_color mb-2">No applications found</h3>
+                        <p className="text-primary_color/60">There are no applications matching your current filter.</p>
+                    </div>
+                )}
             </div>
- 
+        </>
     )
 }
 

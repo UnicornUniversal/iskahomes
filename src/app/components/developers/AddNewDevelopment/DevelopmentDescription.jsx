@@ -1,9 +1,16 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { cn } from '@/lib/utils'
+import ConfirmModal from '../../ui/ConfirmModal'
+import { toast } from 'react-toastify'
 
-const DevelopmentDescription = ({ formData, updateFormData, isEditMode }) => {
+const DevelopmentDescription = ({ formData, updateFormData, isEditMode, developmentId }) => {
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [pendingStatus, setPendingStatus] = useState(null)
+  const [previousStatus, setPreviousStatus] = useState(formData.status || '')
+  const [isProcessing, setIsProcessing] = useState(false)
+
   const statusOptions = [
     'Planning',
     'Under Construction',
@@ -13,10 +20,88 @@ const DevelopmentDescription = ({ formData, updateFormData, isEditMode }) => {
     'Sold Out'
   ]
 
-  const handleInputChange = (field, value) => {
+  useEffect(() => {
+    // Track previous status
+    if (formData.status !== previousStatus) {
+      setPreviousStatus(formData.status || '')
+    }
+  }, [formData.status, previousStatus])
+
+  const handleInputChange = async (field, value) => {
+    // If status is changing to "Sold Out", show confirmation modal
+    if (field === 'status' && value === 'Sold Out' && formData.status !== 'Sold Out' && isEditMode && developmentId) {
+      setPendingStatus(value)
+      setShowConfirmModal(true)
+    } else {
+      updateFormData({
+        [field]: value
+      })
+    }
+  }
+
+  const handleConfirmSoldOut = async () => {
+    if (!developmentId) {
+      toast.error('Development ID is required')
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const token = localStorage.getItem('developer_token')
+      const response = await fetch(`/api/developments/${developmentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: 'Sold Out'
+        })
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        // Update form data with new status
+        updateFormData({
+          status: 'Sold Out'
+        })
+        
+        const listingsUpdated = result.listingsUpdated || 0
+        const salesCreated = result.salesCreated || 0
+        
+        toast.success(
+          `Successfully marked development as Sold Out. ${listingsUpdated} listings updated, ${salesCreated} sales records created.`,
+          { autoClose: 5000 }
+        )
+      } else {
+        toast.error(result.error || 'Failed to mark development as Sold Out')
+        // Revert status on error
+        updateFormData({
+          status: previousStatus
+        })
+      }
+    } catch (error) {
+      console.error('Error marking development as sold out:', error)
+      toast.error('Error marking development as Sold Out. Please try again.')
+      // Revert status on error
+      updateFormData({
+        status: previousStatus
+      })
+    } finally {
+      setIsProcessing(false)
+      setShowConfirmModal(false)
+      setPendingStatus(null)
+    }
+  }
+
+  const handleCancelSoldOut = () => {
+    // Revert status to previous value
     updateFormData({
-      [field]: value
-    });
+      status: previousStatus
+    })
+    setShowConfirmModal(false)
+    setPendingStatus(null)
   }
 
   return (
@@ -127,6 +212,18 @@ const DevelopmentDescription = ({ formData, updateFormData, isEditMode }) => {
         </div>
 
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showConfirmModal}
+        onClose={handleCancelSoldOut}
+        onConfirm={handleConfirmSoldOut}
+        title="Mark Development as Sold Out"
+        message="Are you sure you want to mark this development as Sold Out? This will update all available listings in this development to either 'Sold Out' (for sale listings) or 'Rented Out' (for rent listings), create sales records, and update revenue statistics. This action cannot be easily undone."
+        confirmText={isProcessing ? "Processing..." : "Yes, Mark as Sold Out"}
+        cancelText="Cancel"
+        variant="warning"
+      />
     </div>
   )
 }

@@ -12,7 +12,7 @@ import { iskaServices } from '../Data/StaticData'
 
 const SimpleServices = () => {
   return (
-    <div className="w-full sticky top-0 ">
+    <div className="w-full   ">
       <div className="bg-white/40 rouded-t-lg p-4 ">
         <h5 className="text-[1em]">Get In Touch With Our Services</h5>
       </div>
@@ -37,7 +37,7 @@ const SimpleServices = () => {
           const IconComponent = service.icon
           return (
             <SwiperSlide key={service.id}>
-              <div className="relative w-full h-96 md:h-[400px] overflow-hidden">
+              <div className="relative w-full h-96 md:h-[450px] overflow-hidden">
                 <Image
                   src={service.image}
                   alt={service.title}

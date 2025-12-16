@@ -54,7 +54,6 @@ const PropertyAnalytics = () => {
   const params = useParams()
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
-  const [timeRange, setTimeRange] = useState('30d')
 
   // Dummy property analytics data based on listing_analytics schema
   const propertyData = {
@@ -144,9 +143,17 @@ const PropertyAnalytics = () => {
   }
 
   // Calculate conversion rate from real data
+  // Use unique_leads + anonymous_leads instead of total_leads (which counts actions, not individuals)
   const totalViews = user?.profile?.total_views || 0
-  const totalLeads = user?.profile?.total_leads || 0
-  const conversionRate = totalViews > 0 ? ((totalLeads / totalViews) * 100).toFixed(1) : 0
+  const totalUniqueLeads = user?.profile?.total_unique_leads || 0 // Aggregate across all contexts
+  const totalAnonymousLeads = user?.profile?.total_anonymous_leads || 0 // Aggregate across all contexts
+  const totalLeads = totalUniqueLeads + totalAnonymousLeads // Total unique individuals
+  // Fallback to profile-specific if aggregate not available
+  const profileUniqueLeads = user?.profile?.unique_leads || 0
+  const profileAnonymousLeads = user?.profile?.anonymous_leads || 0
+  const profileTotalLeads = profileUniqueLeads + profileAnonymousLeads
+  const finalTotalLeads = totalLeads > 0 ? totalLeads : (profileTotalLeads > 0 ? profileTotalLeads : (user?.profile?.total_leads || 0))
+  const conversionRate = totalViews > 0 ? ((finalTotalLeads / totalViews) * 100).toFixed(1) : 0
 
   // Get real data from user profile
   const totalUnits = user?.profile?.total_units || 0
@@ -177,24 +184,6 @@ const PropertyAnalytics = () => {
           <p className="text-gray-600">Track views, engagement, and performance metrics for your listings</p>
         </div>
 
-        {/* Time Range Selector */}
-        <div className="mb-6">
-          <div className="flex space-x-2">
-            {['7d', '30d', '90d', '1y'].map((range) => (
-              <button
-                key={range}
-                onClick={() => setTimeRange(range)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                  timeRange === range
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                {range}
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* Overview Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
@@ -230,10 +219,7 @@ const PropertyAnalytics = () => {
         </div>
 
        
-{/* Statistics View */}
-        <StatisticsView />
-<ListingsByLocation />
-<DevelopmentStats />
+
         {/* Monthly Property Views (Chart) */}
         {/* <div className="bg-white rounded-lg shadow p-6 mb-8">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Property Views</h3>
@@ -271,9 +257,15 @@ const PropertyAnalytics = () => {
 
 </div> */}
 
+<div className="flex flex-col gap-[1em]">
 
 
 
+
+{/* Statistics View */}
+<StatisticsView />
+<ListingsByLocation />
+<DevelopmentStats />
 
 
 {/* Property Breakdown Components */}
@@ -287,7 +279,7 @@ const PropertyAnalytics = () => {
         <PopularListings />
         <TopDevelopments />
 
-
+        </div>
 
 
         {/* Properties Performance Table */}

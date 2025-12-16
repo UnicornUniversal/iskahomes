@@ -76,13 +76,13 @@ const HomeSeekerBookings = () => {
     const getStatusColor = (status) => {
         switch (status) {
             case 'confirmed':
-                return 'bg-green-100 text-green-800'
+                return 'bg-primary_color/10 text-primary_color border-primary_color/20'
             case 'pending':
-                return 'bg-yellow-100 text-yellow-800'
+                return 'bg-secondary_color/10 text-secondary_color border-secondary_color/20'
             case 'cancelled':
-                return 'bg-red-100 text-red-800'
+                return 'bg-red-100 text-red-800 border-red-200'
             default:
-                return 'bg-gray-100 text-gray-800'
+                return 'bg-gray-100 text-gray-800 border-gray-200'
         }
     }
 
@@ -116,276 +116,322 @@ const HomeSeekerBookings = () => {
 
     return (
         <>
-            <div className=" w-full">
-                <HomeSeekerHeader />
-                
-                <div className="mt-4">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-bold text-gray-800">My Appointments</h2>
-                        <div className="flex space-x-2">
-                            {['all', 'confirmed', 'pending', 'cancelled'].map((filter) => (
-                                <button
-                                    key={filter}
-                                    onClick={() => setActiveFilter(filter)}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                                        activeFilter === filter
-                                            ? 'bg-primary_color text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
-                                >
-                                    {filter.charAt(0).toUpperCase() + filter.slice(1)}
-                                </button>
-                            ))}
-                        </div>
+            <HomeSeekerHeader />
+            
+            <div className="mt-6 lg:mt-8">
+                {/* Page Header */}
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+                    <div>
+                        <h2 className="text-2xl lg:text-3xl font-bold text-primary_color mb-2 flex items-center gap-3">
+                            <div className="p-2 bg-secondary_color/10 rounded-lg">
+                                <FiCalendar className="w-6 h-6 text-secondary_color" />
+                            </div>
+                            My Appointments
+                        </h2>
+                        <p className="text-primary_color/60 text-sm">Manage your property visits</p>
                     </div>
+                    <div className="flex flex-wrap gap-2">
+                        {['all', 'confirmed', 'pending', 'cancelled'].map((filter) => (
+                            <button
+                                key={filter}
+                                onClick={() => setActiveFilter(filter)}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                                    activeFilter === filter
+                                        ? 'bg-primary_color text-white shadow-lg shadow-primary_color/20'
+                                        : 'default_bg text-primary_color hover:bg-primary_color/10 border border-primary_color/10'
+                                }`}
+                            >
+                                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                            </button>
+                        ))}
+                    </div>
+                </div>
 
-                    <div className="space-y-3">
-                        {loading ? (
-                            <div className="text-center py-12">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary_color mx-auto mb-4"></div>
-                                <p className="text-gray-600">Loading appointments...</p>
+                <div className="space-y-4">
+                    {loading ? (
+                        <div className="text-center py-16">
+                            <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary_color/20 border-t-primary_color mx-auto mb-4"></div>
+                            <p className="text-primary_color/70 font-medium">Loading appointments...</p>
+                        </div>
+                    ) : error ? (
+                        <div className="text-center py-16 default_bg rounded-2xl border border-primary_color/10">
+                            <div className="text-red-400 mb-4">
+                                <FiCalendar className="w-20 h-20 mx-auto" />
                             </div>
-                        ) : error ? (
-                            <div className="text-center py-12">
-                                <div className="text-red-400 mb-4">
-                                    <FiCalendar className="w-16 h-16 mx-auto" />
-                                </div>
-                                <h3 className="text-lg font-medium text-red-600 mb-2">Error loading appointments</h3>
-                                <p className="text-gray-500">{error}</p>
+                            <h3 className="text-xl font-bold text-red-600 mb-2">Error loading appointments</h3>
+                            <p className="text-primary_color/60">{error}</p>
+                        </div>
+                    ) : filteredAppointments.length === 0 ? (
+                        <div className="text-center py-16 default_bg rounded-2xl border border-primary_color/10">
+                            <div className="text-primary_color/30 mb-4">
+                                <FiCalendar className="w-20 h-20 mx-auto" />
                             </div>
-                        ) : filteredAppointments.length === 0 ? (
-                            <div className="text-center py-12">
-                                <div className="text-gray-400 mb-4">
-                                    <FiCalendar className="w-16 h-16 mx-auto" />
-                                </div>
-                                <h3 className="text-lg font-medium text-gray-600 mb-2">No appointments found</h3>
-                                <p className="text-gray-500">
-                                    {appointments.length === 0 
-                                        ? "You haven't booked any appointments yet. Start exploring properties to schedule visits!"
-                                        : "Try adjusting your filters to find what you're looking for."
+                            <h3 className="text-xl font-bold text-primary_color mb-2">No appointments found</h3>
+                            <p className="text-primary_color/60 max-w-md mx-auto">
+                                {appointments.length === 0 
+                                    ? "You haven't booked any appointments yet. Start exploring properties to schedule visits!"
+                                    : "Try adjusting your filters to find what you're looking for."
+                                }
+                            </p>
+                        </div>
+                    ) : (
+                        filteredAppointments.map((appointment) => {
+                            const listing = appointment.listings
+                            
+                            // Extract image from media
+                            const getMainImage = () => {
+                              if (!listing?.media) return null
+                              
+                              try {
+                                const media = typeof listing.media === 'string' 
+                                  ? JSON.parse(listing.media) 
+                                  : listing.media
+                                
+                                if (!media || typeof media !== 'object') return null
+                                
+                                if (media.albums && Array.isArray(media.albums) && media.albums.length > 0) {
+                                  for (const album of media.albums) {
+                                    if (album?.images && Array.isArray(album.images) && album.images.length > 0) {
+                                      return album.images[0].url
                                     }
-                                </p>
-                            </div>
-                            ) : (
-                                filteredAppointments.map((appointment) => {
-                                    const listing = appointment.listings
-                                    const mainImage = listing?.media?.mediaFiles?.[0]?.url || listing?.media?.banner?.url
-                                    const isExpanded = expandedCards[appointment.id] || false
-                                    
-                                    return (
-                                        <div key={appointment.id} className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-                                            {/* Main Card Header - Always Visible */}
-                                            <div className="p-4">
-                                                <div className="flex items-start gap-4">
-                                                    {/* Property Image - Smaller */}
-                                                    <div className="w-20 h-20 flex-shrink-0">
-                                                        {mainImage ? (
-                                                            <img
-                                                                src={mainImage}
-                                                                alt={listing?.title}
-                                                                className="w-full h-full object-cover rounded-lg"
-                                                            />
-                                                        ) : (
-                                                            <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                                                                <div className="text-white text-lg font-bold">
-                                                                    {listing?.title?.charAt(0) || 'P'}
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Main Info */}
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex justify-between items-start mb-2">
-                                                            <h3 className="text-lg font-semibold text-gray-800 truncate">
-                                                                {listing?.title}
-                                                            </h3>
-                                                            <div className="flex items-center space-x-2 ml-2">
-                                                                {getStatusIcon(appointment.status)}
-                                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
-                                                                    {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-                                                                </span>
-                                                            </div>
+                                  }
+                                }
+                                
+                                if (media.mediaFiles && Array.isArray(media.mediaFiles) && media.mediaFiles.length > 0) {
+                                  return media.mediaFiles[0].url
+                                }
+                                
+                                if (media.banner?.url) {
+                                  return media.banner.url
+                                }
+                                
+                                return null
+                              } catch (err) {
+                                return null
+                              }
+                            }
+                            
+                            const mainImage = getMainImage()
+                            const isExpanded = expandedCards[appointment.id] || false
+                            
+                            return (
+                                <div key={appointment.id} className="default_bg rounded-2xl shadow-lg border border-primary_color/10 overflow-hidden hover:shadow-xl transition-all duration-300">
+                                    {/* Main Card Header - Always Visible */}
+                                    <div className="p-4 lg:p-6">
+                                        <div className="flex items-start gap-4">
+                                            {/* Property Image */}
+                                            <div className="w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden border-2 border-primary_color/10">
+                                                {mainImage ? (
+                                                    <img
+                                                        src={mainImage}
+                                                        alt={listing?.title}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full bg-gradient-to-br from-primary_color to-secondary_color flex items-center justify-center">
+                                                        <div className="text-white text-xl font-bold">
+                                                            {listing?.title?.charAt(0) || 'P'}
                                                         </div>
-                                                        
-                                                        <p className="text-sm text-gray-600 flex items-center mb-1">
-                                                            <FiMapPin className="w-3 h-3 mr-1" />
-                                                            {listing?.full_address || `${listing?.city}, ${listing?.state}`}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Main Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-3">
+                                                    <div className="flex-1">
+                                                        <h3 className="text-lg font-bold text-primary_color mb-1.5 truncate">
+                                                            {listing?.title}
+                                                        </h3>
+                                                        <p className="text-sm text-primary_color/70 flex items-center mb-1">
+                                                            <FiMapPin className="w-3 h-3 mr-1.5 flex-shrink-0" />
+                                                            <span className="truncate">{listing?.full_address || `${listing?.city}, ${listing?.state}`}</span>
                                                         </p>
-                                                        
-                                                        <p className="text-sm text-gray-500 mb-2">
+                                                        <p className="text-base font-bold text-secondary_color">
                                                             {listing?.currency} {parseFloat(listing?.price || 0).toLocaleString()}
                                                             {listing?.price_type === 'rent' && `/${listing?.duration}`}
                                                         </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                                        {getStatusIcon(appointment.status)}
+                                                        <span className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${getStatusColor(appointment.status)}`}>
+                                                            {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+                                                        </span>
+                                                    </div>
+                                                </div>
 
-                                                        {/* Quick Info Row */}
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex items-center gap-4 text-sm text-gray-600">
-                                                                <div className="flex items-center gap-1">
-                                                                    <FiCalendar className="w-3 h-3" />
-                                                                    <span>{new Date(appointment.appointment_date).toLocaleDateString()}</span>
-                                                                </div>
-                                                                <div className="flex items-center gap-1">
-                                                                    <FiClock className="w-3 h-3" />
-                                                                    <span>{appointment.appointment_time}</span>
-                                                                </div>
-                                                                <div className="flex items-center gap-1">
-                                                                    <FiMapPin className="w-3 h-3" />
-                                                                    <span className="capitalize">{appointment.appointment_type}</span>
-                                                                </div>
+                                                {/* Quick Info Row */}
+                                                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-primary_color/10">
+                                                    <div className="flex flex-wrap items-center gap-4 text-sm text-primary_color/70">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className="p-1 bg-primary_color/10 rounded">
+                                                                <FiCalendar className="w-3 h-3 text-primary_color" />
                                                             </div>
-                                                            
-                                                            {/* Quick Message Button */}
-                                                            <button
-                                                                onClick={() => handleMessageOwner(appointment)}
-                                                                className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors text-xs"
-                                                            >
-                                                                <FiMessageSquare className="w-3 h-3" />
-                                                                <span>Message</span>
-                                                            </button>
+                                                            <span className="font-medium">{new Date(appointment.appointment_date).toLocaleDateString()}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className="p-1 bg-primary_color/10 rounded">
+                                                                <FiClock className="w-3 h-3 text-primary_color" />
+                                                            </div>
+                                                            <span className="font-medium">{appointment.appointment_time}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className="p-1 bg-primary_color/10 rounded">
+                                                                <FiMapPin className="w-3 h-3 text-primary_color" />
+                                                            </div>
+                                                            <span className="font-medium capitalize">{appointment.appointment_type}</span>
                                                         </div>
                                                     </div>
-
-                                                    {/* Expand/Collapse Button */}
-                                                    <button
-                                                        onClick={() => toggleCardExpansion(appointment.id)}
-                                                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                                                    >
-                                                        {isExpanded ? (
-                                                            <FiChevronUp className="w-5 h-5 text-gray-500" />
-                                                        ) : (
-                                                            <FiChevronDown className="w-5 h-5 text-gray-500" />
-                                                        )}
-                                                    </button>
+                                                    
+                                                    <div className="flex items-center gap-2">
+                                                        {/* Quick Message Button */}
+                                                        <button
+                                                            onClick={() => handleMessageOwner(appointment)}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary_color/10 text-primary_color rounded-lg hover:bg-primary_color/20 transition-colors text-xs font-medium"
+                                                        >
+                                                            <FiMessageSquare className="w-3 h-3" />
+                                                            <span>Message</span>
+                                                        </button>
+                                                        
+                                                        {/* Expand/Collapse Button */}
+                                                        <button
+                                                            onClick={() => toggleCardExpansion(appointment.id)}
+                                                            className="p-2 hover:bg-primary_color/10 rounded-lg transition-colors"
+                                                        >
+                                                            {isExpanded ? (
+                                                                <FiChevronUp className="w-5 h-5 text-primary_color" />
+                                                            ) : (
+                                                                <FiChevronDown className="w-5 h-5 text-primary_color" />
+                                                            )}
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
+                                        </div>
+                                    </div>
 
-                                            {/* Expandable Content */}
-                                            {isExpanded && (
-                                                <div className="border-t border-gray-100 p-4 bg-gray-50">
-                                                    <div className="space-y-4">
-                                                        {/* Detailed Appointment Info */}
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                            <div className="flex items-center space-x-3">
-                                                                <FiMapPin className="w-4 h-4 text-blue-600" />
-                                                                <div>
-                                                                    <p className="text-xs text-gray-500">Meeting Location</p>
-                                                                    <p className="text-sm font-medium">{appointment.meeting_location}</p>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center space-x-3">
-                                                                <FiClock className="w-4 h-4 text-blue-600" />
-                                                                <div>
-                                                                    <p className="text-xs text-gray-500">Duration</p>
-                                                                    <p className="text-sm font-medium">{appointment.duration} minutes</p>
-                                                                </div>
-                                                            </div>
+                                    {/* Expandable Content */}
+                                    {isExpanded && (
+                                        <div className="border-t border-primary_color/10 p-4 lg:p-6 bg-primary_color/5">
+                                            <div className="space-y-4">
+                                                {/* Detailed Appointment Info */}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div className="flex items-center gap-3 default_bg p-3 rounded-xl border border-primary_color/10">
+                                                        <div className="p-2 bg-primary_color/10 rounded-lg">
+                                                            <FiMapPin className="w-4 h-4 text-primary_color" />
                                                         </div>
-
-                                                        {/* Client Information Accordion */}
-                                                        <div className="bg-white rounded-lg p-3">
-                                                            <h4 className="text-sm font-medium text-gray-800 mb-2">Your Information</h4>
-                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                                                <div className="flex items-center space-x-2">
-                                                                    <FiUser className="w-3 h-3 text-gray-600" />
-                                                                    <span className="text-xs">{appointment.client_name}</span>
-                                                                </div>
-                                                                <div className="flex items-center space-x-2">
-                                                                    <FiPhone className="w-3 h-3 text-gray-600" />
-                                                                    <span className="text-xs">{appointment.client_phone}</span>
-                                                                </div>
-                                                                <div className="flex items-center space-x-2">
-                                                                    <FiMail className="w-3 h-3 text-gray-600" />
-                                                                    <span className="text-xs">{appointment.client_email}</span>
-                                                                </div>
-                                                            </div>
+                                                        <div>
+                                                            <p className="text-xs text-primary_color/60 font-medium">Meeting Location</p>
+                                                            <p className="text-sm font-bold text-primary_color">{appointment.meeting_location}</p>
                                                         </div>
-
-                                                        {/* Notes Accordion */}
-                                                        {appointment.notes && (
-                                                            <div className="bg-blue-50 rounded-lg p-3">
-                                                                <h4 className="text-sm font-medium text-blue-800 mb-1">Notes</h4>
-                                                                <p className="text-xs text-blue-700">{appointment.notes}</p>
-                                                            </div>
-                                                        )}
-
-                                                        {/* Actions */}
-                                                        <div className="flex space-x-2 pt-2">
-                                                            {/* Message Owner Button - Always visible */}
-                                                            <button
-                                                                onClick={() => handleMessageOwner(appointment)}
-                                                                className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
-                                                            >
-                                                                <FiMessageSquare className="w-3 h-3" />
-                                                                <span>Message Owner</span>
-                                                            </button>
-
-                                                            {appointment.status === 'pending' && (
-                                                                <button
-                                                                    onClick={() => handleReschedule(appointment)}
-                                                                    className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                                                                >
-                                                                    <FiEdit className="w-3 h-3" />
-                                                                    <span>Reschedule</span>
-                                                                </button>
-                                                            )}
-                                                            {appointment.status === 'confirmed' && (
-                                                                <button className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm">
-                                                                    <FiCheckCircle className="w-3 h-3" />
-                                                                    <span>Confirmed</span>
-                                                                </button>
-                                                            )}
-                                                            {appointment.status === 'cancelled' && (
-                                                                <button className="flex items-center space-x-2 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm">
-                                                                    <FiXCircle className="w-3 h-3" />
-                                                                    <span>Cancelled</span>
-                                                                </button>
-                                                            )}
+                                                    </div>
+                                                    <div className="flex items-center gap-3 default_bg p-3 rounded-xl border border-primary_color/10">
+                                                        <div className="p-2 bg-primary_color/10 rounded-lg">
+                                                            <FiClock className="w-4 h-4 text-primary_color" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs text-primary_color/60 font-medium">Duration</p>
+                                                            <p className="text-sm font-bold text-primary_color">{appointment.duration} minutes</p>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            )}
+
+                                                {/* Client Information */}
+                                                <div className="default_bg rounded-xl p-4 border border-primary_color/10">
+                                                    <h4 className="text-sm font-bold text-primary_color mb-3 flex items-center gap-2">
+                                                        <div className="w-1 h-4 bg-primary_color rounded-full"></div>
+                                                        Your Information
+                                                    </h4>
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <FiUser className="w-4 h-4 text-primary_color/60" />
+                                                            <span className="text-sm text-primary_color/80">{appointment.client_name}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <FiPhone className="w-4 h-4 text-primary_color/60" />
+                                                            <span className="text-sm text-primary_color/80">{appointment.client_phone}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <FiMail className="w-4 h-4 text-primary_color/60" />
+                                                            <span className="text-sm text-primary_color/80 truncate">{appointment.client_email}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Notes */}
+                                                {appointment.notes && (
+                                                    <div className="default_bg rounded-xl p-4 border border-secondary_color/20 bg-secondary_color/5">
+                                                        <h4 className="text-sm font-bold text-primary_color mb-2 flex items-center gap-2">
+                                                            <div className="w-1 h-4 bg-secondary_color rounded-full"></div>
+                                                            Notes
+                                                        </h4>
+                                                        <p className="text-sm text-primary_color/80">{appointment.notes}</p>
+                                                    </div>
+                                                )}
+
+                                                {/* Actions */}
+                                                <div className="flex flex-wrap gap-3 pt-2">
+                                                    <button
+                                                        onClick={() => handleMessageOwner(appointment)}
+                                                        className="flex items-center gap-2 px-4 py-2 bg-primary_color text-white rounded-lg hover:bg-primary_color/90 transition-colors text-sm font-medium shadow-lg shadow-primary_color/20"
+                                                    >
+                                                        <FiMessageSquare className="w-4 h-4" />
+                                                        <span>Message Owner</span>
+                                                    </button>
+
+                                                    {appointment.status === 'pending' && (
+                                                        <button
+                                                            onClick={() => handleReschedule(appointment)}
+                                                            className="flex items-center gap-2 px-4 py-2 bg-secondary_color text-white rounded-lg hover:bg-secondary_color/90 transition-colors text-sm font-medium shadow-lg shadow-secondary_color/20"
+                                                        >
+                                                            <FiEdit className="w-4 h-4" />
+                                                            <span>Reschedule</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
-                                    )
-                                })
-                            )}
-                    </div>
+                                    )}
+                                </div>
+                            )
+                        })
+                    )}
                 </div>
             </div>
 
             {/* Reschedule Modal */}
             {showRescheduleModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
-                        <h3 className="text-lg font-bold text-gray-800 mb-4">Reschedule Appointment</h3>
+                    <div className="default_bg rounded-2xl shadow-2xl max-w-md w-full p-6 border border-primary_color/10">
+                        <h3 className="text-xl font-bold text-primary_color mb-6">Reschedule Appointment</h3>
                         
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">New Date</label>
+                                <label className="block text-sm font-medium text-primary_color mb-2">New Date</label>
                                 <input
                                     type="date"
                                     value={newDate}
                                     onChange={(e) => setNewDate(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent"
+                                    className="w-full px-4 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color"
                                 />
                             </div>
                             
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">New Time</label>
+                                <label className="block text-sm font-medium text-primary_color mb-2">New Time</label>
                                 <input
                                     type="time"
                                     value={newTime}
                                     onChange={(e) => setNewTime(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent"
+                                    className="w-full px-4 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Meeting Type</label>
+                                <label className="block text-sm font-medium text-primary_color mb-2">Meeting Type</label>
                                 <select
                                     value={newMeetingType}
                                     onChange={(e) => setNewMeetingType(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent"
+                                    className="w-full px-4 py-3 border border-primary_color/20 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none default_bg text-primary_color"
                                 >
                                     <option value="in-person">In-Person</option>
                                     <option value="virtual">Virtual</option>
@@ -393,16 +439,16 @@ const HomeSeekerBookings = () => {
                             </div>
                         </div>
 
-                        <div className="flex space-x-3 mt-6">
+                        <div className="flex gap-3 mt-6">
                             <button
                                 onClick={handleRescheduleSubmit}
-                                className="flex-1 px-4 py-2 bg-primary_color text-white rounded-lg hover:bg-primary_color/90 transition-colors"
+                                className="flex-1 px-4 py-3 bg-primary_color text-white rounded-xl hover:bg-primary_color/90 transition-colors font-medium shadow-lg shadow-primary_color/20"
                             >
                                 Reschedule
                             </button>
                             <button
                                 onClick={() => setShowRescheduleModal(false)}
-                                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                                className="flex-1 px-4 py-3 default_bg text-primary_color rounded-xl hover:bg-primary_color/10 transition-colors font-medium border border-primary_color/10"
                             >
                                 Cancel
                             </button>

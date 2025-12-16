@@ -18,7 +18,6 @@ import {
 const MarketAnalytics = () => {
   const params = useParams()
   const [loading, setLoading] = useState(true)
-  const [timeRange, setTimeRange] = useState('30d')
 
   // Dummy data for market analytics
   const marketData = {
@@ -208,24 +207,6 @@ const MarketAnalytics = () => {
           <p className="text-gray-600">Market trends, competitive analysis, and industry insights</p>
         </div>
 
-        {/* Time Range Selector */}
-        <div className="mb-6">
-          <div className="flex space-x-2">
-            {['7d', '30d', '90d', '1y'].map((range) => (
-              <button
-                key={range}
-                onClick={() => setTimeRange(range)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                  timeRange === range
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                {range}
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* Overview Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

@@ -191,8 +191,12 @@ ON user_analytics(user_id);
 -- Function 7: Get cumulative leads breakdown for developers
 -- Aggregates all leads from leads table (expands lead_actions JSONB array) and calculates percentages in SQL
 -- Returns: JSONB-ready structure with totals and percentages per developer
--- Now properly breaks down lead_message by message_type (direct_message, whatsapp, email)
--- Drop the old function first since we're changing the return type
+-- HYBRID APPROACH: Now includes leads from ALL contexts (profile + listings + developments)
+-- This aggregates leads across:
+--   - Profile leads (lister_id = developer_id, context_type = 'profile')
+--   - Listing leads (where listing.user_id = developer_id)
+--   - Development leads (where development.developer_id = developer_id)
+-- Drop the old function first since we're changing the logic
 DROP FUNCTION IF EXISTS get_developer_leads_breakdown(uuid[]);
 CREATE OR REPLACE FUNCTION get_developer_leads_breakdown(developer_ids UUID[])
 RETURNS TABLE (
@@ -213,17 +217,61 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
   RETURN QUERY
-  WITH lead_actions_expanded AS (
-    SELECT
-      l.lister_id,
-      jsonb_array_elements(l.lead_actions) AS action
+  WITH developer_listings AS (
+    -- Get all listing IDs owned by these developers
+    SELECT id, user_id AS developer_id
+    FROM listings
+    WHERE user_id = ANY(developer_ids)
+      AND account_type = 'developer'
+  ),
+  developer_developments AS (
+    -- Get all development IDs owned by these developers
+    SELECT id, developer_id
+    FROM developments
+    WHERE developer_id = ANY(developer_ids)
+  ),
+  all_relevant_leads AS (
+    -- Get all leads that belong to these developers across ALL contexts
+    -- Map each lead to its developer_id
+    SELECT 
+      l.id,
+      l.lead_actions,
+      -- Map to developer_id based on context
+      COALESCE(
+        -- Profile leads: lister_id is the developer_id
+        CASE WHEN l.lister_type = 'developer' AND l.context_type = 'profile' AND l.lister_id = ANY(developer_ids) 
+          THEN l.lister_id 
+          ELSE NULL 
+        END,
+        -- Listing leads: get developer_id from listing
+        (SELECT dl.developer_id FROM developer_listings dl WHERE dl.id = l.listing_id),
+        -- Development leads: get developer_id from development (handle text to UUID)
+        (SELECT dd.developer_id FROM developer_developments dd WHERE dd.id::text = l.development_id::text)
+      ) AS developer_id
     FROM leads l
-    WHERE l.lister_type = 'developer'
-      AND l.lister_id = ANY(developer_ids)
+    WHERE (
+      -- Profile leads: direct profile interactions
+      (l.lister_type = 'developer' AND l.lister_id = ANY(developer_ids) AND l.context_type = 'profile')
+      OR
+      -- Listing leads: leads on listings owned by these developers
+      (l.listing_id IN (SELECT id FROM developer_listings) AND l.context_type = 'listing')
+      OR
+      -- Development leads: leads on developments owned by these developers
+      (l.development_id IS NOT NULL 
+       AND l.development_id::text IN (SELECT id::text FROM developer_developments) 
+       AND l.context_type = 'development')
+    )
+  ),
+  lead_actions_expanded AS (
+    SELECT
+      arl.developer_id,
+      jsonb_array_elements(arl.lead_actions) AS action
+    FROM all_relevant_leads arl
+    WHERE arl.developer_id IS NOT NULL
   ),
   lead_types AS (
     SELECT
-      lister_id,
+      developer_id,
       -- Phone leads
       CASE WHEN (action->>'action_type') = 'lead_phone' THEN 1 ELSE 0 END AS is_phone,
       -- Message leads - break down by message_type
@@ -253,7 +301,7 @@ BEGIN
   ),
   aggregated AS (
     SELECT
-      lister_id,
+      developer_id,
       COALESCE(SUM(is_phone), 0)::BIGINT AS phone_leads,
       COALESCE(SUM(is_whatsapp), 0)::BIGINT AS whatsapp_leads,
       COALESCE(SUM(is_direct_message), 0)::BIGINT AS direct_message_leads,
@@ -263,10 +311,11 @@ BEGIN
       COALESCE(SUM(is_website), 0)::BIGINT AS website_leads,
       COALESCE(SUM(is_phone + is_whatsapp + is_direct_message + is_email_from_message + is_email_legacy + is_appointment + is_website), 0)::BIGINT AS total_actions
     FROM lead_types
-    GROUP BY lister_id
+    WHERE developer_id IS NOT NULL
+    GROUP BY developer_id
   )
   SELECT
-    a.lister_id AS user_id,
+    a.developer_id AS user_id,
     a.total_actions AS total_leads,
     a.phone_leads,
     CASE 
@@ -298,7 +347,8 @@ BEGIN
       WHEN a.total_actions = 0 THEN 0
       ELSE ROUND((a.website_leads * 100.0 / a.total_actions), 2)
     END AS website_percentage
-  FROM aggregated a;
+  FROM aggregated a
+  WHERE a.developer_id = ANY(developer_ids);
 END;
 $$ LANGUAGE plpgsql;
 

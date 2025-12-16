@@ -510,15 +510,15 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
 
   if (!selectedChatId) {
     return (
-      <div className="flex-1 flex items-center min-h-screen h-full justify-center bg-gray-50 rounded-xl shadow-sm">
+      <div className="flex-1 flex items-center h-full justify-center default_bg rounded-xl">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">
-            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-16 h-16 bg-primary_color/10 rounded-full mx-auto mb-4 flex items-center justify-center">
+            <svg className="w-8 h-8 text-primary_color" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Select a conversation</h3>
-          <p className="text-gray-500">Choose a chat from the list to start messaging</p>
+          <h3 className="text-lg font-bold text-primary_color mb-2">Select a conversation</h3>
+          <p className="text-primary_color/60">Choose a chat from the list to start messaging</p>
         </div>
       </div>
     );
@@ -526,16 +526,16 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
 
   if (loading && messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-white rounded-xl shadow-sm">
-        <p className="text-gray-500">Loading messages...</p>
+      <div className="flex-1 flex items-center justify-center default_bg rounded-xl h-full">
+        <p className="text-primary_color/60">Loading messages...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-screen w-full bg-white rounded-xl shadow-sm border border-gray-100">
+    <div className="flex flex-col h-full w-full default_bg rounded-xl shadow-lg border border-primary_color/10">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50 rounded-t-xl">
+      <div className="flex items-center justify-between p-4 border-b border-primary_color/10 default_bg rounded-t-xl flex-shrink-0">
         <div className="flex items-center min-w-0">
           <Button 
             variant="ghost" 
@@ -552,16 +552,16 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
             </AvatarFallback>
           </Avatar>
           <div className="ml-3 min-w-0">
-            <h3 className="text-lg font-medium text-gray-900 truncate max-w-xs md:max-w-sm lg:max-w-md">
+            <h3 className="text-lg font-bold text-primary_color truncate max-w-xs md:max-w-sm lg:max-w-md">
               {getOtherUserName()}
             </h3>
-            <p className="text-sm text-gray-500 truncate capitalize">
+            <p className="text-sm text-primary_color/60 truncate capitalize">
               {(conversation?.other_user?.user_type || conversation?.otherUser?.user_type || 'user').replace('_', ' ')}
             </p>
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" className="text-primary_color hover:bg-primary_color/10">
             <MoreVertical className="h-4 w-4" />
           </Button>
         </div>
@@ -569,7 +569,7 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
 
       {/* Messages */}
       <div 
-        className="flex-1 overflow-y-auto p-4" 
+        className="flex-1 overflow-y-auto p-4 default_bg" 
         ref={scrollRef} 
         style={{ minHeight: 0 }}
         onScroll={handleScroll}
@@ -582,13 +582,13 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
                 <div className={`flex max-w-xs md:max-w-md ${i % 2 === 0 ? 'flex-row-reverse' : 'flex-row'}`}>
                   {/* Avatar Skeleton */}
                   {i % 2 !== 0 && (
-                    <div className="h-8 w-8 bg-gray-200 rounded-full mt-1 flex-shrink-0"></div>
+                    <div className="h-8 w-8 bg-primary_color/10 rounded-full mt-1 flex-shrink-0"></div>
                   )}
                   {/* Message Bubble Skeleton */}
-                  <div className={`ml-2 px-4 py-3 rounded-lg ${i % 2 === 0 ? 'bg-gray-200' : 'bg-gray-100'}`}>
-                    <div className="h-4 bg-gray-300 rounded w-48 mb-2"></div>
-                    <div className="h-4 bg-gray-300 rounded w-32 mb-2"></div>
-                    <div className="h-3 bg-gray-300 rounded w-16"></div>
+                  <div className={`ml-2 px-4 py-3 rounded-lg ${i % 2 === 0 ? 'bg-primary_color/10' : 'bg-primary_color/5'}`}>
+                    <div className="h-4 bg-primary_color/20 rounded w-48 mb-2"></div>
+                    <div className="h-4 bg-primary_color/20 rounded w-32 mb-2"></div>
+                    <div className="h-3 bg-primary_color/20 rounded w-16"></div>
                   </div>
                 </div>
               </div>
@@ -596,7 +596,7 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
           </div>
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-gray-500">No messages yet. Start the conversation!</p>
+            <p className="text-primary_color/60">No messages yet. Start the conversation!</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -635,22 +635,22 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
                       </Avatar>
                     )}
                     <div
-                      className={`ml-2 px-4 py-2 rounded-lg message-bubble break-words max-w-[80vw] md:max-w-md lg:max-w-2xl shadow ${
+                      className={`ml-2 px-4 py-2 rounded-lg message-bubble break-words max-w-[80vw] md:max-w-md lg:max-w-2xl shadow-lg ${
                         isMine
-                          ? 'bg-primary_color text-white'
-                          : 'bg-gray-100 text-gray-900'
+                          ? 'bg-primary_color !text-white'
+                          : 'default_bg border border-primary_color/10 text-primary_color'
                       }`}
                       style={{ wordBreak: 'break-word' }}
                     >
                       {!isMine && (
-                        <p className={`text-xs font-medium mb-1 ${'text-gray-600'}`}>
+                        <p className="text-xs font-medium mb-1 text-primary_color/70">
                           {senderName}
                         </p>
                       )}
-                      <p className={`text-sm break-words ${isMine ? '!text-white' : 'text-gray-900'}`}>
+                      <p className={`text-sm break-words ${isMine ? '!text-white' : 'text-primary_color'}`}>
                         {message.message_text}
                       </p>
-                      <p className={`text-xs mt-1 ${isMine ? '!text-white opacity-90' : 'text-gray-500'}`}>
+                      <p className={`text-xs mt-1 ${isMine ? '!text-white opacity-90' : 'text-primary_color/60'}`}>
                         {formatMessageTime(message.created_at)}
                         {message.is_edited && ' (edited)'}
                       </p>
@@ -664,7 +664,7 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
       </div>
 
       {/* Message Input */}
-      <div className="p-4 border-t border-gray-100 bg-gray-50 rounded-b-xl">
+      <div className="p-4 border-t border-primary_color/10 default_bg rounded-b-xl flex-shrink-0">
         <div className="flex items-center space-x-2">
           <Input
             placeholder="Type a message..."

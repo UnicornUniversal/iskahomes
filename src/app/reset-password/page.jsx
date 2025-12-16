@@ -143,7 +143,7 @@ const ResetPasswordContent = () => {
         
         // Redirect to signin after 3 seconds
         setTimeout(() => {
-          router.push('/signin')
+          router.push('/home/signin')
         }, 3000)
       } else {
         toast.error(result.error || 'Failed to reset password', {

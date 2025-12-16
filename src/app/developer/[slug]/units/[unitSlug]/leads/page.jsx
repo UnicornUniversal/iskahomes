@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import LeadsManagement from '@/app/components/analytics/LeadsManagement'
 import ListingLeadsInsights from '@/app/components/analytics/ListingLeadsInsights'
+import ListingAppointments from '@/app/components/analytics/ListingAppointments'
 
 const ListingLeadsPage = () => {
   const params = useParams()
@@ -70,10 +71,10 @@ const ListingLeadsPage = () => {
   const listerId = user?.profile?.developer_id || user?.id
   const listerType = 'developer'
 
-  if (loading || !unitSlug) {
+  if (loading || !unitSlug || !listingId) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary_color"></div>
       </div>
     )
   }
@@ -81,7 +82,7 @@ const ListingLeadsPage = () => {
   if (metadataError) {
     return (
       <div className="p-6">
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-lg">
+        <div className="border border-yellow-200 text-yellow-800 p-4 rounded-lg">
           <p className="font-medium">Listing unavailable</p>
           <p className="text-sm">{metadataError}</p>
         </div>
@@ -89,9 +90,16 @@ const ListingLeadsPage = () => {
     )
   }
 
+  console.log('🔍 ListingLeadsPage - Rendering with:', {
+    listingId,
+    listerId,
+    listerType
+  })
+
   return (
     <div className="p-6 space-y-6">
       <ListingLeadsInsights listingId={listingId} />
+      <ListingAppointments listingId={listingId} />
       <LeadsManagement 
         listerId={listerId} 
         listerType={listerType}

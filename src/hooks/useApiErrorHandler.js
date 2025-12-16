@@ -16,12 +16,12 @@ export const useApiErrorHandler = () => {
         const errorData = await response?.json();
         if (errorData?.auth_failed || errorData?.error?.includes('Unauthorized') || errorData?.error?.includes('Authentication')) {
           // Auth failure detected - logout and redirect
-          await handleAuthFailure('/signin');
+          await handleAuthFailure('/home/signin');
           return;
         }
       } catch (e) {
         // If we can't parse the error, but it's 401/403, still logout
-        await handleAuthFailure('/signin');
+        await handleAuthFailure('/home/signin');
         return;
       }
     }
@@ -49,7 +49,7 @@ export const fetchWithAuth = async (url, options = {}) => {
           errorData?.error?.includes('Authentication') ||
           errorData?.error?.includes('Token')) {
         // Auth failure - logout and redirect
-        await handleAuthFailure('/signin');
+        await handleAuthFailure('/home/signin');
         return response; // Return the response anyway so caller can handle it
       }
     }

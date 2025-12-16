@@ -35,11 +35,11 @@ const ListingsByLocation = () => {
 
   if (!user) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+      <div className="rounded-lg shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
-            <p className="text-gray-500">Loading location data...</p>
+            <Loader2 className="w-8 h-8 animate-spin text-primary_color mx-auto mb-2" />
+            <p className="text-primary_color">Loading location data...</p>
           </div>
         </div>
       </div>
@@ -48,9 +48,9 @@ const ListingsByLocation = () => {
 
   if (!locationStats) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+      <div className="rounded-lg shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-center h-64">
-          <p className="text-gray-500">No location data available</p>
+          <p className="text-primary_color">No location data available</p>
         </div>
       </div>
     )
@@ -75,12 +75,12 @@ const ListingsByLocation = () => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+    <div className="rounded-lg shadow-sm border border-gray-100 overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+      <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-center gap-2 mb-4">
-          <MapPin className="w-5 h-5 text-blue-600" />
-          <h5 className="text-lg font-semibold text-gray-900">Listings by Location</h5>
+          <MapPin className="w-5 h-5 text-primary_color" />
+          <h5 className="text-lg font-semibold text-primary_color">Listings by Location</h5>
         </div>
 
         {/* Tabs */}
@@ -94,20 +94,19 @@ const ListingsByLocation = () => {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                   activeTab === tab.id
-                    ? 'bg-blue-600 text-white shadow-sm'
+                    ? 'bg-primary_color text-white shadow-sm'
                     : hasData
-                    ? 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    ? 'text-primary_color hover:bg-gray-100 border border-gray-200'
+                    : 'text-primary_color opacity-60 hover:opacity-100 border border-gray-200'
                 }`}
-                disabled={!hasData}
               >
                 <Icon className="w-4 h-4" />
                 <span>{tab.label}</span>
                 {hasData && (
                   <span className={`px-2 py-0.5 rounded-full text-xs ${
                     activeTab === tab.id
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-200 text-gray-700'
+                      ? 'bg-white bg-opacity-20 text-white'
+                      : 'bg-gray-200 text-primary_color'
                   }`}>
                     {tab.data.length}
                   </span>
@@ -122,9 +121,9 @@ const ListingsByLocation = () => {
       <div className="p-6">
         {!activeTabData?.data || activeTabData.data.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <MapPin className="w-12 h-12 text-gray-300 mb-3" />
-            <p className="text-gray-500 font-medium">No {activeTabData?.label.toLowerCase()} data available</p>
-            <p className="text-sm text-gray-400 mt-1">Location statistics will appear here once you have listings</p>
+            <MapPin className="w-12 h-12 text-primary_color opacity-30 mb-3" />
+            <p className="text-primary_color font-medium">No {activeTabData?.label.toLowerCase()} data available</p>
+            <p className="text-sm text-primary_color opacity-60 mt-1">Location statistics will appear here once you have listings</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -140,48 +139,48 @@ const ListingsByLocation = () => {
                       {activeTab === 'state' && <Map className="w-4 h-4 text-green-600" />}
                       {activeTab === 'city' && <Building2 className="w-4 h-4 text-purple-600" />}
                       {activeTab === 'town' && <MapPin className="w-4 h-4 text-orange-600" />}
-                      <h6 className="font-semibold text-gray-900">{item.location}</h6>
+                      <h6 className="font-semibold text-primary_color">{item.location}</h6>
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
                       <div className="flex flex-col">
-                        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                        <span className="text-xs font-medium text-primary_color uppercase tracking-wide mb-1">
                           Total Units
                         </span>
                         <div className="flex items-center gap-1">
-                          <Home className="w-4 h-4 text-gray-400" />
-                          <span className="text-lg font-bold text-gray-900">
+                          <Home className="w-4 h-4 text-primary_color" />
+                          <span className="text-lg font-bold text-primary_color">
                             {item.total_units || 0}
                           </span>
                         </div>
                       </div>
 
                       <div className="flex flex-col">
-                        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                        <span className="text-xs font-medium text-primary_color uppercase tracking-wide mb-1">
                           Percentage
                         </span>
                         <div className="flex items-center gap-1">
-                          <TrendingUp className="w-4 h-4 text-blue-500" />
-                          <span className="text-lg font-bold text-blue-600">
+                          <TrendingUp className="w-4 h-4 text-primary_color" />
+                          <span className="text-lg font-bold text-primary_color">
                             {formatPercentage(item.percentage)}
                           </span>
                         </div>
                       </div>
 
                       <div className="flex flex-col">
-                        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                        <span className="text-xs font-medium text-primary_color uppercase tracking-wide mb-1">
                           Unit Sales
                         </span>
-                        <span className="text-lg font-bold text-gray-900">
+                        <span className="text-lg font-bold text-primary_color">
                           {item.unit_sales || 0}
                         </span>
                       </div>
 
                       <div className="flex flex-col">
-                        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                        <span className="text-xs font-medium text-primary_color uppercase tracking-wide mb-1">
                           Sales Amount
                         </span>
-                        <span className="text-lg font-bold text-gray-900">
+                        <span className="text-lg font-bold text-primary_color">
                           {formatCurrency(item.sales_amount)}
                         </span>
                       </div>
@@ -191,7 +190,7 @@ const ListingsByLocation = () => {
 
                 {/* Progress Bar */}
                 <div className="mt-4">
-                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                  <div className="flex items-center justify-between text-xs text-primary_color mb-1">
                     <span>Distribution</span>
                     <span>{formatPercentage(item.percentage)}</span>
                   </div>
@@ -218,12 +217,12 @@ const ListingsByLocation = () => {
 
       {/* Summary Footer */}
       {activeTabData?.data && activeTabData.data.length > 0 && (
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="px-6 py-4 border-t border-gray-200">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">
+            <span className="text-primary_color">
               Total {activeTabData.label.toLowerCase()}s: <strong>{activeTabData.data.length}</strong>
             </span>
-            <span className="text-gray-600">
+            <span className="text-primary_color">
               Total Units: <strong>
                 {activeTabData.data.reduce((sum, item) => sum + (item.total_units || 0), 0)}
               </strong>

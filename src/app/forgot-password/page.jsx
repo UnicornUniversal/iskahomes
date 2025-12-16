@@ -103,7 +103,7 @@ const ForgotPasswordPage = () => {
           
           <div className="text-center">
             <Link
-              href="/signin"
+              href="/home/signin"
               className="inline-flex items-center text-sm text-primary_color hover:text-primary_color/80"
             >
               <ArrowLeft className="h-4 w-4 mr-1" />
@@ -176,7 +176,7 @@ const ForgotPasswordPage = () => {
           {/* Back to Sign In */}
           <div className="text-center">
             <Link
-              href="/signin"
+              href="/home/signin"
               className="inline-flex items-center text-sm text-primary_color hover:text-primary_color/80"
             >
               <ArrowLeft className="h-4 w-4 mr-1" />

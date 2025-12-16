@@ -11,9 +11,9 @@
  * Client-side auth failure handler
  * Use this in React components, hooks, and client-side code
  * 
- * @param {string} redirectTo - The URL to redirect to after logout (default: '/signin')
+ * @param {string} redirectTo - The URL to redirect to after logout (default: '/home/signin')
  */
-export const handleAuthFailure = async (redirectTo = '/signin') => {
+export const handleAuthFailure = async (redirectTo = '/home/signin') => {
   try {
     // Clear all tokens from localStorage
     const tokensToRemove = [

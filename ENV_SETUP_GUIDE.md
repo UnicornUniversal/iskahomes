@@ -21,18 +21,21 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 # ============================================
-# SENDGRID EMAIL CONFIGURATION
+# EMAIL CONFIGURATION (SendGrid + Resend)
 # ============================================
+# The system tries SendGrid first, then falls back to Resend if SendGrid fails
+
+# SendGrid Configuration (Primary)
 # Get these from: https://sendgrid.com
-
-# SendGrid API Key (starts with SG.)
 SENDGRID_API_KEY=SG.your-sendgrid-api-key-here
-
-# Verified sender email (must be verified in SendGrid)
 SENDGRID_FROM_EMAIL=noreply@yourdomain.com
-
-# Sender name that appears in emails
 SENDGRID_FROM_NAME=Iska Homes
+
+# Resend Configuration (Fallback)
+# Get these from: https://resend.com
+RESEND_API_KEY=re_your-resend-api-key-here
+RESEND_FROM_EMAIL=noreply@yourdomain.com  # Optional, will use SENDGRID_FROM_EMAIL if not set
+RESEND_FROM_NAME=Iska Homes  # Optional, will use SENDGRID_FROM_NAME if not set
 
 # ============================================
 # FRONTEND CONFIGURATION
@@ -67,7 +70,9 @@ NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
    - **anon public** key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - **service_role** key → `SUPABASE_SERVICE_ROLE_KEY` ⚠️ Keep secret!
 
-### 2. SendGrid Keys
+### 2. Email Provider Keys
+
+#### SendGrid (Primary Provider)
 
 1. Go to: https://sendgrid.com
 2. Sign up or log in
@@ -85,6 +90,25 @@ NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
    - Fill in your email and details
    - Check your email and click verification link
    - Use this verified email for `SENDGRID_FROM_EMAIL`
+
+#### Resend (Fallback Provider)
+
+1. Go to: https://resend.com
+2. Sign up or log in
+3. **Create API Key:**
+   - Go to **API Keys** section
+   - Click "Create API Key"
+   - Name it (e.g., "Iska Homes Production")
+   - Copy the key (starts with `re_`)
+   - Paste into `RESEND_API_KEY`
+
+4. **Verify Domain (Recommended) or Use Default:**
+   - Go to **Domains** section
+   - Add and verify your domain (recommended for production)
+   - Or use the default `onboarding@resend.dev` for testing
+   - Use your verified email for `RESEND_FROM_EMAIL` (optional, will use `SENDGRID_FROM_EMAIL` if not set)
+
+**Note:** The system automatically uses Resend as a fallback if SendGrid fails. You only need Resend configured if you want the fallback functionality.
 
 ### 3. Frontend URLs
 
@@ -107,6 +131,7 @@ FRONTEND_LINK=https://yourdomain.com
 ### NEVER expose these in client-side code:
 - ❌ `SUPABASE_SERVICE_ROLE_KEY`
 - ❌ `SENDGRID_API_KEY`
+- ❌ `RESEND_API_KEY`
 
 ### Safe to expose (NEXT_PUBLIC_ prefix):
 - ✅ `NEXT_PUBLIC_SUPABASE_URL`
@@ -153,13 +178,28 @@ After adding all env variables:
 - Verify SendGrid API key is correct
 - Verify sender email is verified in SendGrid
 - Check SendGrid activity log
+- If SendGrid fails, the system will automatically try Resend (if configured)
+- Verify Resend API key is correct if using fallback
 
 ### Emails not sending
 **Fix:**
-1. Go to SendGrid dashboard
-2. Check "Activity" tab
-3. Look for bounces or blocks
-4. Verify sender email is verified
+1. **For SendGrid:**
+   - Go to SendGrid dashboard
+   - Check "Activity" tab
+   - Look for bounces or blocks
+   - Verify sender email is verified
+
+2. **For Resend (if SendGrid fails):**
+   - Go to Resend dashboard
+   - Check "Logs" section
+   - Verify domain/email is verified
+   - Check API key permissions
+
+3. **Test the email functionality:**
+   - Go to `/another` page
+   - Use the email test form
+   - Check which provider was used (SendGrid or Resend)
+   - Review error messages if both fail
 
 ---
 
@@ -173,10 +213,13 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 
-# SendGrid
+# Email Providers (SendGrid primary, Resend fallback)
 SENDGRID_API_KEY=
 SENDGRID_FROM_EMAIL=
 SENDGRID_FROM_NAME=Iska Homes
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=  # Optional
+RESEND_FROM_NAME=Iska Homes  # Optional
 
 # Frontend
 NEXT_PUBLIC_FRONTEND_URL=http://localhost:3000
@@ -191,10 +234,12 @@ Fill in the empty values with your keys!
 
 - [ ] Created `.env.local` file
 - [ ] Added all Supabase keys
-- [ ] Added SendGrid API key
+- [ ] Added SendGrid API key (primary)
 - [ ] Verified sender email in SendGrid
+- [ ] Added Resend API key (optional, for fallback)
 - [ ] Added frontend URLs
 - [ ] Restarted dev server
+- [ ] Tested email functionality at `/another` page
 - [ ] Tested signup flow
 - [ ] Received verification email
 

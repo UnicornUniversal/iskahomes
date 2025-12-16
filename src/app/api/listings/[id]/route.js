@@ -1022,6 +1022,8 @@ export async function PUT(request, { params }) {
       if (jsonData.listing_condition) formData.append('listing_condition', jsonData.listing_condition)
       if (jsonData.upload_status) formData.append('upload_status', jsonData.upload_status)
       if (jsonData.final_listing_status) formData.append('final_listing_status', jsonData.final_listing_status)
+      if (jsonData.published_at) formData.append('published_at', jsonData.published_at)
+      if (jsonData.published_status) formData.append('published_status', jsonData.published_status)
     } else {
       // Handle FormData requests (normal updates with files)
       formData = await request.formData()
@@ -1140,6 +1142,14 @@ export async function PUT(request, { params }) {
         listing_condition: jsonData.listing_condition || 'completed',
         upload_status: jsonData.upload_status || 'completed',
         last_modified_by: userId
+      }
+      // Add published_at if provided (for finalization/publishing)
+      if (jsonData.published_at) {
+        updateData.published_at = jsonData.published_at
+      }
+      // Add published_status if provided
+      if (jsonData.published_status) {
+        updateData.published_status = jsonData.published_status
       }
     } else {
       updateData = {
@@ -1456,13 +1466,25 @@ export async function PUT(request, { params }) {
     }
 
     // After successful update, mark as completed
-    const { data: finalizedListing, error: finalError } = await supabase
-      .from('listings')
-      .update({
+    const finalUpdateData = {
         listing_condition: 'completed',
         upload_status: 'completed',
         listing_status: finalListingStatus
-      })
+    }
+    
+    // Include published_at if it was in the updateData (for publishing)
+    if (updateData.published_at) {
+      finalUpdateData.published_at = updateData.published_at
+    }
+    
+    // Include published_status if it was in the updateData (for publishing)
+    if (updateData.published_status) {
+      finalUpdateData.published_status = updateData.published_status
+    }
+    
+    const { data: finalizedListing, error: finalError } = await supabase
+      .from('listings')
+      .update(finalUpdateData)
       .eq('id', listingId)
       .select()
       .single()

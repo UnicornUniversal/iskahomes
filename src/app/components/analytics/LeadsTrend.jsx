@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Loader2 } from 'lucide-react'
 import {
   Chart as ChartJS,
@@ -14,6 +14,8 @@ import {
   Filler
 } from 'chart.js'
 import { Line } from 'react-chartjs-2'
+import { DateRangePicker } from '@/app/components/ui/date-range-picker'
+import { ExportDropdown } from '@/app/components/ui/export-dropdown'
 
 // Register Chart.js components
 ChartJS.register(
@@ -28,14 +30,26 @@ ChartJS.register(
 )
 
 export default function LeadsTrend({ listerId, listerType = 'developer', listingId = null }) {
-  const [timeRange, setTimeRange] = useState('week')
+  // Initialize with current month as default
+  const getDefaultDateRange = () => {
+    const today = new Date()
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+    return {
+      startDate: startOfMonth.toISOString().split('T')[0],
+      endDate: today.toISOString().split('T')[0]
+    }
+  }
+
+  const defaultRange = getDefaultDateRange()
+  const [dateRange, setDateRange] = useState(defaultRange)
   const [leadsData, setLeadsData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     async function fetchLeadsTrend() {
-      if (!listerId) {
+      if (!listerId || !dateRange.startDate || !dateRange.endDate) {
         setLoading(false)
         return
       }
@@ -47,7 +61,8 @@ export default function LeadsTrend({ listerId, listerType = 'developer', listing
         const params = new URLSearchParams({
           lister_id: listerId,
           lister_type: listerType,
-          period: timeRange
+          date_from: dateRange.startDate,
+          date_to: dateRange.endDate
         })
 
         if (listingId) {
@@ -71,7 +86,92 @@ export default function LeadsTrend({ listerId, listerType = 'developer', listing
     }
 
     fetchLeadsTrend()
-  }, [listerId, listerType, listingId, timeRange])
+  }, [listerId, listerType, listingId, dateRange.startDate, dateRange.endDate])
+
+  // Export function
+  const handleExport = useCallback(async (format = 'csv') => {
+    if (!listerId || exporting || !dateRange.startDate || !dateRange.endDate) return
+    
+    try {
+      setExporting(true)
+      const params = new URLSearchParams({
+        lister_id: listerId,
+        lister_type: listerType,
+        date_from: dateRange.startDate,
+        date_to: dateRange.endDate
+      })
+
+      if (listingId) {
+        params.append('listing_id', listingId)
+      }
+
+      const response = await fetch(`/api/leads/trends?${params.toString()}`)
+      const result = await response.json()
+      
+      if (response.ok && result.success && result.data) {
+        const { performance } = result.data
+        const { labels, phone, message, email, appointment, website } = performance || {}
+        
+        if (format === 'csv') {
+          const csvRows = [
+            ['Period', 'Total', 'Phone', 'Message', 'Email', 'Appointment', 'Website'],
+            ...(labels || []).map((label, index) => [
+              label,
+              (phone?.[index] || 0) + (message?.[index] || 0) + (email?.[index] || 0) + (appointment?.[index] || 0) + (website?.[index] || 0),
+              phone?.[index] || 0,
+              message?.[index] || 0,
+              email?.[index] || 0,
+              appointment?.[index] || 0,
+              website?.[index] || 0
+            ])
+          ]
+          
+          const csvContent = csvRows.map(row => row.join(',')).join('\n')
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+          const link = document.createElement('a')
+          const url = URL.createObjectURL(blob)
+          
+          link.setAttribute('href', url)
+          link.setAttribute('download', `leads-trend-${dateRange.startDate}-to-${dateRange.endDate}.csv`)
+          link.style.visibility = 'hidden'
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+        } else if (format === 'excel') {
+          const excelRows = [
+            ['Period', 'Total', 'Phone', 'Message', 'Email', 'Appointment', 'Website'],
+            ...(labels || []).map((label, index) => [
+              label,
+              (phone?.[index] || 0) + (message?.[index] || 0) + (email?.[index] || 0) + (appointment?.[index] || 0) + (website?.[index] || 0),
+              phone?.[index] || 0,
+              message?.[index] || 0,
+              email?.[index] || 0,
+              appointment?.[index] || 0,
+              website?.[index] || 0
+            ])
+          ]
+          
+          const BOM = '\uFEFF'
+          const excelContent = BOM + excelRows.map(row => row.join('\t')).join('\n')
+          const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+          const link = document.createElement('a')
+          const url = URL.createObjectURL(blob)
+          
+          link.setAttribute('href', url)
+          link.setAttribute('download', `leads-trend-${dateRange.startDate}-to-${dateRange.endDate}.xls`)
+          link.style.visibility = 'hidden'
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+        }
+      }
+    } catch (error) {
+      console.error('Error exporting data:', error)
+      alert('Failed to export data. Please try again.')
+    } finally {
+      setExporting(false)
+    }
+  }, [listerId, listerType, listingId, dateRange, exporting])
 
   // Default empty data structure
   const defaultData = {
@@ -175,22 +275,19 @@ export default function LeadsTrend({ listerId, listerType = 'developer', listing
     <div className="space-y-6">
       {/* Leads chart with per-type series */}
       <div className="default_bg rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center flex-wrap justify-between mb-4 gap-4">
           <h3 className="text-lg font-semibold text-gray-900">Leads Trend</h3>
-          <div className="flex space-x-2">
-            {['week', 'month', 'year'].map((range) => (
-              <button
-                key={range}
-                onClick={() => setTimeRange(range)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize ${
-                  timeRange === range
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {range === 'week' ? 'This Week' : range === 'month' ? 'This Month' : 'This Year'}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <DateRangePicker
+              startDate={dateRange.startDate}
+              endDate={dateRange.endDate}
+              onChange={setDateRange}
+              className="w-[280px]"
+            />
+            <ExportDropdown
+              onExport={handleExport}
+              disabled={exporting || loading || !dateRange.startDate || !dateRange.endDate}
+            />
           </div>
         </div>
         <div className="h-80">

@@ -4,44 +4,46 @@ import Link from 'next/link'
 import { MapPin } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
-const TopSoldProperties = ({ listerId, currency: propCurrency }) => {
+const TopSoldProperties = React.memo(({ listerId, currency: propCurrency }) => {
   const [topSoldProperties, setTopSoldProperties] = useState([])
   const [loading, setLoading] = useState(true)
-  const [currency, setCurrency] = useState(propCurrency || 'USD')
+  const currency = propCurrency || 'USD'
 
   useEffect(() => {
+    let isMounted = true
+    
     const fetchData = async () => {
+      if (!listerId) return
+      
       try {
         const response = await fetch(`/api/sales/top-properties?slug=${listerId}&limit=10`)
         const result = await response.json()
         
+        if (!isMounted) return
+        
         if (result.success && result.data) {
           setTopSoldProperties(result.data)
-          // Get currency from first property if available, or use prop currency
-          if (result.data.length > 0 && result.data[0].currency) {
-            setCurrency(result.data[0].currency)
-          } else if (propCurrency) {
-            setCurrency(propCurrency)
-          }
+        } else {
+          setTopSoldProperties([])
         }
       } catch (error) {
         console.error('Error fetching top properties:', error)
+        if (isMounted) {
+          setTopSoldProperties([])
+        }
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
-    if (listerId) {
-      fetchData()
+    fetchData()
+    
+    return () => {
+      isMounted = false
     }
-  }, [listerId, propCurrency])
-  
-  // Update currency when prop changes
-  useEffect(() => {
-    if (propCurrency) {
-      setCurrency(propCurrency)
-    }
-  }, [propCurrency])
+  }, [listerId])
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A'
@@ -180,6 +182,8 @@ const TopSoldProperties = ({ listerId, currency: propCurrency }) => {
       </div>
     </div>
   )
-}
+})
+
+TopSoldProperties.displayName = 'TopSoldProperties'
 
 export default TopSoldProperties

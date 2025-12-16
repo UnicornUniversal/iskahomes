@@ -131,8 +131,9 @@ const GoogleMapViewer = React.memo(({ center, zoom, coordinates, onMapClick }) =
 
 GoogleMapViewer.displayName = 'GoogleMapViewer'
 
-const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocations = [] }) => {
+const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocations = [], accountType, developments = [], user }) => {
   const [locationData, setLocationData] = useState({
+    id: null, // Location ID from development_locations (for developer units)
     country: '',
     countryCode: '', // ISO country code for currency lookup
     state: '',
@@ -170,6 +171,66 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
       scheduleTimerRef.current = null
     }, 0)
   }, [updateFormData])
+
+  // Check if this is a developer creating a unit - should use development locations dropdown
+  // For developers, assume it's a unit unless listing_type is explicitly set to something else
+  const isDeveloperUnit = accountType === 'developer' && (formData?.listing_type === 'unit' || !formData?.listing_type || formData?.listing_type === '')
+  
+  // Find the selected development and get its locations
+  const selectedDevelopment = useMemo(() => {
+    if (!isDeveloperUnit || !formData?.development_id) return null
+    return developments.find(dev => dev.id === formData.development_id)
+  }, [isDeveloperUnit, formData?.development_id, developments])
+
+  // Get development locations array
+  const developmentLocations = useMemo(() => {
+    if (!selectedDevelopment?.development_locations) return []
+    // Handle both array and JSON string formats
+    if (Array.isArray(selectedDevelopment.development_locations)) {
+      return selectedDevelopment.development_locations
+    }
+    try {
+      return typeof selectedDevelopment.development_locations === 'string' 
+        ? JSON.parse(selectedDevelopment.development_locations)
+        : []
+    } catch (e) {
+      return []
+    }
+  }, [selectedDevelopment])
+
+  // Handle development location selection
+  const handleDevelopmentLocationSelect = useCallback((selectedLocation) => {
+    if (!selectedLocation) return
+    
+    // Store the selected location data (include id for reference)
+    const locationData = {
+      id: selectedLocation.id || selectedLocation._id || null, // Store the location ID
+      country: selectedLocation.country || '',
+      countryCode: selectedLocation.countryCode || '',
+      state: selectedLocation.state || '',
+      city: selectedLocation.city || '',
+      town: selectedLocation.town || '',
+      fullAddress: selectedLocation.fullAddress || '',
+      coordinates: selectedLocation.coordinates || {
+        latitude: '',
+        longitude: ''
+      },
+      additionalInformation: selectedLocation.additionalInformation || ''
+    }
+    
+    setLocationData(locationData)
+    scheduleParentUpdate(locationData)
+    
+    // Update map center if coordinates exist
+    if (locationData.coordinates?.latitude && locationData.coordinates?.longitude) {
+      const lat = parseFloat(locationData.coordinates.latitude)
+      const lng = parseFloat(locationData.coordinates.longitude)
+      if (!isNaN(lat) && !isNaN(lng)) {
+        setMapCenter([lat, lng])
+        setMapZoom(15)
+      }
+    }
+  }, [scheduleParentUpdate])
 
   // Commented out GeoNames functionality
   // const [countries, setCountries] = useState([])
@@ -209,6 +270,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
     if (!currentLocation) return
 
     const newLocationData = {
+      id: currentLocation.id || currentLocation._id || null, // Location ID from development_locations
       country: currentLocation.country || '',
       countryCode: currentLocation.countryCode || '', // ISO country code
       state: currentLocation.state || '',
@@ -563,6 +625,177 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
     }
   }, [scheduleParentUpdate, mapCenter])
 
+  // If developer creating a unit, show dropdown of development locations
+  if (isDeveloperUnit) {
+    // Check if development is selected
+    if (!formData?.development_id) {
+      return (
+        <div className="secondary_bg">
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-yellow-800">
+              Please select a development in the Basic Information step first to choose a location.
+            </p>
+          </div>
+        </div>
+      )
+    }
+
+    // Check if development has locations
+    if (!selectedDevelopment || developmentLocations.length === 0) {
+      return (
+        <div className="secondary_bg">
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-yellow-800">
+              The selected development doesn't have any locations configured. Please add locations to the development first.
+            </p>
+          </div>
+        </div>
+      )
+    }
+
+    // Find currently selected location (if any)
+    // Try to match by ID first, then by location data
+    const currentLocation = formData?.location
+    let selectedLocationValue = ''
+    
+    if (currentLocation?.id || currentLocation?._id) {
+      selectedLocationValue = currentLocation.id || currentLocation._id
+    } else if (currentLocation) {
+      // Try to match by location data (city, town, etc.)
+      const matchedLocation = developmentLocations.find(loc => {
+        return (
+          (loc.city && currentLocation.city && loc.city === currentLocation.city) ||
+          (loc.town && currentLocation.town && loc.town === currentLocation.town) ||
+          (loc.fullAddress && currentLocation.fullAddress && loc.fullAddress === currentLocation.fullAddress)
+        )
+      })
+      if (matchedLocation) {
+        selectedLocationValue = matchedLocation.id || matchedLocation._id || ''
+      }
+    }
+
+    return (
+      <div className="secondary_bg">
+        <div className="space-y-4 sm:space-y-6">
+          {/* Development Location Dropdown */}
+          <div>
+            <label htmlFor="developmentLocation" className="block text-sm font-medium mb-2">
+              Select Location from Development *
+            </label>
+            <p className="text-sm text-gray-600 mb-4">
+              Choose a location from the development's configured locations
+            </p>
+            <select
+              id="developmentLocation"
+              value={selectedLocationValue}
+              onChange={(e) => {
+                const selectedLoc = developmentLocations.find(loc => 
+                  (loc.id || loc._id) === e.target.value
+                )
+                handleDevelopmentLocationSelect(selectedLoc)
+              }}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">-- Select a location --</option>
+              {developmentLocations.map((loc, index) => {
+                const locId = loc.id || loc._id || index
+                const displayText = [
+                  loc.town,
+                  loc.city,
+                  loc.state,
+                  loc.country
+                ].filter(Boolean).join(', ') || loc.fullAddress || `Location ${index + 1}`
+                
+                return (
+                  <option key={locId} value={locId}>
+                    {displayText} {loc.isPrimary ? '(Primary)' : ''}
+                  </option>
+                )
+              })}
+            </select>
+          </div>
+
+          {/* Display selected location details */}
+          {locationData.city || locationData.fullAddress ? (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="text-sm font-medium mb-2">Selected Location Details:</h3>
+              <div className="space-y-1 text-sm">
+                {locationData.town && <p><span className="font-medium">Town:</span> {locationData.town}</p>}
+                {locationData.city && <p><span className="font-medium">City:</span> {locationData.city}</p>}
+                {locationData.state && <p><span className="font-medium">State:</span> {locationData.state}</p>}
+                {locationData.country && <p><span className="font-medium">Country:</span> {locationData.country}</p>}
+                {locationData.fullAddress && <p><span className="font-medium">Address:</span> {locationData.fullAddress}</p>}
+                {locationData.coordinates?.latitude && locationData.coordinates?.longitude && (
+                  <p>
+                    <span className="font-medium">Coordinates:</span>{' '}
+                    {parseFloat(locationData.coordinates.latitude).toFixed(6)}, {parseFloat(locationData.coordinates.longitude).toFixed(6)}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Interactive Map - Show if location is selected */}
+          {locationData.coordinates?.latitude && locationData.coordinates?.longitude && (
+            <div className="bg-gradient-to-r from-teal-50 to-cyan-50 p-4 rounded-lg border border-teal-200">
+              <label className="block text-sm font-medium text-teal-900 mb-2">
+                Location Map
+              </label>
+              <div className="h-96 rounded-lg overflow-hidden border border-teal-300">
+                <Wrapper {...mapOptions} render={(status) => {
+                  if (status === 'LOADING') {
+                    return <div className="h-full bg-gray-100 rounded-lg flex items-center justify-center">Loading Google Maps...</div>
+                  }
+                  
+                  if (status === 'FAILURE') {
+                    return (
+                      <div>
+                        <div className="text-xs p-2 bg-orange-50 mb-2 rounded">
+                          Google Maps unavailable. Using OpenStreetMap as fallback.
+                        </div>
+                        <MapComponent
+                          center={mapCenter}
+                          zoom={mapZoom}
+                          onMapClick={handleMapClick}
+                          coordinates={locationData.coordinates}
+                        />
+                      </div>
+                    )
+                  }
+                  
+                  return (
+                    <GoogleMapViewer
+                      center={mapCenter}
+                      zoom={mapZoom}
+                      coordinates={locationData.coordinates}
+                      onMapClick={handleMapClick}
+                    />
+                  )
+                }} />
+              </div>
+            </div>
+          )}
+
+          {/* Additional Information - Still allow editing */}
+          <div>
+            <label htmlFor="additionalInformation" className="block text-sm font-medium mb-2">
+              Additional Location Information
+            </label>
+            <textarea
+              id="additionalInformation"
+              rows={4}
+              placeholder="Any additional location details, landmarks, or directions..."
+              value={locationData.additionalInformation}
+              onChange={(e) => handleChange('additionalInformation', e.target.value)}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Regular location UI for non-developer units
   return (
     <div className=" secondary_bg">
       {/* <div className="mb-4 sm:mb-6">

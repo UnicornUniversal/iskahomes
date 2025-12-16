@@ -6,8 +6,10 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('user_id')
     const userType = searchParams.get('user_type') || 'developer'
-    const period = searchParams.get('period') || 'today' // 'today', 'week', 'month', 'year'
+    const period = searchParams.get('period') // 'today', 'week', 'month', 'year' (for backward compatibility)
     const metric = searchParams.get('metric') || 'views' // 'views' or 'impressions'
+    const dateFrom = searchParams.get('date_from')
+    const dateTo = searchParams.get('date_to')
 
     if (!userId) {
       return NextResponse.json(
@@ -16,45 +18,66 @@ export async function GET(request) {
       )
     }
 
-    // Calculate date range based on period
+    // Calculate date range based on period or custom date range
     const now = new Date()
     let startDate, endDate, groupBy
 
-    switch (period) {
-      case 'today':
-        // Today: hourly data
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+    // Use custom date range if provided, otherwise use period
+    if (dateFrom && dateTo) {
+      startDate = new Date(dateFrom)
+      startDate.setHours(0, 0, 0, 0)
+      endDate = new Date(dateTo)
+      endDate.setHours(23, 59, 59, 999)
+      
+      // Determine groupBy based on date range length
+      const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24))
+      if (daysDiff <= 1) {
         groupBy = 'hour'
-        break
-      case 'week':
-        // Last 7 days: daily data
-        startDate = new Date(now)
-        startDate.setDate(startDate.getDate() - 6)
-        startDate.setHours(0, 0, 0, 0)
-        endDate = new Date(now)
-        endDate.setHours(23, 59, 59, 999)
+      } else if (daysDiff <= 90) {
         groupBy = 'date'
-        break
-      case 'month':
-        // Last 30 days: daily data
-        startDate = new Date(now)
-        startDate.setDate(startDate.getDate() - 29)
-        startDate.setHours(0, 0, 0, 0)
-        endDate = new Date(now)
-        endDate.setHours(23, 59, 59, 999)
-        groupBy = 'date'
-        break
-      case 'year':
-        // Last 12 months: monthly data
-        startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
-        endDate = new Date(now)
+      } else if (daysDiff <= 365) {
+        groupBy = 'week'
+      } else {
         groupBy = 'month'
-        break
-      default:
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
-        groupBy = 'hour'
+      }
+    } else {
+      // Use period for backward compatibility
+      switch (period) {
+        case 'today':
+          // Today: hourly data
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+          endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+          groupBy = 'hour'
+          break
+        case 'week':
+          // Last 7 days: daily data
+          startDate = new Date(now)
+          startDate.setDate(startDate.getDate() - 6)
+          startDate.setHours(0, 0, 0, 0)
+          endDate = new Date(now)
+          endDate.setHours(23, 59, 59, 999)
+          groupBy = 'date'
+          break
+        case 'month':
+          // Last 30 days: daily data
+          startDate = new Date(now)
+          startDate.setDate(startDate.getDate() - 29)
+          startDate.setHours(0, 0, 0, 0)
+          endDate = new Date(now)
+          endDate.setHours(23, 59, 59, 999)
+          groupBy = 'date'
+          break
+        case 'year':
+          // Last 12 months: monthly data
+          startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
+          endDate = new Date(now)
+          groupBy = 'month'
+          break
+        default:
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+          endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+          groupBy = 'hour'
+      }
     }
 
     // Format dates for query

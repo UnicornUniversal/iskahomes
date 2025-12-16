@@ -56,13 +56,14 @@ export async function GET(request) {
       views_from_explore: 0,
       views_from_search: 0,
       views_from_direct: 0,
-      total_leads: 0,
+      total_leads: 0, // Keep for backward compatibility (counts actions)
       phone_leads: 0,
       message_leads: 0,
       email_leads: 0,
       appointment_leads: 0,
       website_leads: 0,
       unique_leads: 0,
+      anonymous_leads: 0,
       total_sales: 0,
       sales_value: 0,
       total_shares: 0,
@@ -84,13 +85,14 @@ export async function GET(request) {
       aggregated.views_from_explore += record.views_from_explore || 0
       aggregated.views_from_search += record.views_from_search || 0
       aggregated.views_from_direct += record.views_from_direct || 0
-      aggregated.total_leads += record.total_leads || 0
+      aggregated.total_leads += record.total_leads || 0 // Keep for backward compatibility
       aggregated.phone_leads += record.phone_leads || 0
       aggregated.message_leads += record.message_leads || 0
       aggregated.email_leads += record.email_leads || 0
       aggregated.appointment_leads += record.appointment_leads || 0
       aggregated.website_leads += record.website_leads || 0
       aggregated.unique_leads += record.unique_leads || 0
+      aggregated.anonymous_leads += record.anonymous_leads || 0
       aggregated.total_sales += record.total_sales || 0
       aggregated.sales_value += parseFloat(record.sales_value || 0)
       aggregated.total_shares += record.total_shares || 0
@@ -99,7 +101,8 @@ export async function GET(request) {
     })
 
     // Calculate percentages for leads breakdown
-    const leadTotal = aggregated.total_leads
+    // Use unique_leads + anonymous_leads instead of total_leads (which counts actions, not individuals)
+    const leadTotal = aggregated.unique_leads + aggregated.anonymous_leads || aggregated.total_leads
     const messageTotal = aggregated.message_leads
     
     // Create nested messaging structure
@@ -181,21 +184,67 @@ export async function GET(request) {
     ].filter(item => item.value > 0)
 
     // Calculate conversion rate
+    // Use unique_leads + anonymous_leads instead of total_leads (which counts actions, not individuals)
+    const uniqueLeadCount = aggregated.unique_leads + aggregated.anonymous_leads || aggregated.total_leads
     const conversionRate = aggregated.total_views > 0 
-      ? parseFloat(((aggregated.total_leads / aggregated.total_views) * 100).toFixed(2))
+      ? parseFloat(((uniqueLeadCount / aggregated.total_views) * 100).toFixed(2))
       : 0
 
     // Calculate lead to sale rate
-    const leadToSaleRate = aggregated.total_leads > 0
-      ? parseFloat(((aggregated.total_sales / aggregated.total_leads) * 100).toFixed(2))
+    // Reuse uniqueLeadCount from above (unique_leads + anonymous_leads instead of total_leads)
+    const leadToSaleRate = uniqueLeadCount > 0
+      ? parseFloat(((aggregated.total_sales / uniqueLeadCount) * 100).toFixed(2))
       : 0
+
+    // Build time series data - group by date
+    const timeSeriesMap = {}
+    
+    analytics.forEach(record => {
+      const date = record.date
+      if (!date) return
+      
+      if (!timeSeriesMap[date]) {
+        timeSeriesMap[date] = {
+          date,
+          total_views: 0,
+          unique_views: 0,
+          total_leads: 0,
+          unique_leads: 0,
+          anonymous_leads: 0,
+          total_sales: 0,
+          total_shares: 0,
+          saved_count: 0,
+          social_media_clicks: 0
+        }
+      }
+      
+      timeSeriesMap[date].total_views += record.total_views || 0
+      timeSeriesMap[date].unique_views += record.unique_views || 0
+      timeSeriesMap[date].total_leads += record.total_leads || 0
+      timeSeriesMap[date].unique_leads += record.unique_leads || 0
+      timeSeriesMap[date].anonymous_leads += record.anonymous_leads || 0
+      timeSeriesMap[date].total_sales += record.total_sales || 0
+      timeSeriesMap[date].total_shares += record.total_shares || 0
+      timeSeriesMap[date].saved_count += record.saved_count || 0
+      timeSeriesMap[date].social_media_clicks += record.social_media_clicks || 0
+    })
+    
+    // Convert to array and sort by date
+    const timeSeries = Object.values(timeSeriesMap)
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .map(item => ({
+        date: item.date,
+        views: item.total_views,
+        leads: item.unique_leads + item.anonymous_leads || item.total_leads,
+        engagement: item.total_shares + item.saved_count + item.social_media_clicks
+      }))
 
     return NextResponse.json({
       success: true,
       data: {
         development: {
           total_views: aggregated.total_views,
-          total_leads: aggregated.total_leads,
+          total_leads: aggregated.unique_leads + aggregated.anonymous_leads || aggregated.total_leads, // Use unique individuals, fallback to total_leads
           total_sales: aggregated.total_sales,
           sales_value: aggregated.sales_value,
           conversion_rate: conversionRate,
@@ -226,7 +275,8 @@ export async function GET(request) {
               percentage: 0
             }
           ].filter(item => item.value > 0)
-        }
+        },
+        time_series: timeSeries // Add time series data
       }
     })
 

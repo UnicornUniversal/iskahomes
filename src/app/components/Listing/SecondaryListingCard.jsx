@@ -229,7 +229,7 @@ const SecondaryListingCard = ({ listing, imageClasses = null }) => {
   }
 
   return (
-    <Link href={`/property/${listing_type}/${slug}/${id}`} onClick={handleCardClick} className="block">
+    <Link href={`/home/property/${listing_type}/${slug}/${id}`} onClick={handleCardClick} className="block">
       <div className="overflow-hidden transition-all mx-auto duration-300 transform hover:-translate-y-1 cursor-pointer group flex flex-col w-auto">
         {/* Image Section */}
         <div className={`relative overflow-hidden ${getImageClasses()}`}>

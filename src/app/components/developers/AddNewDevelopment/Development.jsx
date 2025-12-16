@@ -1,11 +1,13 @@
 "use client"
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { toast } from 'react-toastify'
+import { toast, ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 import { uploadFileToStorage, uploadMultipleFilesToStorage } from '@/lib/fileUpload'
 import DevelopmentDescription from './DevelopmentDescription'
 import DevelopmentCategories from './DevelopmentCategories'
 import PropertyLocation from '@/app/components/propertyManagement/modules/PropertyLocation'
+import DevelopmentLocations from './DevelopmentLocations'
 import DevelopmentAmenities from './DevelopmentAmenities'
 import DevelopmentMedia from './DevelopmentMedia'
 import DevelopmentFiles from './DevelopmentFiles'
@@ -66,6 +68,9 @@ const Development = ({ isAddMode, developmentId }) => {
       additionalInformation: ''
     },
     
+    // Development locations - array of multiple locations (JSONB)
+    development_locations: [],
+    
     // Amenities section
     amenities: {
       inbuilt: [],
@@ -117,6 +122,40 @@ const Development = ({ isAddMode, developmentId }) => {
         const { data } = await response.json();
         setDevelopmentData(data);
         
+        // Get development locations
+        const devLocations = Array.isArray(data.development_locations) ? data.development_locations : []
+        
+        // Find primary location or use first location, or fall back to main location fields
+        let primaryLocation = null
+        if (devLocations.length > 0) {
+          primaryLocation = devLocations.find(loc => loc.isPrimary) || devLocations[0]
+        }
+        
+        // Use primary location if available, otherwise use main location fields
+        const mainLocation = primaryLocation ? {
+          country: primaryLocation.country || '',
+          state: primaryLocation.state || '',
+          city: primaryLocation.city || '',
+          town: primaryLocation.town || '',
+          fullAddress: primaryLocation.fullAddress || '',
+          coordinates: {
+            latitude: primaryLocation.coordinates?.latitude || '',
+            longitude: primaryLocation.coordinates?.longitude || ''
+          },
+          additionalInformation: primaryLocation.additionalInformation || ''
+        } : (data.location || {
+          country: data.country || '',
+          state: data.state || '',
+          city: data.city || '',
+          town: data.town || '',
+          fullAddress: data.full_address || '',
+          coordinates: {
+            latitude: data.latitude || '',
+            longitude: data.longitude || ''
+          },
+          additionalInformation: data.additional_information || ''
+        })
+        
         // Populate form with existing data
         setFormData({
           title: data.title || '',
@@ -129,18 +168,8 @@ const Development = ({ isAddMode, developmentId }) => {
           types: data.types || [],
           categories: data.categories || [],
           unit_types: data.unit_types || { database: [], inbuilt: [], custom: [] },
-          location: data.location || {
-            country: data.country || '',
-            state: data.state || '',
-            city: data.city || '',
-            town: data.town || '',
-            fullAddress: data.full_address || '',
-            coordinates: {
-              latitude: data.latitude || '',
-              longitude: data.longitude || ''
-            },
-            additionalInformation: data.additional_information || ''
-          },
+          location: mainLocation,
+          development_locations: devLocations,
           amenities: data.amenities || { inbuilt: [], custom: [] },
           media: data.media || {
             banner: data.banner || null,
@@ -284,38 +313,57 @@ const Development = ({ isAddMode, developmentId }) => {
       const { location, media, ...otherFormData } = formData;
       console.log('Form data:', { location, media, otherFormData });
       
-      // Upload banner if it exists
+      // Upload banner if it exists (only if it's a new File, otherwise preserve existing)
       let bannerData = null;
-      if (media?.banner && media.banner instanceof File) {
-        const bannerUpload = await uploadFileToStorage(media.banner, 'iskaHomes', 'banners');
-        if (bannerUpload.success) {
-          bannerData = bannerUpload.data;
-        } else {
-          toast.error('Failed to upload banner image');
-          return;
+      if (media?.banner) {
+        if (media.banner instanceof File) {
+          // New file upload
+          const bannerUpload = await uploadFileToStorage(media.banner, 'iskaHomes', 'banners');
+          if (bannerUpload.success) {
+            bannerData = bannerUpload.data;
+          } else {
+            toast.error('Failed to upload banner image');
+            return;
+          }
+        } else if (media.banner && typeof media.banner === 'object' && media.banner.url) {
+          // Existing uploaded banner - preserve it
+          bannerData = media.banner;
         }
       }
       
-      // Upload video if it exists
+      // Upload video if it exists (only if it's a new File, otherwise preserve existing)
       let videoData = null;
-      if (media?.video && media.video instanceof File) {
-        const videoUpload = await uploadFileToStorage(media.video, 'iskaHomes', 'videos');
-        if (videoUpload.success) {
-          videoData = videoUpload.data;
-        } else {
-          toast.error('Failed to upload video file');
-          return;
+      if (media?.video) {
+        if (media.video instanceof File) {
+          // New file upload
+          const videoUpload = await uploadFileToStorage(media.video, 'iskaHomes', 'videos');
+          if (videoUpload.success) {
+            videoData = videoUpload.data;
+          } else {
+            toast.error('Failed to upload video file');
+            return;
+          }
+        } else if (media.video && typeof media.video === 'object' && media.video.url) {
+          // Existing uploaded video - preserve it
+          videoData = media.video;
         }
       }
       
-      // Upload media files if they exist
+      // Upload media files if they exist (preserve existing, upload new)
       let mediaFilesData = [];
       if (media?.mediaFiles && media.mediaFiles.length > 0) {
-        const fileUploads = media.mediaFiles.filter(file => file instanceof File);
-        if (fileUploads.length > 0) {
-          const mediaUpload = await uploadMultipleFilesToStorage(fileUploads, 'iskaHomes', 'media');
+        // Separate existing files from new files
+        const existingFiles = media.mediaFiles.filter(file => !(file instanceof File) && file.url);
+        const newFiles = media.mediaFiles.filter(file => file instanceof File);
+        
+        // Start with existing files
+        mediaFilesData = [...existingFiles];
+        
+        // Upload new files if any
+        if (newFiles.length > 0) {
+          const mediaUpload = await uploadMultipleFilesToStorage(newFiles, 'iskaHomes', 'media');
           if (mediaUpload.success) {
-            mediaFilesData = mediaUpload.data;
+            mediaFilesData = [...mediaFilesData, ...mediaUpload.data];
           } else {
             toast.error('Failed to upload some media files');
             return;
@@ -323,14 +371,21 @@ const Development = ({ isAddMode, developmentId }) => {
         }
       }
       
-      // Upload additional files if they exist
+      // Upload additional files if they exist (preserve existing, upload new)
       let additionalFilesData = [];
       if (otherFormData.additional_files && otherFormData.additional_files.length > 0) {
-        const fileUploads = otherFormData.additional_files.filter(file => file instanceof File);
-        if (fileUploads.length > 0) {
-          const filesUpload = await uploadMultipleFilesToStorage(fileUploads, 'iskaHomes', 'documents');
+        // Separate existing files from new files
+        const existingFiles = otherFormData.additional_files.filter(file => !(file instanceof File) && file.url);
+        const newFiles = otherFormData.additional_files.filter(file => file instanceof File);
+        
+        // Start with existing files
+        additionalFilesData = [...existingFiles];
+        
+        // Upload new files if any
+        if (newFiles.length > 0) {
+          const filesUpload = await uploadMultipleFilesToStorage(newFiles, 'iskaHomes', 'documents');
           if (filesUpload.success) {
-            additionalFilesData = filesUpload.data;
+            additionalFilesData = [...additionalFilesData, ...filesUpload.data];
           } else {
             toast.error('Failed to upload some additional files');
             return;
@@ -350,6 +405,8 @@ const Development = ({ isAddMode, developmentId }) => {
         latitude: location?.coordinates?.latitude || '',
         longitude: location?.coordinates?.longitude || '',
         additional_information: location?.additionalInformation || '',
+        // Development locations (JSONB array)
+        development_locations: otherFormData.development_locations || [],
         // Store uploaded file data
         banner: bannerData,
         video: videoData,
@@ -395,10 +452,20 @@ const Development = ({ isAddMode, developmentId }) => {
       if (response.ok) {
         const result = await response.json();
         console.log('Success response:', result);
+        
+        // Show success toast
         toast.success(
           isAddMode 
-            ? 'Development created successfully!' 
-            : 'Development updated successfully!'
+            ? 'Development created successfully! Redirecting...' 
+            : 'Development updated successfully! Redirecting...',
+          {
+            position: "top-center",
+            autoClose: 2000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+          }
         );
         
         // Redirect to developments list
@@ -408,11 +475,40 @@ const Development = ({ isAddMode, developmentId }) => {
       } else {
         const error = await response.json();
         console.error('Error response:', error);
-        toast.error(error.error || error.message || 'Failed to save development');
+        
+        // Show error toast with detailed message
+        const errorMessage = error.error || error.message || 'Failed to save development';
+        toast.error(
+          isAddMode 
+            ? `Failed to create development: ${errorMessage}` 
+            : `Failed to update development: ${errorMessage}`,
+          {
+            position: "top-center",
+            autoClose: 5000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+          }
+        );
       }
     } catch (error) {
       console.error('Error saving development:', error);
-      toast.error('Error saving development');
+      
+      // Show error toast for network/other errors
+      toast.error(
+        isAddMode 
+          ? `Error creating development: ${error.message || 'Network error. Please try again.'}` 
+          : `Error updating development: ${error.message || 'Network error. Please try again.'}`,
+        {
+          position: "top-center",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        }
+      );
     } finally {
       setLoading(false);
     }
@@ -449,7 +545,7 @@ const Development = ({ isAddMode, developmentId }) => {
           {[
             { id: 'description', label: 'Description' },
             { id: 'categories', label: 'Categories' },
-            { id: 'location', label: 'Location' },
+            { id: 'locations', label: 'Locations' },
             { id: 'amenities', label: 'Amenities' },
             { id: 'media', label: 'Media' },
             { id: 'files', label: 'Files' }
@@ -472,7 +568,8 @@ const Development = ({ isAddMode, developmentId }) => {
           <DevelopmentDescription 
             formData={formData}
             updateFormData={updateFormData}
-            isEditMode={!isAddMode} 
+            isEditMode={!isAddMode}
+            developmentId={developmentId}
           />
         </div>
 
@@ -485,9 +582,18 @@ const Development = ({ isAddMode, developmentId }) => {
           />
         </div>
 
-        {/* Location Section */}
-        <div id='location' className='scroll-mt-20'>
+        {/* Location Section - COMMENTED OUT: Now handled in Development Locations */}
+        {/* <div id='location' className='scroll-mt-20'>
           <PropertyLocation 
+            formData={formData}
+            updateFormData={updateFormData}
+            isEditMode={!isAddMode} 
+          />
+        </div> */}
+
+        {/* Development Locations Section */}
+        <div id='locations' className='scroll-mt-20'>
+          <DevelopmentLocations 
             formData={formData}
             updateFormData={updateFormData}
             isEditMode={!isAddMode} 
@@ -525,26 +631,9 @@ const Development = ({ isAddMode, developmentId }) => {
       {/* Sticky Submit Button */}
       <div className='fixed bottom-0 left-0 right-0 border-t border-gray-200 p-4 z-50 shadow-lg'>
         <div className='max-w-7xl mx-auto flex justify-center items-center'>
-          {console.log('Button render state:', { loading, isAddMode, user: !!user })}
           <button
             type='button'
-            onClick={(e) => {
-              alert('Button clicked! Check console for details.');
-              console.log('=== BUTTON CLICKED ===');
-              console.log('Button clicked!', { 
-                loading, 
-                isAddMode, 
-                user: user ? { id: user.id, profile: user.profile } : null,
-                formData: {
-                  title: formData.title,
-                  description: formData.description,
-                  status: formData.status
-                }
-              });
-              console.log('About to call handleSubmit...');
-              handleSubmit(e);
-              console.log('handleSubmit called successfully');
-            }}
+            onClick={handleSubmit}
             disabled={loading}
             className='primary_button backdrop-blur-md'
           >
@@ -552,6 +641,20 @@ const Development = ({ isAddMode, developmentId }) => {
           </button>
         </div>
       </div>
+
+      {/* Toast Container */}
+      <ToastContainer
+        position="top-center"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   )
 }

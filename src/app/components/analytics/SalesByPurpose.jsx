@@ -22,15 +22,21 @@ const pieColors = [
   '#9966FF', // Light Purple
 ]
 
-const SalesByPurpose = ({ listerId }) => {
+const SalesByPurpose = React.memo(({ listerId }) => {
   const [salesByPurposeData, setSalesByPurposeData] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let isMounted = true
+    
     const fetchData = async () => {
+      if (!listerId) return
+      
       try {
         const response = await fetch(`/api/sales/summary?slug=${listerId}`)
         const result = await response.json()
+        
+        if (!isMounted) return
         
         if (result.success && result.data?.summary?.by_purpose) {
           const purposeData = Object.values(result.data.summary.by_purpose)
@@ -47,13 +53,20 @@ const SalesByPurpose = ({ listerId }) => {
         }
       } catch (error) {
         console.error('Error fetching sales by purpose:', error)
+        if (isMounted) {
+          setSalesByPurposeData([])
+        }
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
-    if (listerId) {
-      fetchData()
+    fetchData()
+    
+    return () => {
+      isMounted = false
     }
   }, [listerId])
 
@@ -67,7 +80,7 @@ const SalesByPurpose = ({ listerId }) => {
 
   if (salesByPurposeData.length === 0) {
     return (
-      <div className="p-4 sm:p-6 default_bg  shadow-xl flex items-center justify-center" style={{ minHeight: '300px' }}>
+      <div className="p-4 sm:p-6 default_bg shadow-xl flex items-center justify-center" style={{ minHeight: '300px' }}>
         <div className="text-gray-500">No sales data available</div>
       </div>
     )
@@ -149,6 +162,8 @@ const SalesByPurpose = ({ listerId }) => {
       </div>
     </div>
   )
-}
+})
+
+SalesByPurpose.displayName = 'SalesByPurpose'
 
 export default SalesByPurpose

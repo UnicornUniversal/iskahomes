@@ -2,7 +2,6 @@
 
 import React from 'react'
 import SecondaryListingCard from './SecondaryListingCard'
-import { dynamic_images } from '@/app/components/Data/StaticData'
 
 const ListingList = ({ listings = [], loading = false, error = null }) => {
   if (loading) {
@@ -45,23 +44,13 @@ const ListingList = ({ listings = [], loading = false, error = null }) => {
 
   return (
     <div className="w-full">
-      <div className="flex flex-col md:flex-row flex-wrap gap-4 justify-center lg:justify-between items-center  xl:columns-3 w-full">
-        {listings.map((listing, index) => {
-          const randomIndex = Math.floor(Math.random() * dynamic_images.length)
-          const imageClasses = dynamic_images[randomIndex].imageClasses
-          
-          return (
-            <div 
-              key={listing.id || index} 
-              className=""
-            >
-              <SecondaryListingCard 
-                listing={listing} 
-                imageClasses={imageClasses}
-              />
-            </div>
-          )
-        })}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {listings.map((listing, index) => (
+          <SecondaryListingCard 
+            key={listing.id || index} 
+            listing={listing} 
+          />
+        ))}
       </div>
     </div>
   )

@@ -59,7 +59,7 @@ export default function EnhancedListingCard({ listing }) {
     })
 
     // Navigate to listing detail page
-    router.push(`/property/${listing.listing_type}/${listing.id}`)
+    router.push(`/home/property/${listing.listing_type}/${listing.id}`)
   }
 
   // Handle save/unsave listing

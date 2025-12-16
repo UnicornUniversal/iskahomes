@@ -49,6 +49,13 @@ export async function GET(request) {
     const listerType = searchParams.get('lister_type') || 'developer'
     const listingId = searchParams.get('listing_id')
     const status = searchParams.get('status')
+    
+    console.log('🔍 GET /api/leads - Params:', {
+      listerId,
+      listerType,
+      listingId,
+      status
+    })
     const search = searchParams.get('search')
     const actionType = searchParams.get('action_type')
     const dateFrom = searchParams.get('date_from')
@@ -85,7 +92,7 @@ export async function GET(request) {
     }
 
     // Build query for leads
-    let query = supabase
+    let query = supabaseAdmin
       .from('leads')
       .select(`
         id,
@@ -123,7 +130,7 @@ export async function GET(request) {
 
     // Fetch ALL leads (no pagination yet - we'll group first)
     // We need all records to properly group by (seeker_id, listing_id)
-    let dataQuery = supabase
+    let dataQuery = supabaseAdmin
       .from('leads')
       .select(`
         id,
@@ -147,10 +154,20 @@ export async function GET(request) {
       .eq('lister_id', finalListerId)
       .eq('lister_type', listerType)
       .not('seeker_id', 'is', null)
+      
+    console.log('🔍 Query filters:', {
+      lister_id: finalListerId,
+      lister_type: listerType,
+      listing_id: listingId || 'all listing-based leads'
+    })
 
     if (listingId) {
+      console.log('🔍 Filtering leads by listing_id:', listingId)
       dataQuery = dataQuery.eq('listing_id', listingId)
+      // Also ensure context_type is 'listing' when filtering by listing_id
+      dataQuery = dataQuery.eq('context_type', 'listing')
     } else {
+      console.log('🔍 Filtering leads: listing_id is not null (all listing-based leads)')
       dataQuery = dataQuery.not('listing_id', 'is', null)
     }
 
@@ -162,6 +179,12 @@ export async function GET(request) {
       .order('last_action_date', { ascending: false })
       .order('created_at', { ascending: false })
 
+    console.log('🔍 Raw leads from database:', {
+      count: allLeads?.length || 0,
+      listingId: listingId,
+      sampleListingIds: allLeads?.slice(0, 5).map(l => l.listing_id)
+    })
+
     if (leadsError) {
       console.error('Error fetching leads:', leadsError)
       return NextResponse.json(
@@ -171,6 +194,7 @@ export async function GET(request) {
     }
 
     if (!allLeads || allLeads.length === 0) {
+      console.log('🔍 No leads found for criteria')
       return NextResponse.json({
         success: true,
         data: [],
@@ -314,11 +338,41 @@ export async function GET(request) {
       })
     }
 
-    // Sort merged leads by last_action_date DESC
+    // Sort merged leads by most recent action timestamp DESC
+    // This ensures leads with new actions appear first, even if it's the same lead
     filteredLeads.sort((a, b) => {
-      const dateA = new Date(a.last_action_date || a.created_at || 0)
-      const dateB = new Date(b.last_action_date || b.created_at || 0)
-      return dateB - dateA
+      // Get most recent action timestamp for each lead
+      const getMostRecentActionTime = (lead) => {
+        if (!lead.lead_actions || lead.lead_actions.length === 0) {
+          // If no actions, use last_action_date or created_at as fallback
+          return new Date(lead.last_action_date || lead.created_at || 0).getTime()
+        }
+        
+        // Find the most recent action timestamp
+        let mostRecent = 0
+        lead.lead_actions.forEach(action => {
+          if (action.action_timestamp) {
+            const timestamp = new Date(action.action_timestamp).getTime()
+            if (timestamp > mostRecent) {
+              mostRecent = timestamp
+            }
+          } else if (action.action_date) {
+            // Fallback to action_date if timestamp not available
+            const date = new Date(action.action_date).getTime()
+            if (date > mostRecent) {
+              mostRecent = date
+            }
+          }
+        })
+        
+        return mostRecent || new Date(lead.last_action_date || lead.created_at || 0).getTime()
+      }
+      
+      const timeA = getMostRecentActionTime(a)
+      const timeB = getMostRecentActionTime(b)
+      
+      // Sort descending (newest first)
+      return timeB - timeA
     })
 
     // Get total count of unique groups (after filtering)

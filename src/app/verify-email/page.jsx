@@ -10,8 +10,42 @@ const VerifyEmailContent = () => {
 
   useEffect(() => {
     const verifyEmail = async () => {
+      // Check for Supabase confirmation (hash fragments or type parameter)
+      const type = searchParams.get('type')
       const token = searchParams.get('token')
+      const hashParams = new URLSearchParams(window.location.hash.substring(1))
+      const supabaseType = hashParams.get('type') || type
+      const supabaseToken = hashParams.get('access_token') || token
 
+      // If it's a Supabase confirmation (has type=signup or access_token in hash)
+      if (supabaseType === 'signup' || (supabaseToken && window.location.hash)) {
+        try {
+          // Call Supabase verification API
+          const response = await fetch(`/api/auth/verify-email-supabase?token=${encodeURIComponent(supabaseToken || '')}&type=${supabaseType || 'signup'}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          })
+
+          const result = await response.json()
+
+          if (response.ok) {
+            setVerificationStatus('success')
+            setMessage(result.message || 'Your email has been verified successfully! You can now sign in to your account.')
+          } else {
+            setVerificationStatus('error')
+            setMessage(result.error || 'Verification failed. Please try again.')
+          }
+        } catch (error) {
+          console.error('Supabase verification error:', error)
+          setVerificationStatus('error')
+          setMessage('An error occurred during verification. Please try again.')
+        }
+        return
+      }
+
+      // Otherwise, use the old custom token flow
       if (!token) {
         setVerificationStatus('error')
         setMessage('Invalid verification link. Please check your email for the correct link.')
@@ -67,7 +101,7 @@ const VerifyEmailContent = () => {
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Email Verified!</h1>
             <p className="text-gray-600 mb-6">{message}</p>
             <a
-              href="/signin"
+              href="/home/signin"
               className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
             >
               Sign In to Your Account
@@ -92,7 +126,7 @@ const VerifyEmailContent = () => {
                 Sign Up Again
               </a>
               <a
-                href="/signin"
+                href="/home/signin"
                 className="block bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors font-medium"
               >
                 Sign In

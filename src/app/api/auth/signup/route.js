@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendVerificationEmail } from '@/lib/sendgrid'
+import crypto from 'crypto'
 
 export async function POST(request) {
   try {
@@ -25,8 +26,32 @@ export async function POST(request) {
     }
 
     // Generate verification token
-    const verificationToken = require('crypto').randomBytes(32).toString('hex')
+    const verificationToken = crypto.randomBytes(32).toString('hex')
+    const expiresAt = new Date()
+    expiresAt.setHours(expiresAt.getHours() + 24) // 24 hours expiry
 
+    // CRITICAL: Send verification email FIRST before creating any database records
+    // This ensures we only create users if the email was successfully sent
+    let emailResult
+    try {
+      emailResult = await sendVerificationEmail(email, userData.fullName || 'there', verificationToken)
+      
+      if (!emailResult.success) {
+        console.error('Failed to send verification email:', emailResult.error)
+        return NextResponse.json(
+          { error: 'Failed to send verification email. Please try again or contact support.' },
+          { status: 500 }
+        )
+      }
+    } catch (emailError) {
+      console.error('Error sending verification email:', emailError)
+      return NextResponse.json(
+        { error: 'Failed to send verification email. Please try again or contact support.' },
+        { status: 500 }
+      )
+    }
+
+    // Only proceed to create user if email was sent successfully
     // Create user with Supabase Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
@@ -79,7 +104,13 @@ export async function POST(request) {
             total_developments: 0,
             social_media: [],
             customer_care: [],
-            registration_files: []
+            registration_files: [],
+            // New invitation and signup status fields
+            invitation_status: 'sent',
+            signup_status: 'invited',
+            invitation_token: verificationToken,
+            invitation_sent_at: new Date().toISOString(),
+            invitation_expires_at: expiresAt.toISOString()
           }
           const { data: devData, error: devError } = await supabaseAdmin
             .from('developers')
@@ -98,7 +129,13 @@ export async function POST(request) {
             phone: userData.phone || '',
             agency_name: userData.agencyName || '',
             license_id: userData.licenseId || '',
-            status: 'active'
+            status: 'active',
+            // New invitation and signup status fields
+            invitation_status: 'sent',
+            signup_status: 'invited',
+            invitation_token: verificationToken,
+            invitation_sent_at: new Date().toISOString(),
+            invitation_expires_at: expiresAt.toISOString()
           }
           const { data: agentData, error: agentError } = await supabaseAdmin
             .from('agents')
@@ -115,7 +152,13 @@ export async function POST(request) {
             name: userData.fullName || '',
             email: email,
             phone: userData.phone || '',
-            status: 'active'
+            status: 'active',
+            // New invitation and signup status fields
+            invitation_status: 'sent',
+            signup_status: 'invited',
+            invitation_token: verificationToken,
+            invitation_sent_at: new Date().toISOString(),
+            invitation_expires_at: expiresAt.toISOString()
           }
           const { data: seekerData, error: seekerError } = await supabaseAdmin
             .from('property_seekers')
@@ -144,14 +187,6 @@ export async function POST(request) {
         { error: 'Failed to create user profile' },
         { status: 500 }
       )
-    }
-
-    // Send verification email using SendGrid
-    try {
-      await sendVerificationEmail(email, userData.fullName || 'there', verificationToken)
-    } catch (emailError) {
-      console.error('Failed to send verification email:', emailError)
-      // Don't fail the signup if email fails, just log it
     }
 
     return NextResponse.json({

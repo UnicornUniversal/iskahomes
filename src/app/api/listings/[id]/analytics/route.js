@@ -66,6 +66,7 @@ export async function GET(request, { params }) {
         acc.appointment_leads += record.appointment_leads || 0
         acc.website_leads += record.website_leads || 0
         acc.unique_leads += record.unique_leads || 0
+        acc.anonymous_leads += record.anonymous_leads || 0
         return acc
       },
       {
@@ -88,7 +89,8 @@ export async function GET(request, { params }) {
         email_leads: 0,
         appointment_leads: 0,
         website_leads: 0,
-        unique_leads: 0
+        unique_leads: 0,
+        anonymous_leads: 0
       }
     ) || {}
 
@@ -103,9 +105,65 @@ export async function GET(request, { params }) {
       console.error('Error fetching listing meta:', metaError)
     }
 
-    // Calculate conversion rate
+    // Recalculate total_appointments from appointments table to ensure accuracy
+    let actualAppointmentCount = listingMeta?.total_appointments || 0
+    try {
+      const { count: appointmentCount, error: appointmentCountError } = await supabaseAdmin
+        .from('appointments')
+        .select('*', { count: 'exact', head: true })
+        .eq('listing_id', listingId)
+
+      if (!appointmentCountError && appointmentCount !== null) {
+        actualAppointmentCount = appointmentCount
+        // If there's a mismatch, update the listing (but don't fail the request)
+        if (listingMeta && (listingMeta.total_appointments || 0) !== appointmentCount) {
+          supabaseAdmin
+            .from('listings')
+            .update({ total_appointments: appointmentCount })
+            .eq('id', listingId)
+            .then(({ error }) => {
+              if (error) {
+                console.error('Error syncing total_appointments:', error)
+              }
+            })
+        }
+      }
+    } catch (err) {
+      console.error('Error counting appointments:', err)
+    }
+
+    // Recalculate total_saved from saved_listings table to ensure accuracy
+    let actualSavedCount = listingMeta?.total_saved || 0
+    try {
+      const { count: savedCount, error: savedCountError } = await supabaseAdmin
+        .from('saved_listings')
+        .select('*', { count: 'exact', head: true })
+        .eq('listing_id', listingId)
+
+      if (!savedCountError && savedCount !== null) {
+        actualSavedCount = savedCount
+        // If there's a mismatch, update the listing (but don't fail the request)
+        if (listingMeta && (listingMeta.total_saved || 0) !== savedCount) {
+          supabaseAdmin
+            .from('listings')
+            .update({ total_saved: savedCount })
+            .eq('id', listingId)
+            .then(({ error }) => {
+              if (error) {
+                console.error('Error syncing total_saved:', error)
+              }
+            })
+        }
+      }
+    } catch (err) {
+      console.error('Error counting saved listings:', err)
+    }
+
+    // Calculate conversion rate using unique individuals (unique_leads + anonymous_leads)
+    // This represents the percentage of views that converted to unique leads
+    const totalUniqueLeads = (totals.unique_leads || 0) + (totals.anonymous_leads || 0)
     const conversion_rate = totals.total_views > 0 
-      ? ((totals.total_leads / totals.total_views) * 100).toFixed(2)
+      ? ((totalUniqueLeads / totals.total_views) * 100).toFixed(2)
       : 0
 
     return NextResponse.json({
@@ -114,12 +172,13 @@ export async function GET(request, { params }) {
         time_series: analytics || [],
         totals: {
           ...totals,
+          total_unique_leads: totalUniqueLeads, // unique_leads + anonymous_leads (total unique individuals)
           conversion_rate: parseFloat(conversion_rate)
         },
         meta: {
           title: listingMeta?.title || null,
-          total_appointments: listingMeta?.total_appointments || 0,
-          total_saved: listingMeta?.total_saved || 0
+          total_appointments: actualAppointmentCount,
+          total_saved: actualSavedCount
         }
       }
     })

@@ -7,18 +7,20 @@ import 'swiper/css'
 import 'swiper/css/navigation'
 import 'swiper/css/pagination'
 
-export default function Reminders({ listerId, listerType = 'developer', refreshKey = 0 }) {
+export default function Reminders({ listerId, listerType = 'developer', listingId = null, refreshKey = 0 }) {
   const [reminders, setReminders] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const listerIdRef = useRef(listerId)
   const listerTypeRef = useRef(listerType)
+  const listingIdRef = useRef(listingId)
 
   // Update refs when props change
   useEffect(() => {
     listerIdRef.current = listerId
     listerTypeRef.current = listerType
-  }, [listerId, listerType])
+    listingIdRef.current = listingId
+  }, [listerId, listerType, listingId])
 
   useEffect(() => {
     if (!listerId) return
@@ -34,7 +36,19 @@ export default function Reminders({ listerId, listerType = 'developer', refreshK
         const result = await response.json()
         if (!isMounted) return
         if (response.ok && result.success) {
-          setReminders(result.data || [])
+          let allReminders = result.data || []
+          
+          // Filter by listingId if provided
+          if (listingIdRef.current) {
+            allReminders = allReminders.filter(reminder => {
+              // Check if reminder's listing matches the listingId
+              return reminder.listing?.id === listingIdRef.current || 
+                     reminder.listing_id === listingIdRef.current ||
+                     (reminder.leads && reminder.leads.listing_id === listingIdRef.current)
+            })
+          }
+          
+          setReminders(allReminders)
         } else {
           setError('reminders error')
           setReminders([])
@@ -56,7 +70,7 @@ export default function Reminders({ listerId, listerType = 'developer', refreshK
     return () => {
       isMounted = false
     }
-  }, [listerId, listerType, refreshKey])
+  }, [listerId, listerType, listingId, refreshKey])
 
   // Format date as "3 - 12 - 2024"
   const formatDate = (dateString) => {
@@ -135,7 +149,7 @@ export default function Reminders({ listerId, listerType = 'developer', refreshK
       {/* Swiper Container */}
       {loading ? (
         <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary_color"></div>
           <span className="ml-2 text-secondary_color-600">Loading reminders...</span>
         </div>
       ) : error ? (

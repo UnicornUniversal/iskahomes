@@ -36,7 +36,7 @@ const SalesAnalytics = () => {
   })
   const [loading, setLoading] = useState(true)
 
-  // Get currency from user profile if not in overview
+  // Get currency from user profile if not in overview - memoized to prevent recalculation
   const currency = useMemo(() => {
     if (overview.currency && overview.currency !== 'USD') {
       return overview.currency
@@ -79,24 +79,33 @@ const SalesAnalytics = () => {
     return 'USD'
   }, [overview.currency, user?.profile?.company_locations, user?.profile?.default_currency])
 
+  // Fetch overview only once when slug changes
   useEffect(() => {
+    let isMounted = true
+    
     const fetchOverview = async () => {
       try {
         const response = await fetch(`/api/sales/overview?slug=${params.slug}`)
         const result = await response.json()
         
-        if (result.success && result.data?.overview) {
+        if (isMounted && result.success && result.data?.overview) {
           setOverview(result.data.overview)
         }
       } catch (error) {
         console.error('Error fetching overview:', error)
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
     if (params.slug) {
       fetchOverview()
+    }
+    
+    return () => {
+      isMounted = false
     }
   }, [params.slug])
 

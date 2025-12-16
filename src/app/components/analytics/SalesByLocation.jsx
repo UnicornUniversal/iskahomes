@@ -103,27 +103,42 @@ const SalesByLocation = ({ listerId }) => {
   }, [])
 
   useEffect(() => {
+    let isMounted = true
+    
     const fetchData = async () => {
+      if (!listerId) return
+      
       try {
         setLoading(true)
         const response = await fetch(`/api/sales/by-location?slug=${listerId}`)
         const result = await response.json()
+        
+        if (!isMounted) return
         
         if (result.success && result.data) {
           setData(result.data)
           if (result.data.currency) {
             setCurrency(result.data.currency)
           }
+        } else {
+          setData({ locations: [], totalRevenue: 0, totalSales: 0 })
         }
       } catch (error) {
         console.error('Error fetching sales by location:', error)
+        if (isMounted) {
+          setData({ locations: [], totalRevenue: 0, totalSales: 0 })
+        }
       } finally {
+        if (isMounted) {
         setLoading(false)
+        }
       }
     }
 
-    if (listerId) {
       fetchData()
+    
+    return () => {
+      isMounted = false
     }
   }, [listerId])
 

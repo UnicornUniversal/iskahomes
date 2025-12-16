@@ -22,15 +22,21 @@ const pieColors = [
   '#9966FF', // Light Purple
 ]
 
-const SalesByType = ({ listerId }) => {
+const SalesByType = React.memo(({ listerId }) => {
   const [salesByTypeData, setSalesByTypeData] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let isMounted = true
+    
     const fetchData = async () => {
+      if (!listerId) return
+      
       try {
         const response = await fetch(`/api/sales/summary?slug=${listerId}`)
         const result = await response.json()
+        
+        if (!isMounted) return
         
         if (result.success && result.data?.summary?.by_type_property) {
           const typeData = Object.values(result.data.summary.by_type_property)
@@ -42,16 +48,25 @@ const SalesByType = ({ listerId }) => {
             .sort((a, b) => b.count - a.count)
           
           setSalesByTypeData(typeData)
+        } else {
+          setSalesByTypeData([])
         }
       } catch (error) {
         console.error('Error fetching sales by type:', error)
+        if (isMounted) {
+          setSalesByTypeData([])
+        }
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
-    if (listerId) {
-      fetchData()
+    fetchData()
+    
+    return () => {
+      isMounted = false
     }
   }, [listerId])
 
@@ -147,6 +162,8 @@ const SalesByType = ({ listerId }) => {
       </div>
     </div>
   )
-}
+})
+
+SalesByType.displayName = 'SalesByType'
 
 export default SalesByType

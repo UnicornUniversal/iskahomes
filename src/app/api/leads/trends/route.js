@@ -13,7 +13,9 @@ export async function GET(request) {
     const listerId = searchParams.get('lister_id')
     const listerType = searchParams.get('lister_type') || 'developer'
     const listingId = searchParams.get('listing_id')
-    const period = searchParams.get('period') || 'week' // 'week', 'month', 'year'
+    const period = searchParams.get('period') // 'week', 'month', 'year' (for backward compatibility)
+    const dateFrom = searchParams.get('date_from')
+    const dateTo = searchParams.get('date_to')
 
     if (!listerId) {
       return NextResponse.json(
@@ -70,42 +72,61 @@ export async function GET(request) {
       }
     }
 
-    // Calculate date range based on period
+    // Calculate date range based on period or custom date range
     const now = new Date()
     let startDate, endDate, groupBy
 
-    switch (period) {
-      case 'week':
-        // Last 7 days
-        startDate = new Date(now)
-        startDate.setDate(startDate.getDate() - 6)
-        startDate.setHours(0, 0, 0, 0)
-        endDate = new Date(now)
-        endDate.setHours(23, 59, 59, 999)
+    // Use custom date range if provided, otherwise use period
+    if (dateFrom && dateTo) {
+      startDate = new Date(dateFrom)
+      startDate.setHours(0, 0, 0, 0)
+      endDate = new Date(dateTo)
+      endDate.setHours(23, 59, 59, 999)
+      
+      // Determine groupBy based on date range length
+      const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24))
+      if (daysDiff <= 90) {
         groupBy = 'day'
-        break
-      case 'month':
-        // Last 30 days
-        startDate = new Date(now)
-        startDate.setDate(startDate.getDate() - 29)
-        startDate.setHours(0, 0, 0, 0)
-        endDate = new Date(now)
-        endDate.setHours(23, 59, 59, 999)
-        groupBy = 'day'
-        break
-      case 'year':
-        // Last 12 months
-        startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
-        endDate = new Date(now)
+      } else if (daysDiff <= 365) {
+        groupBy = 'week'
+      } else {
         groupBy = 'month'
-        break
-      default:
-        startDate = new Date(now)
-        startDate.setDate(startDate.getDate() - 6)
-        startDate.setHours(0, 0, 0, 0)
-        endDate = new Date(now)
-        endDate.setHours(23, 59, 59, 999)
-        groupBy = 'day'
+      }
+    } else {
+      // Use period for backward compatibility
+      switch (period) {
+        case 'week':
+          // Last 7 days
+          startDate = new Date(now)
+          startDate.setDate(startDate.getDate() - 6)
+          startDate.setHours(0, 0, 0, 0)
+          endDate = new Date(now)
+          endDate.setHours(23, 59, 59, 999)
+          groupBy = 'day'
+          break
+        case 'month':
+          // Last 30 days
+          startDate = new Date(now)
+          startDate.setDate(startDate.getDate() - 29)
+          startDate.setHours(0, 0, 0, 0)
+          endDate = new Date(now)
+          endDate.setHours(23, 59, 59, 999)
+          groupBy = 'day'
+          break
+        case 'year':
+          // Last 12 months
+          startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
+          endDate = new Date(now)
+          groupBy = 'month'
+          break
+        default:
+          startDate = new Date(now)
+          startDate.setDate(startDate.getDate() - 6)
+          startDate.setHours(0, 0, 0, 0)
+          endDate = new Date(now)
+          endDate.setHours(23, 59, 59, 999)
+          groupBy = 'day'
+      }
     }
 
     // Fetch leads for this lister

@@ -2,7 +2,7 @@
 import React from 'react'
 import PropertyLocation from '../modules/PropertyLocation'
 
-const LocationStep = ({ formData, updateFormData, mode, user }) => {
+const LocationStep = ({ formData, updateFormData, mode, user, accountType, developments }) => {
   return (
     <div className="space-y-6">
       <div>
@@ -15,6 +15,9 @@ const LocationStep = ({ formData, updateFormData, mode, user }) => {
         updateFormData={updateFormData}
         isEditMode={mode === 'edit'} 
         companyLocations={user?.profile?.company_locations || []}
+        accountType={accountType}
+        developments={developments}
+        user={user}
       />
     </div>
   )

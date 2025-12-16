@@ -4,6 +4,7 @@ import { Poppins } from "next/font/google";
 import Layout1 from "./layout/Layout1";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { PostHogProvider } from "./providers";
+import DisableNumberInputScroll from "./components/DisableNumberInputScroll";
 
 import Nav from "./components/Nav";
 import Footer from "./components/Footer";
@@ -37,6 +38,7 @@ export default function RootLayout({ children }) {
       >
         <PostHogProvider>
           <AuthProvider>
+            <DisableNumberInputScroll />
             {/* <Nav /> */}
             {/* <Layout1> */}
               {children}

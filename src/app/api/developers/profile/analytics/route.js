@@ -148,9 +148,20 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const range = searchParams.get('range') || 'month'
-    const startDate = getStartDateForRange(range)
-    const endDate = new Date().toISOString().split('T')[0]
+    const range = searchParams.get('range') // For backward compatibility
+    const dateFrom = searchParams.get('date_from')
+    const dateTo = searchParams.get('date_to')
+    
+    // Use custom date range if provided, otherwise use range
+    let startDate, endDate
+    if (dateFrom && dateTo) {
+      startDate = dateFrom
+      endDate = dateTo
+    } else {
+      startDate = getStartDateForRange(range || 'month')
+      endDate = new Date().toISOString().split('T')[0]
+    }
+    
     const startDateTime = `${startDate}T00:00:00Z`
     const endDateTime = `${endDate}T23:59:59Z`
     
@@ -301,7 +312,16 @@ export async function GET(request) {
           impression_share: totals.impression_share,
           impression_saved: totals.impression_saved,
           appointments_booked: appointmentsCount,
-          properties_saved: savedPropertiesCount
+          properties_saved: savedPropertiesCount,
+          // Use unique_leads + anonymous_leads instead of total_leads (which counts actions, not individuals)
+          total_leads: (developer?.total_unique_leads || 0) + (developer?.total_anonymous_leads || 0) || 
+                       (developer?.unique_leads || 0) + (developer?.anonymous_leads || 0) || 
+                       (developer?.total_leads || 0),
+          conversion_rate: totals.profile_views > 0 
+            ? ((((developer?.total_unique_leads || 0) + (developer?.total_anonymous_leads || 0) || 
+                 (developer?.unique_leads || 0) + (developer?.anonymous_leads || 0) || 
+                 (developer?.total_leads || 0)) / totals.profile_views) * 100).toFixed(2)
+            : 0
         },
         time_series: {
           profile_views: profileSeries,

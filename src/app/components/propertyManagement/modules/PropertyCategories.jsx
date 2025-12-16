@@ -285,7 +285,7 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
           <p className="text-blue-700 text-xs mb-2 sm:mb-3">Select the primary purpose</p>
           
           <CustomSelect
-            value={formData.purposes.length > 0 ? formData.purposes[0] : ''}
+            value={(formData.purposes && formData.purposes.length > 0) ? formData.purposes[0] : ''}
             onChange={(e) => {
               if (e.target.value) {
                 handleCategoryToggle('purposes', { id: e.target.value });
@@ -319,7 +319,7 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
           <p className="text-green-700 text-xs mb-2 sm:mb-3">Choose the property type</p>
           
           <CustomSelect
-            value={formData.types.length > 0 ? formData.types[0] : ''}
+            value={(formData.types && formData.types.length > 0) ? formData.types[0] : ''}
             onChange={(e) => {
               if (e.target.value) {
                 handleCategoryToggle('types', { id: e.target.value });
@@ -354,7 +354,7 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
           {/* <p>{formData.categories.length > 0 ? formData.categories[0] : 'Nothing is showing'}</p>
            */}
           <CustomSelect
-            value={formData.categories.length > 0 ? formData.categories[0] : ''}
+            value={(formData.categories && formData.categories.length > 0) ? formData.categories[0] : ''}
             onChange={(e) => {
               if (e.target.value) {
                 handleCategoryToggle('categories', { id: e.target.value });
@@ -365,12 +365,12 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
             options={
               categoriesLoading 
                 ? [{ value: '', label: 'Loading...' }]
-                : formData.types.length === 0
+                : !formData.types || formData.types.length === 0
                 ? [{ value: '', label: 'Select type first', disabled: true }]
                 : filteredCategories.map(category => ({ value: category.id, label: category.name }))
             }
             placeholder="Select category"
-            disabled={formData.types.length === 0 || categoriesLoading}
+            disabled={!formData.types || formData.types.length === 0 || categoriesLoading}
           />
         </div>
 
@@ -386,7 +386,7 @@ const PropertyCategories = ({ formData, updateFormData, isEditMode }) => {
           </div>
           <p className="text-orange-700 text-xs mb-2 sm:mb-3">Select specific subtype</p>
           
-          {formData.types.length > 0 ? (
+          {formData.types && formData.types.length > 0 ? (
             <CustomSelect
               value={(() => {
                 const propertyTypes = formData.listing_types || { database: [], inbuilt: [], custom: [] };

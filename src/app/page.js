@@ -7,10 +7,12 @@ import SideBanner from "./components/Ads/SideBanner";
 import DevelopmentHeaders from "./components/developers/DevelopmentHeaders";
 import PostHogDebug from "./components/PostHogDebug";
 import Layout1 from "./layout/Layout1";
+import HomeCategories from "./components/general/HomeCategories";
 import Nav from "./components/Nav";
+import WhyIskaHomes from "./components/general/WhyIskaHomes";
 export default function Home() {
   return (
-   <div className="  w-full h-full flex flex-col items-center justify-center" >
+   <div className=" max-w-[1500px] mx-auto w-full h-full flex flex-col items-center justify-center" >
    <Nav />
    <Layout1>
 
@@ -18,10 +20,12 @@ export default function Home() {
       {/* <Banner /> */}
       {/* <DevelopmentHeaders /> */}
 
-      <div className="flex flex-col md:flex-row gap-4  w-full  mt-[3em]">
+      <div className="flex flex-col md:flex-row gap-4   w-full  mt-[3em]">
   
-  <div className="w-full h-full ">
+  <div className="w-full h-full flex flex-col gap-4">
   <HomeProperties />
+  <HomeCategories />
+  <WhyIskaHomes/>
   </div>
 {/*       
         <div className="w-full h-full  md:w-[20%]">

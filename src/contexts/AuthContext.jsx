@@ -5,6 +5,7 @@ import { verifyToken } from '@/lib/jwt';
 import { supabase } from '@/lib/supabase';
 import posthog from 'posthog-js';
 import { handleAuthFailure } from '@/lib/authFailureHandler';
+import { clearAnonymousId } from '@/lib/anonymousId';
 
 const AuthContext = createContext();
 
@@ -123,6 +124,57 @@ export const AuthProvider = ({ children }) => {
   const [developerToken, setDeveloperToken] = useState('');
   const [propertySeekerToken, setPropertySeekerToken] = useState('');
 
+  // Helper function to fetch subscription data for a user
+  const fetchUserSubscription = async (userId, userType) => {
+    try {
+      // Map user_type to database format
+      const dbUserType = userType === 'developer' ? 'developer' : 
+                        userType === 'agent' ? 'agent' : 
+                        userType === 'agency' ? 'agency' : null
+
+      if (!dbUserType) {
+        return null
+      }
+
+      // Fetch active subscription with package details
+      const { data: subscription, error } = await supabase
+        .from('subscriptions')
+        .select(`
+          *,
+          subscriptions_package:package_id (
+            id,
+            name,
+            description,
+            features,
+            local_currency_price,
+            international_currency_price,
+            duration,
+            span,
+            display_text,
+            ideal_duration,
+            user_type,
+            is_active
+          )
+        `)
+        .eq('user_id', userId)
+        .eq('user_type', dbUserType)
+        .in('status', ['pending', 'active', 'grace_period'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (error) {
+        console.error('Error fetching subscription:', error)
+        return null
+      }
+
+      return subscription
+    } catch (error) {
+      console.error('Error in fetchUserSubscription:', error)
+      return null
+    }
+  }
+
   const loadUser = async () => {
     try {
       // Check for all possible token types
@@ -186,18 +238,22 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
             // Handle auth failure (logout, clear storage, redirect)
             if (typeof window !== 'undefined') {
-              handleAuthFailure('/signin');
+              handleAuthFailure('/home/signin');
             }
             return;
           } else if (userData) {
             // Enrich stats with category names
             const enrichedProfile = await enrichDeveloperStats(userData);
             
+            // Fetch subscription data
+            const subscription = await fetchUserSubscription(developerId, 'developer');
+            
             setUser({
               id: userData.developer_id,
               email: userData.email,
               user_type: 'developer',
-              profile: enrichedProfile // Store enriched developer profile
+              profile: enrichedProfile, // Store enriched developer profile
+              subscription: subscription || null // Add subscription data
             });
           } else {
             // No user data found - auth failure
@@ -207,9 +263,9 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
             if (typeof window !== 'undefined') {
               if (handleAuthFailure) {
-                handleAuthFailure('/signin');
+                handleAuthFailure('/home/signin');
               } else {
-                window.location.href = '/signin';
+                window.location.href = '/home/signin';
               }
             }
             return;
@@ -221,9 +277,9 @@ export const AuthProvider = ({ children }) => {
           setDeveloperToken('');
           setUser(null);
           if (handleAuthFailure) {
-            handleAuthFailure('/signin');
+            handleAuthFailure('/home/signin');
           } else {
-            window.location.href = '/signin';
+            window.location.href = '/home/signin';
           }
           return;
         }
@@ -250,12 +306,16 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
             // Handle auth failure (logout, clear storage, redirect)
             if (typeof window !== 'undefined') {
-              handleAuthFailure('/signin');
+              handleAuthFailure('/home/signin');
             }
             return;
           } else if (userData) {
             console.log('🔍 Property Seeker Auth - User data:', userData)
             console.log('🔍 Property Seeker Auth - Token:', propertySeekerTokenValue)
+            
+            // Property seekers typically don't have subscriptions, but fetch anyway
+            const subscription = await fetchUserSubscription(seekerId, 'property_seeker');
+            
             setUser({
               id: userData.id,
               email: userData.email,
@@ -266,7 +326,8 @@ export const AuthProvider = ({ children }) => {
                 name: userData.name,
                 slug: userData.slug,
                 status: userData.status
-              }
+              },
+              subscription: subscription || null
             });
           } else {
             // No user data found - auth failure
@@ -276,9 +337,9 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
             if (typeof window !== 'undefined') {
               if (handleAuthFailure) {
-                handleAuthFailure('/signin');
+                handleAuthFailure('/home/signin');
               } else {
-                window.location.href = '/signin';
+                window.location.href = '/home/signin';
               }
             }
             return;
@@ -290,9 +351,9 @@ export const AuthProvider = ({ children }) => {
           setPropertySeekerToken('');
           setUser(null);
           if (handleAuthFailure) {
-            handleAuthFailure('/signin');
+            handleAuthFailure('/home/signin');
           } else {
-            window.location.href = '/signin';
+            window.location.href = '/home/signin';
           }
           return;
         }
@@ -308,12 +369,12 @@ export const AuthProvider = ({ children }) => {
           const path = window.location.pathname;
           const protectedRoutes = ['/developer/', '/agents/', '/admin/', '/propertySeeker/', '/homeowner/', '/homeSeeker/'];
           const isProtectedRoute = protectedRoutes.some(route => path.startsWith(route));
-          const isPublicRoute = path === '/signin' || path === '/signup' || path === '/' || path.startsWith('/property/');
+          const isPublicRoute = path === '/home/signin' || path === '/signup' || path === '/' || path.startsWith('/property/');
           
           // Only redirect if on a protected route (don't redirect from public pages)
           if (isProtectedRoute && !isPublicRoute) {
             console.log('No token found on protected route, redirecting to signin');
-            handleAuthFailure('/signin');
+            handleAuthFailure('/home/signin');
             return;
           }
         }
@@ -328,9 +389,9 @@ export const AuthProvider = ({ children }) => {
         setPropertySeekerToken('');
         setUser(null);
         if (handleAuthFailure) {
-          handleAuthFailure('/signin');
+          handleAuthFailure('/home/signin');
         } else {
-          window.location.href = '/signin';
+          window.location.href = '/home/signin';
         }
       } else {
         // Other errors - also logout for security
@@ -340,9 +401,9 @@ export const AuthProvider = ({ children }) => {
         setPropertySeekerToken('');
         setUser(null);
         if (handleAuthFailure) {
-          handleAuthFailure('/signin');
+          handleAuthFailure('/home/signin');
         } else {
-          window.location.href = '/signin';
+          window.location.href = '/home/signin';
         }
       }
     } finally {
@@ -361,7 +422,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password, userType = null) => {
     try {
-      const response = await fetch('/api/auth/signin', {
+      const response = await fetch('/api/auth/home/signin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -380,12 +441,25 @@ export const AuthProvider = ({ children }) => {
           localStorage.removeItem('agent_token');
           localStorage.removeItem('admin_token');
           
+          // Clear anonymous ID when user logs in (they now have a real user ID)
+          clearAnonymousId();
+          
           // Handle different user types
           if (data.user.user_type === 'developer') {
             // Store developer token
             localStorage.setItem('developer_token', data.token);
             setDeveloperToken(data.token);
-            setUser(data.user);
+            
+            // Fetch subscription data
+            const subscription = await fetchUserSubscription(data.user.id, 'developer');
+            
+            // Add subscription to user object
+            const userWithSubscription = {
+              ...data.user,
+              subscription: subscription || null
+            };
+            
+            setUser(userWithSubscription);
             
             // Track login with PostHog
             posthog.identify(data.user.id, {
@@ -400,14 +474,24 @@ export const AuthProvider = ({ children }) => {
               login_method: 'email'
             });
             
-            return { success: true, user: data.user };
+            return { success: true, user: userWithSubscription };
           } else if (data.user.user_type === 'property_seeker') {
             // Store property seeker token
             console.log('🔍 Property Seeker Login - Storing token:', data.token)
             console.log('🔍 Property Seeker Login - User data:', data.user)
             localStorage.setItem('property_seeker_token', data.token);
             setPropertySeekerToken(data.token);
-            setUser(data.user);
+            
+            // Property seekers typically don't have subscriptions, but fetch anyway
+            const subscription = await fetchUserSubscription(data.user.id, 'property_seeker');
+            
+            // Add subscription to user object
+            const userWithSubscription = {
+              ...data.user,
+              subscription: subscription || null
+            };
+            
+            setUser(userWithSubscription);
             
             // Track login with PostHog
             posthog.identify(data.user.id, {
@@ -421,11 +505,21 @@ export const AuthProvider = ({ children }) => {
               login_method: 'email'
             });
             
-            return { success: true, user: data.user };
+            return { success: true, user: userWithSubscription };
           } else if (data.user.user_type === 'agent') {
             // Store agent token
             localStorage.setItem('agent_token', data.token);
-            setUser(data.user);
+            
+            // Fetch subscription data
+            const subscription = await fetchUserSubscription(data.user.id, 'agent');
+            
+            // Add subscription to user object
+            const userWithSubscription = {
+              ...data.user,
+              subscription: subscription || null
+            };
+            
+            setUser(userWithSubscription);
             
             posthog.identify(data.user.id, {
               email: data.user.email,
@@ -438,7 +532,7 @@ export const AuthProvider = ({ children }) => {
               login_method: 'email'
             });
             
-            return { success: true, user: data.user };
+            return { success: true, user: userWithSubscription };
           } else if (data.user.user_type === 'admin') {
             // Store admin token
             localStorage.setItem('admin_token', data.token);

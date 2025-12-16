@@ -28,6 +28,9 @@ const page = () => {
   const [locationSearch, setLocationSearch] = useState('')
   const [locationSearchResults, setLocationSearchResults] = useState([])
   const [selectedLocation, setSelectedLocation] = useState(null) // { type: 'country'|'state'|'city'|'town', value: string }
+  const [showLocationResults, setShowLocationResults] = useState(false)
+  const locationSearchRef = useRef(null)
+  const locationResultsRef = useRef(null)
   
   // Category filters
   const [selectedPurpose, setSelectedPurpose] = useState('')
@@ -61,15 +64,6 @@ const page = () => {
     { value: '', label: 'All Sub Types' },
     ...subtypesData.map(s => ({ value: s.id, label: s.name }))
   ], [subtypesData])
-  
-  // Location options from search results
-  const locationOptions = useMemo(() => [
-    { value: '', label: 'All Locations' },
-    ...locationSearchResults.map(loc => ({
-      value: `${loc.type}:${loc.value}`,
-      label: `${loc.label} (${loc.type})`
-    }))
-  ], [locationSearchResults])
   
   // View mode state
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
@@ -148,10 +142,28 @@ const page = () => {
     fetchDevelopments()
   }, [user])
 
+  // Close location results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        locationResultsRef.current &&
+        !locationResultsRef.current.contains(event.target) &&
+        locationSearchRef.current &&
+        !locationSearchRef.current.contains(event.target)
+      ) {
+        setShowLocationResults(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   // Search locations using API
   useEffect(() => {
     if (!locationSearch.trim() || locationSearch.trim().length < 1) {
       setLocationSearchResults([])
+      setShowLocationResults(false)
       return
     }
 
@@ -161,34 +173,28 @@ const page = () => {
         const response = await fetch(`/api/locations/search?q=${encodeURIComponent(locationSearch.trim())}&limit=10`)
         if (response.ok) {
           const result = await response.json()
-          setLocationSearchResults(result.data || [])
+          const results = result.data || []
+          setLocationSearchResults(results)
+          setShowLocationResults(results.length > 0)
         } else {
           setLocationSearchResults([])
+          setShowLocationResults(false)
         }
       } catch (error) {
         console.error('Error searching locations:', error)
         setLocationSearchResults([])
+        setShowLocationResults(false)
       }
     }, 200) // 200ms debounce
 
     return () => clearTimeout(timeoutId)
   }, [locationSearch])
 
-  // Handle location selection from CustomSelect
-  const handleLocationSelect = (e) => {
-    const value = e.target.value
-    if (!value || value === '') {
-      setSelectedLocation(null)
-      setLocationSearch('')
-      return
-    }
-    
-    const [type, locationValue] = value.split(':')
-    const location = locationSearchResults.find(loc => loc.type === type && loc.value === locationValue)
-    if (location) {
-      setSelectedLocation(location)
-      setLocationSearch(location.label)
-    }
+  // Handle location selection from dropdown
+  const handleLocationSelect = (location) => {
+    setSelectedLocation(location)
+    setLocationSearch(location.label)
+    setShowLocationResults(false)
   }
 
   // Fetch filtered developments from server
@@ -341,6 +347,7 @@ const page = () => {
     setSelectedType('')
     setSelectedCategory('')
     setSelectedSubType('')
+    setShowLocationResults(false)
   }
 
   if (loading) {
@@ -393,8 +400,8 @@ const page = () => {
                   onClick={() => setViewMode('grid')}
                   className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
                     viewMode === 'grid' 
-                      ? 'bg-white text-gray-900 shadow-sm' 
-                      : 'text-gray-600 hover:text-gray-900'
+                      ? 'bg-white text-primary_color shadow-sm' 
+                      : 'text-gray-600 hover:text-primary_color'
                   }`}
                 >
                   <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
@@ -405,8 +412,8 @@ const page = () => {
                   onClick={() => setViewMode('list')}
                   className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
                     viewMode === 'list' 
-                      ? 'bg-white text-gray-900 shadow-sm' 
-                      : 'text-gray-600 hover:text-gray-900'
+                      ? 'bg-white text-primary_color shadow-sm' 
+                      : 'text-gray-600 hover:text-primary_color'
                   }`}
                 >
                   <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
@@ -470,8 +477,8 @@ const page = () => {
         </div>
 
         {/* Filters Sidebar - Hidden on small/medium, visible on large+ */}
-        <div className='hidden lg:block w-80 flex-shrink-0'>
-          <div className='border-l border-white/50 p-4 sticky top-20 max-h-[calc(100vh-5rem)] overflow-y-auto'>
+        <div className='hidden lg:block w-80 flex-shrink-0 sticky top-20 self-start'>
+          <div className='border-l border-white/50 p-4 max-h-[calc(100vh-5rem)] overflow-y-auto'>
             <div className='flex items-center justify-between mb-4'>
               <h2 className='text-lg font-semibold'>Filters</h2>
               {(searchQuery || selectedLocation || selectedPurpose || selectedType || selectedCategory || selectedSubType) && (
@@ -504,11 +511,14 @@ const page = () => {
             {/* Location Filter */}
             <div className='mb-6'>
               <label className='block text-sm font-medium mb-2'>Location</label>
-              <div className='relative'>
+              <div className='relative' ref={locationSearchRef}>
                 <input
                   type='text'
                   value={locationSearch}
                   onChange={(e) => setLocationSearch(e.target.value)}
+                  onFocus={() => {
+                    if (locationSearchResults.length > 0) setShowLocationResults(true)
+                  }}
                   placeholder='Search location...'
                   className='w-full pl-10'
                 />
@@ -516,19 +526,37 @@ const page = () => {
                   <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z' />
                   <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 11a3 3 0 11-6 0 3 3 0 016 0z' />
                 </svg>
+                
+                {/* Location Results Dropdown */}
+                {showLocationResults && locationSearch.trim().length > 0 && locationSearchResults.length > 0 && (
+                  <div
+                    ref={locationResultsRef}
+                    className='absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 max-h-[300px] overflow-y-auto z-50'
+                  >
+                    <div className='py-2'>
+                      {locationSearchResults.map((location) => (
+                        <button
+                          key={`${location.type}-${location.value}`}
+                          type='button'
+                          onClick={() => handleLocationSelect(location)}
+                          className='w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0'
+                        >
+                          <div className='flex items-center justify-between'>
+                            <div>
+                              <p className='text-sm font-medium text-primary_color'>
+                                {location.label}
+                              </p>
+                              <p className='text-xs text-gray-500 capitalize mt-0.5'>
+                                {location.type}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              
-              {/* Location Dropdown - Only show when there are results */}
-              {locationSearch.trim().length > 0 && locationSearchResults.length > 0 && (
-                <div className='mt-2'>
-                  <CustomSelect
-                    value={selectedLocation ? `${selectedLocation.type}:${selectedLocation.value}` : ''}
-                    onChange={handleLocationSelect}
-                    options={locationOptions}
-                    placeholder='Select location...'
-                  />
-                </div>
-              )}
               
               {selectedLocation && (
                 <div className='mt-2 px-3 py-2 rounded-lg border border-gray-200 flex items-center justify-between'>
@@ -537,6 +565,7 @@ const page = () => {
                     onClick={() => {
                       setSelectedLocation(null)
                       setLocationSearch('')
+                      setShowLocationResults(false)
                     }}
                     className='text-sm'
                   >
@@ -641,11 +670,14 @@ const page = () => {
                 {/* Location Filter */}
                 <div className='mb-6'>
                   <label className='block text-sm font-medium mb-2'>Location</label>
-                  <div className='relative'>
+                  <div className='relative' ref={locationSearchRef}>
                     <input
                       type='text'
                       value={locationSearch}
                       onChange={(e) => setLocationSearch(e.target.value)}
+                      onFocus={() => {
+                        if (locationSearchResults.length > 0) setShowLocationResults(true)
+                      }}
                       placeholder='Search location...'
                       className='w-full pl-10'
                     />
@@ -653,19 +685,37 @@ const page = () => {
                       <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z' />
                       <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 11a3 3 0 11-6 0 3 3 0 016 0z' />
                     </svg>
+                    
+                    {/* Location Results Dropdown */}
+                    {showLocationResults && locationSearch.trim().length > 0 && locationSearchResults.length > 0 && (
+                      <div
+                        ref={locationResultsRef}
+                        className='absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 max-h-[300px] overflow-y-auto z-50'
+                      >
+                        <div className='py-2'>
+                          {locationSearchResults.map((location) => (
+                            <button
+                              key={`${location.type}-${location.value}`}
+                              type='button'
+                              onClick={() => handleLocationSelect(location)}
+                              className='w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0'
+                            >
+                              <div className='flex items-center justify-between'>
+                                <div>
+                                  <p className='text-sm font-medium text-gray-900'>
+                                    {location.label}
+                                  </p>
+                                  <p className='text-xs text-gray-500 capitalize mt-0.5'>
+                                    {location.type}
+                                  </p>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  
-                  {/* Location Dropdown - Only show when there are results */}
-                  {locationSearch.trim().length > 0 && locationSearchResults.length > 0 && (
-                    <div className='mt-2'>
-                      <CustomSelect
-                        value={selectedLocation ? `${selectedLocation.type}:${selectedLocation.value}` : ''}
-                        onChange={handleLocationSelect}
-                        options={locationOptions}
-                        placeholder='Select location...'
-                      />
-                    </div>
-                  )}
                   
                   {selectedLocation && (
                     <div className='mt-2 px-3 py-2 rounded-lg border border-gray-200 flex items-center justify-between'>
@@ -674,6 +724,7 @@ const page = () => {
                         onClick={() => {
                           setSelectedLocation(null)
                           setLocationSearch('')
+                          setShowLocationResults(false)
                         }}
                         className='text-sm'
                       >

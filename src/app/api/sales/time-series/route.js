@@ -6,7 +6,9 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('user_id')
     const slug = searchParams.get('slug')
-    const range = searchParams.get('range') || 'month' // week, month, year
+    const range = searchParams.get('range') // week, month, year (for backward compatibility)
+    const dateFrom = searchParams.get('date_from')
+    const dateTo = searchParams.get('date_to')
 
     if (!userId && !slug) {
       return NextResponse.json(
@@ -35,13 +37,26 @@ export async function GET(request) {
       finalUserId = developer.developer_id
     }
 
-    // OPTIMIZED: Fetch only needed fields
-    const { data: sales, error: salesError } = await supabaseAdmin
+    // Build query with date filters if provided
+    let query = supabaseAdmin
       .from('sales_listings')
       .select('sale_date, sale_price')
       .eq('user_id', finalUserId)
       .not('sale_date', 'is', null)
-      .order('sale_date', { ascending: true })
+
+    // Apply date range filter if provided
+    if (dateFrom) {
+      query = query.gte('sale_date', dateFrom)
+    }
+    if (dateTo) {
+      // Add time to end of day for inclusive end date
+      const endDate = new Date(dateTo)
+      endDate.setHours(23, 59, 59, 999)
+      query = query.lte('sale_date', endDate.toISOString())
+    }
+
+    // OPTIMIZED: Fetch only needed fields
+    const { data: sales, error: salesError } = await query.order('sale_date', { ascending: true })
 
     if (salesError) {
       console.error('Error fetching sales:', salesError)
@@ -68,8 +83,114 @@ export async function GET(request) {
     let salesCount = []
     let revenue = []
 
+    // Determine grouping strategy
+    const useCustomRange = dateFrom && dateTo
+    const startDate = dateFrom ? new Date(dateFrom) : null
+    const endDate = dateTo ? new Date(dateTo) : null
+    
+    // Calculate days difference for custom range
+    let daysDiff = 0
+    if (useCustomRange && startDate && endDate) {
+      daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24))
+    }
+
     // Group sales by time period (optimized)
-    if (range === 'week') {
+    if (useCustomRange && daysDiff > 0) {
+      // Custom date range - group by day if <= 90 days, by week if <= 365 days, by month if > 365 days
+      if (daysDiff <= 90) {
+        // Group by day
+        const dayData = {}
+        const dateKeys = []
+        
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+          const dateKey = d.toISOString().split('T')[0]
+          const dayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          labels.push(dayLabel)
+          dateKeys.push(dateKey)
+          dayData[dateKey] = { count: 0, revenue: 0 }
+        }
+
+        sales.forEach(sale => {
+          const saleDate = sale.sale_date.split('T')[0]
+          if (dayData[saleDate]) {
+            dayData[saleDate].count++
+            dayData[saleDate].revenue += (sale.sale_price || 0)
+          }
+        })
+
+        dateKeys.forEach(dateKey => {
+          salesCount.push(dayData[dateKey].count)
+          revenue.push(dayData[dateKey].revenue)
+        })
+      } else if (daysDiff <= 365) {
+        // Group by week
+        const weekData = {}
+        const weekKeys = []
+        
+        let currentWeekStart = new Date(startDate)
+        currentWeekStart.setDate(currentWeekStart.getDate() - currentWeekStart.getDay()) // Start of week
+        
+        while (currentWeekStart <= endDate) {
+          const weekEnd = new Date(currentWeekStart)
+          weekEnd.setDate(weekEnd.getDate() + 6)
+          
+          const weekKey = `${currentWeekStart.toISOString().split('T')[0]}_${weekEnd.toISOString().split('T')[0]}`
+          const weekLabel = `${currentWeekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+          labels.push(weekLabel)
+          weekKeys.push(weekKey)
+          weekData[weekKey] = { start: new Date(currentWeekStart), end: new Date(weekEnd), count: 0, revenue: 0 }
+          
+          currentWeekStart.setDate(currentWeekStart.getDate() + 7)
+        }
+
+        sales.forEach(sale => {
+          const saleDate = new Date(sale.sale_date)
+          weekKeys.forEach(weekKey => {
+            const week = weekData[weekKey]
+            if (saleDate >= week.start && saleDate <= week.end) {
+              week.count++
+              week.revenue += (sale.sale_price || 0)
+            }
+          })
+        })
+
+        weekKeys.forEach(weekKey => {
+          salesCount.push(weekData[weekKey].count)
+          revenue.push(weekData[weekKey].revenue)
+        })
+      } else {
+        // Group by month
+        const monthData = {}
+        const monthKeys = []
+        
+        let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
+        
+        while (currentMonth <= endDate) {
+          const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+          labels.push(monthLabel)
+          
+          const monthKey = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`
+          monthKeys.push(monthKey)
+          monthData[monthKey] = { count: 0, revenue: 0 }
+          
+          currentMonth.setMonth(currentMonth.getMonth() + 1)
+        }
+
+        sales.forEach(sale => {
+          const saleDate = new Date(sale.sale_date)
+          const monthKey = `${saleDate.getFullYear()}-${String(saleDate.getMonth() + 1).padStart(2, '0')}`
+          if (monthData[monthKey]) {
+            monthData[monthKey].count++
+            monthData[monthKey].revenue += (sale.sale_price || 0)
+          }
+        })
+
+        monthKeys.forEach(monthKey => {
+          salesCount.push(monthData[monthKey].count)
+          revenue.push(monthData[monthKey].revenue)
+        })
+      }
+    } else if (range === 'week') {
       // Last 7 days
       const weekData = {}
       const dateKeys = []

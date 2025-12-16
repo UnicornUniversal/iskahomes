@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Line } from 'react-chartjs-2'
 import {
@@ -13,6 +13,8 @@ import {
   Legend,
 } from 'chart.js'
 import { Loader2 } from 'lucide-react'
+import { DateRangePicker } from '@/app/components/ui/date-range-picker'
+import { ExportDropdown } from '@/app/components/ui/export-dropdown'
 
 // Register ChartJS components
 ChartJS.register(
@@ -156,7 +158,7 @@ const ImpressionsChart = ({ data }) => {
 const StatisticsView = () => {
   const { user } = useAuth()
   const [selectedMetric, setSelectedMetric] = useState('views')
-  const [selectedPeriod, setSelectedPeriod] = useState('today')
+  const [exporting, setExporting] = useState(false)
   const [viewsData, setViewsData] = useState([])
   // const [impressionsData, setImpressionsData] = useState([]) // COMMENTED OUT: Impressions too slow
   const [loading, setLoading] = useState(true)
@@ -165,6 +167,35 @@ const StatisticsView = () => {
     totalListingViews: 0, 
     totalProfileViews: 0 
   })
+
+  // Initialize with current month as default
+  const getDefaultDateRange = () => {
+    const today = new Date()
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+    return {
+      startDate: startOfMonth.toISOString().split('T')[0],
+      endDate: today.toISOString().split('T')[0]
+    }
+  }
+
+  const defaultRange = getDefaultDateRange()
+  const [dateRange, setDateRange] = useState(defaultRange)
+  
+  // Convert date range to period for API compatibility
+  const getPeriodFromDateRange = useCallback(() => {
+    if (!dateRange.startDate || !dateRange.endDate) return 'month'
+    
+    const start = new Date(dateRange.startDate)
+    const end = new Date(dateRange.endDate)
+    const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24))
+    
+    if (daysDiff <= 1) return 'today'
+    if (daysDiff <= 7) return 'week'
+    if (daysDiff <= 30) return 'month'
+    return 'year'
+  }, [dateRange])
+  
+  const selectedPeriod = getPeriodFromDateRange()
 
   useEffect(() => {
     if (!user?.id) {
@@ -203,10 +234,20 @@ const StatisticsView = () => {
         //   `/api/analytics/statistics?user_id=${user.id}&user_type=${userType}&period=${selectedPeriod}&metric=${selectedMetric}`
         // )
         
-        // NEW: Use Supabase user_analytics table
-        const response = await fetch(
-          `/api/analytics/statistics-db?user_id=${user.id}&user_type=${userType}&period=${selectedPeriod}&metric=${selectedMetric}`
-        )
+        // NEW: Use Supabase user_analytics table with date range
+        const params = new URLSearchParams({
+          user_id: user.id,
+          user_type: userType,
+          period: selectedPeriod,
+          metric: selectedMetric
+        })
+        
+        if (dateRange.startDate && dateRange.endDate) {
+          params.append('date_from', dateRange.startDate)
+          params.append('date_to', dateRange.endDate)
+        }
+        
+        const response = await fetch(`/api/analytics/statistics-db?${params.toString()}`)
 
         if (response.ok) {
           const result = await response.json()
@@ -241,7 +282,7 @@ const StatisticsView = () => {
     return () => {
       isMounted = false
     }
-  }, [user?.id, user?.profile?.account_type, selectedPeriod, selectedMetric])
+  }, [user?.id, user?.profile?.account_type, selectedPeriod, selectedMetric, dateRange.startDate, dateRange.endDate])
 
   // const currentData = selectedMetric === 'views' ? viewsData : impressionsData // COMMENTED OUT: Only views now
   const currentData = viewsData
@@ -273,55 +314,65 @@ const StatisticsView = () => {
           <h5 className="text-lg font-semibold">Statistics</h5>
           
           <div className="flex gap-3 items-center">
-            {/* Period Selector */}
-            <div className="flex gap-2 rounded-full p-1 border border-gray-200 bg-white/40">
-              <button
-                onClick={() => setSelectedPeriod('today')}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  selectedPeriod === 'today'
-                    ? 'bg-white shadow-sm'
-                    : 'hover:bg-gray-100'
-                }`}
-              >
-                Today
-              </button>
-              <button
-                onClick={() => setSelectedPeriod('week')}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  selectedPeriod === 'week'
-                    ? 'bg-white shadow-sm'
-                    : 'hover:bg-gray-100'
-                }`}
-              >
-                Week
-              </button>
-              <button
-                onClick={() => setSelectedPeriod('month')}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  selectedPeriod === 'month'
-                    ? 'bg-white shadow-sm'
-                    : 'hover:bg-gray-100'
-                }`}
-              >
-                Month
-              </button>
-              <button
-                onClick={() => setSelectedPeriod('year')}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  selectedPeriod === 'year'
-                    ? 'bg-white shadow-sm'
-                    : 'hover:bg-gray-100'
-                }`}
-              >
-                Year
-              </button>
-            </div>
+            <DateRangePicker
+              startDate={dateRange.startDate}
+              endDate={dateRange.endDate}
+              onChange={setDateRange}
+              className="w-[280px]"
+            />
+            <ExportDropdown
+              onExport={async (format) => {
+                if (!dateRange.startDate || !dateRange.endDate || exporting) return
+                
+                setExporting(true)
+                try {
+                  const exportData = [
+                    ['Date', 'Views'],
+                    ...currentData.map(item => [
+                      item.label || '',
+                      item.value || 0
+                    ])
+                  ]
+                  
+                  if (format === 'csv') {
+                    const csvContent = exportData.map(row => row.join(',')).join('\n')
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+                    const link = document.createElement('a')
+                    const url = URL.createObjectURL(blob)
+                    link.setAttribute('href', url)
+                    link.setAttribute('download', `statistics-${dateRange.startDate}-to-${dateRange.endDate}.csv`)
+                    link.style.visibility = 'hidden'
+                    document.body.appendChild(link)
+                    link.click()
+                    document.body.removeChild(link)
+                  } else if (format === 'excel') {
+                    const BOM = '\uFEFF'
+                    const excelContent = BOM + exportData.map(row => row.join('\t')).join('\n')
+                    const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+                    const link = document.createElement('a')
+                    const url = URL.createObjectURL(blob)
+                    link.setAttribute('href', url)
+                    link.setAttribute('download', `statistics-${dateRange.startDate}-to-${dateRange.endDate}.xls`)
+                    link.style.visibility = 'hidden'
+                    document.body.appendChild(link)
+                    link.click()
+                    document.body.removeChild(link)
+                  }
+                } catch (error) {
+                  console.error('Error exporting data:', error)
+                  alert('Failed to export data. Please try again.')
+                } finally {
+                  setExporting(false)
+                }
+              }}
+              disabled={exporting || !dateRange.startDate || !dateRange.endDate || currentData.length === 0}
+            />
 
             {/* Metric Toggle Buttons */}
             {/* COMMENTED OUT: Impressions button - query is too slow */}
             {/* TODO: Re-enable when impressions query is optimized or using cached data */}
             {/*
-            <div className="flex gap-2 bg-white rounded-lg p-1 border border-gray-200">
+            <div className="flex gap-2 rounded-lg p-1 border border-gray-200">
               <button
                 onClick={() => setSelectedMetric('views')}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
@@ -354,30 +405,30 @@ const StatisticsView = () => {
       <div className="px-6 py-4 grid grid-cols-3 gap-4 border-b border-gray-100">
         {/* Total Views */}
         <div className="flex flex-col">
-          <span className="text-xs font-medium uppercase tracking-wide mb-1">
+          <span className="text-[10px] font-medium uppercase tracking-wide mb-1">
             Total Views
           </span>
-          <h3 className="md:text-[3em]  ">
+          <h3 className="md:text-[2em]  ">
             {loading ? '...' : totalViews.toLocaleString()}
           </h3>
         </div>
 
         {/* Total Listing Views */}
         <div className="flex flex-col">
-          <span className="text-xs font-medium uppercase tracking-wide mb-1">
+          <span className="text-[10px] font-medium uppercase tracking-wide mb-1">
             Total Listing Views
           </span>
-          <h3 className="md:text-[3em]  ">
+          <h3 className="md:text-[2em]  ">
             {loading ? '...' : totalListingViews.toLocaleString()}
           </h3>
         </div>
 
         {/* Total Profile Views */}
         <div className="flex flex-col">
-          <span className="text-xs font-medium uppercase tracking-wide mb-1">
+          <span className="text-[10px] font-medium uppercase tracking-wide mb-1">
             Total Profile Views
           </span>
-          <h3 className="md:text-[3em]  ">
+          <h3 className="md:text-[2em]  ">
             {loading ? '...' : totalProfileViews.toLocaleString()}
           </h3>
         </div>

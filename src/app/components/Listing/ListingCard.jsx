@@ -70,7 +70,7 @@ const ListingCard = ({ listing }) => {
   const specs = getSpecifications()
 
   return (
-    <Link href={`/property/${listing_type}/${slug}/${id}`}>
+    <Link href={`/home/property/${listing_type}/${slug}/${id}`}>
       <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer group">
         {/* Image Section */}
         <div className="relative h-64 w-full overflow-hidden">

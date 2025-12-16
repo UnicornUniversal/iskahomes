@@ -96,15 +96,15 @@ const TopDevelopments = () => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+    <div className="rounded-lg shadow-sm border border-gray-100 overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+      <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-blue-600" />
-            <h5 className="text-lg font-semibold text-gray-900">Top Developments</h5>
+            <Building2 className="w-5 h-5 text-primary_color" />
+            <h5 className="text-lg font-semibold text-primary_color">Top Developments</h5>
           </div>
-          <span className="text-sm text-gray-500">Top 7 by views</span>
+          <span className="text-sm text-primary_color">Top 7 by views</span>
         </div>
       </div>
 
@@ -150,36 +150,36 @@ const TopDevelopments = () => {
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <h6 className="font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                    <h6 className="font-semibold text-primary_color truncate group-hover:text-blue-600 transition-colors">
                       {dev.title}
                     </h6>
-                    <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
+                    <div className="flex items-center gap-2 mt-1 text-sm text-primary_color">
                       <MapPin className="w-3 h-3 flex-shrink-0" />
                       <span className="truncate">{formatLocation(dev)}</span>
                     </div>
                     <div className="flex items-center gap-3 mt-2 flex-wrap">
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                      <div className="flex items-center gap-1 text-xs text-primary_color">
                         <Eye className="w-3 h-3" />
                         <span className="font-medium">{dev.total_views?.toLocaleString() || 0} views</span>
                       </div>
                       <span className="text-gray-300">•</span>
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                      <div className="flex items-center gap-1 text-xs text-primary_color">
                         <Building2 className="w-3 h-3" />
                         <span className="font-medium">{dev.units_sold || 0} sold</span>
                       </div>
                       <span className="text-gray-300">•</span>
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                      <div className="flex items-center gap-1 text-xs text-primary_color">
                         <span className="font-medium">Expected Revenue: {formatCurrency(dev.total_estimated_revenue)}</span>
                       </div>
                       <span className="text-gray-300">•</span>
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                      <div className="flex items-center gap-1 text-xs text-primary_color">
                         <span className="font-medium">Total Revenue: {formatCurrency(dev.total_revenue)}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Arrow */}
-                  <div className="flex-shrink-0 text-gray-400 group-hover:text-blue-600 transition-colors">
+                  <div className="flex-shrink-0 text-primary_color group-hover:text-blue-600 transition-colors">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
@@ -193,11 +193,11 @@ const TopDevelopments = () => {
 
       {/* Footer */}
       {developments.length > 0 && (
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="px-6 py-4 border-t border-gray-200">
           <div className="text-center">
             <Link
               href={`/developer/${user?.profile?.slug || user?.profile?.id}/analytics/properties`}
-              className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+              className="text-primary_color hover:text-blue-700 font-medium text-sm"
             >
               View All Developments →
             </Link>

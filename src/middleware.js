@@ -8,7 +8,7 @@ export async function middleware(req) {
   // This middleware is kept for potential future cookie-based auth.
   
   // For now, we'll let the client-side AuthContext handle authentication checks
-  // The AuthContext will redirect to /signin if no valid token is found
+  // The AuthContext will redirect to /home/signin if no valid token is found
   
   return NextResponse.next()
 }

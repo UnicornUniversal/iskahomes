@@ -1,18 +1,51 @@
 'use client'
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import LeadsManagement from '@/app/components/analytics/LeadsManagement'
 import LeadsTrend from '@/app/components/analytics/LeadsTrend'
 import LeadsShare from '@/app/components/analytics/LeadsShare'
+import ChannelPerformance from '@/app/components/analytics/ChannelPerformance'
+import LeadLifecycle from '@/app/components/analytics/LeadLifecycle'
+import TemporalPatterns from '@/app/components/analytics/TemporalPatterns'
+import ContextAnalysis from '@/app/components/analytics/ContextAnalysis'
+import EngagementAnalysis from '@/app/components/analytics/EngagementAnalysis'
+import PredictiveMetrics from '@/app/components/analytics/PredictiveMetrics'
+import ComparativeAnalysis from '@/app/components/analytics/ComparativeAnalysis'
+import OperationalEfficiency from '@/app/components/analytics/OperationalEfficiency'
 import DataCard from '@/app/components/developers/DataCard'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, BarChart3, MessageCircle, Phone, Calendar, TrendingUp } from 'lucide-react'
+import { ArrowLeft, BarChart3, MessageCircle, Phone, Calendar, TrendingUp, Loader2, UserX } from 'lucide-react'
 
 const LeadAnalytics = () => {
   const params = useParams()
   const { user } = useAuth()
   const listerId = user?.profile?.developer_id || params.slug
+  const [analyticsData, setAnalyticsData] = useState(null)
+  const [loadingAnalytics, setLoadingAnalytics] = useState(true)
+
+  // Fetch comprehensive analytics data
+  useEffect(() => {
+    async function fetchAnalytics() {
+      if (!listerId) return
+
+      setLoadingAnalytics(true)
+      try {
+        const response = await fetch(`/api/leads/analytics?lister_id=${listerId}&lister_type=developer`)
+        const result = await response.json()
+        
+        if (result.success) {
+          setAnalyticsData(result.data)
+        }
+      } catch (error) {
+        console.error('Error fetching analytics:', error)
+      } finally {
+        setLoadingAnalytics(false)
+      }
+    }
+
+    fetchAnalytics()
+  }, [listerId])
 
   // Extract leads data directly from user profile
   const getTotalLeadsData = () => {
@@ -44,8 +77,27 @@ const LeadAnalytics = () => {
     const directMessageLeads = messagingData?.direct_message?.total ?? leadsBreakdown?.direct_message?.total ?? 0
     const messageTotal = messagingData?.total ?? ((whatsappLeads + directMessageLeads) || leadsBreakdown?.message_leads?.total || 0)
 
+    // HYBRID APPROACH: Use aggregate total_unique_leads + total_anonymous_leads for developer-level display
+    // This shows unique individuals across ALL contexts (profile + listings + developments)
+    const totalUniqueLeads = user.profile.total_unique_leads || 0 // Aggregate across all contexts
+    const totalAnonymousLeads = user.profile.total_anonymous_leads || 0 // Aggregate across all contexts
+    const totalLeads = totalUniqueLeads + totalAnonymousLeads // Total unique individuals across all contexts
+    
+    // Fallback to profile-specific if aggregate not available
+    const profileUniqueLeads = user.profile.unique_leads || 0 // Profile-specific only
+    const profileAnonymousLeads = user.profile.anonymous_leads || 0 // Profile-specific only
+    const profileTotalLeads = profileUniqueLeads + profileAnonymousLeads
+    
+    // Use aggregate if available, otherwise fallback to profile-specific, then to total_leads
+    const totalLeadsFallback = profileTotalLeads > 0 ? profileTotalLeads : (leadsBreakdown?.total_leads || user.profile.total_leads || 0)
+    const finalTotalLeads = totalLeads > 0 ? totalLeads : totalLeadsFallback
+    
     return {
-      total_leads: leadsBreakdown?.total_leads || user.profile.total_leads || 0,
+      total_leads: finalTotalLeads, // Aggregate across all contexts (HYBRID APPROACH)
+      unique_leads: totalUniqueLeads, // Aggregate unique logged-in leads
+      anonymous_leads: totalAnonymousLeads, // Aggregate anonymous leads
+      profile_unique_leads: profileUniqueLeads, // Profile-specific only (for reference)
+      profile_anonymous_leads: profileAnonymousLeads, // Profile-specific only (for reference)
       // Extract individual lead types from leads_breakdown
       phone_leads: leadsBreakdown?.phone?.total || 0,
       messaging: messagingData, // Nested messaging structure
@@ -89,7 +141,7 @@ const LeadAnalytics = () => {
         </div>
 
         {/* Total Leads Overview Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
           <DataCard
             title="Total Leads"
             value={(totalLeadsData?.total_leads || 0).toLocaleString()}
@@ -115,6 +167,11 @@ const LeadAnalytics = () => {
             value={(totalLeadsData?.appointment_leads || 0).toLocaleString()}
             icon={Calendar}
           />
+          <DataCard
+            title="Anonymous Leads"
+            value={(totalLeadsData?.anonymous_leads || 0).toLocaleString()}
+            icon={UserX}
+          />
         </div>
 
         {/* Leads Trend Component */}
@@ -125,6 +182,44 @@ const LeadAnalytics = () => {
           <h3 className="text-lg font-semibold  mb-4">Lead Distribution</h3>
           <LeadsShare totalLeadsData={totalLeadsData} />
         </div>
+
+        {/* Comprehensive Analytics Sections */}
+        {loadingAnalytics ? (
+          <div className="mt-8 flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
+            <span className="text-gray-600">Loading analytics...</span>
+          </div>
+        ) : analyticsData ? (
+          <div className="mt-8 space-y-8">
+            {/* Channel Performance Analysis */}
+            <ChannelPerformance data={analyticsData.channelPerformance} />
+
+            {/* Lead Lifecycle & Funnel Analysis */}
+            <LeadLifecycle data={analyticsData.lifecycleAnalysis} />
+
+            {/* Temporal Patterns */}
+            <TemporalPatterns data={analyticsData.temporalPatterns} />
+
+            {/* Context-Based Analysis */}
+            <ContextAnalysis data={analyticsData.contextAnalysis} />
+
+            {/* Engagement Analysis */}
+            <EngagementAnalysis data={analyticsData.engagementAnalysis} />
+
+            {/* Predictive Metrics */}
+            <PredictiveMetrics data={analyticsData.predictiveMetrics} />
+
+            {/* Comparative Analysis */}
+            <ComparativeAnalysis listerId={listerId} listerType="developer" />
+
+            {/* Operational Efficiency */}
+            <OperationalEfficiency data={analyticsData.operationalEfficiency} />
+          </div>
+        ) : (
+          <div className="mt-8 text-center text-gray-500 py-12">
+            No analytics data available yet. Analytics will appear as leads are generated.
+          </div>
+        )}
 
         {/* Leads Management */}
         {/* <div className="mt-10">

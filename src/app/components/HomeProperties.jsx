@@ -3,10 +3,10 @@ import React, { useState, useEffect } from 'react'
 import ListingList from './Listing/ListingList'
 import Filter from './Filters/Filter'
 import LoadingSpinner from './ui/LoadingSpinner'
-import { listings as dummyListings } from './Data/StaticData'
+// import { listings as dummyListings } from './Data/StaticData'
 
 const HomeProperties = () => {
-  const [listings, setListings] = useState(dummyListings)
+  const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [filters, setFilters] = useState({
@@ -17,49 +17,49 @@ const HomeProperties = () => {
   });
 
   // Fetch listings from API
-  // useEffect(() => {
-  //   const fetchListings = async () => {
-  //     try {
-  //       setLoading(true)
-  //       console.log('Fetching listings from /api/get-listings...')
+  useEffect(() => {
+    const fetchListings = async () => {
+      try {
+        setLoading(true)
+        console.log('Fetching listings from /api/get-listings...')
         
-  //       const response = await fetch('/api/get-listings')
-  //       const result = await response.json()
+        const response = await fetch('/api/get-listings')
+        const result = await response.json()
         
-  //       console.log('API Response:', result)
+        console.log('API Response:', result)
         
-  //       if (result.success) {
-  //         // Parse JSON fields if they come as strings
-  //         const parsedListings = result.data.map(listing => {
-  //           const parsed = { ...listing }
+        if (result.success) {
+          // Parse JSON fields if they come as strings
+          const parsedListings = result.data.map(listing => {
+            const parsed = { ...listing }
             
-  //           // Parse media if it's a string
-  //           if (typeof parsed.media === 'string') {
-  //             try {
-  //               parsed.media = JSON.parse(parsed.media)
-  //             } catch (e) {
-  //               console.error('Error parsing media:', e)
-  //             }
-  //           }
+            // Parse media if it's a string
+            if (typeof parsed.media === 'string') {
+              try {
+                parsed.media = JSON.parse(parsed.media)
+              } catch (e) {
+                console.error('Error parsing media:', e)
+              }
+            }
             
-  //           return parsed
-  //         })
+            return parsed
+          })
           
-  //         setListings(parsedListings)
-  //         console.log('Listings set:', parsedListings.length)
-  //       } else {
-  //         setError(result.error || 'Failed to fetch listings')
-  //       }
-  //     } catch (err) {
-  //       console.error('Error fetching listings:', err)
-  //       setError('Failed to fetch listings')
-  //     } finally {
-  //       setLoading(false)
-  //     }
-  //   }
+          setListings(parsedListings)
+          console.log('Listings set:', parsedListings.length)
+        } else {
+          setError(result.error || 'Failed to fetch listings')
+        }
+      } catch (err) {
+        console.error('Error fetching listings:', err)
+        setError('Failed to fetch listings')
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  //   fetchListings()
-  // }, []); // Remove filters dependency since we're not using them
+    fetchListings()
+  }, []); // Remove filters dependency since we're not using them
 
   return (
     <div className='w-full h-full'>

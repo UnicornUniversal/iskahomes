@@ -4,48 +4,47 @@ import Link from 'next/link'
 import { Building2, DollarSign, TrendingUp, Users } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
-const DevelopmentsBySale = ({ developerId, currency: propCurrency }) => {
+const DevelopmentsBySale = React.memo(({ developerId, currency: propCurrency }) => {
   const [developmentsBySale, setDevelopmentsBySale] = useState([])
   const [loading, setLoading] = useState(true)
-  const [currency, setCurrency] = useState(propCurrency || 'USD')
+  const currency = propCurrency || 'USD'
 
   useEffect(() => {
+    let isMounted = true
+    
     const fetchData = async () => {
+      if (!developerId) return
+      
       try {
         setLoading(true)
         const response = await fetch(`/api/sales/developments?slug=${developerId}`)
         const result = await response.json()
         
+        if (!isMounted) return
+        
         if (result.success && result.data) {
           setDevelopmentsBySale(result.data)
-          // Get currency from first development if available, or use prop currency
-          if (result.data.length > 0 && result.data[0].currency) {
-            setCurrency(result.data[0].currency)
-          } else if (propCurrency) {
-            setCurrency(propCurrency)
-          }
         } else {
           setDevelopmentsBySale([])
         }
       } catch (error) {
         console.error('Error fetching developments by sale:', error)
-        setDevelopmentsBySale([])
+        if (isMounted) {
+          setDevelopmentsBySale([])
+        }
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
-    if (developerId) {
-      fetchData()
+    fetchData()
+    
+    return () => {
+      isMounted = false
     }
-  }, [developerId, propCurrency])
-  
-  // Update currency when prop changes
-  useEffect(() => {
-    if (propCurrency) {
-      setCurrency(propCurrency)
-    }
-  }, [propCurrency])
+  }, [developerId])
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -180,6 +179,8 @@ const DevelopmentsBySale = ({ developerId, currency: propCurrency }) => {
       </div>
     </div>
   )
-}
+})
+
+DevelopmentsBySale.displayName = 'DevelopmentsBySale'
 
 export default DevelopmentsBySale

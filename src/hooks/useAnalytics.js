@@ -5,6 +5,7 @@ import posthog from 'posthog-js'
 import { queueEvent } from '@/lib/analyticsBatcher'
 import { useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { getAnonymousId } from '@/lib/anonymousId'
 
 export function useAnalytics() {
   const posthog = usePostHog()
@@ -83,11 +84,24 @@ export function useAnalytics() {
     const viewedFrom = additionalContext.viewedFrom || additionalContext.viewed_from
     const listingType = additionalContext.listingType || additionalContext.listing_type
     
-    // Always provide seeker_id - use user.id if logged in, otherwise "anonymous"
-    const seekerId = isPropertySeeker ? user.id : (additionalContext.seekerId || additionalContext.seeker_id || 'anonymous')
-    const distinctId = getDistinctId() || 'anonymous'
-    // Use seekerId if available, otherwise fall back to distinct_id, otherwise "anonymous"
-    const finalSeekerId = seekerId !== 'anonymous' ? seekerId : (distinctId !== 'anonymous' ? distinctId : 'anonymous')
+    // Determine if user is logged in
+    const isLoggedIn = isPropertySeeker && !!user?.id
+    
+    // Get seeker_id: use user.id if logged in, otherwise use anonymous ID from localStorage
+    let finalSeekerId
+    if (isLoggedIn) {
+      finalSeekerId = user.id
+    } else {
+      // User is not logged in - use anonymous ID
+      const anonymousId = getAnonymousId()
+      finalSeekerId = anonymousId || (additionalContext.seekerId || additionalContext.seeker_id)
+      
+      // Fallback to PostHog distinct_id if anonymous ID not available
+      if (!finalSeekerId) {
+        const distinctId = getDistinctId()
+        finalSeekerId = distinctId || 'anonymous'
+      }
+    }
     
     return {
       ...additionalContext,
@@ -117,7 +131,7 @@ export function useAnalytics() {
       seeker_name: isPropertySeeker ? user.profile?.name : null,
       seekerEmail: isPropertySeeker ? user.email : null,
       seeker_email: isPropertySeeker ? user.email : null,
-      is_logged_in: isPropertySeeker
+      is_logged_in: isLoggedIn
     }
   }, [user])
 

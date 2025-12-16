@@ -88,7 +88,11 @@ export async function POST(request) {
       const updateData = {
         is_verified: true,
         email_verified_at: new Date().toISOString(),
-        is_active: true
+        is_active: true,
+        // Update invitation and signup status
+        invitation_status: 'sent', // Email was sent and now verified
+        signup_status: 'verified', // User has verified their email
+        invitation_token: null // Clear the token after verification
       }
       
       // Use account_status for developers, status for others

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
@@ -29,6 +29,8 @@ import {
   ArcElement
 } from 'chart.js'
 import { Line, Doughnut } from 'react-chartjs-2'
+import { DateRangePicker } from '@/app/components/ui/date-range-picker'
+import { ExportDropdown } from '@/app/components/ui/export-dropdown'
 
 ChartJS.register(
   CategoryScale,
@@ -108,7 +110,9 @@ const SummaryCards = ({ developer }) => {
 }
 
 // Profile Views Chart Component
-const ProfileViewsChart = ({ profileSeries, latest }) => {
+const ProfileViewsChart = ({ profileSeries, latest, dateRange, onDateRangeChange }) => {
+  const [exporting, setExporting] = useState(false)
+  
   const chartData = useMemo(
     () => ({
       labels: profileSeries.map(entry =>
@@ -151,14 +155,71 @@ const ProfileViewsChart = ({ profileSeries, latest }) => {
     }
   }
 
+  const handleExport = async (format) => {
+    if (!dateRange?.startDate || !dateRange?.endDate || exporting) return
+    
+    setExporting(true)
+    try {
+      const exportData = [
+        ['Date', 'Profile Views', 'Unique Visitors'],
+        ...profileSeries.map(entry => [
+          new Date(entry.date).toLocaleDateString('en-US'),
+          entry.total || 0,
+          entry.unique || 0
+        ])
+      ]
+      
+      if (format === 'csv') {
+        const csvContent = exportData.map(row => row.join(',')).join('\n')
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const link = document.createElement('a')
+        const url = URL.createObjectURL(blob)
+        link.setAttribute('href', url)
+        link.setAttribute('download', `profile-views-${dateRange.startDate}-to-${dateRange.endDate}.csv`)
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      } else if (format === 'excel') {
+        const BOM = '\uFEFF'
+        const excelContent = BOM + exportData.map(row => row.join('\t')).join('\n')
+        const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+        const link = document.createElement('a')
+        const url = URL.createObjectURL(blob)
+        link.setAttribute('href', url)
+        link.setAttribute('download', `profile-views-${dateRange.startDate}-to-${dateRange.endDate}.xls`)
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
+    } catch (error) {
+      console.error('Error exporting data:', error)
+      alert('Failed to export data. Please try again.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="secondary_bg p-6 border border-gray-200 rounded-2xl">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center flex-wrap justify-between mb-4 gap-4">
         <div>
           <h3 className="text-lg font-semibold text-primary_color">Profile Views Trend</h3>
           <p className="text-sm text-gray-500">Daily views vs unique visitors</p>
         </div>
-        <ChangeBadge change={latest?.profile_views_change} />
+        <div className="flex items-center gap-2">
+          <DateRangePicker
+            startDate={dateRange?.startDate}
+            endDate={dateRange?.endDate}
+            onChange={onDateRangeChange}
+            className="w-[280px]"
+          />
+          <ExportDropdown
+            onExport={handleExport}
+            disabled={exporting || !dateRange?.startDate || !dateRange?.endDate || profileSeries.length === 0}
+          />
+        </div>
       </div>
       {profileSeries.length > 0 ? (
         <div className="h-80">
@@ -174,7 +235,9 @@ const ProfileViewsChart = ({ profileSeries, latest }) => {
 }
 
 // Impressions Chart Component
-const ImpressionsChart = ({ impressionsSeries, latest }) => {
+const ImpressionsChart = ({ impressionsSeries, latest, dateRange, onDateRangeChange }) => {
+  const [exporting, setExporting] = useState(false)
+  
   const chartData = useMemo(
     () => ({
       labels: impressionsSeries.map(entry =>
@@ -241,11 +304,74 @@ const ImpressionsChart = ({ impressionsSeries, latest }) => {
     }
   }
 
+  const handleExport = async (format) => {
+    if (!dateRange?.startDate || !dateRange?.endDate || exporting) return
+    
+    setExporting(true)
+    try {
+      const exportData = [
+        ['Date', 'Total Impressions', 'Social Media', 'Website Visits', 'Shares', 'Saved'],
+        ...impressionsSeries.map(entry => [
+          new Date(entry.date).toLocaleDateString('en-US'),
+          entry.total || 0,
+          entry.social || 0,
+          entry.website || 0,
+          entry.share || 0,
+          entry.saved || 0
+        ])
+      ]
+      
+      if (format === 'csv') {
+        const csvContent = exportData.map(row => row.join(',')).join('\n')
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const link = document.createElement('a')
+        const url = URL.createObjectURL(blob)
+        link.setAttribute('href', url)
+        link.setAttribute('download', `impressions-${dateRange.startDate}-to-${dateRange.endDate}.csv`)
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      } else if (format === 'excel') {
+        const BOM = '\uFEFF'
+        const excelContent = BOM + exportData.map(row => row.join('\t')).join('\n')
+        const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+        const link = document.createElement('a')
+        const url = URL.createObjectURL(blob)
+        link.setAttribute('href', url)
+        link.setAttribute('download', `impressions-${dateRange.startDate}-to-${dateRange.endDate}.xls`)
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
+    } catch (error) {
+      console.error('Error exporting data:', error)
+      alert('Failed to export data. Please try again.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="secondary_bg p-6 border border-gray-200 rounded-2xl">
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold text-primary_color">Impressions & Reach</h3>
-        <p className="text-sm text-gray-500">Channel level breakdown over time</p>
+      <div className="flex items-center flex-wrap justify-between mb-4 gap-4">
+        <div>
+          <h3 className="text-lg font-semibold text-primary_color">Impressions & Reach</h3>
+          <p className="text-sm text-gray-500">Channel level breakdown over time</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <DateRangePicker
+            startDate={dateRange?.startDate}
+            endDate={dateRange?.endDate}
+            onChange={onDateRangeChange}
+            className="w-[280px]"
+          />
+          <ExportDropdown
+            onExport={handleExport}
+            disabled={exporting || !dateRange?.startDate || !dateRange?.endDate || impressionsSeries.length === 0}
+          />
+        </div>
       </div>
       {impressionsSeries.length > 0 ? (
         <div className="h-80">
@@ -477,7 +603,6 @@ const TrafficSources = ({ summary }) => {
 const ProfileAnalytics = () => {
   const params = useParams()
   const { developerToken, user } = useAuth()
-  const [range, setRange] = useState('month')
   const [analytics, setAnalytics] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -485,12 +610,29 @@ const ProfileAnalytics = () => {
   // Get developer data from useAuth
   const developer = user?.profile || null
 
-  const fetchAnalytics = async (value) => {
-    if (!developerToken) return
+  // Initialize with current month as default
+  const getDefaultDateRange = () => {
+    const today = new Date()
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+    return {
+      startDate: startOfMonth.toISOString().split('T')[0],
+      endDate: today.toISOString().split('T')[0]
+    }
+  }
+
+  const defaultRange = getDefaultDateRange()
+  const [dateRange, setDateRange] = useState(defaultRange)
+
+  const fetchAnalytics = async (startDate, endDate) => {
+    if (!developerToken || !startDate || !endDate) return
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`/api/developers/profile/analytics?range=${value}`, {
+      const params = new URLSearchParams({
+        date_from: startDate,
+        date_to: endDate
+      })
+      const response = await fetch(`/api/developers/profile/analytics?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${developerToken}`
         },
@@ -513,9 +655,11 @@ const ProfileAnalytics = () => {
   }
 
   useEffect(() => {
-    fetchAnalytics(range)
+    if (dateRange.startDate && dateRange.endDate) {
+      fetchAnalytics(dateRange.startDate, dateRange.endDate)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [developerToken, range])
+  }, [developerToken, dateRange.startDate, dateRange.endDate])
 
   const profileSeries = analytics?.time_series?.profile_views || []
   const impressionsSeries = analytics?.time_series?.impressions || []
@@ -565,28 +709,24 @@ const ProfileAnalytics = () => {
           <>
             <SummaryCards developer={developer} />
 
-            <div className="flex flex-wrap items-center gap-3 mt-4">
-              {rangeOptions.map(option => (
-                <button
-                  key={option.value}
-                  onClick={() => setRange(option.value)}
-                  className={`secondary_button px-4 py-2 text-sm font-medium rounded-xl ${
-                    range === option.value
-                      ? 'opacity-100'
-                      : 'opacity-60 hover:opacity-80'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+              <ProfileViewsChart 
+                profileSeries={profileSeries} 
+                latest={latest}
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
+              />
+              <ImpressionsChart 
+                impressionsSeries={impressionsSeries} 
+                latest={latest}
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
+              />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <ProfileViewsChart profileSeries={profileSeries} latest={latest} />
-              <ImpressionsChart impressionsSeries={impressionsSeries} latest={latest} />
+            <div className="mt-6">
+              <ImpressionsBreakdown impressionsBreakdown={impressionsBreakdown} summary={summary} />
             </div>
-
-            <ImpressionsBreakdown impressionsBreakdown={impressionsBreakdown} summary={summary} />
 
             {/* <TrafficSources summary={summary} /> */}
           </>

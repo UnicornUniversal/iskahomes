@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { Input } from '../../ui/input'
 import { cn } from '@/lib/utils'
+import { toast } from 'react-toastify'
 // React Icons imports
 import { FaFilePdf, FaFileExcel, FaFileWord, FaFilePowerpoint, FaFileImage, FaFileAlt, FaTrash, FaUpload, FaEdit } from 'react-icons/fa'
 
@@ -34,29 +35,36 @@ const DevelopmentFiles = ({ formData, updateFormData, isEditMode }) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
+  // Calculate total size of all files (handles both File objects and existing file objects)
+  const totalSize = useMemo(() => {
+    return allFiles.reduce((total, file) => {
+      // Handle both File objects and existing file objects from database
+      if (file instanceof File) {
+        return total + file.size;
+      }
+      // For existing files, use the size property
+      return total + (file.size || 0);
+    }, 0);
+  }, [allFiles]);
+
+  const maxTotalSize = 50 * 1024 * 1024; // 50MB in bytes
+  const remainingSize = maxTotalSize - totalSize;
+  const isSizeLimitReached = totalSize >= maxTotalSize;
+
   const getFileSizeColor = (bytes) => {
-    const maxSize = 300 * 1024; // 300KB
-    if (bytes > maxSize * 0.9) return 'text-red-500'; // 90% of limit
-    if (bytes > maxSize * 0.7) return 'text-yellow-500'; // 70% of limit
-    return 'text-green-500';
+    return 'text-primary_color';
   }
 
   const handleFileUpload = (files) => {
     const fileArray = Array.from(files)
     
-    // Check file count limit
-    if (allFiles.length + fileArray.length > 15) {
-      alert(`Maximum 15 files allowed. You currently have ${allFiles.length} files and are trying to upload ${fileArray.length} more.`);
-      return;
-    }
-
-    // Check file size limit (300KB = 300 * 1024 bytes)
-    const maxSize = 300 * 1024;
-    const oversizedFiles = fileArray.filter(file => file.size > maxSize);
+    // Calculate total size of new files
+    const newFilesTotalSize = fileArray.reduce((total, file) => total + file.size, 0);
     
-    if (oversizedFiles.length > 0) {
-      const fileNames = oversizedFiles.map(f => f.name).join(', ');
-      alert(`The following files exceed the 300KB size limit: ${fileNames}`);
+    // Check cumulative size limit (50MB)
+    if (totalSize + newFilesTotalSize > maxTotalSize) {
+      const availableMB = (remainingSize / (1024 * 1024)).toFixed(2);
+      toast.error(`Total file size would exceed 50MB limit. You have ${availableMB}MB remaining.`);
       return;
     }
     
@@ -76,6 +84,8 @@ const DevelopmentFiles = ({ formData, updateFormData, isEditMode }) => {
     updateFormData({
       additional_files: updatedFiles
     });
+    
+    toast.success(`${fileArray.length} file(s) added successfully`);
   }
 
   const handleDrag = (e) => {
@@ -108,12 +118,15 @@ const DevelopmentFiles = ({ formData, updateFormData, isEditMode }) => {
   }
 
   const replaceFile = (fileId, newFile) => {
-    const fileArray = Array.from([newFile]);
+    // Find the file being replaced to calculate size difference
+    const fileToReplace = allFiles.find(f => f.id === fileId);
+    const oldSize = fileToReplace?.size || 0;
+    const sizeDifference = newFile.size - oldSize;
     
-    // Check file size limit (300KB = 300 * 1024 bytes)
-    const maxSize = 300 * 1024;
-    if (newFile.size > maxSize) {
-      alert(`File "${newFile.name}" exceeds the 300KB size limit`);
+    // Check if replacement would exceed total size limit
+    if (totalSize + sizeDifference > maxTotalSize) {
+      const availableMB = (remainingSize / (1024 * 1024)).toFixed(2);
+      toast.error(`Replacing this file would exceed the 50MB limit. You have ${availableMB}MB remaining.`);
       return;
     }
 
@@ -137,6 +150,8 @@ const DevelopmentFiles = ({ formData, updateFormData, isEditMode }) => {
     updateFormData({
       additional_files: updatedFiles
     });
+    
+    toast.success('File replaced successfully');
   }
 
 
@@ -152,19 +167,38 @@ const DevelopmentFiles = ({ formData, updateFormData, isEditMode }) => {
       <div className="space-y-6">
         {/* File Upload Area */}
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium ">
-              Upload Files
-            </label>
-            <div className="text-sm ">
-              {allFiles.length}/15 files • Max 300KB per file
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium ">
+                Upload Files
+              </label>
+              <div className="text-sm ">
+                {formatFileSize(totalSize)} / {formatFileSize(maxTotalSize)} • {allFiles.length} file(s)
+              </div>
+            </div>
+            {/* Progress Bar */}
+            <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+              <div
+                className={cn(
+                  "h-2.5 rounded-full transition-all duration-300",
+                  totalSize / maxTotalSize > 0.9 ? "bg-red-500" :
+                  totalSize / maxTotalSize > 0.7 ? "bg-yellow-500" : "bg-primary_color"
+                )}
+                style={{ width: `${Math.min((totalSize / maxTotalSize) * 100, 100)}%` }}
+              />
+            </div>
+            <div className="text-xs text-gray-500">
+              {isSizeLimitReached 
+                ? 'Limit reached' 
+                : `${formatFileSize(remainingSize)} remaining (${((remainingSize / maxTotalSize) * 100).toFixed(1)}%)`
+              }
             </div>
           </div>
           <div
             className={cn(
               "border-2 border-dashed rounded-lg p-8 text-center transition-colors",
               dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300",
-              allFiles.length >= 15 ? "opacity-50 cursor-not-allowed" : ""
+              isSizeLimitReached ? "opacity-50 cursor-not-allowed" : ""
             )}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
@@ -176,16 +210,22 @@ const DevelopmentFiles = ({ formData, updateFormData, isEditMode }) => {
             <p className="text-sm  mb-4">
               Supports: PDF, Excel, Word, PowerPoint, and other documents (no images)
             </p>
-            <p className="text-xs text-red-500 mb-4">
-              Maximum 15 files • 300KB per file limit
+            <p className={cn(
+              "text-xs mb-4",
+              isSizeLimitReached ? "text-red-500" : remainingSize < 5 * 1024 * 1024 ? "text-yellow-500" : "text-gray-500"
+            )}>
+              {isSizeLimitReached 
+                ? '50MB limit reached • Remove files to add more'
+                : `${formatFileSize(remainingSize)} remaining • No file count limit`
+              }
             </p>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={allFiles.length >= 15}
+              disabled={isSizeLimitReached}
               className="primary_button"
             >
-              {allFiles.length >= 15 ? 'Maximum files reached' : 'Choose Files'}
+              {isSizeLimitReached ? 'Size limit reached' : 'Choose Files'}
             </button>
             <input
               ref={fileInputRef}

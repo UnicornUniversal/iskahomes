@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 
 import React from 'react'
 
@@ -26,12 +27,14 @@ const SearchGeneral = () => {
         suppressHydrationWarning={true}
       />
       {/* Search Button */}
-      <button 
+    <Link href="/home/exploreProperties">
+    <button 
         className="bg-orange-500 hover:bg-orange-600 p-3 rounded-md flex items-center justify-center"
         suppressHydrationWarning={true}
       >
         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="white"><circle cx="11" cy="11" r="7" strokeWidth="2"/><path strokeWidth="2" strokeLinecap="round" d="M20 20l-3.5-3.5"/></svg>
       </button>
+    </Link>
     </div></div>
   )
 }

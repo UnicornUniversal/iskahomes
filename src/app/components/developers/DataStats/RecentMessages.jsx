@@ -70,89 +70,93 @@ const RecentMessages = () => {
 
   if (loading) {
     return (
-      <div className=" border border-gray-200 rounded-lg p-6 flex-1">
+      <div className="border border-gray-200 rounded-lg p-6">
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-5 h-5 animate-spin" />
+          <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
         </div>
       </div>
     )
   }
 
   return (
-    <div className=" secondary_bg border border-gray-200 rounded-lg p-6 flex-1">
+    <div className="border border-gray-200 rounded-lg p-6 flex flex-col h-full">
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary_color/10 flex items-center justify-center">
-            <MessageSquare className="w-4 h-4" />
-          </div>
-          <h3 className="text-base font-semibold">Unread Messages</h3>
-        </div>
+        <h3 className="text-base">Unread Messages</h3>
         {messages.length > 0 && (
-          <span className="text-xs">{messages.length}</span>
+          <span className="text-sm">{messages.length}</span>
         )}
       </div>
 
-      <div className="space-y-2">
-        {messages.map((message) => (
-          <Link
-            key={message.id}
-            href={`/developer/${user.slug}/messages`}
-            className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:border-primary_color/20 hover:bg-gray-50/50 transition-all group"
-          >
-            {message.listing?.image ? (
-              <div className="relative w-12 h-12 rounded-md overflow-hidden flex-shrink-0 border border-gray-200">
-                <Image
-                  src={message.listing.image}
-                  alt={message.listing.title}
-                  fill
-                  className="object-cover"
-                />
-              </div>
-            ) : (
-              <div className="w-12 h-12 rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
-                <ImageIcon className="w-4 h-4" />
-              </div>
-            )}
-            
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-sm truncate mb-0.5">
-                {message.listing?.title || message.subject || 'General Inquiry'}
-              </div>
-              <div className="text-xs truncate">
-                {message.isSender && <span>You: </span>}
-                {truncateText(message.lastMessage, 40)}
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <div className="flex items-center text-xs">
-                <Clock className="w-3 h-3 mr-1" />
-                <span>{formatTimeAgo(message.lastMessageAt)}</span>
-              </div>
-              <ChevronRight className="w-4 h-4 transition-colors" />
-            </div>
-          </Link>
-        ))}
-      </div>
-
-      {messages.length === 0 && (
+      {messages.length === 0 ? (
         <div className="text-center py-12">
-          <div className="w-16 h-16 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-3">
-            <MessageSquare className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-3">
+            <MessageSquare className="w-5 h-5" />
           </div>
           <p className="text-sm">No unread messages</p>
         </div>
-      )}
+      ) : (
+        <div className="flex flex-col flex-1">
+          <div className="space-y-3">
+            {messages.map((message) => (
+              <Link
+                key={message.id}
+                href={`/developer/${user.slug}/messages`}
+                className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 bg-white/20 hover:border-gray-200 hover:bg-gray-50 transition-all group"
+              >
+                {message.otherUserProfileImage ? (
+                  <div className="relative w-12 h-12 rounded-md overflow-hidden flex-shrink-0 border border-gray-200">
+                    <Image
+                      src={message.otherUserProfileImage}
+                      alt={message.otherUserName}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ) : message.listing?.image ? (
+                  <div className="relative w-12 h-12 rounded-md overflow-hidden flex-shrink-0 border border-gray-200">
+                    <Image
+                      src={message.listing.image}
+                      alt={message.listing.title}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                    <ImageIcon className="w-4 h-4" />
+                  </div>
+                )}
+                
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-sm">
+                      {message.otherUserName || 'User'}
+                    </div>
+                    <div className="flex items-center text-xs flex-shrink-0">
+                      <Clock className="w-3 h-3 mr-1" />
+                      <span>{formatTimeAgo(message.lastMessageAt)}</span>
+                    </div>
+                  </div>
+                  <div className="text-xs">
+                    {message.isSender && <span>You: </span>}
+                    {truncateText(message.lastMessage, 40)}
+                  </div>
+                </div>
+                
+                <ChevronRight className="w-4 h-4 transition-colors flex-shrink-0 mt-1" />
+              </Link>
+            ))}
+          </div>
 
-      {messages.length > 0 && (
-        <div className="mt-6 pt-4 border-t border-gray-100">
-          <Link
-            href={`/developer/${user.slug}/messages`}
-            className="flex items-center justify-center gap-1 text-sm font-medium transition-colors"
-          >
-            View All Messages
-            <ChevronRight className="w-4 h-4" />
-          </Link>
+          <div className="mt-auto pt-4 border-t border-gray-100 flex justify-center">
+            <Link
+              href={`/developer/${user.slug}/messages`}
+              className="flex items-center justify-center gap-1 text-xs transition-colors"
+            >
+              View All Messages
+              <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
       )}
     </div>

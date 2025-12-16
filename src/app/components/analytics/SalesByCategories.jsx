@@ -22,15 +22,21 @@ const pieColors = [
   '#9966FF', // Light Purple
 ]
 
-const SalesByCategories = ({ listerId }) => {
+const SalesByCategories = React.memo(({ listerId }) => {
   const [salesByCategoriesData, setSalesByCategoriesData] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let isMounted = true
+    
     const fetchData = async () => {
+      if (!listerId) return
+      
       try {
         const response = await fetch(`/api/sales/summary?slug=${listerId}`)
         const result = await response.json()
+        
+        if (!isMounted) return
         
         if (result.success && result.data?.summary?.by_category) {
           const categoryData = Object.values(result.data.summary.by_category)
@@ -42,16 +48,25 @@ const SalesByCategories = ({ listerId }) => {
             .sort((a, b) => b.count - a.count)
           
           setSalesByCategoriesData(categoryData)
+        } else {
+          setSalesByCategoriesData([])
         }
       } catch (error) {
         console.error('Error fetching sales by categories:', error)
+        if (isMounted) {
+          setSalesByCategoriesData([])
+        }
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
-    if (listerId) {
-      fetchData()
+    fetchData()
+    
+    return () => {
+      isMounted = false
     }
   }, [listerId])
 
@@ -147,6 +162,8 @@ const SalesByCategories = ({ listerId }) => {
       </div>
     </div>
   )
-}
+})
+
+SalesByCategories.displayName = 'SalesByCategories'
 
 export default SalesByCategories

@@ -127,7 +127,7 @@ export async function sendVerificationEmail(email, name, verificationToken) {
  * Send welcome email after verification
  */
 export async function sendWelcomeEmail(email, name, userType) {
-  const dashboardLink = `${process.env.FRONTEND_LINK}/signin`
+  const dashboardLink = `${process.env.FRONTEND_LINK}/home/signin`
   
   const msg = {
     to: email,
