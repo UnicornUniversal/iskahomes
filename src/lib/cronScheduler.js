@@ -80,7 +80,7 @@ export async function triggerAnalyticsProcessing(date = null) {
   try {
     const entities = await getAllActiveEntities()
     
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/cron/analytics`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://iskapromos.vercel.app'}/api/cron/analytics`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

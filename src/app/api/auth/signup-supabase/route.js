@@ -47,7 +47,7 @@ export async function POST(request) {
       email: email,
       password: password,
       options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_FRONTEND_URL || process.env.FRONTEND_LINK || 'http://localhost:3000'}/verify-email`,
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_FRONTEND_URL || process.env.FRONTEND_LINK || 'https://iskapromos.vercel.app'}/verify-email`,
         data: {
           user_type: userType,
           full_name: userData.fullName || '',
