@@ -35,7 +35,11 @@ if (circuitBreakerEnabled) {
 }
 
 // Create client ONLY if it doesn't exist and circuit breaker is not active
-if (!client && !circuitBreakerEnabled) {
+// Also check if we're in a build environment - skip Redis during build
+const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' || 
+                    process.env.NODE_ENV === 'production' && !process.env.VERCEL_ENV;
+
+if (!client && !circuitBreakerEnabled && !isBuildTime) {
   try {
     // Create Redis client with connection URL if available, otherwise use socket config
     const redisUrl = process.env.REDIS_URL;
@@ -45,12 +49,31 @@ if (!client && !circuitBreakerEnabled) {
         url: redisUrl
       });
     } else {
+      // Check if required environment variables are present
+      const redisHost = process.env.REDIS_HOST;
+      const redisPort = process.env.REDIS_PORT;
+      
+      if (!redisHost || !redisPort) {
+        console.warn('Redis: Missing REDIS_HOST or REDIS_PORT environment variables. Redis will not be initialized.');
+        client = null;
+        globalForRedis.redisClient = null;
+        return;
+      }
+      
+      const port = parseInt(redisPort, 10);
+      if (isNaN(port) || port < 0 || port >= 65536) {
+        console.warn(`Redis: Invalid REDIS_PORT value: ${redisPort}. Redis will not be initialized.`);
+        client = null;
+        globalForRedis.redisClient = null;
+        return;
+      }
+      
       client = createClient({
         username: 'default',
         password: process.env.REDIS_PASSWORD,
         socket: {
-          host: process.env.REDIS_HOST,
-          port: parseInt(process.env.REDIS_PORT),
+          host: redisHost,
+          port: port,
           reconnectStrategy: false // Disable automatic reconnection to prevent connection spam
         }
       });
@@ -102,10 +125,13 @@ if (!client && !circuitBreakerEnabled) {
     globalForRedis.redisClient = client;
     
     // Connect immediately - create once and reuse
-    client.connect().catch(err => {
-      // Connection errors are handled by the error event handler
-      console.error('Redis initial connection error:', err.message);
-    });
+    // Only connect if not in build time
+    if (!isBuildTime) {
+      client.connect().catch(err => {
+        // Connection errors are handled by the error event handler
+        console.error('Redis initial connection error:', err.message);
+      });
+    }
     
   } catch (error) {
     console.error('Failed to create Redis client:', error);
@@ -116,6 +142,10 @@ if (!client && !circuitBreakerEnabled) {
     client = null;
     globalForRedis.redisClient = null;
   }
+} else if (isBuildTime) {
+  // During build time, set client to null to prevent errors
+  client = null;
+  globalForRedis.redisClient = null;
 }
 
 // Export the singleton client
