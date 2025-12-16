@@ -21,7 +21,7 @@ const MessagesPage = () => {
   };
 
   return (
-    <div className='flex gap-4 h-full overflow-hidden'>
+    <div className='flex gap-4 h-[80vh] overflow-hidden'>
       <div className={`${selectedChatId ? 'hidden md:flex' : 'flex'} flex-col h-full`}>
         <Chats 
           onChatSelect={handleChatSelect} 

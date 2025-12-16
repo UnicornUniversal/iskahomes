@@ -26,7 +26,7 @@ import {
   FiExternalLink,
   FiSave
 } from 'react-icons/fi'
-import DeveloperNav from '../../../../components/developers/DeveloperNav'
+import DeveloperNav from '@/app/components/developers/DeveloperNav'
 
 const SubscriptionsPage = () => {
   const [selectedPlan, setSelectedPlan] = useState(null)
