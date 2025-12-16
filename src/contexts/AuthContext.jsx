@@ -422,7 +422,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password, userType = null) => {
     try {
-      const response = await fetch('/api/auth/home/signin', {
+      const response = await fetch('/api/auth/signin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
