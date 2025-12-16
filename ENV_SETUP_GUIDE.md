@@ -41,8 +41,8 @@ RESEND_FROM_NAME=Iska Homes  # Optional, will use SENDGRID_FROM_NAME if not set
 # FRONTEND CONFIGURATION
 # ============================================
 # Your frontend URL (used in email verification links)
-NEXT_PUBLIC_FRONTEND_URL=https://iskapromos.vercel.app
-FRONTEND_LINK=https://iskapromos.vercel.app
+NEXT_PUBLIC_FRONTEND_URL=https://iskahomes.vercel.app/
+FRONTEND_LINK=https://iskahomes.vercel.app/
 
 # ============================================
 # GOOGLE MAPS API (if using)
@@ -114,8 +114,8 @@ NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 
 For development:
 ```env
-NEXT_PUBLIC_FRONTEND_URL=https://iskapromos.vercel.app
-FRONTEND_LINK=https://iskapromos.vercel.app
+NEXT_PUBLIC_FRONTEND_URL=https://iskahomes.vercel.app/
+FRONTEND_LINK=https://iskahomes.vercel.app/
 ```
 
 For production:
@@ -222,8 +222,8 @@ RESEND_FROM_EMAIL=  # Optional
 RESEND_FROM_NAME=Iska Homes  # Optional
 
 # Frontend
-NEXT_PUBLIC_FRONTEND_URL=https://iskapromos.vercel.app
-FRONTEND_LINK=https://iskapromos.vercel.app
+NEXT_PUBLIC_FRONTEND_URL=https://iskahomes.vercel.app/
+FRONTEND_LINK=https://iskahomes.vercel.app/
 ```
 
 Fill in the empty values with your keys!

@@ -165,7 +165,7 @@ CRON_SECRET=your-secret-token-here
 
 **Manual Testing** (development only):
 ```bash
-curl -X POST https://iskapromos.vercel.app/api/cron/cleanup-incomplete-listings \
+curl -X POST https://iskahomes.vercel.app//api/cron/cleanup-incomplete-listings \
   -H "Authorization: Bearer your-secret-token"
 ```
 

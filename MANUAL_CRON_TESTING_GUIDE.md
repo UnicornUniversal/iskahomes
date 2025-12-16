@@ -4,7 +4,7 @@
 
 ### Option 1: Using the Test Page (Easiest)
 
-1. Navigate to: `https://iskapromos.vercel.app/test`
+1. Navigate to: `https://iskahomes.vercel.app//test`
 2. Find the "Test Analytics Cron" section
 3. Click the "Test Cron" button
 4. Wait for the response (check browser console for detailed logs)
@@ -13,19 +13,19 @@
 
 **Test Mode (Last 24 Hours):**
 ```
-POST https://iskapromos.vercel.app/api/cron/analytics?testMode=true&ignoreLastRun=true
+POST https://iskahomes.vercel.app//api/cron/analytics?testMode=true&ignoreLastRun=true
 Content-Type: application/json
 ```
 
 **Normal Mode (From Last Successful Run):**
 ```
-POST https://iskapromos.vercel.app/api/cron/analytics
+POST https://iskahomes.vercel.app//api/cron/analytics
 Content-Type: application/json
 ```
 
 **Ignore Last Run (Process All Historical Data):**
 ```
-POST https://iskapromos.vercel.app/api/cron/analytics?ignoreLastRun=true
+POST https://iskahomes.vercel.app//api/cron/analytics?ignoreLastRun=true
 Content-Type: application/json
 ```
 
@@ -33,15 +33,15 @@ Content-Type: application/json
 
 ```bash
 # Test mode - fetch last 24 hours
-curl -X POST "https://iskapromos.vercel.app/api/cron/analytics?testMode=true&ignoreLastRun=true" \
+curl -X POST "https://iskahomes.vercel.app//api/cron/analytics?testMode=true&ignoreLastRun=true" \
   -H "Content-Type: application/json"
 
 # Normal mode - from last successful run
-curl -X POST "https://iskapromos.vercel.app/api/cron/analytics" \
+curl -X POST "https://iskahomes.vercel.app//api/cron/analytics" \
   -H "Content-Type: application/json"
 
 # Health check
-curl -X GET "https://iskapromos.vercel.app/api/cron/analytics"
+curl -X GET "https://iskahomes.vercel.app//api/cron/analytics"
 ```
 
 ## What to Check After Running

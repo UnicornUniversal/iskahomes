@@ -79,11 +79,11 @@ You can manually trigger the cron for testing:
 
 ```bash
 # Using curl
-curl -X GET "https://iskapromos.vercel.app/api/cron/trigger" \
+curl -X GET "https://iskahomes.vercel.app//api/cron/trigger" \
   -H "Authorization: Bearer your-secure-secret-key"
 
 # Or using the API directly
-curl -X POST "https://iskapromos.vercel.app/api/cron/analytics" \
+curl -X POST "https://iskahomes.vercel.app//api/cron/analytics" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-secure-secret-key" \
   -d '{

@@ -43,8 +43,8 @@ Add to your `.env.local`:
 
 ```env
 # Frontend URL
-NEXT_PUBLIC_FRONTEND_URL=https://iskapromos.vercel.app
-FRONTEND_LINK=https://iskapromos.vercel.app
+NEXT_PUBLIC_FRONTEND_URL=https://iskahomes.vercel.app/
+FRONTEND_LINK=https://iskahomes.vercel.app/
 
 # SendGrid Configuration
 SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxxxxxxxxx

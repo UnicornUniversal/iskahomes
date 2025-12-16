@@ -633,8 +633,8 @@ SENDGRID_FROM_EMAIL=verified_email@domain.com
 SENDGRID_FROM_NAME=Iska Homes
 
 # Frontend
-NEXT_PUBLIC_FRONTEND_URL=https://iskapromos.vercel.app
-FRONTEND_LINK=https://iskapromos.vercel.app
+NEXT_PUBLIC_FRONTEND_URL=https://iskahomes.vercel.app/
+FRONTEND_LINK=https://iskahomes.vercel.app/
 
 # Google Maps (optional)
 NEXT_PUBLIC_GOOGLE_MAPS_API=your_google_maps_key

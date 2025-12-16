@@ -50,8 +50,8 @@ Add these to your `.env.local`:
 
 ```env
 # Frontend URL
-NEXT_PUBLIC_FRONTEND_URL=https://iskapromos.vercel.app
-FRONTEND_LINK=https://iskapromos.vercel.app
+NEXT_PUBLIC_FRONTEND_URL=https://iskahomes.vercel.app/
+FRONTEND_LINK=https://iskahomes.vercel.app/
 
 # SendGrid
 SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -87,7 +87,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 2. **Go to signup page:**
    ```
-   https://iskapromos.vercel.app/signup
+   https://iskahomes.vercel.app//signup
    ```
 
 3. **Fill in the Property Seeker form:**
@@ -107,7 +107,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 6. **Sign in:**
    ```
-   https://iskapromos.vercel.app/home/signin
+   https://iskahomes.vercel.app//home/signin
    ```
    - Use the email and password
    - Should successfully log in
@@ -147,7 +147,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 4. **SendGrid sends verification email**:
    - Beautiful HTML template
-   - Verification link: `https://iskapromos.vercel.app/verify-email?token=xxx`
+   - Verification link: `https://iskahomes.vercel.app//verify-email?token=xxx`
    - Expires in 24 hours (customizable)
 
 5. **User clicks verification link**:
