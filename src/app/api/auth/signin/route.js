@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { signIn } from '@/lib/auth'
 import { developerDB, agentDB, homeSeekerDB } from '@/lib/database'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { generateToken } from '@/lib/jwt'
 
 export async function POST(request) {
@@ -67,23 +67,35 @@ export async function POST(request) {
         profile = devCheck
         console.log('🔐 SIGNIN API: Detected as developer from profile table')
       } else {
-        // Try agents
-        const { data: agentCheck } = await agentDB.getByUserId(user.id)
-        if (agentCheck) {
-          userType = 'agent'
-          profile = agentCheck
-          console.log('🔐 SIGNIN API: Detected as agent from profile table')
+        // Try agencies
+        const { data: agencyCheck } = await supabaseAdmin
+          .from('agencies')
+          .select('*')
+          .eq('agency_id', user.id)
+          .single()
+        if (agencyCheck) {
+          userType = 'agency'
+          profile = agencyCheck
+          console.log('🔐 SIGNIN API: Detected as agency from profile table')
         } else {
-          // Try property seekers
-          const { data: seekerCheck } = await supabase
-            .from('property_seekers')
-            .select('*')
-            .eq('user_id', user.id)
-            .single()
-          if (seekerCheck) {
-            userType = 'property_seeker'
-            profile = seekerCheck
-            console.log('🔐 SIGNIN API: Detected as property_seeker from profile table')
+          // Try agents
+          const { data: agentCheck } = await agentDB.getByUserId(user.id)
+          if (agentCheck) {
+            userType = 'agent'
+            profile = agentCheck
+            console.log('🔐 SIGNIN API: Detected as agent from profile table')
+          } else {
+            // Try property seekers
+            const { data: seekerCheck } = await supabase
+              .from('property_seekers')
+              .select('*')
+              .eq('user_id', user.id)
+              .single()
+            if (seekerCheck) {
+              userType = 'property_seeker'
+              profile = seekerCheck
+              console.log('🔐 SIGNIN API: Detected as property_seeker from profile table')
+            }
           }
         }
       }
@@ -163,6 +175,31 @@ export async function POST(request) {
             }
           }
           break
+        case 'agency':
+          if (profile && userType === 'agency') {
+            console.log('🔐 SIGNIN API: Using pre-detected agency profile')
+          } else {
+            console.log('🔐 SIGNIN API: Looking for agency profile for user:', user.id)
+            const { data: agencyProfile, error: agencyError } = await supabaseAdmin
+              .from('agencies')
+              .select('*')
+              .eq('agency_id', user.id)
+              .single()
+            
+            console.log('🔐 SIGNIN API: Agency profile result:', { 
+              agencyProfile: agencyProfile ? 'found' : 'not found',
+              agencyError: agencyError ? agencyError.message : 'none'
+            })
+            
+            if (providedUserType === 'agency' && (agencyError || !agencyProfile)) {
+              return NextResponse.json(
+                { error: 'No agency profile found for this email. Please check your account type selection.' },
+                { status: 404 }
+              )
+            }
+            profile = agencyProfile
+          }
+          break
         case 'agent':
           if (profile && userType === 'agent') {
             console.log('🔐 SIGNIN API: Using pre-detected agent profile')
@@ -219,7 +256,7 @@ export async function POST(request) {
       }
     }
 
-    // Generate JWT token for developers and property seekers
+    // Generate JWT token for developers, agencies, agents, and property seekers
     let jwtToken = null;
     if (userType === 'developer' && profile) {
       try {
@@ -233,6 +270,32 @@ export async function POST(request) {
         console.log('JWT token generated successfully:', jwtToken ? 'Yes' : 'No');
       } catch (jwtError) {
         console.error('Error generating JWT token:', jwtError);
+      }
+    } else if (userType === 'agency' && profile) {
+      try {
+        jwtToken = generateToken({
+          id: user.id,
+          user_id: user.id,
+          agency_id: profile.agency_id,
+          email: user.email,
+          user_type: userType
+        });
+        console.log('JWT token generated successfully for agency:', jwtToken ? 'Yes' : 'No');
+      } catch (jwtError) {
+        console.error('Error generating JWT token for agency:', jwtError);
+      }
+    } else if (userType === 'agent' && profile) {
+      try {
+        jwtToken = generateToken({
+          id: user.id,
+          user_id: user.id,
+          agent_id: profile.agent_id,
+          email: user.email,
+          user_type: userType
+        });
+        console.log('JWT token generated successfully for agent:', jwtToken ? 'Yes' : 'No');
+      } catch (jwtError) {
+        console.error('Error generating JWT token for agent:', jwtError);
       }
     } else if (userType === 'property_seeker' && profile) {
       try {
@@ -277,6 +340,23 @@ export async function POST(request) {
           name: profile.name,
           slug: profile.slug,
           account_status: profile.account_status
+        };
+      } else if (userType === 'agency') {
+        profileData = {
+          id: profile.id,
+          agency_id: profile.agency_id,
+          name: profile.name,
+          slug: profile.slug,
+          account_status: profile.account_status
+        };
+      } else if (userType === 'agent') {
+        profileData = {
+          id: profile.id,
+          agent_id: profile.agent_id,
+          name: profile.name,
+          slug: profile.slug,
+          account_status: profile.account_status,
+          agency_id: profile.agency_id
         };
       } else if (userType === 'property_seeker') {
         profileData = {

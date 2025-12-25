@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import PropertyPricing from '../modules/PropertyPricing'
 
-const PricingStep = ({ formData, updateFormData, mode, user }) => {
+const PricingStep = ({ formData, updateFormData, mode, user, accountType = 'developer' }) => {
   const [purposeData, setPurposeData] = useState(null)
 
   // Fetch purpose data when purpose changes
@@ -41,6 +41,8 @@ const PricingStep = ({ formData, updateFormData, mode, user }) => {
         mode={mode}
         purposeData={purposeData}
         companyLocations={user?.profile?.company_locations || []}
+        accountType={accountType}
+        user={user}
       />
     </div>
   )

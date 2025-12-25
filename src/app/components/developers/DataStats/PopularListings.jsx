@@ -12,13 +12,17 @@ import 'swiper/css'
 import 'swiper/css/navigation'
 import 'swiper/css/pagination'
 
-const PopularListings = ({ limit = 7 }) => {
+const PopularListings = ({ limit = 7, userId: propUserId = null, accountType: propAccountType = 'developer' }) => {
   const { user } = useAuth()
   const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // Use provided userId/accountType or fall back to auth user
+  const userId = propUserId || user?.id
+  const accountType = propAccountType || user?.profile?.account_type || 'developer'
+
   useEffect(() => {
-    if (!user?.id) {
+    if (!userId) {
       setLoading(false)
       return
     }
@@ -27,7 +31,7 @@ const PopularListings = ({ limit = 7 }) => {
 
     const fetchPopularListings = async () => {
       try {
-        const response = await fetch(`/api/listings/popular?user_id=${user.id}&limit=${limit}`)
+        const response = await fetch(`/api/listings/popular?user_id=${userId}&account_type=${accountType}&limit=${limit}`)
         if (response.ok) {
           const result = await response.json()
           if (isMounted) {
@@ -48,7 +52,7 @@ const PopularListings = ({ limit = 7 }) => {
     return () => {
       isMounted = false
     }
-  }, [user?.id, limit])
+  }, [userId, accountType, limit])
 
   const formatCurrency = (amount, currencyCode = 'GHS') => {
     if (amount === null || amount === undefined || amount === 0) return 'Price on request'

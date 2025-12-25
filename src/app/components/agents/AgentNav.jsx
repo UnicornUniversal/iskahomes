@@ -1,85 +1,84 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { usePathname, useParams } from 'next/navigation'
+import Link from 'next/link'
 import { 
     FiHome, 
     FiCalendar, 
-    FiUsers, 
     FiMapPin, 
-    FiHeart, 
     FiMessageSquare, 
     FiUser, 
-    FiCreditCard, 
-    FiGrid,
     FiLogOut,
     FiMenu,
     FiX,
-    FiSearch,
-    FiStar,
-    FiTrendingUp,
-    FiSettings
+    FiTrendingUp
 } from 'react-icons/fi'
+import { useAuth } from '@/contexts/AuthContext'
 
 const AgentNav = ({ active }) => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const pathname = usePathname()
+    const params = useParams()
+    const { logout } = useAuth()
+    
+    // Get slug from params or pathname
+    const getSlug = () => {
+        if (params?.slug) return params.slug
+        const parts = pathname?.split('/') || []
+        if (parts.length >= 3 && parts[1] === 'agents') {
+            return parts[2]
+        }
+        return user?.profile?.slug || ''
+    }
+
+    const slug = getSlug()
 
     const navItems = [
         {
             label: 'Dashboard',
-            href: '/agents/12345/dashboard',
+            href: `/agents/${slug}/dashboard`,
             icon: FiHome
         },
         {
             label: 'Properties',
-            href: '/agents/12345/properties',
+            href: `/agents/${slug}/properties`,
             icon: FiMapPin
         },
         {
-            label: 'HomeOwners',
-            href: '/agents/12345/homeowners',
-            icon: FiUsers
-        },
-        {
             label: 'Appointments',
-            href: '/agents/12345/appointments',
+            href: `/agents/${slug}/appointments`,
             icon: FiCalendar
         },
         {
             label: 'Messages',
-            href: '/agents/12345/messages',
+            href: `/agents/${slug}/messages`,
             icon: FiMessageSquare
         },
-        // {
-        //     label: 'Leads',
-        //     href: '/agents/12345/leads',
-        //     icon: FiSearch
-        // },
         {
-            label: 'Favorites',
-            href: '/agents/12345/favorites',
-            icon: FiHeart
-        },
-        // {
-        //     label: 'Performance',
-        //     href: '/agents/12345/performance',
-        //     icon: FiTrendingUp
-        // },
-        {
-            label: 'Reviews',
-            href: '/agents/12345/reviews',
-            icon: FiStar
+            label: 'Leads',
+            href: `/agents/${slug}/leads`,
+            icon: FiTrendingUp
         },
         {
             label: 'Profile',
-            href: '/agents/12345/profile',
+            href: `/agents/${slug}/profile`,
             icon: FiUser
-        },
-        // {
-        //     label: 'Settings',
-        //     href: '/agents/12345/settings',
-        //     icon: FiSettings
-        // }
+        }
     ]
+
+    // Determine active item from pathname
+    const getActiveIndex = () => {
+        if (!pathname) return active || 1
+        for (let i = 0; i < navItems.length; i++) {
+            if (pathname.includes(navItems[i].href.split('/').pop())) {
+                return i + 1
+            }
+        }
+        return active || 1
+    }
+
+    const activeIndex = getActiveIndex()
 
     const toggleMobileMenu = () => {
         setIsMobileMenuOpen(!isMobileMenuOpen)
@@ -123,10 +122,10 @@ const AgentNav = ({ active }) => {
                 <div className="space-y-2 w-full">
                     {navItems.map((item, index) => {
                         const IconComponent = item.icon
-                        const isActive = active === index + 1
+                        const isActive = activeIndex === index + 1
                         
                         return (
-                            <a
+                            <Link
                                 key={index}
                                 href={item.href}
                                 onClick={() => setIsMobileMenuOpen(false)}
@@ -165,7 +164,7 @@ const AgentNav = ({ active }) => {
                                 {!isActive && (
                                     <div className="absolute inset-0 bg-gradient-to-r from-primary_color/5 to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                                 )}
-                            </a>
+                            </Link>
                         )
                     })}
                 </div>
@@ -173,17 +172,20 @@ const AgentNav = ({ active }) => {
                 {/* Logout */}
                 <br/>
                 <div className="mb-4 space-y-2 w-full rounded-xl shadow-primary_red/25 bg-primary_red cursor-pointer">
-                    <a
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={`group relative text-[0.8em] flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 ease-in-out transform hover:scale-105`}
+                    <button
+                        onClick={() => {
+                            setIsMobileMenuOpen(false)
+                            logout()
+                        }}
+                        className="group relative text-[0.8em] flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 ease-in-out transform hover:scale-105"
                     >
                         {/* Icon */}
                         <FiLogOut color='white' className="w-5 h-5" />
                         {/* Label */}
-                        <span className={`font-medium transition-all duration-300 text-text_color`}>
+                        <span className="font-medium transition-all duration-300 text-white">
                             Logout
                         </span>
-                    </a>
+                    </button>
                 </div>
 
                 <br/>

@@ -122,6 +122,8 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [developerToken, setDeveloperToken] = useState('');
+  const [agencyToken, setAgencyToken] = useState('');
+  const [agentToken, setAgentToken] = useState('');
   const [propertySeekerToken, setPropertySeekerToken] = useState('');
 
   // Helper function to fetch subscription data for a user
@@ -179,19 +181,23 @@ export const AuthProvider = ({ children }) => {
     try {
       // Check for all possible token types
       const developerTokenValue = localStorage.getItem('developer_token');
+      const agencyTokenValue = localStorage.getItem('agency_token');
       const propertySeekerTokenValue = localStorage.getItem('property_seeker_token');
       const agentTokenValue = localStorage.getItem('agent_token');
       const adminTokenValue = localStorage.getItem('admin_token');
       
       // Also check for generic 'token' key and migrate it if found
       const genericToken = localStorage.getItem('token');
-      if (genericToken && !developerTokenValue && !propertySeekerTokenValue && !agentTokenValue && !adminTokenValue) {
+      if (genericToken && !developerTokenValue && !agencyTokenValue && !propertySeekerTokenValue && !agentTokenValue && !adminTokenValue) {
         console.warn('Found generic "token" key, attempting to migrate...');
         // Try to decode and determine type
         const decoded = verifyToken(genericToken);
         if (decoded) {
           if (decoded.developer_id) {
             localStorage.setItem('developer_token', genericToken);
+            localStorage.removeItem('token');
+          } else if (decoded.agency_id) {
+            localStorage.setItem('agency_token', genericToken);
             localStorage.removeItem('token');
           } else if (decoded.user_type === 'property_seeker') {
             localStorage.setItem('property_seeker_token', genericToken);
@@ -283,6 +289,71 @@ export const AuthProvider = ({ children }) => {
           }
           return;
         }
+      } else if (agencyTokenValue) {
+        // Verify agency token
+        const decoded = verifyToken(agencyTokenValue);
+        
+        if (decoded && decoded.agency_id) {
+          setAgencyToken(agencyTokenValue);
+          
+          const agencyId = decoded.agency_id;
+          
+          const { data: userData, error } = await supabase
+            .from('agencies')
+            .select('*')
+            .eq('agency_id', agencyId)
+            .single();
+
+          if (error) {
+            // Auth failure - logout and redirect
+            console.error('Auth failure - Agency profile fetch error:', error);
+            localStorage.removeItem('agency_token');
+            setAgencyToken('');
+            setUser(null);
+            // Handle auth failure (logout, clear storage, redirect)
+            if (typeof window !== 'undefined') {
+              handleAuthFailure('/home/signin');
+            }
+            return;
+          } else if (userData) {
+            // Fetch subscription data
+            const subscription = await fetchUserSubscription(agencyId, 'agency');
+            
+            setUser({
+              id: userData.agency_id,
+              email: userData.email,
+              user_type: 'agency',
+              profile: userData,
+              subscription: subscription || null
+            });
+          } else {
+            // No user data found - auth failure
+            console.error('Auth failure - Agency profile not found');
+            localStorage.removeItem('agency_token');
+            setAgencyToken('');
+            setUser(null);
+            if (typeof window !== 'undefined') {
+              if (handleAuthFailure) {
+                handleAuthFailure('/home/signin');
+              } else {
+                window.location.href = '/home/signin';
+              }
+            }
+            return;
+          }
+        } else {
+          // Invalid token - auth failure
+          console.error('Auth failure - Invalid agency token');
+          localStorage.removeItem('agency_token');
+          setAgencyToken('');
+          setUser(null);
+          if (handleAuthFailure) {
+            handleAuthFailure('/home/signin');
+          } else {
+            window.location.href = '/home/signin';
+          }
+          return;
+        }
       } else if (propertySeekerTokenValue) {
         // Verify property seeker token
         const decoded = verifyToken(propertySeekerTokenValue);
@@ -357,17 +428,84 @@ export const AuthProvider = ({ children }) => {
           }
           return;
         }
+      } else if (agentTokenValue) {
+        // Verify agent token
+        const decoded = verifyToken(agentTokenValue);
+        
+        if (decoded && (decoded.user_type === 'agent' || decoded.agent_id)) {
+          setAgentToken(agentTokenValue);
+          
+          const agentId = decoded.agent_id || decoded.user_id;
+          
+          const { data: userData, error } = await supabase
+            .from('agents')
+            .select('*')
+            .eq('agent_id', agentId)
+            .single();
+
+          if (error) {
+            // Auth failure - logout and redirect
+            console.error('Auth failure - Agent profile fetch error:', error);
+            localStorage.removeItem('agent_token');
+            setAgentToken('');
+            setUser(null);
+            // Handle auth failure (logout, clear storage, redirect)
+            if (typeof window !== 'undefined') {
+              handleAuthFailure('/home/signin');
+            }
+            return;
+          } else if (userData) {
+            // Fetch subscription data
+            const subscription = await fetchUserSubscription(agentId, 'agent');
+            
+            setUser({
+              id: userData.agent_id,
+              email: userData.email,
+              user_type: 'agent',
+              profile: userData,
+              subscription: subscription || null
+            });
+          } else {
+            // No user data found - auth failure
+            console.error('Auth failure - Agent profile not found');
+            localStorage.removeItem('agent_token');
+            setAgentToken('');
+            setUser(null);
+            if (typeof window !== 'undefined') {
+              if (handleAuthFailure) {
+                handleAuthFailure('/home/signin');
+              } else {
+                window.location.href = '/home/signin';
+              }
+            }
+            return;
+          }
+        } else {
+          // Invalid token - auth failure
+          console.error('Auth failure - Invalid agent token');
+          localStorage.removeItem('agent_token');
+          setAgentToken('');
+          setUser(null);
+          if (handleAuthFailure) {
+            handleAuthFailure('/home/signin');
+          } else {
+            window.location.href = '/home/signin';
+          }
+          return;
+        }
       } else {
         // No token found at all - user is not authenticated
         console.log('No authentication token found');
         setUser(null);
         setDeveloperToken('');
+        setAgencyToken('');
+        setAgentToken('');
         setPropertySeekerToken('');
         
         // Check if we're on a protected route
         if (typeof window !== 'undefined') {
           const path = window.location.pathname;
-          const protectedRoutes = ['/developer/', '/agents/', '/admin/', '/propertySeeker/', '/homeowner/', '/homeSeeker/'];
+          const protectedRoutes = ['/developer/', '/agency/', '/agents/', '/admin/', '/propertySeeker/', '/homeowner/', '/homeSeeker/'];
           const isProtectedRoute = protectedRoutes.some(route => path.startsWith(route));
           const isPublicRoute = path === '/home/signin' || path === '/signup' || path === '/' || path.startsWith('/property/');
           
@@ -384,8 +522,12 @@ export const AuthProvider = ({ children }) => {
       if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
         // Token error - clear everything and logout
         localStorage.removeItem('developer_token');
+        localStorage.removeItem('agency_token');
+        localStorage.removeItem('agent_token');
         localStorage.removeItem('property_seeker_token');
         setDeveloperToken('');
+        setAgencyToken('');
+        setAgentToken('');
         setPropertySeekerToken('');
         setUser(null);
         if (handleAuthFailure) {
@@ -396,8 +538,12 @@ export const AuthProvider = ({ children }) => {
       } else {
         // Other errors - also logout for security
         localStorage.removeItem('developer_token');
+        localStorage.removeItem('agency_token');
+        localStorage.removeItem('agent_token');
         localStorage.removeItem('property_seeker_token');
         setDeveloperToken('');
+        setAgencyToken('');
+        setAgentToken('');
         setPropertySeekerToken('');
         setUser(null);
         if (handleAuthFailure) {
@@ -437,6 +583,7 @@ export const AuthProvider = ({ children }) => {
           // Clear any old tokens first
           localStorage.removeItem('token'); // Remove generic token if exists
           localStorage.removeItem('developer_token');
+          localStorage.removeItem('agency_token');
           localStorage.removeItem('property_seeker_token');
           localStorage.removeItem('agent_token');
           localStorage.removeItem('admin_token');
@@ -467,6 +614,36 @@ export const AuthProvider = ({ children }) => {
               user_type: data.user.user_type,
               name: data.user.profile?.name,
               developer_id: data.user.profile?.developer_id
+            });
+            
+            posthog.capture('user_logged_in', {
+              user_type: data.user.user_type,
+              login_method: 'email'
+            });
+            
+            return { success: true, user: userWithSubscription };
+          } else if (data.user.user_type === 'agency') {
+            // Store agency token
+            localStorage.setItem('agency_token', data.token);
+            setAgencyToken(data.token);
+            
+            // Fetch subscription data
+            const subscription = await fetchUserSubscription(data.user.id, 'agency');
+            
+            // Add subscription to user object
+            const userWithSubscription = {
+              ...data.user,
+              subscription: subscription || null
+            };
+            
+            setUser(userWithSubscription);
+            
+            // Track login with PostHog
+            posthog.identify(data.user.id, {
+              email: data.user.email,
+              user_type: data.user.user_type,
+              name: data.user.profile?.name,
+              agency_id: data.user.profile?.agency_id
             });
             
             posthog.capture('user_logged_in', {
@@ -509,6 +686,7 @@ export const AuthProvider = ({ children }) => {
           } else if (data.user.user_type === 'agent') {
             // Store agent token
             localStorage.setItem('agent_token', data.token);
+            setAgentToken(data.token);
             
             // Fetch subscription data
             const subscription = await fetchUserSubscription(data.user.id, 'agent');
@@ -524,7 +702,8 @@ export const AuthProvider = ({ children }) => {
             posthog.identify(data.user.id, {
               email: data.user.email,
               user_type: data.user.user_type,
-              name: data.user.profile?.name
+              name: data.user.profile?.name,
+              agent_id: data.user.profile?.agent_id
             });
             
             posthog.capture('user_logged_in', {
@@ -574,7 +753,7 @@ export const AuthProvider = ({ children }) => {
       
       // Call server-side logout API to handle any server-side cleanup
       try {
-        const currentToken = developerToken || propertySeekerToken;
+        const currentToken = developerToken || agencyToken || agentToken || propertySeekerToken;
         await fetch('/api/auth/signout', {
           method: 'POST',
           headers: {
@@ -593,12 +772,15 @@ export const AuthProvider = ({ children }) => {
       // Clear client-side tokens and state
       localStorage.removeItem('token'); // Remove generic token if exists
       localStorage.removeItem('developer_token');
-      localStorage.removeItem('property_seeker_token');
+      localStorage.removeItem('agency_token');
       localStorage.removeItem('agent_token');
+      localStorage.removeItem('property_seeker_token');
       localStorage.removeItem('admin_token');
       localStorage.removeItem('homeowner_token');
       localStorage.removeItem('homeseeker_token');
       setDeveloperToken('');
+      setAgencyToken('');
+      setAgentToken('');
       setPropertySeekerToken('');
       setUser(null);
       
@@ -609,12 +791,15 @@ export const AuthProvider = ({ children }) => {
       // Even if there's an error, clear local state to prevent stuck sessions
       localStorage.removeItem('token'); // Remove generic token if exists
       localStorage.removeItem('developer_token');
-      localStorage.removeItem('property_seeker_token');
+      localStorage.removeItem('agency_token');
       localStorage.removeItem('agent_token');
+      localStorage.removeItem('property_seeker_token');
       localStorage.removeItem('admin_token');
       localStorage.removeItem('homeowner_token');
       localStorage.removeItem('homeseeker_token');
       setDeveloperToken('');
+      setAgencyToken('');
+      setAgentToken('');
       setPropertySeekerToken('');
       setUser(null);
       
@@ -626,10 +811,12 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     developerToken,
+    agencyToken,
+    agentToken,
     propertySeekerToken,
     login,
     logout,
-    isAuthenticated: !!user && (!!developerToken || !!propertySeekerToken),
+    isAuthenticated: !!user && (!!developerToken || !!agencyToken || !!agentToken || !!propertySeekerToken),
   };
   
 

@@ -9,6 +9,7 @@ const SignupPage = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
+  const [toastType, setToastType] = useState('error') // 'error' or 'success'
 
   const accountTypes = {
     seeker: {
@@ -58,13 +59,37 @@ const SignupPage = () => {
         'Lead management system',
         'Investor connections'
       ]
+    },
+    agency: {
+      title: 'Real Estate Agency',
+      description: 'Manage multiple agents and grow your real estate business with comprehensive tools.',
+      image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80',
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+      ),
+      features: [
+        'Manage multiple agents',
+        'Track team performance',
+        'Centralized lead management',
+        'Agency-wide analytics'
+      ]
     }
   }
 
   const showErrorToast = (message) => {
+    setToastType('error')
     setToastMessage(message)
     setShowToast(true)
     setTimeout(() => setShowToast(false), 5000)
+  }
+
+  const showSuccessToast = (message) => {
+    setToastType('success')
+    setToastMessage(message)
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 5000) // Show for 5 seconds, no redirect
   }
 
   return (
@@ -100,23 +125,43 @@ const SignupPage = () => {
         {/* Toast Notification */}
         {showToast && (
           <div className="fixed bottom-6 right-6 z-50 animate-slide-in">
-            <div className="bg-white border-l-4 border-[#9D2C2C] px-6 py-4 rounded-lg shadow-xl flex items-center space-x-3 max-w-md">
-              <svg className="w-6 h-6 text-[#9D2C2C] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div className="flex-1">
-                <p className="font-semibold text-[#17637C]">Sign up failed</p>
-                <p className="text-sm text-gray-600 mt-1">{toastMessage || 'Please try again or contact support'}</p>
-              </div>
-              <button
-                onClick={() => setShowToast(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            {toastType === 'success' ? (
+              <div className="bg-white border-l-4 border-green-500 px-6 py-4 rounded-lg shadow-xl flex items-center space-x-3 max-w-md">
+                <svg className="w-6 h-6 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-              </button>
-            </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-[#17637C]">Success!</p>
+                  <p className="text-sm text-gray-600 mt-1">{toastMessage || 'Account created successfully!'}</p>
+                </div>
+                <button
+                  onClick={() => setShowToast(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <div className="bg-white border-l-4 border-[#9D2C2C] px-6 py-4 rounded-lg shadow-xl flex items-center space-x-3 max-w-md">
+                <svg className="w-6 h-6 text-[#9D2C2C] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="flex-1">
+                  <p className="font-semibold text-[#17637C]">Sign up failed</p>
+                  <p className="text-sm text-gray-600 mt-1">{toastMessage || 'Please try again or contact support'}</p>
+                </div>
+                <button
+                  onClick={() => setShowToast(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -203,6 +248,19 @@ const SignupPage = () => {
                     <span>Developer</span>
                   </div>
                 </button>
+                <button
+                  onClick={() => setActiveTab('agency')}
+                  className={`flex-1 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-300 ${
+                    activeTab === 'agency'
+                      ? 'bg-[#17637C] text-white shadow-lg'
+                      : 'text-gray-600 hover:text-[#17637C]'
+                  }`}
+                >
+                  <div className="flex items-center justify-center space-x-2">
+                    {accountTypes.agency.icon}
+                    <span>Agency</span>
+                  </div>
+                </button>
               </div>
 
               {/* Signup Forms */}
@@ -211,14 +269,24 @@ const SignupPage = () => {
                   <PropertySeekerForm 
                     isLoading={isLoading} 
                     setIsLoading={setIsLoading} 
-                    showErrorToast={showErrorToast} 
+                    showErrorToast={showErrorToast}
+                    showSuccessToast={showSuccessToast}
                   />
                 )}
                 {activeTab === 'developer' && (
                   <DeveloperForm 
                     isLoading={isLoading} 
                     setIsLoading={setIsLoading} 
-                    showErrorToast={showErrorToast} 
+                    showErrorToast={showErrorToast}
+                    showSuccessToast={showSuccessToast}
+                  />
+                )}
+                {activeTab === 'agency' && (
+                  <AgencyForm 
+                    isLoading={isLoading} 
+                    setIsLoading={setIsLoading} 
+                    showErrorToast={showErrorToast}
+                    showSuccessToast={showSuccessToast}
                   />
                 )}
               </div>
@@ -241,7 +309,7 @@ const SignupPage = () => {
 }
 
 // Property Seeker Form Component
-const PropertySeekerForm = ({ isLoading, setIsLoading, showErrorToast }) => {
+const PropertySeekerForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast }) => {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -261,7 +329,7 @@ const PropertySeekerForm = ({ isLoading, setIsLoading, showErrorToast }) => {
     setIsLoading(true)
     
     try {
-      const response = await fetch('/api/auth/signup-supabase', {
+      const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -273,11 +341,22 @@ const PropertySeekerForm = ({ isLoading, setIsLoading, showErrorToast }) => {
       })
 
       const result = await response.json()
+      console.log('📥 Signup response:', { ok: response.ok, result })
 
-      if (response.ok) {
-        // Success - redirect to signin with success message
-        window.location.href = '/home/signin?message=Account created successfully! Please check your email for verification link.'
+      if (response.ok && result.success) {
+        // Clear form fields
+        setFormData({
+          fullName: '',
+          email: '',
+          phone: '',
+          password: ''
+        })
+        // Show success toast
+        const successMessage = result.message || 'Account created successfully! Please check your email for verification link.'
+        console.log('✅ Signup successful, showing toast:', successMessage)
+        showSuccessToast(successMessage)
       } else {
+        console.error('❌ Signup failed:', result.error)
         showErrorToast(result.error || 'Signup failed. Please try again.')
       }
     } catch (error) {
@@ -356,7 +435,7 @@ const PropertySeekerForm = ({ isLoading, setIsLoading, showErrorToast }) => {
 }
 
 // Agent Form Component
-const AgentForm = ({ isLoading, setIsLoading, showErrorToast }) => {
+const AgentForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast }) => {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -378,7 +457,7 @@ const AgentForm = ({ isLoading, setIsLoading, showErrorToast }) => {
     setIsLoading(true)
     
     try {
-      const response = await fetch('/api/auth/signup-supabase', {
+      const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -390,10 +469,24 @@ const AgentForm = ({ isLoading, setIsLoading, showErrorToast }) => {
       })
 
       const result = await response.json()
+      console.log('📥 Signup response:', { ok: response.ok, result })
 
-      if (response.ok) {
-        window.location.href = '/home/signin?message=Account created successfully! Please check your email for verification link.'
+      if (response.ok && result.success) {
+        // Clear form fields
+        setFormData({
+          fullName: '',
+          email: '',
+          phone: '',
+          password: '',
+          agencyName: '',
+          licenseId: ''
+        })
+        // Show success toast
+        const successMessage = result.message || 'Account created successfully! Please check your email for verification link.'
+        console.log('✅ Signup successful, showing toast:', successMessage)
+        showSuccessToast(successMessage)
       } else {
+        console.error('❌ Signup failed:', result.error)
         showErrorToast(result.error || 'Signup failed. Please try again.')
       }
     } catch (error) {
@@ -495,8 +588,8 @@ const AgentForm = ({ isLoading, setIsLoading, showErrorToast }) => {
   )
 }
 
-// Developer Form Component
-const DeveloperForm = ({ isLoading, setIsLoading, showErrorToast }) => {
+// Agency Form Component
+const AgencyForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast }) => {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -518,7 +611,161 @@ const DeveloperForm = ({ isLoading, setIsLoading, showErrorToast }) => {
     setIsLoading(true)
     
     try {
-      const response = await fetch('/api/auth/signup-supabase', {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          userType: 'agency'
+        })
+      })
+
+      const result = await response.json()
+      console.log('📥 Signup response:', { ok: response.ok, result })
+
+      if (response.ok && result.success) {
+        // Clear form fields
+        setFormData({
+          fullName: '',
+          email: '',
+          phone: '',
+          password: '',
+          companyWebsite: '',
+          registrationNumber: ''
+        })
+        // Show success toast
+        const successMessage = result.message || 'Account created successfully! Please check your email for verification link.'
+        console.log('✅ Signup successful, showing toast:', successMessage)
+        showSuccessToast(successMessage)
+      } else {
+        console.error('❌ Signup failed:', result.error)
+        showErrorToast(result.error || 'Signup failed. Please try again.')
+      }
+    } catch (error) {
+      console.error('Signup error:', error)
+      showErrorToast('An error occurred. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div>
+        <label className="block text-sm font-semibold text-[#17637C] mb-2">Agency Name</label>
+        <input
+          type="text"
+          name="fullName"
+          value={formData.fullName}
+          onChange={handleChange}
+          required
+          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#17637C] focus:border-transparent transition-all"
+          placeholder="Enter agency name"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold text-[#17637C] mb-2">Email Address</label>
+        <input
+          type="email"
+          name="email"
+          value={formData.email}
+          onChange={handleChange}
+          required
+          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#17637C] focus:border-transparent transition-all"
+          placeholder="Enter your email"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold text-[#17637C] mb-2">Phone Number</label>
+        <input
+          type="tel"
+          name="phone"
+          value={formData.phone}
+          onChange={handleChange}
+          required
+          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#17637C] focus:border-transparent transition-all"
+          placeholder="Enter your phone number"
+        />
+      </div>
+
+      <PasswordField
+        name="password"
+        value={formData.password}
+        onChange={handleChange}
+        required={true}
+        placeholder="Enter your password"
+      />
+
+      <div>
+        <label className="block text-sm font-semibold text-[#17637C] mb-2">Agency Website <span className="text-gray-400 font-normal">(Optional)</span></label>
+        <input
+          type="url"
+          name="companyWebsite"
+          value={formData.companyWebsite}
+          onChange={handleChange}
+          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#17637C] focus:border-transparent transition-all"
+          placeholder="https://example.com"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold text-[#17637C] mb-2">License/Registration Number <span className="text-gray-400 font-normal">(Optional)</span></label>
+        <input
+          type="text"
+          name="registrationNumber"
+          value={formData.registrationNumber}
+          onChange={handleChange}
+          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#17637C] focus:border-transparent transition-all"
+          placeholder="Enter license or registration number"
+        />
+      </div>
+
+      <button
+        type="submit"
+        disabled={isLoading}
+        className="w-full bg-[#17637C] text-white py-3 px-4 rounded-xl hover:bg-[#17637C]/90 focus:outline-none focus:ring-2 focus:ring-[#17637C] focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center font-semibold shadow-lg"
+      >
+        {isLoading ? (
+          <>
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
+            Creating Account...
+          </>
+        ) : (
+          'Create Account'
+        )}
+      </button>
+    </form>
+  )
+}
+
+// Developer Form Component
+const DeveloperForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast }) => {
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    password: '',
+    companyWebsite: '',
+    registrationNumber: ''
+  })
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    })
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setIsLoading(true)
+    
+    try {
+      const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -530,10 +777,24 @@ const DeveloperForm = ({ isLoading, setIsLoading, showErrorToast }) => {
       })
 
       const result = await response.json()
+      console.log('📥 Signup response:', { ok: response.ok, result })
 
-      if (response.ok) {
-        window.location.href = '/home/signin?message=Account created successfully! Please check your email for verification link.'
+      if (response.ok && result.success) {
+        // Clear form fields
+        setFormData({
+          fullName: '',
+          email: '',
+          phone: '',
+          password: '',
+          companyWebsite: '',
+          registrationNumber: ''
+        })
+        // Show success toast
+        const successMessage = result.message || 'Account created successfully! Please check your email for verification link.'
+        console.log('✅ Signup successful, showing toast:', successMessage)
+        showSuccessToast(successMessage)
       } else {
+        console.error('❌ Signup failed:', result.error)
         showErrorToast(result.error || 'Signup failed. Please try again.')
       }
     } catch (error) {

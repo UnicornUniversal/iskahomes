@@ -509,7 +509,11 @@ async function checkListingAlreadySold(listingId) {
 // Helper function to update total_revenue for developer and development
 async function updateTotalRevenue(userId, developmentId, estimatedRevenue, operation = 'add') {
   try {
-    const primaryCurrency = await getDeveloperPrimaryCurrency(userId)
+    const currencyResult = await getDeveloperPrimaryCurrency(userId)
+    if (currencyResult.error) {
+      return { error: currencyResult.error, requiresCurrencySetup: currencyResult.requiresCurrencySetup }
+    }
+    const primaryCurrency = currencyResult.currency
     
     // Get revenue value - use estimated_revenue.estimated_revenue (user's primary currency)
     const revenueValue = estimatedRevenue?.estimated_revenue || estimatedRevenue?.price || 0
@@ -526,7 +530,7 @@ async function updateTotalRevenue(userId, developmentId, estimatedRevenue, opera
     
     if (!revenueValueNum || revenueValueNum <= 0) {
       console.log('⚠️ No revenue value to update (value is 0 or invalid)')
-      return
+      return { success: true }
     }
 
     if (userId) {
@@ -668,21 +672,87 @@ async function updateTotalRevenue(userId, developmentId, estimatedRevenue, opera
         }
       }
     }
+    
+    return { success: true }
   } catch (error) {
     console.error('Error in updateTotalRevenue:', error)
+    return { error: 'Error updating revenue. Please try again.' }
   }
 }
 
 // Helper function to create sales_listings entry
 async function createSalesListingEntry(listingId, userId, listingData, saleType, salesInfo = {}) {
   try {
-    const primaryCurrency = await getDeveloperPrimaryCurrency(userId)
+    // Get primary currency based on account type
+    let primaryCurrency = null
+    let currencyError = null
+    
+    if (listingData.account_type === 'developer') {
+      const currencyResult = await getDeveloperPrimaryCurrency(userId)
+      if (currencyResult.error) {
+        return { error: currencyResult.error, requiresCurrencySetup: currencyResult.requiresCurrencySetup }
+      }
+      primaryCurrency = currencyResult.currency
+    } else if (listingData.account_type === 'agent') {
+      // Get agency's default currency
+      const { data: agent } = await supabaseAdmin
+        .from('agents')
+        .select('agency_id')
+        .eq('agent_id', userId)
+        .single()
+      
+      if (agent?.agency_id) {
+        const { data: agency } = await supabaseAdmin
+          .from('agencies')
+          .select('default_currency, company_locations, name')
+          .eq('agency_id', agent.agency_id)
+          .single()
+        
+        if (agency?.default_currency) {
+          primaryCurrency = agency.default_currency
+        } else if (agency?.company_locations) {
+          // Try to get currency from primary location
+          const locations = Array.isArray(agency.company_locations) 
+            ? agency.company_locations 
+            : (typeof agency.company_locations === 'string' ? JSON.parse(agency.company_locations) : [])
+          const primaryLocation = locations.find(loc => loc.primary_location === true)
+          if (primaryLocation?.currency) {
+            primaryCurrency = primaryLocation.currency
+          }
+        }
+        
+        // If still no currency found, return error
+        if (!primaryCurrency) {
+          return { 
+            error: `Please set your agency's default currency in your agency profile settings. Go to your agency profile and set a default currency.`,
+            requiresCurrencySetup: true
+          }
+        }
+      } else {
+        return { 
+          error: 'Agent agency not found. Please contact support.',
+          requiresCurrencySetup: false
+        }
+      }
+    } else {
+      primaryCurrency = 'GHS' // Default fallback
+    }
+    
     const estimatedRevenue = listingData.estimated_revenue || {}
     const salePrice = estimatedRevenue.estimated_revenue || estimatedRevenue.price || 0
     
     if (!salePrice || salePrice <= 0) {
       console.error('No sale price available for sales_listings entry')
-      return null
+      return { error: 'No sale price available for this listing.' }
+    }
+
+    // Calculate commission for agents
+    let commissionRate = null
+    let commissionAmount = null
+    if (listingData.account_type === 'agent' && listingData.commission_rate) {
+      commissionRate = listingData.commission_rate
+      const percentage = commissionRate.percentage || 0
+      commissionAmount = (salePrice * percentage) / 100
     }
 
     const salesEntry = {
@@ -696,8 +766,8 @@ async function createSalesListingEntry(listingId, userId, listingData, saleType,
       sale_source: salesInfo.sale_source || 'Iska Homes',
       buyer_name: salesInfo.buyer_name || null,
       notes: salesInfo.notes || null,
-      commission_rate: null,
-      commission_amount: null
+      commission_rate: commissionRate,
+      commission_amount: commissionAmount ? parseFloat(commissionAmount.toFixed(2)) : null
     }
 
     const { data, error } = await supabaseAdmin
@@ -708,13 +778,13 @@ async function createSalesListingEntry(listingId, userId, listingData, saleType,
 
     if (error) {
       console.error('Error creating sales_listings entry:', error)
-      return null
+      return { error: 'Failed to create sales entry. Please try again.' }
     }
 
-    return data
+    return { success: true, data }
   } catch (error) {
     console.error('Error in createSalesListingEntry:', error)
-    return null
+    return { error: 'Error creating sales entry. Please try again.' }
   }
 }
 
@@ -1035,7 +1105,10 @@ export async function handleStepUpdate(request, params, isNewListing) {
           flexible_terms: pricingData.flexible_terms !== undefined ? pricingData.flexible_terms : existingListing.flexible_terms,
           available_from: pricingData.available_from || existingListing.available_from,
           available_until: pricingData.available_until || existingListing.available_until,
-          acquisition_rules: pricingData.acquisition_rules || existingListing.acquisition_rules
+          acquisition_rules: pricingData.acquisition_rules || existingListing.acquisition_rules,
+          // Agent-specific fields
+          commission_rate: stepData.commission_rate || existingListing.commission_rate || null,
+          listing_agency_id: existingListing.listing_agency_id || null
         }
         
         // If status indicates sold/rented/taken, update listing_status
@@ -1482,17 +1555,56 @@ export async function handleStepUpdate(request, params, isNewListing) {
                 saleType = 'rented'
               } else if (newListingStatus?.toLowerCase() === 'sold' || newStatus?.toLowerCase() === 'sold') {
                 saleType = 'sold'
-              } else if (newStatus?.toLowerCase() === 'taken') {
+              } else if (newListingStatus?.toLowerCase() === 'taken' || newStatus?.toLowerCase() === 'taken') {
                 // "Taken" defaults to 'sold' but could be made configurable
                 saleType = 'sold'
               }
               
               // Get sales information from stepData if provided (from modal)
               const salesInfo = stepData.sales_info || {}
-              await createSalesListingEntry(listingId, userId, latestListing, saleType, salesInfo)
-              await updateTotalRevenue(userId, latestListing.development_id, estimatedRevenue, 'add')
+              const salesEntryResult = await createSalesListingEntry(listingId, userId, latestListing, saleType, salesInfo)
               
-              // Update admin_sales_analytics when status changes to sold/rented
+              // Check if currency setup is required
+              if (salesEntryResult?.error) {
+                return NextResponse.json(
+                  { 
+                    error: salesEntryResult.error,
+                    requiresCurrencySetup: salesEntryResult.requiresCurrencySetup || false
+                  },
+                  { status: 400 }
+                )
+              }
+              
+              // Update revenue based on account type
+              if (latestListing.account_type === 'developer') {
+                const revenueResult = await updateTotalRevenue(userId, latestListing.development_id, estimatedRevenue, 'add')
+                if (revenueResult?.error) {
+                  return NextResponse.json(
+                    { 
+                      error: revenueResult.error,
+                      requiresCurrencySetup: revenueResult.requiresCurrencySetup || false
+                    },
+                    { status: 400 }
+                  )
+                }
+              } else if (latestListing.account_type === 'agent') {
+                // Import and call agent metrics update function
+                const updateModule = await import('@/app/api/listings/[id]/route')
+                if (updateModule.updateAgentAndAgencyMetrics) {
+                  const metricsResult = await updateModule.updateAgentAndAgencyMetrics(listingId, userId, latestListing, estimatedRevenue, saleType, 'add')
+                  if (metricsResult?.error) {
+                    return NextResponse.json(
+                      { 
+                        error: metricsResult.error,
+                        requiresCurrencySetup: metricsResult.requiresCurrencySetup || false
+                      },
+                      { status: 400 }
+                    )
+                  }
+                }
+              }
+              
+              // Update admin_sales_analytics when status changes to sold/rented/taken
               await updateAdminSalesAnalytics(latestListing, 'update')
             }
           }
@@ -1526,7 +1638,15 @@ export async function handleStepUpdate(request, params, isNewListing) {
             
             if (revenueValue > 0) {
               await createSalesListingEntry(listingId, userId, latestListing, 'sold')
-              await updateTotalRevenue(userId, latestListing.development_id, estimatedRevenue, 'add')
+              // Update revenue based on account type
+              if (latestListing.account_type === 'developer') {
+                await updateTotalRevenue(userId, latestListing.development_id, estimatedRevenue, 'add')
+              } else if (latestListing.account_type === 'agent') {
+                const updateModule = await import('@/app/api/listings/[id]/route')
+                if (updateModule.updateAgentAndAgencyMetrics) {
+                  await updateModule.updateAgentAndAgencyMetrics(listingId, userId, latestListing, estimatedRevenue, 'sold', 'add')
+                }
+              }
             }
             await updateAdminSalesAnalytics(latestListing, 'update')
           }
@@ -1551,8 +1671,15 @@ export async function handleStepUpdate(request, params, isNewListing) {
                 .delete()
                 .eq('id', existingSale.id)
               
-              // Subtract revenue from developer and development
-              await updateTotalRevenue(userId, latestListing.development_id, estimatedRevenue, 'subtract')
+              // Subtract revenue from developer/agent and development
+              if (latestListing.account_type === 'developer') {
+                await updateTotalRevenue(userId, latestListing.development_id, estimatedRevenue, 'subtract')
+              } else if (latestListing.account_type === 'agent') {
+                const updateModule = await import('@/app/api/listings/[id]/route')
+                if (updateModule.updateAgentAndAgencyMetrics) {
+                  await updateModule.updateAgentAndAgencyMetrics(listingId, userId, latestListing, estimatedRevenue, existingSale.sale_type, 'subtract')
+                }
+              }
               
               // Update admin_sales_analytics
               await updateAdminSalesAnalytics(latestListing, 'update')

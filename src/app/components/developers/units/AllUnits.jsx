@@ -11,9 +11,19 @@ import {
   usePropertyTypes
 } from '@/hooks/useCachedData'
 
-const AllUnits = () => {
+const AllUnits = ({ accountType = 'developer' }) => {
   const router = useRouter()
   const { user } = useAuth()
+  
+  // Determine labels based on account type
+  const isAgent = accountType === 'agent'
+  const itemLabel = isAgent ? 'Property' : 'Unit'
+  const itemLabelPlural = isAgent ? 'Properties' : 'Units'
+  const addButtonLabel = isAgent ? 'Add New Property' : 'Add New Unit'
+  const pageTitle = isAgent ? 'All Properties' : 'All Units'
+  const emptyStateTitle = isAgent ? 'No properties found' : 'No units found'
+  const emptyStateMessage = isAgent ? 'Get started by creating your first property' : 'Get started by creating your first unit'
+  const emptyStateButton = isAgent ? 'Create Your First Property' : 'Create Your First Unit'
   const [units, setUnits] = useState([])
   const [filteredUnits, setFilteredUnits] = useState([])
   const [loading, setLoading] = useState(true)
@@ -67,26 +77,31 @@ const AllUnits = () => {
     { value: 'Coming Soon', label: 'Coming Soon' }
   ]
 
-  // Get developer ID from user profile or URL params
-  const developerId = user?.profile?.developer_id
+  // Get ID from user profile based on account type
+  const accountId = isAgent 
+    ? (user?.profile?.agent_id || user?.id)
+    : (user?.profile?.developer_id || user?.id)
 
   useEffect(() => {
-    if (developerId) {
+    if (accountId) {
       fetchUnits()
     }
-  }, [developerId])
+  }, [accountId])
 
   const fetchUnits = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('developer_token')
+      const token = isAgent 
+        ? localStorage.getItem('agent_token')
+        : localStorage.getItem('developer_token')
       
       if (!token) {
         setError('No authentication token found')
         return
       }
 
-      const response = await fetch(`/api/user-listings?listing_type=unit`, {
+      const listingType = isAgent ? 'property' : 'unit'
+      const response = await fetch(`/api/user-listings?listing_type=${listingType}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -94,19 +109,19 @@ const AllUnits = () => {
 
       if (response.ok) {
         const data = await response.json()
-        console.log('📋 Fetched units:', data)
+        console.log(`📋 Fetched ${itemLabelPlural.toLowerCase()}:`, data)
         const fetchedUnits = data.data || data || []
         setUnits(fetchedUnits)
         setFilteredUnits(fetchedUnits)
       } else {
         const errorData = await response.json()
-        setError(errorData.error || 'Failed to fetch units')
-        toast.error('Failed to fetch units')
+        setError(errorData.error || `Failed to fetch ${itemLabelPlural.toLowerCase()}`)
+        toast.error(`Failed to fetch ${itemLabelPlural.toLowerCase()}`)
       }
     } catch (error) {
-      console.error('Error fetching units:', error)
-      setError('Error fetching units')
-      toast.error('Error fetching units')
+      console.error(`Error fetching ${itemLabelPlural.toLowerCase()}:`, error)
+      setError(`Error fetching ${itemLabelPlural.toLowerCase()}`)
+      toast.error(`Error fetching ${itemLabelPlural.toLowerCase()}`)
     } finally {
       setLoading(false)
     }
@@ -115,10 +130,14 @@ const AllUnits = () => {
 
   const handleAddUnit = () => {
     if (!user?.profile?.slug) {
-      toast.error('Developer profile not found')
+      toast.error(`${isAgent ? 'Agent' : 'Developer'} profile not found`)
       return
     }
-    router.push(`/developer/${user.profile.slug}/units/addNewUnit`)
+    if (isAgent) {
+      router.push(`/agents/${user.profile.slug}/properties/addNewProperty`)
+    } else {
+      router.push(`/developer/${user.profile.slug}/units/addNewUnit`)
+    }
   }
 
   const handleRefresh = () => {
@@ -269,13 +288,13 @@ const AllUnits = () => {
     return (
       <div className="w-full p-6">
         <div className="flex justify-between items-center mb-6">
-          <h1 className=" font-bold ">All Units</h1>
+          <h1 className=" font-bold ">{pageTitle}</h1>
           <button 
             onClick={handleAddUnit}
             className="primary_button flex items-center gap-2"
           >
            
-            Add New Unit
+            {addButtonLabel}
             <Plus className="w-4 h-4" />
           </button>
         </div>
@@ -283,7 +302,7 @@ const AllUnits = () => {
         <div className="flex justify-center items-center py-12">
           <div className="flex items-center gap-3">
             <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-            <span className="text-gray-600">Loading units...</span>
+            <span className="text-gray-600">Loading {itemLabelPlural.toLowerCase()}...</span>
           </div>
         </div>
       </div>
@@ -294,13 +313,13 @@ const AllUnits = () => {
     return (
       <div className="w-full p-6">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="">All Units</h1>
+          <h1 className="">{pageTitle}</h1>
           <button 
             onClick={handleAddUnit}
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
           >
             <Plus className="w-4 h-4" />
-            Add New Unit
+            {addButtonLabel}
           </button>
         </div>
         
@@ -309,7 +328,7 @@ const AllUnits = () => {
             <svg className="w-12 h-12 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
-            <p className="text-lg font-medium">Error loading units</p>
+            <p className="text-lg font-medium">Error loading {itemLabelPlural.toLowerCase()}</p>
             <p className="text-gray-600 mb-4">{error}</p>
             <button 
               onClick={handleRefresh}
@@ -342,9 +361,9 @@ const AllUnits = () => {
         <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
             <p>Manage all your</p>
-            <h1 className="text-[4em]">Listings Units</h1>
+            <h1 className="text-[4em]">Listings {itemLabelPlural}</h1>
             <p className="mt-1">
-              Showing {filteredUnits.length} of {units.length} {units.length === 1 ? 'unit' : 'units'}
+              Showing {filteredUnits.length} of {units.length} {units.length === 1 ? itemLabel.toLowerCase() : itemLabelPlural.toLowerCase()}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -363,7 +382,7 @@ const AllUnits = () => {
               className="primary_button transition-colors flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
-              Add New Unit
+              {addButtonLabel}
             </button>
           </div>
         </div>
@@ -376,19 +395,19 @@ const AllUnits = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No units found</h3>
-            <p className="text-gray-600 mb-6">Get started by creating your first unit</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">{emptyStateTitle}</h3>
+            <p className="text-gray-600 mb-6">{emptyStateMessage}</p>
             <button 
               onClick={handleAddUnit}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              Create Your First Unit
+              {emptyStateButton}
             </button>
           </div>
         ) : filteredUnits.length === 0 ? (
           <div className="flex justify-center items-center h-64">
             <div className="text-center">
-              <div className="text-lg mb-2">No units match your filters</div>
+              <div className="text-lg mb-2">No {itemLabelPlural.toLowerCase()} match your filters</div>
               <div className="text-sm mb-4">Try adjusting your search criteria</div>
               <button
                 onClick={clearFilters}
@@ -405,6 +424,7 @@ const AllUnits = () => {
                 <UnitCard 
                   unit={unit}
                   developerSlug={user?.profile?.slug}
+                  accountType={accountType}
                 />
               </div>
             ))}
@@ -436,7 +456,7 @@ const AllUnits = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search units..."
+                placeholder={`Search ${itemLabelPlural.toLowerCase()}...`}
                 className="w-full pl-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <svg className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -585,7 +605,7 @@ const AllUnits = () => {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search units..."
+                    placeholder={`Search ${itemLabelPlural.toLowerCase()}...`}
                     className="w-full pl-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <svg className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

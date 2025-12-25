@@ -14,7 +14,7 @@ import AppointmentsList from './appointments/AppointmentsList'
 import AppointmentsCalendar from './appointments/AppointmentsCalendar'
 import EventModal from './appointments/EventModal'
 
-const Appointments = () => {
+const Appointments = ({ accountId: propAccountId = null, accountType: propAccountType = 'developer', readOnly = false }) => {
   const { user, isAuthenticated } = useAuth()
   const [appointments, setAppointments] = useState([])
   const [loading, setLoading] = useState(true)
@@ -29,9 +29,13 @@ const Appointments = () => {
   const [isEventModalOpen, setIsEventModalOpen] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(null)
 
+  // Use provided accountId/accountType or fall back to auth user
+  const accountId = propAccountId || user?.id
+  const accountType = propAccountType || user?.profile?.account_type || 'developer'
+
   // Fetch appointments from API
   const fetchAppointments = async (pageNum = 1, reset = false) => {
-    if (!user?.id) return
+    if (!accountId) return
 
     try {
       if (reset) {
@@ -41,7 +45,7 @@ const Appointments = () => {
         setLoadingMore(true)
       }
 
-      const response = await fetch(`/api/appointments?account_id=${user.id}&account_type=developer&page=${pageNum}&limit=10`)
+      const response = await fetch(`/api/appointments?account_id=${accountId}&account_type=${accountType}&page=${pageNum}&limit=10`)
       const result = await response.json()
 
       if (result.success) {
@@ -123,7 +127,18 @@ const Appointments = () => {
   }, [isAuthenticated, user?.id])
 
   // Filter appointments based on search and status
-  const filteredAppointments = appointments.filter(appointment => {
+  // Also mark appointments as read-only if they're for agents (when viewing as agency)
+  const filteredAppointments = appointments.map(appointment => {
+    // Determine if this appointment is read-only
+    // For agencies: if appointment is for an agent, it's read-only
+    // For agencies: if appointment is for the agency directly, it's read-write
+    const isReadOnly = readOnly || (accountType === 'agency' && appointment.account_type === 'agent')
+    
+    return {
+      ...appointment,
+      _isReadOnly: isReadOnly
+    }
+  }).filter(appointment => {
     const matchesStatus = selectedStatus === 'all' || appointment.status === selectedStatus
     const matchesSearch = searchTerm === '' || 
       appointment.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||

@@ -27,8 +27,8 @@ export async function POST(request, { params }) {
       );
     }
 
-    // For developers, use developer_id. For property_seekers, use id
-    const userId = decoded.developer_id || decoded.id;
+    // For developers, use developer_id. For agents, use agent_id. For agencies, use agency_id. For property_seekers, use id
+    const userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
     const userType = decoded.user_type;
 
     // Use admin client to bypass RLS (since we're using custom JWT, not Supabase Auth)

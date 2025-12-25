@@ -27,8 +27,8 @@ export async function GET(request, { params }) {
       );
     }
 
-    // For developers, use developer_id. For property_seekers, use id
-    const userId = decoded.developer_id || decoded.id;
+    // For developers, use developer_id. For agents, use agent_id. For agencies, use agency_id. For property_seekers, use id
+    const userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
     const userType = decoded.user_type;
 
     // Fetch conversation
@@ -116,6 +116,23 @@ export async function GET(request, { params }) {
             user_type: 'agent'
           };
         }
+      } else if (otherUserType === 'agency') {
+        const { data } = await supabase
+          .from('agencies')
+          .select('agency_id, name, email, profile_image, slug')
+          .eq('agency_id', otherUserId)
+          .single();
+        if (data) {
+          otherUser = {
+            id: data.agency_id,
+            name: data.name,
+            email: data.email,
+            profile_image: data.profile_image?.url || data.profile_image || null,
+            slug: data.slug,
+            type: 'agency',
+            user_type: 'agency'
+          };
+        }
       }
     } catch (err) {
       console.error('Error fetching user profile:', err);
@@ -163,8 +180,8 @@ export async function PUT(request, { params }) {
       );
     }
 
-    // For developers, use developer_id. For property_seekers, use id
-    const userId = decoded.developer_id || decoded.id;
+    // For developers, use developer_id. For agents, use agent_id. For agencies, use agency_id. For property_seekers, use id
+    const userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
     const userType = decoded.user_type;
 
     const body = await request.json();
@@ -251,8 +268,8 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    // For developers, use developer_id. For property_seekers, use id
-    const userId = decoded.developer_id || decoded.id;
+    // For developers, use developer_id. For agents, use agent_id. For agencies, use agency_id. For property_seekers, use id
+    const userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
     const userType = decoded.user_type;
 
     // Fetch conversation to verify ownership

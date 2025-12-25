@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
+// import { createClient } from '@supabase/supabase-js' // Commented out - using SendGrid instead of Supabase auth
 import { supabaseAdmin } from '@/lib/supabase'
-import { sendVerificationEmail } from '@/lib/sendgrid'
+import { sendVerificationEmail } from '@/lib/sendgrid' // Using SendGrid for email verification
 import crypto from 'crypto'
 
 export async function POST(request) {
@@ -17,46 +18,115 @@ export async function POST(request) {
     }
 
     // Validate user type
-    const validUserTypes = ['developer', 'agent', 'property_seeker']
+    const validUserTypes = ['developer', 'agent', 'property_seeker', 'agency']
     if (!validUserTypes.includes(userType)) {
       return NextResponse.json(
-        { error: 'Invalid user type. Must be: developer, agent, or property_seeker' },
+        { error: 'Invalid user type. Must be: developer, agent, property_seeker, or agency' },
         { status: 400 }
       )
     }
 
-    // Generate verification token
+    // Generate verification token for email verification (using SendGrid)
     const verificationToken = crypto.randomBytes(32).toString('hex')
     const expiresAt = new Date()
     expiresAt.setHours(expiresAt.getHours() + 24) // 24 hours expiry
 
+    // ===== SENDGRID EMAIL LOGIC - Send verification email FIRST before creating any database records =====
     // CRITICAL: Send verification email FIRST before creating any database records
     // This ensures we only create users if the email was successfully sent
+    console.log('📧 Attempting to send verification email via SendGrid:', { email, userType })
     let emailResult
     try {
       emailResult = await sendVerificationEmail(email, userData.fullName || 'there', verificationToken)
       
       if (!emailResult.success) {
-        console.error('Failed to send verification email:', emailResult.error)
+        console.error('❌ Failed to send verification email:', emailResult.error)
         return NextResponse.json(
           { error: 'Failed to send verification email. Please try again or contact support.' },
           { status: 500 }
         )
       }
+      console.log('✅ Verification email sent successfully via SendGrid')
     } catch (emailError) {
-      console.error('Error sending verification email:', emailError)
+      console.error('❌ Error sending verification email:', emailError)
       return NextResponse.json(
         { error: 'Failed to send verification email. Please try again or contact support.' },
         { status: 500 }
       )
     }
+    // ===== END SENDGRID EMAIL LOGIC =====
 
-    // Only proceed to create user if email was sent successfully
-    // Create user with Supabase Auth
+    // ===== SUPABASE AUTH SIGNUP (COMMENTED OUT - USING SENDGRID INSTEAD) =====
+    // // Create a Supabase client for signup (uses anon key, will trigger email sending)
+    // const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    // const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    //
+    // if (!supabaseUrl || !supabaseAnonKey) {
+    //   return NextResponse.json(
+    //     { error: 'Supabase configuration missing' },
+    //     { status: 500 }
+    //   )
+    // }
+    //
+    // const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+    //   auth: {
+    //     autoRefreshToken: false,
+    //     persistSession: false
+    //   }
+    // })
+    //
+    // // CRITICAL: Use Supabase's built-in signUp - this will automatically send verification email
+    // // This ensures we only create users if the email was successfully sent
+    // console.log('📧 Attempting to sign up user with Supabase:', { email, userType })
+    // 
+    // const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+    //   email: email,
+    //   password: password,
+    //   options: {
+    //     emailRedirectTo: `${process.env.NEXT_PUBLIC_FRONTEND_URL || process.env.FRONTEND_LINK || 'https://iskahomes.vercel.app/'}/verify-email`,
+    //     data: {
+    //       user_type: userType,
+    //       full_name: userData.fullName || '',
+    //       phone: userData.phone || ''
+    //     }
+    //   }
+    // })
+    //
+    // console.log('📧 Supabase signUp response:', { 
+    //   hasUser: !!authData?.user, 
+    //   hasError: !!authError,
+    //   userEmail: authData?.user?.email,
+    //   emailConfirmed: authData?.user?.email_confirmed_at,
+    //   errorMessage: authError?.message,
+    //   session: !!authData?.session,
+    //   fullResponse: JSON.stringify(authData, null, 2)
+    // })
+    //
+    // if (authError) {
+    //   console.error('❌ Supabase signup error:', authError)
+    //   return NextResponse.json(
+    //     { error: authError.message || 'Failed to create user account' },
+    //     { status: 400 }
+    //   )
+    // }
+    //
+    // if (!authData.user) {
+    //   console.error('❌ User creation failed - no user data returned')
+    //   return NextResponse.json(
+    //     { error: 'User creation failed - no user data returned' },
+    //     { status: 500 }
+    //   )
+    // }
+    // ===== END SUPABASE AUTH SIGNUP =====
+
+    // ===== CREATE USER WITH SUPABASE ADMIN API (NO EMAIL CONFIRMATION) =====
+    // Create user with Supabase Admin API - email confirmation disabled since we're using SendGrid
+    console.log('📝 Creating user with Supabase Admin API:', { email, userType })
+    
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
       password: password,
-      email_confirm: false, // We'll handle email verification ourselves
+      email_confirm: false, // We handle email verification ourselves via SendGrid
       user_metadata: {
         user_type: userType,
         full_name: userData.fullName || '',
@@ -66,16 +136,28 @@ export async function POST(request) {
     })
 
     if (authError) {
-      console.error('Auth user creation failed:', authError)
+      console.error('❌ Supabase admin user creation error:', authError)
       return NextResponse.json(
         { error: authError.message || 'Failed to create user account' },
         { status: 400 }
       )
     }
 
+    if (!authData.user) {
+      console.error('❌ User creation failed - no user data returned')
+      return NextResponse.json(
+        { error: 'User creation failed - no user data returned' },
+        { status: 500 }
+      )
+    }
+
+    console.log('✅ User created successfully in Supabase Auth (via Admin API):', authData.user.id)
+    // ===== END CREATE USER WITH SUPABASE ADMIN API =====
+
     const newUser = authData.user
 
     // Create user profile in appropriate table using supabaseAdmin
+    console.log('📝 Creating profile for user type:', userType)
     let profileData = null
     let profileError = null
 
@@ -119,6 +201,11 @@ export async function POST(request) {
             .single()
           profileData = devData
           profileError = devError
+          if (devError) {
+            console.error('❌ Developer profile creation error:', devError)
+          } else {
+            console.log('✅ Developer profile created successfully')
+          }
           break
 
         case 'agent':
@@ -144,6 +231,11 @@ export async function POST(request) {
             .single()
           profileData = agentData
           profileError = agentError
+          if (agentError) {
+            console.error('❌ Agent profile creation error:', agentError)
+          } else {
+            console.log('✅ Agent profile created successfully')
+          }
           break
 
         case 'property_seeker':
@@ -167,6 +259,68 @@ export async function POST(request) {
             .single()
           profileData = seekerData
           profileError = seekerError
+          if (seekerError) {
+            console.error('❌ Property seeker profile creation error:', seekerError)
+          } else {
+            console.log('✅ Property seeker profile created successfully')
+          }
+          break
+
+        case 'agency':
+          // Generate slug from agency name (matching signin pattern)
+          const agencySlug = (userData.fullName || `agency-${newUser.id.slice(0, 8)}`)
+            .toLowerCase()
+            .replace(/\s+/g, '-')
+            .replace(/[^a-z0-9-]/g, '') // Remove special characters
+            .replace(/-+/g, '-') // Replace multiple dashes with single dash
+            .replace(/^-+|-+$/g, '') // Remove leading/trailing dashes
+          
+          const agencyProfile = {
+            agency_id: newUser.id,
+            name: userData.fullName || '',
+            email: email,
+            phone: userData.phone || '',
+            website: userData.companyWebsite || '',
+            license_number: userData.registrationNumber || '',
+            account_status: 'active',
+            slug: agencySlug,
+            profile_completion_percentage: 0,
+            total_agents: 0,
+            active_agents: 0,
+            total_listings: 0,
+            total_views: 0,
+            total_impressions: 0,
+            total_leads: 0,
+            total_appointments: 0,
+            total_sales: 0,
+            total_revenue: 0,
+            estimated_revenue: 0,
+            social_media: [],
+            customer_care: [],
+            registration_files: [],
+            company_locations: [],
+            company_statistics: [],
+            company_gallery: [],
+            commission_rate: { default: 3.0 },
+            // Signup status fields
+            invitation_status: 'sent',
+            signup_status: 'pending', // Will be 'verified' after email confirmation
+            invitation_token: verificationToken,
+            invitation_sent_at: new Date().toISOString(),
+            invitation_expires_at: expiresAt.toISOString()
+          }
+          const { data: agencyData, error: agencyError } = await supabaseAdmin
+            .from('agencies')
+            .insert(agencyProfile)
+            .select()
+            .single()
+          profileData = agencyData
+          profileError = agencyError
+          if (agencyError) {
+            console.error('❌ Agency profile creation error:', agencyError)
+          } else {
+            console.log('✅ Agency profile created successfully')
+          }
           break
       }
 
@@ -189,7 +343,14 @@ export async function POST(request) {
       )
     }
 
-    return NextResponse.json({
+    console.log('✅ Signup completed successfully:', {
+      userId: newUser.id,
+      email: newUser.email,
+      userType,
+      profileId: profileData?.id
+    })
+
+    const response = NextResponse.json({
       success: true,
       message: 'Account created successfully. Please check your email for verification link.',
       user: {
@@ -199,6 +360,9 @@ export async function POST(request) {
         profile: profileData
       }
     })
+
+    console.log('📤 Sending response to client')
+    return response
 
   } catch (error) {
     console.error('Signup error:', error)

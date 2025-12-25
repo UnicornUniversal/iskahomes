@@ -166,34 +166,36 @@ const AppointmentsList = ({
                       <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(appointment.status)}`}>
                         {getStatusIcon(appointment.status)} {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
                       </span>
-                      {editingAppointment === appointment.id ? (
-                        <div className="flex gap-1">
+                      {!appointment._isReadOnly && (
+                        editingAppointment === appointment.id ? (
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => onUpdateStatus(appointment.id, 'confirmed')}
+                              disabled={updatingStatus === appointment.id}
+                              className="p-1 text-green-600 hover:bg-green-50 rounded disabled:opacity-50"
+                            >
+                              {updatingStatus === appointment.id ? (
+                                <FiLoader className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <FiCheck className="w-4 h-4" />
+                              )}
+                            </button>
+                            <button
+                              onClick={() => setEditingAppointment(null)}
+                              disabled={updatingStatus === appointment.id}
+                              className="p-1 text-gray-600 hover:bg-gray-50 rounded disabled:opacity-50"
+                            >
+                              <FiX className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
                           <button
-                            onClick={() => onUpdateStatus(appointment.id, 'confirmed')}
-                            disabled={updatingStatus === appointment.id}
-                            className="p-1 text-green-600 hover:bg-green-50 rounded disabled:opacity-50"
+                            onClick={() => setEditingAppointment(appointment.id)}
+                            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded"
                           >
-                            {updatingStatus === appointment.id ? (
-                              <FiLoader className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <FiCheck className="w-4 h-4" />
-                            )}
+                            <FiEdit3 className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => setEditingAppointment(null)}
-                            disabled={updatingStatus === appointment.id}
-                            className="p-1 text-gray-600 hover:bg-gray-50 rounded disabled:opacity-50"
-                          >
-                            <FiX className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setEditingAppointment(appointment.id)}
-                          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded"
-                        >
-                          <FiEdit3 className="w-4 h-4" />
-                        </button>
+                        )
                       )}
                     </div>
                   </div>
@@ -252,37 +254,41 @@ const AppointmentsList = ({
                   >
                     View Details
                   </button>
-                  {appointment.status === 'pending' && (
-                    <button 
-                      onClick={() => onUpdateStatus(appointment.id, 'confirmed')}
-                      disabled={updatingStatus === appointment.id}
-                      className="flex-1 bg-green-500 text-white py-2.5 px-4 rounded-lg hover:bg-green-600 transition-colors text-sm font-medium disabled:opacity-50 flex items-center justify-center"
-                    >
-                      {updatingStatus === appointment.id ? (
-                        <>
-                          <FiLoader className="w-4 h-4 animate-spin mr-2" />
-                          Confirming...
-                        </>
-                      ) : (
-                        'Confirm'
+                  {!appointment._isReadOnly && (
+                    <>
+                      {appointment.status === 'pending' && (
+                        <button 
+                          onClick={() => onUpdateStatus(appointment.id, 'confirmed')}
+                          disabled={updatingStatus === appointment.id}
+                          className="flex-1 bg-green-500 text-white py-2.5 px-4 rounded-lg hover:bg-green-600 transition-colors text-sm font-medium disabled:opacity-50 flex items-center justify-center"
+                        >
+                          {updatingStatus === appointment.id ? (
+                            <>
+                              <FiLoader className="w-4 h-4 animate-spin mr-2" />
+                              Confirming...
+                            </>
+                          ) : (
+                            'Confirm'
+                          )}
+                        </button>
                       )}
-                    </button>
-                  )}
-                  {appointment.status === 'confirmed' && (
-                    <button 
-                      onClick={() => onUpdateStatus(appointment.id, 'completed')}
-                      disabled={updatingStatus === appointment.id}
-                      className="flex-1 bg-blue-500 text-white py-2.5 px-4 rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium disabled:opacity-50 flex items-center justify-center"
-                    >
-                      {updatingStatus === appointment.id ? (
-                        <>
-                          <FiLoader className="w-4 h-4 animate-spin mr-2" />
-                          Completing...
-                        </>
-                      ) : (
-                        'Mark Complete'
+                      {appointment.status === 'confirmed' && (
+                        <button 
+                          onClick={() => onUpdateStatus(appointment.id, 'completed')}
+                          disabled={updatingStatus === appointment.id}
+                          className="flex-1 bg-blue-500 text-white py-2.5 px-4 rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium disabled:opacity-50 flex items-center justify-center"
+                        >
+                          {updatingStatus === appointment.id ? (
+                            <>
+                              <FiLoader className="w-4 h-4 animate-spin mr-2" />
+                              Completing...
+                            </>
+                          ) : (
+                            'Mark Complete'
+                          )}
+                        </button>
                       )}
-                    </button>
+                    </>
                   )}
                 </div>
               </div>

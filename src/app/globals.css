@@ -445,6 +445,14 @@ html::-webkit-scrollbar:vertical {
     border-bottom: 2px solid transparent;
   }
 
+  span{
+    @apply text-primary_color;
+  }
+
+  label{
+    @apply text-primary_color;
+  }
+
   select:focus,
   select:hover {
     border-bottom: 2px solid var(--color-primary_color);

@@ -506,13 +506,13 @@ async function getDeveloperPrimaryCurrency(userId) {
   try {
     const { data: profile, error } = await supabaseAdmin
       .from('developers')
-      .select('company_locations, default_currency')
-      .eq('user_id', userId)
+      .select('company_locations, default_currency, name')
+      .eq('developer_id', userId)
       .single()
 
     if (error || !profile) {
       console.error('Error fetching developer currency:', error)
-      return 'USD' // Default
+      return { error: 'Developer profile not found. Please set your default currency in your profile settings.' }
     }
 
     if (profile.company_locations && Array.isArray(profile.company_locations)) {
@@ -520,18 +520,25 @@ async function getDeveloperPrimaryCurrency(userId) {
         loc => loc.primary_location === true
       )
       if (primaryLocation?.currency) {
-        return primaryLocation.currency
+        return { currency: primaryLocation.currency }
       }
     }
 
     if (profile.default_currency?.code) {
-      return profile.default_currency.code
+      return { currency: profile.default_currency.code }
     }
 
-    return 'USD' // Default
+    // No currency found - return error
+    return { 
+      error: `Please set your default currency in your profile settings. Go to your developer profile and set a default currency.`,
+      requiresCurrencySetup: true
+    }
   } catch (error) {
     console.error('Error in getDeveloperPrimaryCurrency:', error)
-    return 'USD'
+    return { 
+      error: 'Error fetching currency. Please set your default currency in your profile settings.',
+      requiresCurrencySetup: true
+    }
   }
 }
 
@@ -727,8 +734,60 @@ async function updateTotalRevenue(userId, developmentId, estimatedRevenue, opera
 // Helper function to create sales_listings entry
 async function createSalesListingEntry(listingId, userId, listingData, saleType, salesInfo = {}) {
   try {
-    // Get primary currency
-    const primaryCurrency = await getDeveloperPrimaryCurrency(userId)
+    // Get primary currency based on account type
+    let primaryCurrency = null
+    let currencyError = null
+    
+    if (listingData.account_type === 'developer') {
+      const currencyResult = await getDeveloperPrimaryCurrency(userId)
+      if (currencyResult.error) {
+        return { error: currencyResult.error, requiresCurrencySetup: currencyResult.requiresCurrencySetup }
+      }
+      primaryCurrency = currencyResult.currency
+    } else if (listingData.account_type === 'agent') {
+      // Get agency's default currency
+      const { data: agent } = await supabaseAdmin
+        .from('agents')
+        .select('agency_id')
+        .eq('agent_id', userId)
+        .single()
+      
+      if (agent?.agency_id) {
+        const { data: agency } = await supabaseAdmin
+          .from('agencies')
+          .select('default_currency, company_locations, name')
+          .eq('agency_id', agent.agency_id)
+          .single()
+        
+        if (agency?.default_currency) {
+          primaryCurrency = agency.default_currency
+        } else if (agency?.company_locations) {
+          // Try to get currency from primary location
+          const locations = Array.isArray(agency.company_locations) 
+            ? agency.company_locations 
+            : (typeof agency.company_locations === 'string' ? JSON.parse(agency.company_locations) : [])
+          const primaryLocation = locations.find(loc => loc.primary_location === true)
+          if (primaryLocation?.currency) {
+            primaryCurrency = primaryLocation.currency
+          }
+        }
+        
+        // If still no currency found, return error
+        if (!primaryCurrency) {
+          return { 
+            error: `Please set your agency's default currency in your agency profile settings. Go to your agency profile and set a default currency.`,
+            requiresCurrencySetup: true
+          }
+        }
+      } else {
+        return { 
+          error: 'Agent agency not found. Please contact support.',
+          requiresCurrencySetup: false
+        }
+      }
+    } else {
+      primaryCurrency = 'GHS' // Default fallback
+    }
     
     // Extract estimated_revenue value (in primary currency)
     const estimatedRevenue = listingData.estimated_revenue || {}
@@ -737,6 +796,15 @@ async function createSalesListingEntry(listingId, userId, listingData, saleType,
     if (!salePrice || salePrice <= 0) {
       console.error('No sale price available for sales_listings entry')
       return null
+    }
+
+    // Calculate commission for agents
+    let commissionRate = null
+    let commissionAmount = null
+    if (listingData.account_type === 'agent' && listingData.commission_rate) {
+      commissionRate = listingData.commission_rate
+      const percentage = commissionRate.percentage || 0
+      commissionAmount = (salePrice * percentage) / 100
     }
 
     const salesEntry = {
@@ -750,8 +818,8 @@ async function createSalesListingEntry(listingId, userId, listingData, saleType,
       sale_source: salesInfo.sale_source || 'Iska Homes', // From modal or default
       buyer_name: salesInfo.buyer_name || null, // From modal
       notes: salesInfo.notes || null, // From modal
-      commission_rate: null, // Can be added later
-      commission_amount: null // Can be added later
+      commission_rate: commissionRate,
+      commission_amount: commissionAmount ? parseFloat(commissionAmount.toFixed(2)) : null
     }
 
     const { data, error } = await supabaseAdmin
@@ -771,6 +839,153 @@ async function createSalesListingEntry(listingId, userId, listingData, saleType,
     return null
   }
 }
+
+// Helper function to update agent and agency metrics when listing is sold/rented
+async function updateAgentAndAgencyMetrics(listingId, agentId, listingData, estimatedRevenue, saleType, operation = 'add') {
+  try {
+    const revenueValue = estimatedRevenue.estimated_revenue || estimatedRevenue.price || 0
+    if (!revenueValue || revenueValue <= 0) {
+      return { success: true }
+    }
+
+    // Get agent data
+    const { data: agent, error: agentError } = await supabaseAdmin
+      .from('agents')
+      .select('agency_id, properties_sold, total_revenue, total_commission')
+      .eq('agent_id', agentId)
+      .single()
+
+    if (agentError || !agent) {
+      console.error('Error fetching agent:', agentError)
+      return { error: 'Agent profile not found. Please contact support.' }
+    }
+    
+    // Validate agency has currency set
+    if (agent.agency_id) {
+      const { data: agency } = await supabaseAdmin
+        .from('agencies')
+        .select('default_currency, company_locations, name')
+        .eq('agency_id', agent.agency_id)
+        .single()
+      
+      if (agency) {
+        let hasCurrency = false
+        if (agency.default_currency) {
+          hasCurrency = true
+        } else if (agency.company_locations) {
+          const locations = Array.isArray(agency.company_locations) 
+            ? agency.company_locations 
+            : (typeof agency.company_locations === 'string' ? JSON.parse(agency.company_locations) : [])
+          const primaryLocation = locations.find(loc => loc.primary_location === true)
+          if (primaryLocation?.currency) {
+            hasCurrency = true
+          }
+        }
+        
+        if (!hasCurrency) {
+          return { 
+            error: `Please set your agency's default currency in your agency profile settings. Go to your agency profile and set a default currency.`,
+            requiresCurrencySetup: true
+          }
+        }
+      }
+    }
+
+    // Calculate commission
+    let commissionAmount = 0
+    if (listingData.commission_rate) {
+      const percentage = listingData.commission_rate.percentage || 0
+      commissionAmount = (revenueValue * percentage) / 100
+    }
+
+    // Update agent metrics
+    const currentPropertiesSold = agent.properties_sold || 0
+    const currentTotalRevenue = parseFloat(agent.total_revenue || 0)
+    const currentTotalCommission = parseFloat(agent.total_commission || 0)
+
+    let newPropertiesSold = currentPropertiesSold
+    let newTotalRevenue = currentTotalRevenue
+    let newTotalCommission = currentTotalCommission
+
+    if (operation === 'add') {
+      newPropertiesSold = currentPropertiesSold + 1
+      newTotalRevenue = currentTotalRevenue + revenueValue
+      newTotalCommission = currentTotalCommission + commissionAmount
+    } else if (operation === 'subtract') {
+      newPropertiesSold = Math.max(0, currentPropertiesSold - 1)
+      newTotalRevenue = Math.max(0, currentTotalRevenue - revenueValue)
+      newTotalCommission = Math.max(0, currentTotalCommission - commissionAmount)
+    }
+
+    // Update agent table
+    const { error: updateAgentError } = await supabaseAdmin
+      .from('agents')
+      .update({
+        properties_sold: newPropertiesSold,
+        total_revenue: newTotalRevenue.toFixed(2),
+        total_commission: newTotalCommission.toFixed(2)
+      })
+      .eq('agent_id', agentId)
+
+    if (updateAgentError) {
+      console.error('Error updating agent metrics:', updateAgentError)
+    }
+
+    // Update agency metrics if agent has an agency
+    if (agent.agency_id) {
+      const { data: agency, error: agencyError } = await supabaseAdmin
+        .from('agencies')
+        .select('agents_total_sales, agents_total_revenue')
+        .eq('agency_id', agent.agency_id)
+        .single()
+
+      if (!agencyError && agency) {
+        const currentAgencySales = agency.agents_total_sales || 0
+        const currentAgencyRevenue = parseFloat(agency.agents_total_revenue || 0)
+
+        let newAgencySales = currentAgencySales
+        let newAgencyRevenue = currentAgencyRevenue
+
+        if (operation === 'add') {
+          newAgencySales = currentAgencySales + 1
+          newAgencyRevenue = currentAgencyRevenue + revenueValue
+        } else if (operation === 'subtract') {
+          newAgencySales = Math.max(0, currentAgencySales - 1)
+          newAgencyRevenue = Math.max(0, currentAgencyRevenue - revenueValue)
+        }
+
+        const { error: updateAgencyError } = await supabaseAdmin
+          .from('agencies')
+          .update({
+            agents_total_sales: newAgencySales,
+            agents_total_revenue: newAgencyRevenue.toFixed(2)
+          })
+          .eq('agency_id', agent.agency_id)
+
+        if (updateAgencyError) {
+          console.error('Error updating agency metrics:', updateAgencyError)
+        }
+      }
+    }
+
+    console.log('✅ Agent and agency metrics updated:', {
+      agentId,
+      agencyId: agent.agency_id,
+      operation,
+      propertiesSold: `${currentPropertiesSold} -> ${newPropertiesSold}`,
+      totalRevenue: `${currentTotalRevenue} -> ${newTotalRevenue}`,
+      totalCommission: `${currentTotalCommission} -> ${newTotalCommission}`
+    })
+    
+    return { success: true }
+  } catch (error) {
+    console.error('Error in updateAgentAndAgencyMetrics:', error)
+    return { error: 'Error updating agent metrics. Please try again.' }
+  }
+}
+
+// Export updateAgentAndAgencyMetrics for use in other files
+export { updateAgentAndAgencyMetrics }
 
 // Helper function to check if a string is a valid UUID
 function isUUID(str) {
@@ -1344,6 +1559,9 @@ export async function PUT(request, { params }) {
       available_until: formData.get('available_until') || existingListing.available_until,
       acquisition_rules: formData.get('acquisition_rules') || existingListing.acquisition_rules,
       additional_information: formData.get('additional_information') || existingListing.additional_information,
+      // Agent-specific fields
+      commission_rate: formData.get('commission_rate') ? JSON.parse(formData.get('commission_rate')) : (existingListing.commission_rate || null),
+      listing_agency_id: formData.get('listing_agency_id') || existingListing.listing_agency_id || null,
       listing_status: formData.get('listing_status') || existingListing.listing_status,
       is_featured: formData.get('is_featured') !== null ? formData.get('is_featured') === 'true' : existingListing.is_featured,
       is_verified: formData.get('is_verified') !== null ? formData.get('is_verified') === 'true' : existingListing.is_verified,
@@ -1632,7 +1850,7 @@ export async function PUT(request, { params }) {
     }
 
     // Handle status changes to sold/rented - update total_revenue and sales_listings
-    if (updatedListing.account_type === 'developer') {
+    if (updatedListing.account_type === 'developer' || updatedListing.account_type === 'agent') {
       const estimatedRevenue = updatedListing.estimated_revenue || existingListing.estimated_revenue || {}
       const revenueValue = estimatedRevenue.estimated_revenue || estimatedRevenue.price || 0
       
@@ -1653,9 +1871,13 @@ export async function PUT(request, { params }) {
         const salesInfo = updateData.sales_info || {}
         await createSalesListingEntry(listingId, userId, updatedListing, saleType, salesInfo)
         
-        // Add revenue to developer and development total_revenue
+        // Add revenue to developer/agent and development total_revenue
         if (revenueValue > 0) {
-          await updateTotalRevenue(userId, updatedListing.development_id, estimatedRevenue, 'add')
+          if (updatedListing.account_type === 'developer') {
+            await updateTotalRevenue(userId, updatedListing.development_id, estimatedRevenue, 'add')
+          } else if (updatedListing.account_type === 'agent') {
+            await updateAgentAndAgencyMetrics(listingId, userId, updatedListing, estimatedRevenue, saleType, 'add')
+          }
         }
       } else if (statusChangedFromRentedToSold) {
         // Changed from Rented Out to Sold - only update status, no revenue recalculation
@@ -1670,18 +1892,37 @@ export async function PUT(request, { params }) {
         if (existingSale) {
           // Just update the sale_type from 'rented' to 'sold'
           // No revenue recalculation needed since both account for the same thing
+          // But update commission if it's an agent listing
+          const updateData = {
+            sale_type: 'sold',
+            updated_at: new Date().toISOString()
+          }
+          
+          // Recalculate commission for agents if commission_rate exists
+          if (updatedListing.account_type === 'agent' && updatedListing.commission_rate) {
+            const estimatedRevenue = updatedListing.estimated_revenue || existingListing.estimated_revenue || {}
+            const salePrice = estimatedRevenue.estimated_revenue || estimatedRevenue.price || 0
+            if (salePrice > 0) {
+              const percentage = updatedListing.commission_rate.percentage || 0
+              const commissionAmount = (salePrice * percentage) / 100
+              updateData.commission_rate = updatedListing.commission_rate
+              updateData.commission_amount = parseFloat(commissionAmount.toFixed(2))
+            }
+          }
+          
           await supabaseAdmin
             .from('sales_listings')
-            .update({
-              sale_type: 'sold',
-              updated_at: new Date().toISOString()
-            })
+            .update(updateData)
             .eq('id', existingSale.id)
         } else {
           // No existing entry, create new one (shouldn't happen but handle it)
           await createSalesListingEntry(listingId, userId, updatedListing, 'sold')
           if (revenueValue > 0) {
-            await updateTotalRevenue(userId, updatedListing.development_id, estimatedRevenue, 'add')
+            if (updatedListing.account_type === 'developer') {
+              await updateTotalRevenue(userId, updatedListing.development_id, estimatedRevenue, 'add')
+            } else if (updatedListing.account_type === 'agent') {
+              await updateAgentAndAgencyMetrics(listingId, userId, updatedListing, estimatedRevenue, 'sold', 'add')
+            }
           }
         }
         
@@ -1708,8 +1949,12 @@ export async function PUT(request, { params }) {
               .delete()
               .eq('id', existingSale.id)
             
-            // Subtract revenue from developer and development
-            await updateTotalRevenue(userId, updatedListing.development_id, estimatedRevenue, 'subtract')
+            // Subtract revenue from developer/agent and development
+            if (updatedListing.account_type === 'developer') {
+              await updateTotalRevenue(userId, updatedListing.development_id, estimatedRevenue, 'subtract')
+            } else if (updatedListing.account_type === 'agent') {
+              await updateAgentAndAgencyMetrics(listingId, userId, updatedListing, estimatedRevenue, existingSale.sale_type, 'subtract')
+            }
           }
         }
         

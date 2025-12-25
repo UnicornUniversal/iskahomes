@@ -24,8 +24,8 @@ export async function GET(request) {
       );
     }
 
-    // For developers, use developer_id. For property_seekers, use id
-    const userId = decoded.developer_id || decoded.id;
+    // For developers, use developer_id. For agents, use agent_id. For agencies, use agency_id. For property_seekers, use id
+    const userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
     const userType = decoded.user_type;
 
     // Get conversation_id and pagination params from query
@@ -93,7 +93,8 @@ export async function GET(request) {
     const senderIdsByType = {
       property_seeker: [],
       developer: [],
-      agent: []
+      agent: [],
+      agency: []
     }
 
     // Group sender IDs by type
@@ -110,7 +111,7 @@ export async function GET(request) {
     const sendersMap = {}
 
     // Batch fetch all senders of each type in parallel (much faster!)
-    const [seekersData, developersData, agentsData] = await Promise.all([
+    const [seekersData, developersData, agentsData, agenciesData] = await Promise.all([
       // Fetch all property seekers at once
       senderIdsByType.property_seeker.length > 0
         ? supabase
@@ -133,6 +134,14 @@ export async function GET(request) {
             .from('agents')
             .select('agent_id, name, profile_image')
             .in('agent_id', senderIdsByType.agent)
+        : { data: [] },
+      
+      // Fetch all agencies at once
+      senderIdsByType.agency.length > 0
+        ? supabase
+            .from('agencies')
+            .select('agency_id, name, profile_image')
+            .in('agency_id', senderIdsByType.agency)
         : { data: [] }
     ])
 
@@ -155,6 +164,13 @@ export async function GET(request) {
       sendersMap[agent.agent_id] = {
         name: agent.name || 'Agent',
         profile_image: agent.profile_image || null
+      }
+    })
+
+    agenciesData.data?.forEach(agency => {
+      sendersMap[agency.agency_id] = {
+        name: agency.name || 'Agency',
+        profile_image: agency.profile_image || null
       }
     })
 
@@ -210,8 +226,8 @@ export async function POST(request) {
       );
     }
 
-    // For developers, use developer_id. For property_seekers, use id
-    const userId = decoded.developer_id || decoded.id;
+    // For developers, use developer_id. For agents, use agent_id. For agencies, use agency_id. For property_seekers, use id
+    const userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
     const userType = decoded.user_type;
 
     const body = await request.json();

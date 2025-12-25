@@ -25,8 +25,8 @@ export async function GET(request) {
     }
 
     // Get user info from token
-    // For developers, use developer_id. For property_seekers, use id
-    const userId = decoded.developer_id || decoded.id;
+    // For developers, use developer_id. For agents, use agent_id. For agencies, use agency_id. For property_seekers, use id
+    const userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
     const userType = decoded.user_type;
 
     // Get pagination params
@@ -58,7 +58,8 @@ export async function GET(request) {
     const otherUsersByType = {
       property_seeker: [],
       developer: [],
-      agent: []
+      agent: [],
+      agency: []
     };
 
     conversations.forEach(conv => {
@@ -72,7 +73,7 @@ export async function GET(request) {
     });
 
     // Batch fetch all user profiles at once
-    const [seekersData, developersData, agentsData] = await Promise.all([
+    const [seekersData, developersData, agentsData, agenciesData] = await Promise.all([
       // Fetch all property seekers
       otherUsersByType.property_seeker.length > 0
         ? supabase
@@ -95,6 +96,14 @@ export async function GET(request) {
             .from('agents')
             .select('agent_id, name, email, profile_image, slug')
             .in('agent_id', otherUsersByType.agent)
+        : { data: [] },
+      
+      // Fetch all agencies
+      otherUsersByType.agency.length > 0
+        ? supabase
+            .from('agencies')
+            .select('agency_id, name, email, profile_image, slug')
+            .in('agency_id', otherUsersByType.agency)
         : { data: [] }
     ]);
 
@@ -102,6 +111,7 @@ export async function GET(request) {
     const seekersMap = new Map((seekersData.data || []).map(s => [s.id, s]));
     const developersMap = new Map((developersData.data || []).map(d => [d.developer_id, d]));
     const agentsMap = new Map((agentsData.data || []).map(a => [a.agent_id, a]));
+    const agenciesMap = new Map((agenciesData.data || []).map(a => [a.agency_id, a]));
 
     // Map conversations with user details
     const conversationsWithUserDetails = conversations.map(conv => {
@@ -150,6 +160,19 @@ export async function GET(request) {
             slug: data.slug,
             type: 'agent',
             user_type: 'agent'
+          };
+        }
+      } else if (otherUserType === 'agency') {
+        const data = agenciesMap.get(otherUserId);
+        if (data) {
+          otherUser = {
+            id: data.agency_id,
+            name: data.name,
+            email: data.email,
+            profile_image: data.profile_image?.url || data.profile_image || null,
+            slug: data.slug,
+            type: 'agency',
+            user_type: 'agency'
           };
         }
       }
@@ -264,8 +287,8 @@ export async function POST(request) {
         console.error('Error sending first message:', msgError);
       } else {
         // Automatically update lead status from "New" to "Contacted" when sending a message
-        // Only update if the sender is a developer/agent (lister) and receiver is a property_seeker
-        if (userType === 'developer' && otherUserType === 'property_seeker') {
+        // Only update if the sender is a developer/agent/agency (lister) and receiver is a property_seeker
+        if ((userType === 'developer' || userType === 'agent' || userType === 'agency') && otherUserType === 'property_seeker') {
           try {
             // Find leads associated with this conversation
             // Lead is identified by: seeker_id = otherUserId, lister_id = userId

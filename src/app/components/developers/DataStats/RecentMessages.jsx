@@ -6,13 +6,17 @@ import { MessageSquare, Clock, Loader2, Image as ImageIcon, ChevronRight } from 
 import Image from 'next/image'
 import Link from 'next/link'
 
-const RecentMessages = () => {
+const RecentMessages = ({ userId: propUserId = null, accountType: propAccountType = 'developer' }) => {
   const { user } = useAuth()
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // Use provided userId/accountType or fall back to auth user
+  const userId = propUserId || user?.id
+  const accountType = propAccountType || user?.profile?.account_type || 'developer'
+
   useEffect(() => {
-    if (!user?.id) {
+    if (!userId) {
       setLoading(false)
       return
     }
@@ -21,8 +25,7 @@ const RecentMessages = () => {
 
     const fetchMessages = async () => {
       try {
-        const userType = user?.profile?.account_type || 'developer'
-        const response = await fetch(`/api/messages/recent?user_id=${user.id}&user_type=${userType}&limit=7`)
+        const response = await fetch(`/api/messages/recent?user_id=${userId}&user_type=${accountType}&limit=7`)
         if (response.ok) {
           const result = await response.json()
           if (isMounted) {
@@ -43,7 +46,7 @@ const RecentMessages = () => {
     return () => {
       isMounted = false
     }
-  }, [user?.id, user?.profile?.account_type])
+  }, [userId, accountType])
 
   const formatTimeAgo = (dateString) => {
     if (!dateString) return 'N/A'

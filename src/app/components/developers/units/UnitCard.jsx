@@ -3,8 +3,9 @@ import React from 'react'
 import { useRouter } from 'next/navigation'
 import { Heart, MapPin, Bed, Bath, Car, Square } from 'lucide-react'
 
-const UnitCard = ({ unit, developerSlug }) => {
+const UnitCard = ({ unit, developerSlug, accountType = 'developer' }) => {
   const router = useRouter()
+  const isAgent = accountType === 'agent'
 
   const formatPrice = (price, currency = 'GHS') => {
     const numPrice = parseFloat(price)
@@ -68,18 +69,21 @@ const UnitCard = ({ unit, developerSlug }) => {
     e.preventDefault()
     e.stopPropagation()
     
-    // Navigate to single unit page with developer context
-    // Always use ID for the route - the page will handle it
+    // Navigate to single unit/property page based on account type
     const slug = developerSlug || 'default'
     const unitId = unit.id
     
     if (!unitId) {
-      console.error('Unit ID is missing:', unit)
+      console.error(`${isAgent ? 'Property' : 'Unit'} ID is missing:`, unit)
       return
     }
     
-    console.log('Navigating to unit:', { slug, unitId, unit })
-    router.push(`/developer/${slug}/units/${unitId}`)
+    console.log(`Navigating to ${isAgent ? 'property' : 'unit'}:`, { slug, unitId, unit })
+    if (isAgent) {
+      router.push(`/agents/${slug}/properties/${unitId}`)
+    } else {
+      router.push(`/developer/${slug}/units/${unitId}`)
+    }
   }
 
   return (

@@ -939,7 +939,10 @@ export async function POST(request) {
       meta_keywords: propertyData.meta_keywords || null,
       seo_title: propertyData.seo_title || null,
       slug: propertyData.slug || null,
-      floor_plan: propertyData.floor_plan || null
+      floor_plan: propertyData.floor_plan || null,
+      // Agent-specific fields
+      listing_agency_id: propertyData.account_type === 'agent' && agencyId ? agencyId : null,
+      commission_rate: propertyData.commission_rate || null
     }
 
     // If resuming, start with existing listing data

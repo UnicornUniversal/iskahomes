@@ -1,17 +1,18 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, Suspense } from 'react'
 import { Input } from '@/app/components/ui/input'
 import { Button } from '@/app/components/ui/button'
 import { Eye, EyeOff } from 'lucide-react'
 import { ToastContainer, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { useAuth } from '@/contexts/AuthContext'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 const SignInPage = () => {
   const { login, isAuthenticated, user, loading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   
   const [formData, setFormData] = useState({
     email: '',
@@ -20,6 +21,23 @@ const SignInPage = () => {
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+
+  // Check for success message from signup redirect
+  useEffect(() => {
+    const message = searchParams.get('message')
+    if (message) {
+      toast.success(message, {
+        position: "top-center",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      })
+      // Clean up URL by removing query parameter
+      router.replace('/home/signin')
+    }
+  }, [searchParams, router])
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -33,6 +51,9 @@ const SignInPage = () => {
           break
         case 'agent':
           redirectUrl = `/agents/${user.profile?.slug}/dashboard`
+          break
+        case 'agency':
+          redirectUrl = `/agency/${user.profile?.slug}/dashboard`
           break
         case 'seeker':
           redirectUrl = `/homeSeeker/${user.profile?.slug}/dashboard`
@@ -102,6 +123,9 @@ const SignInPage = () => {
             break
           case 'agent':
             redirectUrl = `/agents/${result.user.profile?.slug || result.user.id}/dashboard`
+            break
+          case 'agency':
+            redirectUrl = `/agency/${result.user.profile?.slug || result.user.id}/dashboard`
             break
           case 'seeker':
             redirectUrl = `/homeSeeker/${result.user.profile?.slug || result.user.id}/dashboard`
@@ -202,6 +226,7 @@ const SignInPage = () => {
                 <option value="">Select account type</option>
                 <option value="developer">Developer</option>
                 <option value="agent">Agent</option>
+                <option value="agency">Agency</option>
                 <option value="property_seeker">Property Seeker</option>
               </select>
             </div>
@@ -351,4 +376,16 @@ const SignInPage = () => {
   )
 }
 
-export default SignInPage
+const SignInPageWrapper = () => {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    }>
+      <SignInPage />
+    </Suspense>
+  )
+}
+
+export default SignInPageWrapper

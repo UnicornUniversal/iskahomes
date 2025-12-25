@@ -11,14 +11,19 @@ const Chats = ({ onChatSelect, selectedChatId, onConversationDataChange }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { user, developerToken, propertySeekerToken } = useAuth();
+  const { user, developerToken, propertySeekerToken, agentToken, agencyToken } = useAuth();
 
   // Get the appropriate token based on user type
-  const token = user?.user_type === 'developer' ? developerToken : propertySeekerToken;
-
+  const token = user?.user_type === 'developer' ? developerToken 
+              : user?.user_type === 'agent' ? agentToken
+              : user?.user_type === 'agency' ? agencyToken
+              : propertySeekerToken;
 
   // Fetch conversations and subscribe to realtime updates
-  const currentUserId = user?.id ?? user?.profile?.developer_id ?? null;
+  const currentUserId = user?.user_type === 'developer' ? (user?.id || user?.profile?.developer_id)
+                      : user?.user_type === 'agent' ? (user?.id || user?.profile?.agent_id)
+                      : user?.user_type === 'agency' ? (user?.id || user?.profile?.agency_id)
+                      : user?.id;
 
   useEffect(() => {
     if (!token || !user || !currentUserId) return;
@@ -238,7 +243,7 @@ const Chats = ({ onChatSelect, selectedChatId, onConversationDataChange }) => {
   };
 
   return (
-    <div className="w-full h-full default_bg border-r border-primary_color/10 flex flex-col shadow-lg rounded-xl overflow-hidden">
+    <div className="w-full h-full default_bg border-r border-primary_color/10 flex flex-col shadow-lg rounded-xl overflow-hidden min-h-0">
       {/* Header */}
       <div className="p-4 border-b border-primary_color/10 default_bg">
         <h2 className="text-xl font-bold text-primary_color">Chats</h2>

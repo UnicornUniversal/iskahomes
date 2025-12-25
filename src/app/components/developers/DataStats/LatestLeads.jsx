@@ -13,13 +13,17 @@ function getLeadCategory(score) {
   return { label: 'Base', color: 'bg-gray-100 border-gray-200' }
 }
 
-const LatestLeads = () => {
+const LatestLeads = ({ listerId: propListerId = null, listerType: propListerType = 'developer' }) => {
   const { user } = useAuth()
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // Use provided listerId/listerType or fall back to auth user
+  const listerId = propListerId || user?.id
+  const listerType = propListerType || user?.profile?.account_type || 'developer'
+
   useEffect(() => {
-    if (!user?.id) {
+    if (!listerId) {
       setLoading(false)
       return
     }
@@ -28,7 +32,7 @@ const LatestLeads = () => {
 
     const fetchLeads = async () => {
       try {
-        const response = await fetch(`/api/leads/latest?lister_id=${user.id}&limit=7`)
+        const response = await fetch(`/api/leads/latest?lister_id=${listerId}&lister_type=${listerType}&limit=7`)
         if (response.ok) {
           const result = await response.json()
           if (isMounted) {
@@ -49,7 +53,7 @@ const LatestLeads = () => {
     return () => {
       isMounted = false
     }
-  }, [user?.id])
+  }, [listerId, listerType])
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A'

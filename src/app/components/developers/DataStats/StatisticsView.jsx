@@ -155,7 +155,7 @@ const ImpressionsChart = ({ data }) => {
 }
 */
 
-const StatisticsView = () => {
+const StatisticsView = ({ userId: propUserId = null, accountType: propAccountType = 'developer' }) => {
   const { user } = useAuth()
   const [selectedMetric, setSelectedMetric] = useState('views')
   const [exporting, setExporting] = useState(false)
@@ -167,6 +167,10 @@ const StatisticsView = () => {
     totalListingViews: 0, 
     totalProfileViews: 0 
   })
+
+  // Use provided userId/accountType or fall back to auth user
+  const userId = propUserId || user?.id
+  const accountType = propAccountType || user?.profile?.account_type || 'developer'
 
   // Initialize with current month as default
   const getDefaultDateRange = () => {
@@ -198,7 +202,7 @@ const StatisticsView = () => {
   const selectedPeriod = getPeriodFromDateRange()
 
   useEffect(() => {
-    if (!user?.id) {
+    if (!userId) {
       setLoading(false)
       return
     }
@@ -208,7 +212,7 @@ const StatisticsView = () => {
     const fetchStatistics = async () => {
       try {
         setLoading(true)
-        const userType = user?.profile?.account_type || 'developer'
+        const userType = accountType
         
         // COMMENTED OUT: PostHog implementation (too slow, replaced with Supabase user_analytics table)
         // NOTE: Now using Supabase user_analytics table instead of PostHog API
@@ -236,7 +240,7 @@ const StatisticsView = () => {
         
         // NEW: Use Supabase user_analytics table with date range
         const params = new URLSearchParams({
-          user_id: user.id,
+          user_id: userId,
           user_type: userType,
           period: selectedPeriod,
           metric: selectedMetric
@@ -282,7 +286,7 @@ const StatisticsView = () => {
     return () => {
       isMounted = false
     }
-  }, [user?.id, user?.profile?.account_type, selectedPeriod, selectedMetric, dateRange.startDate, dateRange.endDate])
+  }, [userId, accountType, selectedPeriod, selectedMetric, dateRange.startDate, dateRange.endDate])
 
   // const currentData = selectedMetric === 'views' ? viewsData : impressionsData // COMMENTED OUT: Only views now
   const currentData = viewsData

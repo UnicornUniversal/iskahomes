@@ -16,10 +16,10 @@ export async function POST(request) {
     }
 
     // Validate user type
-    const validUserTypes = ['developer', 'agent', 'property_seeker']
+    const validUserTypes = ['developer', 'agent', 'property_seeker', 'agency']
     if (!validUserTypes.includes(userType)) {
       return NextResponse.json(
-        { error: 'Invalid user type. Must be: developer, agent, or property_seeker' },
+        { error: 'Invalid user type. Must be: developer, agent, property_seeker, or agency' },
         { status: 400 }
       )
     }
@@ -159,6 +159,56 @@ export async function POST(request) {
             .single()
           profileData = seekerData
           profileError = seekerError
+          break
+
+        case 'agency':
+          // Generate slug from agency name (matching signin pattern)
+          const agencySlug = (userData.fullName || `agency-${newUser.id.slice(0, 8)}`)
+            .toLowerCase()
+            .replace(/\s+/g, '-')
+            .replace(/[^a-z0-9-]/g, '') // Remove special characters
+            .replace(/-+/g, '-') // Replace multiple dashes with single dash
+            .replace(/^-+|-+$/g, '') // Remove leading/trailing dashes
+          
+          const agencyProfile = {
+            agency_id: newUser.id,
+            name: userData.fullName || '',
+            email: email,
+            phone: userData.phone || '',
+            website: userData.companyWebsite || '',
+            license_number: userData.registrationNumber || '',
+            account_status: 'active',
+            slug: agencySlug,
+            profile_completion_percentage: 0,
+            total_agents: 0,
+            active_agents: 0,
+            total_listings: 0,
+            total_views: 0,
+            total_impressions: 0,
+            total_leads: 0,
+            total_appointments: 0,
+            total_sales: 0,
+            total_revenue: 0,
+            estimated_revenue: 0,
+            social_media: [],
+            customer_care: [],
+            registration_files: [],
+            company_locations: [],
+            company_statistics: [],
+            company_gallery: [],
+            commission_rate: { default: 3.0 },
+            // Signup status fields
+            invitation_status: 'sent',
+            signup_status: 'pending', // Will be 'verified' after email confirmation
+            invitation_sent_at: new Date().toISOString()
+          }
+          const { data: agencyData, error: agencyError } = await supabaseAdmin
+            .from('agencies')
+            .insert(agencyProfile)
+            .select()
+            .single()
+          profileData = agencyData
+          profileError = agencyError
           break
       }
 

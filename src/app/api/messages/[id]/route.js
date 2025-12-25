@@ -26,8 +26,8 @@ export async function PUT(request, { params }) {
       );
     }
 
-    // For developers, use developer_id. For property_seekers, use id
-    const userId = decoded.developer_id || decoded.id;
+    // For developers, use developer_id. For agents, use agent_id. For agencies, use agency_id. For property_seekers, use id
+    const userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
     const userType = decoded.user_type;
 
     const body = await request.json();
@@ -119,8 +119,8 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    // For developers, use developer_id. For property_seekers, use id
-    const userId = decoded.developer_id || decoded.id;
+    // For developers, use developer_id. For agents, use agent_id. For agencies, use agency_id. For property_seekers, use id
+    const userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
     const userType = decoded.user_type;
 
     // Fetch message to verify ownership

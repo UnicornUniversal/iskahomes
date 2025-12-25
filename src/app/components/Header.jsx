@@ -290,7 +290,7 @@ const Header = () => {
             className='text-primary_color md:text-[5em] font-bold'
             variants={titleVariants}
           >
-            Iska Home
+            ISKA Homes
           </motion.h1>
           <motion.div variants={itemVariants}>
             <h4 className=''>Your Dream Property Awaits You</h4>

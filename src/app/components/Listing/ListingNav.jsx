@@ -13,7 +13,7 @@ const ListingNav = () => {
   const slugIndex = pathParts.indexOf('units')
   const unitSlug = slugIndex >= 0 && pathParts[slugIndex + 1] ? pathParts[slugIndex + 1] : null
   
-  // Don't show nav if we're not on a unit page
+  // Don't show nav if we're not on a unit page (for developers)
   if (!unitSlug || unitSlug === 'addNewUnit') {
     return null
   }

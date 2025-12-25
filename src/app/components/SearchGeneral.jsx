@@ -17,7 +17,7 @@ const SearchGeneral = () => {
         <option>Rent</option>
         <option>Buy</option>
         <option>Lease</option>
-        <option>All Properties</option>
+        {/* <option>All Properties</option> */}
       </select>
       {/* Search Input */}
       <input

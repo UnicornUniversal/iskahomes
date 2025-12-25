@@ -20,29 +20,44 @@ import ImmersiveExperienceStep from './steps/ImmersiveExperienceStep'
 import AdditionalInfoStep from './steps/AdditionalInfoStep'
 import PreviewStep from './steps/PreviewStep'
 
-const STEPS = [
-  { id: 'basic-info', label: 'Basic Info', component: BasicInfoStep },
-  { id: 'categories', label: 'Categories', component: CategoriesStep },
-  { id: 'specifications', label: 'Specifications', component: SpecificationsStep },
-  { id: 'location', label: 'Location', component: LocationStep },
-  { id: 'pricing', label: 'Pricing', component: PricingStep },
-  { id: 'amenities', label: 'Amenities', component: AmenitiesStep },
-  { id: 'social-amenities', label: 'Social Amenities', component: SocialAmenitiesStep },
-  { id: 'media', label: 'Media', component: MediaStep },
-  { id: 'immersive-experience', label: 'Immersive Experience', component: ImmersiveExperienceStep },
-  { id: 'additional-info', label: 'Additional Info', component: AdditionalInfoStep },
-  { id: 'preview', label: 'Preview and Finalize', component: PreviewStep }
-]
+// Get steps based on account type - agents don't have immersive experience
+const getSteps = (accountType) => {
+  const baseSteps = [
+    { id: 'basic-info', label: 'Basic Info', component: BasicInfoStep },
+    { id: 'categories', label: 'Categories', component: CategoriesStep },
+    { id: 'specifications', label: 'Specifications', component: SpecificationsStep },
+    { id: 'location', label: 'Location', component: LocationStep },
+    { id: 'pricing', label: 'Pricing', component: PricingStep },
+    { id: 'amenities', label: 'Amenities', component: AmenitiesStep },
+    { id: 'social-amenities', label: 'Social Amenities', component: SocialAmenitiesStep },
+    { id: 'media', label: 'Media', component: MediaStep },
+  ]
+  
+  // Only add immersive experience for developers
+  if (accountType === 'developer') {
+    baseSteps.push({ id: 'immersive-experience', label: 'Immersive Experience', component: ImmersiveExperienceStep })
+  }
+  
+  baseSteps.push(
+    { id: 'additional-info', label: 'Additional Info', component: AdditionalInfoStep },
+    { id: 'preview', label: 'Preview and Finalize', component: PreviewStep }
+  )
+  
+  return baseSteps
+}
 
-const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
+const PropertyManagementWizard = ({ slug, propertyId, accountType = 'developer' }) => {
   const { user } = useAuth()
   
-  // Use cached developments hook
+  // Get steps based on account type
+  const STEPS = getSteps(accountType)
+  
+  // Use cached developments hook - only for developers
   const { 
     data: developments = [], 
     loading: developmentsLoading, 
     error: developmentsError 
-  } = useDevelopments(user?.profile?.developer_id)
+  } = useDevelopments(accountType === 'developer' ? user?.profile?.developer_id : null)
 
   const [currentStep, setCurrentStep] = useState(0)
   // Initialize formData with default empty arrays to prevent undefined errors
@@ -452,7 +467,14 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
         toast.success(`${currentStepData.label} saved successfully!`)
       } else {
         const error = await response.json()
-        toast.error(error.error || `Failed to save ${currentStepData.label}`)
+        // Check if currency setup is required
+        if (error.requiresCurrencySetup) {
+          toast.error(error.error || `Failed to save ${currentStepData.label}. Please set your default currency first.`, {
+            autoClose: 6000
+          })
+        } else {
+          toast.error(error.error || `Failed to save ${currentStepData.label}`)
+        }
         throw new Error(error.error || `Failed to save ${currentStepData.label}`)
       }
     } catch (error) {
@@ -553,7 +575,14 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType }) => {
       } else {
         const error = await response.json()
         setShowFinalizingModal(false)
-        toast.error(error.error || 'Failed to finalize listing')
+        // Check if currency setup is required
+        if (error.requiresCurrencySetup) {
+          toast.error(error.error || 'Failed to finalize listing. Please set your default currency first.', {
+            autoClose: 6000
+          })
+        } else {
+          toast.error(error.error || 'Failed to finalize listing')
+        }
       }
     } catch (error) {
       console.error('Error finalizing listing:', error)

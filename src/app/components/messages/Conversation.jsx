@@ -18,11 +18,19 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
   const [pagination, setPagination] = useState({ hasMore: false, offset: 0, limit: 50 });
   const scrollRef = useRef(null);
   const initialLoadRef = useRef(true);
-  const { user, developerToken, propertySeekerToken } = useAuth();
+  const { user, developerToken, propertySeekerToken, agentToken, agencyToken } = useAuth();
 
   // Get the appropriate token based on user type
-  const token = user?.user_type === 'developer' ? developerToken : propertySeekerToken;
-  const currentUserId = user?.id || user?.profile?.developer_id;
+  const token = user?.user_type === 'developer' ? developerToken 
+              : user?.user_type === 'agent' ? agentToken
+              : user?.user_type === 'agency' ? agencyToken
+              : propertySeekerToken;
+  
+  // Get user ID based on user type
+  const currentUserId = user?.user_type === 'developer' ? (user?.id || user?.profile?.developer_id)
+                      : user?.user_type === 'agent' ? (user?.id || user?.profile?.agent_id)
+                      : user?.user_type === 'agency' ? (user?.id || user?.profile?.agency_id)
+                      : user?.id;
 
   // Use conversationData from props if available, otherwise keep existing state
   useEffect(() => {
@@ -230,6 +238,16 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
                     .single();
                   if (data) {
                     senderName = data.name || 'Agent';
+                    senderImage = data.profile_image;
+                  }
+                } else if (payload.new.sender_type === 'agency') {
+                  const { data } = await supabase
+                    .from('agencies')
+                    .select('agency_id, name, profile_image')
+                    .eq('agency_id', payload.new.sender_id)
+                    .single();
+                  if (data) {
+                    senderName = data.name || 'Agency';
                     senderImage = data.profile_image;
                   }
                 }
@@ -533,7 +551,7 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
   }
 
   return (
-    <div className="flex flex-col h-full w-full default_bg rounded-xl shadow-lg border border-primary_color/10">
+    <div className="flex flex-col h-full w-full default_bg rounded-xl shadow-lg border border-primary_color/10 min-h-0">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-primary_color/10 default_bg rounded-t-xl flex-shrink-0">
         <div className="flex items-center min-w-0">

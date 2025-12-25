@@ -56,7 +56,8 @@ export async function GET(request) {
     const otherUserIdsByType = {
       property_seeker: [],
       developer: [],
-      agent: []
+      agent: [],
+      agency: []
     }
 
     conversations?.forEach(conv => {
@@ -73,7 +74,7 @@ export async function GET(request) {
     })
 
     // Fetch all other users' info in parallel
-    const [seekersData, developersData, agentsData] = await Promise.all([
+    const [seekersData, developersData, agentsData, agenciesData] = await Promise.all([
       otherUserIdsByType.property_seeker.length > 0
         ? supabase
             .from('property_seekers')
@@ -91,6 +92,12 @@ export async function GET(request) {
             .from('agents')
             .select('agent_id, name, profile_image')
             .in('agent_id', otherUserIdsByType.agent)
+        : { data: [] },
+      otherUserIdsByType.agency.length > 0
+        ? supabase
+            .from('agencies')
+            .select('agency_id, name, profile_image')
+            .in('agency_id', otherUserIdsByType.agency)
         : { data: [] }
     ])
 
@@ -112,6 +119,12 @@ export async function GET(request) {
       otherUsersInfoMap[`agent_${agent.agent_id}`] = {
         name: agent.name || 'Agent',
         profileImage: agent.profile_image || null
+      }
+    })
+    agenciesData.data?.forEach(agency => {
+      otherUsersInfoMap[`agency_${agency.agency_id}`] = {
+        name: agency.name || 'Agency',
+        profileImage: agency.profile_image || null
       }
     })
 

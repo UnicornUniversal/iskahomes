@@ -121,7 +121,7 @@ export const agentDB = {
       const { data, error } = await supabaseAdmin
         .from('agents')
         .select('*')
-        .eq('developer_id', userId)
+        .eq('agent_id', userId)
         .single()
 
       if (error) throw error

@@ -65,7 +65,7 @@ export async function POST(request) {
       )
     }
 
-    // Update the appropriate profile table (property_seekers, developers, or agents)
+    // Update the appropriate profile table (property_seekers, developers, agents, or agencies)
     const userType = user.user_metadata?.user_type
     let tableName = ''
     
@@ -78,6 +78,9 @@ export async function POST(request) {
         break
       case 'agent':
         tableName = 'agents'
+        break
+      case 'agency':
+        tableName = 'agencies'
         break
       default:
         tableName = null
@@ -95,15 +98,20 @@ export async function POST(request) {
         invitation_token: null // Clear the token after verification
       }
       
-      // Use account_status for developers, status for others
-      if (tableName === 'developers') {
+      // Use account_status for developers and agencies, status for others
+      if (tableName === 'developers' || tableName === 'agencies') {
         updateData.account_status = 'active'
       } else {
         updateData.status = 'active'
       }
       
-      // Use developer_id for developers, user_id for others
-      const idField = tableName === 'developers' ? 'developer_id' : 'user_id'
+      // Use developer_id for developers, agency_id for agencies, user_id for others
+      let idField = 'user_id'
+      if (tableName === 'developers') {
+        idField = 'developer_id'
+      } else if (tableName === 'agencies') {
+        idField = 'agency_id'
+      }
       
       const { error: profileUpdateError } = await supabaseAdmin
         .from(tableName)
