@@ -210,19 +210,42 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
   
   // Calculate commission rate when property details change (for agents)
   useEffect(() => {
-    if (isAgent && agencyCommissionRates && pricingData.estimated_revenue) {
+    if (isAgent && agencyCommissionRates) {
       const purpose = pricingData.price_type || 'rent'
       const propertyTypeId = formData.types?.[0]?.id || formData.types?.[0] || null
-      const propertySubtypeId = formData.subtypes?.[0]?.id || formData.subtypes?.[0] || null
+      // Subtypes are stored in listing_types.database
+      const listingTypes = formData.listing_types || { database: [], inbuilt: [], custom: [] }
+      const propertySubtypeId = listingTypes.database?.[0] || null
+      
+      // Get property type and subtype names for display
+      const propertyTypeName = formData.types?.[0]?.name || formData.types?.[0]?.label || null
+      // For subtypes, we'll need to fetch the name if we have the ID, but for now just use the ID
+      const propertySubtypeName = null // Will be populated if needed
       
       const selectedRate = getCommissionRate(agencyCommissionRates, purpose, propertyTypeId, propertySubtypeId)
       const percentage = selectedRate?.percentage || selectedRate || 3.0
-      const estimatedRevenue = parseFloat(pricingData.estimated_revenue) || 0
+      
+      // Calculate estimated revenue if not set (for display purposes)
+      let estimatedRevenue = parseFloat(pricingData.estimated_revenue) || 0
+      if (!estimatedRevenue && pricingData.price) {
+        if (pricingData.price_type === 'sale') {
+          estimatedRevenue = parseFloat(pricingData.price) || 0
+        } else if ((pricingData.price_type === 'rent' || pricingData.price_type === 'lease') &&
+                   pricingData.ideal_duration && pricingData.time_span) {
+          const price = parseFloat(pricingData.price) || 0
+          const duration = parseFloat(pricingData.ideal_duration) || 0
+          const multiplier = pricingData.time_span === 'years' ? 12 : 1
+          estimatedRevenue = price * duration * multiplier
+        }
+      }
+      
       const commissionAmount = (estimatedRevenue * percentage) / 100
       
-      // Get agency default currency from company_locations
+      // Get agency default currency from company_locations or default_currency
       let agencyCurrency = 'GHS'
-      if (user?.profile?.company_locations) {
+      if (user?.profile?.default_currency) {
+        agencyCurrency = user.profile.default_currency
+      } else if (user?.profile?.company_locations) {
         let locations = user.profile.company_locations
         if (typeof locations === 'string') {
           try {
@@ -239,24 +262,101 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
         }
       }
       
+      // Determine rate source for display
+      let rateSource = 'Default'
+      if (selectedRate?.category === 'property_subtype' && propertySubtypeName) {
+        rateSource = `Property Subtype: ${propertySubtypeName}`
+      } else if (selectedRate?.category === 'property_type' && propertyTypeName) {
+        rateSource = `Property Type: ${propertyTypeName}`
+      } else if (selectedRate?.category === 'default') {
+        rateSource = 'Default Rate'
+      }
+      
       const commissionData = {
         selectedRate: selectedRate,
         percentage: percentage,
-        amount: commissionAmount.toFixed(2),
+        amount: commissionAmount > 0 ? commissionAmount.toFixed(2) : '0.00',
         currency: agencyCurrency,
         purpose: purpose,
         propertyTypeId: propertyTypeId,
-        propertySubtypeId: propertySubtypeId
+        propertySubtypeId: propertySubtypeId,
+        propertyTypeName: propertyTypeName,
+        propertySubtypeName: propertySubtypeName,
+        rateSource: rateSource,
+        estimatedRevenue: estimatedRevenue
       }
       
       setCommissionRate(commissionData)
       
-      // Update formData with commission_rate
-      updateFormData({
-        commission_rate: commissionData
-      })
+      // Update formData with commission_rate (only if estimated_revenue is set)
+      if (estimatedRevenue > 0) {
+        updateFormData({
+          commission_rate: commissionData
+        })
+      }
+    } else if (isAgent && !agencyCommissionRates) {
+      // Clear commission if agency rates are not available
+      setCommissionRate(null)
+    } else if (isAgent && agencyCommissionRates && !commissionRate) {
+      // Calculate commission even without estimated_revenue to show rate and percentage
+      const purpose = pricingData.price_type || 'rent'
+      const propertyTypeId = formData.types?.[0]?.id || formData.types?.[0] || null
+      const listingTypes = formData.listing_types || { database: [], inbuilt: [], custom: [] }
+      const propertySubtypeId = listingTypes.database?.[0] || null
+      
+      const propertyTypeName = formData.types?.[0]?.name || formData.types?.[0]?.label || null
+      
+      const selectedRate = getCommissionRate(agencyCommissionRates, purpose, propertyTypeId, propertySubtypeId)
+      const percentage = selectedRate?.percentage || selectedRate || 3.0
+      
+      // Get agency default currency
+      let agencyCurrency = 'GHS'
+      if (user?.profile?.default_currency) {
+        agencyCurrency = user.profile.default_currency
+      } else if (user?.profile?.company_locations) {
+        let locations = user.profile.company_locations
+        if (typeof locations === 'string') {
+          try {
+            locations = JSON.parse(locations)
+          } catch (e) {
+            // ignore
+          }
+        }
+        if (Array.isArray(locations)) {
+          const primaryLocation = locations.find(loc => loc.primary_location === true)
+          if (primaryLocation?.currency) {
+            agencyCurrency = primaryLocation.currency
+          }
+        }
+      }
+      
+      // Determine rate source for display
+      let rateSource = 'Default Rate'
+      if (selectedRate?.category === 'property_subtype' && propertySubtypeId) {
+        rateSource = 'Property Subtype'
+      } else if (selectedRate?.category === 'property_type' && propertyTypeName) {
+        rateSource = `Property Type: ${propertyTypeName}`
+      } else if (selectedRate?.category === 'default') {
+        rateSource = 'Default Rate'
+      }
+      
+      const commissionData = {
+        selectedRate: selectedRate,
+        percentage: percentage,
+        amount: '0.00',
+        currency: agencyCurrency,
+        purpose: purpose,
+        propertyTypeId: propertyTypeId,
+        propertySubtypeId: propertySubtypeId,
+        propertyTypeName: propertyTypeName,
+        propertySubtypeName: null,
+        rateSource: rateSource,
+        estimatedRevenue: 0
+      }
+      
+      setCommissionRate(commissionData)
     }
-  }, [isAgent, agencyCommissionRates, pricingData.estimated_revenue, pricingData.price_type, formData.types, formData.subtypes, user?.profile?.company_locations])
+  }, [isAgent, agencyCommissionRates, pricingData.estimated_revenue, pricingData.price, pricingData.price_type, pricingData.ideal_duration, pricingData.time_span, formData.types, formData.listing_types, user?.profile?.company_locations, user?.profile?.default_currency, updateFormData, commissionRate])
 
   // Local state for time input to allow free typing
   const [timeInputValue, setTimeInputValue] = useState(String(pricingData.time || 1))
@@ -639,29 +739,37 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
             {isAgent && commissionRate && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Commission Rate
+                  Estimated Commission
                 </label>
-                <div className="space-y-2">
-                  <Input
-                    type="text"
-                    value={`${commissionRate.percentage}%`}
-                    className="w-full !text-sm bg-gray-50"
-                    readOnly
-                    disabled
-                  />
-                  <Input
-                    type="text"
-                    value={commissionRate.amount 
-                      ? `${commissionRate.currency} ${parseFloat(commissionRate.amount || 0).toLocaleString()}` 
-                      : ''}
-                    placeholder="Auto-calculated"
-                    className="w-full !text-sm bg-gray-50"
-                    readOnly
-                    disabled
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Commission amount based on estimated revenue ({commissionRate.currency})
-                  </p>
+                <div className="p-4 bg-secondary_color/10 border border-secondary_color/20 rounded-lg space-y-2">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Commission Rate Source:</p>
+                    <p className="text-sm font-medium text-gray-900">{commissionRate.rateSource}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Commission Percentage:</p>
+                    <p className="text-sm font-medium text-gray-900">{commissionRate.percentage}%</p>
+                  </div>
+                  {commissionRate.estimatedRevenue > 0 ? (
+                    <>
+                      <div>
+                        <p className="text-xs text-gray-600 mb-1">Estimated Revenue:</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {pricingData.currency} {parseFloat(commissionRate.estimatedRevenue || 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600 mb-1">Estimated Commission Amount:</p>
+                        <p className="text-lg font-bold text-primary_color">
+                          {commissionRate.currency} {parseFloat(commissionRate.amount || 0).toLocaleString()}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic">
+                      Enter price {pricingData.price_type !== 'sale' ? 'and duration' : ''} to see estimated commission amount
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -737,40 +845,38 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
       {/* Commission Rate Display for Agents (Rent/Lease) */}
       {isAgent && commissionRate && pricingData.price_type !== 'sale' && (
         <div className="mt-4 sm:mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Estimated Commission
+          </label>
+          <div className="p-4 bg-secondary_color/10 border border-secondary_color/20 rounded-lg space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Commission Rate
-              </label>
-              <Input
-                type="text"
-                value={`${commissionRate.percentage}%`}
-                className="w-full !text-sm bg-gray-50"
-                readOnly
-                disabled
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Commission percentage based on property type/subtype
-              </p>
+              <p className="text-xs text-gray-600 mb-1">Commission Rate Source:</p>
+              <p className="text-sm font-medium text-gray-900">{commissionRate.rateSource}</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Commission Amount
-              </label>
-              <Input
-                type="text"
-                value={commissionRate.amount 
-                  ? `${commissionRate.currency} ${parseFloat(commissionRate.amount || 0).toLocaleString()}` 
-                  : ''}
-                placeholder="Auto-calculated"
-                className="w-full !text-sm bg-gray-50"
-                readOnly
-                disabled
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Commission amount based on estimated revenue ({commissionRate.currency})
-              </p>
+              <p className="text-xs text-gray-600 mb-1">Commission Percentage:</p>
+              <p className="text-sm font-medium text-gray-900">{commissionRate.percentage}%</p>
             </div>
+            {commissionRate.estimatedRevenue > 0 ? (
+              <>
+                <div>
+                  <p className="text-xs text-gray-600 mb-1">Estimated Revenue:</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {pricingData.currency} {parseFloat(commissionRate.estimatedRevenue || 0).toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600 mb-1">Estimated Commission Amount:</p>
+                  <p className="text-lg font-bold text-primary_color">
+                    {commissionRate.currency} {parseFloat(commissionRate.amount || 0).toLocaleString()}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-gray-500 italic">
+                Enter price, ideal duration, and time span to see estimated commission amount
+              </p>
+            )}
           </div>
         </div>
       )}

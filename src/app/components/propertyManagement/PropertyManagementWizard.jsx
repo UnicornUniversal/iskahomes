@@ -446,7 +446,7 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType = 'developer' 
           // Update the URL to edit mode without reloading
           const newUrl = accountType === 'developer'
             ? `/developer/${user.profile?.slug || user.profile.id}/units/${result.data.id}`
-            : `/agent/${user.profile?.slug || user.profile.id}/properties/${result.data.id}`
+            : `/agents/${user.profile?.slug || user.profile.id}/properties/${result.data.id}`
           
           // Update URL without reload
           window.history.pushState({}, '', newUrl)
@@ -568,7 +568,7 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType = 'developer' 
             if (accountType === 'developer') {
               window.location.href = `/developer/${user.profile?.slug || user.profile.id}/units/${effectiveListingId}`
             } else {
-              window.location.href = `/agent/${user.profile?.slug || user.profile.id}/properties/${effectiveListingId}`
+              window.location.href = `/agents/${user.profile?.slug || user.profile.id}/properties/${effectiveListingId}`
             }
           }, 2000)
         }, 300)
@@ -623,7 +623,7 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType = 'developer' 
           if (accountType === 'developer') {
             window.location.href = `/developer/${user.profile?.slug || user.profile.id}/units`
           } else {
-            window.location.href = `/agent/${user.profile?.slug || user.profile.id}/listings`
+            window.location.href = `/agents/${user.profile?.slug || user.profile.id}/properties`
           }
         }, 2000)
       } else {

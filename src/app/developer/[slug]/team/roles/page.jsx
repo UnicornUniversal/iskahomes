@@ -82,6 +82,7 @@ const RolesPage = () => {
             handleRefresh()
             toast.success('Role created successfully!')
           }}
+          organizationType="developer"
         />
       )}
     </div>

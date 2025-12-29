@@ -163,6 +163,7 @@ const RolesList = ({ onRefresh }) => {
             if (onRefresh) onRefresh()
             toast.success('Role updated successfully!')
           }}
+          organizationType="developer"
         />
       )}
     </>

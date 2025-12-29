@@ -445,9 +445,7 @@ html::-webkit-scrollbar:vertical {
     border-bottom: 2px solid transparent;
   }
 
-  span{
-    @apply text-primary_color;
-  }
+ 
 
   label{
     @apply text-primary_color;

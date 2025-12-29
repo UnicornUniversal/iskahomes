@@ -16,7 +16,7 @@ export async function middleware(req) {
 export const config = {
   matcher: [
     '/developer/:path*',
-    '/agent/:path*',
+    '/agents/:path*',
     '/homeowner/:path*',
     '/homeSeeker/:path*',
     '/admin/:path*'

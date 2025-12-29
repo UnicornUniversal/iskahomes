@@ -84,7 +84,7 @@ export const redirectToDashboard = (userType, profile) => {
     case 'developer':
       return `/developer/${profile.slug}/dashboard`
     case 'agent':
-      return `/agent/${profile.slug}/dashboard`
+      return `/agents/${profile.slug}/dashboard`
     case 'seeker':
       return `/homeSeeker/${profile.slug}/dashboard`
     case 'admin':

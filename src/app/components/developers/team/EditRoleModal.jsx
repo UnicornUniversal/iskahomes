@@ -6,7 +6,7 @@ import { toast } from 'react-toastify'
 import { FiX, FiShield } from 'react-icons/fi'
 import PermissionsEditor from './PermissionsEditor'
 
-const EditRoleModal = ({ isOpen, onClose, role, onSuccess }) => {
+const EditRoleModal = ({ isOpen, onClose, role, onSuccess, organizationType = 'developer' }) => {
   const { developerToken } = useAuth()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -63,8 +63,8 @@ const EditRoleModal = ({ isOpen, onClose, role, onSuccess }) => {
   if (!isOpen || !role) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-20">
+      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[85vh] overflow-y-auto mt-8">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-2xl font-bold text-gray-900">Edit Role</h2>
@@ -119,6 +119,7 @@ const EditRoleModal = ({ isOpen, onClose, role, onSuccess }) => {
             <PermissionsEditor
               permissions={formData.permissions}
               onChange={(permissions) => setFormData(prev => ({ ...prev, permissions }))}
+              organizationType={organizationType}
             />
           </div>
 
