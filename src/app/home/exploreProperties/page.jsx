@@ -39,19 +39,34 @@ const ExplorePropertiesContent = () => {
     
     const urlFilters = {};
     
-    // Purpose IDs
+    // Purpose
+    const purposeName = searchParams.get('purpose');
+    const purposeId = searchParams.get('purpose_id');
     const purposeIds = searchParams.getAll('purpose_id');
-    if (purposeIds.length > 0) {
+    
+    if (purposeName) {
+      urlFilters.purpose = purposeName;
+    } else if (purposeIds.length > 0) {
       urlFilters.purposeIds = purposeIds;
     }
     
     // Property Type
+    const propertyTypeName = searchParams.get('property_type');
     const typeId = searchParams.get('property_type_id');
-    if (typeId) urlFilters.typeId = typeId;
     
-    // Subtype IDs
+    if (propertyTypeName) {
+      urlFilters.property_type = propertyTypeName;
+    } else if (typeId) {
+      urlFilters.typeId = typeId;
+    }
+    
+    // Subtype
+    const subtypeName = searchParams.get('subtype');
     const subtypeIds = searchParams.getAll('subtype_id');
-    if (subtypeIds.length > 0) {
+    
+    if (subtypeName) {
+      urlFilters.subtype = subtypeName;
+    } else if (subtypeIds.length > 0) {
       urlFilters.subtypeIds = subtypeIds;
     }
     
@@ -117,15 +132,22 @@ const ExplorePropertiesContent = () => {
     // Build URL params from filters
     const params = new URLSearchParams();
     
-    if (newFilters.purposeIds && newFilters.purposeIds.length > 0) {
+    // Use names if available, otherwise fallback to IDs (or nothing)
+    if (newFilters.purpose) {
+      params.append('purpose', newFilters.purpose);
+    } else if (newFilters.purposeIds && newFilters.purposeIds.length > 0) {
       newFilters.purposeIds.forEach(id => params.append('purpose_id', id));
     }
     
-    if (newFilters.typeId) {
+    if (newFilters.property_type) {
+      params.append('property_type', newFilters.property_type);
+    } else if (newFilters.typeId) {
       params.append('property_type_id', newFilters.typeId);
     }
     
-    if (newFilters.subtypeIds && newFilters.subtypeIds.length > 0) {
+    if (newFilters.subtype) {
+      params.append('subtype', newFilters.subtype);
+    } else if (newFilters.subtypeIds && newFilters.subtypeIds.length > 0) {
       newFilters.subtypeIds.forEach(id => params.append('subtype_id', id));
     }
     
@@ -177,7 +199,7 @@ const ExplorePropertiesContent = () => {
 
       <div className='relative auto'>
         {/* Desktop - Left side - Filters (lg and above) */}
-        <div className='hidden lg:block z-1000 absolute top-0 left-0 border border-primary_color/10 max-w-[350px] w-full'>
+        <div className='hidden lg:block z-1000 absolute top-0 left-0 border border-primary_color/10 max-w-[350px] w-full h-[calc(100vh-6rem)]'>
           <Filters onChange={handleFiltersChange} initial={filters} />
         </div>
 

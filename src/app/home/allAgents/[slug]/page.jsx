@@ -1,5 +1,5 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Layout1 from '@/app/layout/Layout1'
 import { 
@@ -18,15 +18,122 @@ import {
   FiInstagram,
   FiArrowLeft,
   FiHeart,
-  FiShare2
+  FiShare2,
+  FiBuilding2
 } from 'react-icons/fi'
+import Link from 'next/link'
 
 const AgentProfile = () => {
   const params = useParams()
   const agentSlug = params.slug
   const [activeTab, setActiveTab] = useState('overview')
+  const [agent, setAgent] = useState(null)
+  const [agency, setAgency] = useState(null)
+  const [listings, setListings] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  // Dummy data for all agents (in real app, this would be fetched from API)
+  useEffect(() => {
+    if (agentSlug) {
+      fetchAgentData()
+    }
+  }, [agentSlug])
+
+  const fetchAgentData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const response = await fetch(`/api/public/agents/${agentSlug}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch agent')
+      }
+
+      const result = await response.json()
+      
+      if (result.success) {
+        setAgent(result.data.agent)
+        setAgency(result.data.agency)
+        setListings(result.data.listings || [])
+      } else {
+        setError(result.error || 'Agent not found')
+      }
+    } catch (err) {
+      console.error('Error fetching agent:', err)
+      setError(err.message || 'Error loading agent')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <Layout1>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading agent...</p>
+          </div>
+        </div>
+      </Layout1>
+    )
+  }
+
+  if (error || !agent) {
+    return (
+      <Layout1>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Agent Not Found</h1>
+            <p className="text-gray-600 mb-6">{error || 'The agent you\'re looking for doesn\'t exist.'}</p>
+            <Link
+              href="/home/allAgents"
+              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
+            >
+              <FiArrowLeft className="w-4 h-4 mr-2" />
+              Back to All Agents
+            </Link>
+          </div>
+        </div>
+      </Layout1>
+    )
+  }
+
+  // Format price helper
+  const formatPrice = (price, currency, priceType, duration) => {
+    if (!price) return 'Price on request'
+    const priceNum = parseFloat(price)
+    const formattedPrice = priceNum.toLocaleString()
+    
+    let priceText = `${currency || 'GHS'} ${formattedPrice}`
+    
+    if (priceType === 'rent' && duration) {
+      priceText += `/${duration}`
+    }
+    
+    return priceText
+  }
+
+  // Get listing image
+  const getListingImage = (listing) => {
+    if (listing.media?.albums && Array.isArray(listing.media.albums) && listing.media.albums.length > 0) {
+      for (const album of listing.media.albums) {
+        if (album?.images && Array.isArray(album.images) && album.images.length > 0) {
+          return album.images[0].url
+        }
+      }
+    }
+    if (listing.media?.mediaFiles && Array.isArray(listing.media.mediaFiles) && listing.media.mediaFiles.length > 0) {
+      return listing.media.mediaFiles[0].url
+    }
+    if (listing.media?.banner?.url) {
+      return listing.media.banner.url
+    }
+    return null
+  }
+
+  // Dummy data for all agents (fallback - not used)
   const allAgents = [
     {
       id: 1,
@@ -1039,34 +1146,9 @@ const AgentProfile = () => {
     }
   ]
 
-  // Find the specific agent based on slug
-  const agent = allAgents.find(a => a.slug === agentSlug)
-
-  // If agent not found, show 404 or redirect
-  if (!agent) {
-    return (
-      <Layout1>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Agent Not Found</h1>
-            <p className="text-gray-600 mb-6">The agent you're looking for doesn't exist.</p>
-            <a
-              href="/allAgents"
-              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
-            >
-              <FiArrowLeft className="w-4 h-4 mr-2" />
-              Back to All Agents
-            </a>
-          </div>
-        </div>
-      </Layout1>
-    )
-  }
-
   const tabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'properties', label: 'Properties' },
-    { id: 'reviews', label: 'Reviews' },
     { id: 'contact', label: 'Contact' }
   ]
 
@@ -1076,23 +1158,27 @@ const AgentProfile = () => {
         {/* Back Button */}
         <div className="bg-white border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <a
-              href="/allAgents"
+            <Link
+              href="/home/allAgents"
               className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
             >
               <FiArrowLeft className="w-4 h-4 mr-2" />
               Back to All Agents
-            </a>
+            </Link>
           </div>
         </div>
 
         {/* Cover Image */}
         <div className="relative h-64 md:h-80">
-          <img
-            src={agent.coverImage}
-            alt="Cover"
-            className="w-full h-full object-cover"
-          />
+          {agent.cover_image ? (
+            <img
+              src={agent.cover_image}
+              alt="Cover"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600"></div>
+          )}
           <div className="absolute inset-0 bg-black bg-opacity-40"></div>
         </div>
 
@@ -1102,14 +1188,17 @@ const AgentProfile = () => {
             <div className="flex flex-col lg:flex-row items-start lg:items-center gap-6">
               {/* Profile Image */}
               <div className="relative">
-                <img
-                  src={agent.image}
-                  alt={agent.name}
-                  className="w-32 h-32 rounded-2xl object-cover border-4 border-white shadow-lg"
-                />
-                {agent.verified && (
-                  <div className="absolute -top-2 -right-2 bg-blue-600 text-white p-2 rounded-full">
-                    <FiCheckCircle className="w-4 h-4" />
+                {agent.profile_image ? (
+                  <img
+                    src={agent.profile_image}
+                    alt={agent.name}
+                    className="w-32 h-32 rounded-2xl object-cover border-4 border-white shadow-lg"
+                  />
+                ) : (
+                  <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center border-4 border-white shadow-lg">
+                    <span className="text-white text-4xl font-bold">
+                      {agent.name?.charAt(0) || 'A'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1119,40 +1208,21 @@ const AgentProfile = () => {
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   <div>
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">{agent.name}</h1>
-                    <div className="flex items-center text-gray-600 mb-3">
-                      <FiMapPin className="w-5 h-5 mr-2" />
-                      <span>{agent.location}</span>
-                    </div>
-                    
-                    {/* Rating */}
-                    <div className="flex items-center mb-4">
-                      <div className="flex items-center">
-                        {[...Array(5)].map((_, i) => (
-                          <FiStar
-                            key={i}
-                            className={`w-5 h-5 ${
-                              i < Math.floor(agent.rating)
-                                ? 'text-yellow-400 fill-current'
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
+                    {agency && (
+                      <div className="flex items-center text-gray-600 mb-3">
+                        <FiBuilding2 className="w-5 h-5 mr-2" />
+                        <Link href={`/home/allAgencies/${agency.slug}`} className="hover:text-blue-600 hover:underline">
+                          {agency.name}
+                        </Link>
                       </div>
-                      <span className="ml-2 text-gray-600">
-                        {agent.rating} ({agent.reviewCount} reviews)
-                      </span>
-                    </div>
-
-                    {/* Specializations */}
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {agent.specializations.map(spec => (
-                        <span
-                          key={spec}
-                          className="px-3 py-1 bg-blue-50 text-blue-700 text-sm rounded-full font-medium"
-                        >
-                          {spec}
-                        </span>
-                      ))}
+                    )}
+                    
+                    {/* Stats */}
+                    <div className="flex items-center gap-6 mb-4">
+                      <div className="flex items-center text-gray-600">
+                        <FiHome className="w-4 h-4 mr-1" />
+                        <span>{agent.total_listings || 0} Listings</span>
+                      </div>
                     </div>
                   </div>
 
@@ -1202,36 +1272,17 @@ const AgentProfile = () => {
                     <p className="text-gray-600 leading-relaxed mb-6">{agent.bio}</p>
 
                     {/* Stats */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                       <div className="text-center p-4 bg-gray-50 rounded-xl">
-                        <div className="text-2xl font-bold text-gray-900">{agent.listings}</div>
-                        <div className="text-sm text-gray-600">Properties</div>
+                        <div className="text-2xl font-bold text-gray-900">{agent.total_listings || 0}</div>
+                        <div className="text-sm text-gray-600">Listings</div>
                       </div>
-                      <div className="text-center p-4 bg-gray-50 rounded-xl">
-                        <div className="text-2xl font-bold text-gray-900">{agent.experience}</div>
-                        <div className="text-sm text-gray-600">Experience</div>
-                      </div>
-                      <div className="text-center p-4 bg-gray-50 rounded-xl">
-                        <div className="text-2xl font-bold text-gray-900">{agent.rating}</div>
-                        <div className="text-sm text-gray-600">Rating</div>
-                      </div>
-                      <div className="text-center p-4 bg-gray-50 rounded-xl">
-                        <div className="text-2xl font-bold text-gray-900">{agent.reviewCount}</div>
-                        <div className="text-sm text-gray-600">Reviews</div>
-                      </div>
-                    </div>
-
-                    {/* Achievements */}
-                    <div className="mb-6">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-3">Achievements</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {agent.achievements.map((achievement, index) => (
-                          <div key={index} className="flex items-center p-3 bg-yellow-50 rounded-xl">
-                            <FiAward className="w-5 h-5 text-yellow-600 mr-3" />
-                            <span className="text-gray-700">{achievement}</span>
-                          </div>
-                        ))}
-                      </div>
+                      {agency && (
+                        <div className="text-center p-4 bg-gray-50 rounded-xl">
+                          <div className="text-2xl font-bold text-gray-900">1</div>
+                          <div className="text-sm text-gray-600">Agency</div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1256,45 +1307,60 @@ const AgentProfile = () => {
                       </div>
                     </div>
 
-                    {/* Languages */}
-                    <div className="bg-gray-50 rounded-xl p-6">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Languages</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {agent.languages.map(lang => (
-                          <span
-                            key={lang}
-                            className="px-3 py-1 bg-white text-gray-700 text-sm rounded-full border border-gray-200"
-                          >
-                            {lang}
-                          </span>
-                        ))}
+                    {/* Agency Info */}
+                    {agency && (
+                      <div className="bg-gray-50 rounded-xl p-6">
+                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Agency</h4>
+                        <Link href={`/home/allAgencies/${agency.slug}`} className="block">
+                          <div className="flex items-center">
+                            {agency.profile_image ? (
+                              <img
+                                src={agency.profile_image}
+                                alt={agency.name}
+                                className="w-12 h-12 rounded-lg object-cover mr-3"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mr-3">
+                                <FiBuilding2 className="w-6 h-6 text-white" />
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-medium text-gray-900">{agency.name}</div>
+                              {agency.city && (
+                                <div className="text-sm text-gray-600">{agency.city}</div>
+                              )}
+                            </div>
+                          </div>
+                        </Link>
                       </div>
-                    </div>
+                    )}
 
                     {/* Social Media */}
-                    <div className="bg-gray-50 rounded-xl p-6">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Social Media</h4>
-                      <div className="space-y-3">
-                        {agent.socialMedia.linkedin && (
-                          <a href="#" className="flex items-center text-blue-600 hover:text-blue-700">
-                            <FiLinkedin className="w-4 h-4 mr-3" />
-                            LinkedIn
-                          </a>
-                        )}
-                        {agent.socialMedia.twitter && (
-                          <a href="#" className="flex items-center text-blue-400 hover:text-blue-500">
-                            <FiTwitter className="w-4 h-4 mr-3" />
-                            Twitter
-                          </a>
-                        )}
-                        {agent.socialMedia.instagram && (
-                          <a href="#" className="flex items-center text-pink-600 hover:text-pink-700">
-                            <FiInstagram className="w-4 h-4 mr-3" />
-                            Instagram
-                          </a>
-                        )}
+                    {agent.social_media && Object.keys(agent.social_media).length > 0 && (
+                      <div className="bg-gray-50 rounded-xl p-6">
+                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Social Media</h4>
+                        <div className="space-y-3">
+                          {agent.social_media.linkedin && (
+                            <a href={agent.social_media.linkedin} target="_blank" rel="noopener noreferrer" className="flex items-center text-blue-600 hover:text-blue-700">
+                              <FiLinkedin className="w-4 h-4 mr-3" />
+                              LinkedIn
+                            </a>
+                          )}
+                          {agent.social_media.twitter && (
+                            <a href={agent.social_media.twitter} target="_blank" rel="noopener noreferrer" className="flex items-center text-blue-400 hover:text-blue-500">
+                              <FiTwitter className="w-4 h-4 mr-3" />
+                              Twitter
+                            </a>
+                          )}
+                          {agent.social_media.instagram && (
+                            <a href={agent.social_media.instagram} target="_blank" rel="noopener noreferrer" className="flex items-center text-pink-600 hover:text-pink-700">
+                              <FiInstagram className="w-4 h-4 mr-3" />
+                              Instagram
+                            </a>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1303,122 +1369,79 @@ const AgentProfile = () => {
               {activeTab === 'properties' && (
                 <div>
                   <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-semibold text-gray-900">Properties ({agent.properties.length})</h3>
-                    <div className="flex gap-2">
-                      <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
-                        All
-                      </button>
-                      <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
-                        For Sale
-                      </button>
-                      <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
-                        For Rent
-                      </button>
-                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900">Listings ({listings.length})</h3>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {agent.properties.map(property => (
-                      <div key={property.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
-                        <div className="relative">
-                          <img
-                            src={property.image}
-                            alt={property.title}
-                            className="w-full h-48 object-cover"
-                          />
-                          {property.featured && (
-                            <div className="absolute top-3 left-3 bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-medium">
-                              Featured
-                            </div>
-                          )}
-                          <div className="absolute top-3 right-3">
-                            <button className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50">
-                              <FiHeart className="w-4 h-4 text-gray-600" />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="p-4">
-                          <div className="flex justify-between items-start mb-2">
-                            <h4 className="font-semibold text-gray-900">{property.title}</h4>
-                            <span className="text-lg font-bold text-blue-600">{property.price}</span>
-                          </div>
-                          
-                          <div className="flex items-center text-gray-600 text-sm mb-3">
-                            <FiMapPin className="w-4 h-4 mr-1" />
-                            <span>{property.location}</span>
-                          </div>
-
-                          <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
-                            <div className="flex items-center space-x-4">
-                              <span>{property.bedrooms} beds</span>
-                              <span>{property.bathrooms} baths</span>
-                              <span>{property.area}</span>
-                            </div>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              property.type === 'For Sale' 
-                                ? 'bg-green-100 text-green-700' 
-                                : 'bg-blue-100 text-blue-700'
-                            }`}>
-                              {property.type}
-                            </span>
-                          </div>
-
-                          <button className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">
-                            View Details
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Reviews Tab */}
-              {activeTab === 'reviews' && (
-                <div>
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-semibold text-gray-900">Reviews ({agent.reviews.length})</h3>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-center">
-                        <div className="text-3xl font-bold text-gray-900">{agent.rating}</div>
-                        <div className="text-sm text-gray-600">Average Rating</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-6">
-                    {agent.reviews.map(review => (
-                      <div key={review.id} className="bg-gray-50 rounded-xl p-6">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h4 className="font-semibold text-gray-900">{review.reviewer}</h4>
-                            <div className="flex items-center mt-1">
-                              {[...Array(5)].map((_, i) => (
-                                <FiStar
-                                  key={i}
-                                  className={`w-4 h-4 ${
-                                    i < review.rating
-                                      ? 'text-yellow-400 fill-current'
-                                      : 'text-gray-300'
-                                  }`}
+                  {listings.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {listings.map(listing => {
+                        const listingImage = getListingImage(listing)
+                        return (
+                          <div key={listing.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
+                            <div className="relative h-48 bg-gradient-to-br from-blue-500 to-purple-600">
+                              {listingImage ? (
+                                <img
+                                  src={listingImage}
+                                  alt={listing.title}
+                                  className="w-full h-full object-cover"
                                 />
-                              ))}
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <FiHome className="w-16 h-16 text-white opacity-50" />
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="p-4">
+                              <div className="flex justify-between items-start mb-2">
+                                <h4 className="font-semibold text-gray-900 line-clamp-1">{listing.title}</h4>
+                                <span className="text-lg font-bold text-blue-600">
+                                  {formatPrice(listing.price, listing.currency, listing.price_type, listing.duration)}
+                                </span>
+                              </div>
+                              
+                              <div className="flex items-center text-gray-600 text-sm mb-3">
+                                <FiMapPin className="w-4 h-4 mr-1" />
+                                <span className="line-clamp-1">
+                                  {listing.city && listing.state ? `${listing.city}, ${listing.state}` : listing.country || 'Location not specified'}
+                                </span>
+                              </div>
+
+                              {listing.specifications && (
+                                <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+                                  <div className="flex items-center space-x-4">
+                                    {listing.specifications.bedrooms > 0 && (
+                                      <span>{listing.specifications.bedrooms} beds</span>
+                                    )}
+                                    {listing.specifications.bathrooms > 0 && (
+                                      <span>{listing.specifications.bathrooms} baths</span>
+                                    )}
+                                  </div>
+                                  {listing.price_type && (
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      listing.price_type === 'sale' 
+                                        ? 'bg-green-100 text-green-700' 
+                                        : 'bg-blue-100 text-blue-700'
+                                    }`}>
+                                      {listing.price_type === 'sale' ? 'For Sale' : 'For Rent'}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              <button className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                                View Details
+                              </button>
                             </div>
                           </div>
-                          <div className="text-sm text-gray-500">
-                            {new Date(review.date).toLocaleDateString()}
-                          </div>
-                        </div>
-                        
-                        <p className="text-gray-700 mb-3">{review.comment}</p>
-                        
-                        <div className="text-sm text-gray-600">
-                          Property: <span className="font-medium">{review.property}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className="text-gray-600">No listings available.</p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1432,29 +1455,37 @@ const AgentProfile = () => {
                     </p>
 
                     <div className="space-y-4">
-                      <div className="flex items-center p-4 bg-gray-50 rounded-xl">
-                        <FiPhone className="w-5 h-5 text-blue-600 mr-3" />
-                        <div>
-                          <div className="font-medium text-gray-900">Call</div>
-                          <div className="text-gray-600">{agent.phone}</div>
+                      {agent.phone && (
+                        <div className="flex items-center p-4 bg-gray-50 rounded-xl">
+                          <FiPhone className="w-5 h-5 text-blue-600 mr-3" />
+                          <div>
+                            <div className="font-medium text-gray-900">Call</div>
+                            <div className="text-gray-600">{agent.phone}</div>
+                          </div>
                         </div>
-                      </div>
+                      )}
 
-                      <div className="flex items-center p-4 bg-gray-50 rounded-xl">
-                        <FiMail className="w-5 h-5 text-blue-600 mr-3" />
-                        <div>
-                          <div className="font-medium text-gray-900">Email</div>
-                          <div className="text-gray-600">{agent.email}</div>
+                      {agent.email && (
+                        <div className="flex items-center p-4 bg-gray-50 rounded-xl">
+                          <FiMail className="w-5 h-5 text-blue-600 mr-3" />
+                          <div>
+                            <div className="font-medium text-gray-900">Email</div>
+                            <div className="text-gray-600">{agent.email}</div>
+                          </div>
                         </div>
-                      </div>
+                      )}
 
-                      <div className="flex items-center p-4 bg-gray-50 rounded-xl">
-                        <FiMapPin className="w-5 h-5 text-blue-600 mr-3" />
-                        <div>
-                          <div className="font-medium text-gray-900">Location</div>
-                          <div className="text-gray-600">{agent.location}</div>
+                      {agency && (
+                        <div className="flex items-center p-4 bg-gray-50 rounded-xl">
+                          <FiBuilding2 className="w-5 h-5 text-blue-600 mr-3" />
+                          <div>
+                            <div className="font-medium text-gray-900">Agency</div>
+                            <Link href={`/home/allAgencies/${agency.slug}`} className="text-blue-600 hover:underline">
+                              {agency.name}
+                            </Link>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
 

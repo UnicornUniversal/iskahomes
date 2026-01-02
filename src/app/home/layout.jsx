@@ -4,7 +4,7 @@ const HomeLayout = ({ children }) => {
   return (
     <div>
       <Nav />
-      <div className="md:mt-[5em] ">
+      <div className="md:mt-[4em] ">
       {children}
       </div>
    

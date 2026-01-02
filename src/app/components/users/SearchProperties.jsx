@@ -18,15 +18,21 @@ const SearchProperties = ({ filters = {} }) => {
         const params = new URLSearchParams();
         
         // Map filters from Filters component to API parameters
-        if (filters.purposeIds && filters.purposeIds.length > 0) {
+        if (filters.purpose) {
+          params.append('purpose', filters.purpose);
+        } else if (filters.purposeIds && filters.purposeIds.length > 0) {
           filters.purposeIds.forEach(id => params.append('purpose_id', id));
         }
         
-        if (filters.typeId) {
+        if (filters.property_type) {
+          params.append('property_type', filters.property_type);
+        } else if (filters.typeId) {
           params.append('property_type_id', filters.typeId);
         }
         
-        if (filters.subtypeIds && filters.subtypeIds.length > 0) {
+        if (filters.subtype) {
+          params.append('subtype', filters.subtype);
+        } else if (filters.subtypeIds && filters.subtypeIds.length > 0) {
           filters.subtypeIds.forEach(id => params.append('subtype_id', id));
         }
         

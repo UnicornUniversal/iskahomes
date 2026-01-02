@@ -616,9 +616,25 @@ const SpecificationFields = ({ propertyTypeId, specifications, bedrooms, bathroo
 const Filters = ({ onChange, initial = {} }) => {
   console.log('🔄 Filters component rendering...');
   
-  const [selectedPurposeIds, setSelectedPurposeIds] = useState(initial.purposeIds || []);
-  const [selectedTypeId, setSelectedTypeId] = useState(initial.typeId || "");
-  const [selectedSubtypeIds, setSelectedSubtypeIds] = useState(initial.subtypeIds || []);
+  // State now stores NAMES (slugs) instead of IDs where possible, but we might still need IDs for internal logic
+  // Actually, let's store IDs internally for easy selection, but we'll map to names when applying filters
+  // OR we can store names if we have them.
+  // The initial props will now come with names from the URL.
+  
+  // We need to map initial names back to IDs to show them as selected in the UI
+  // This requires taxonomyData to be loaded.
+  
+  const [selectedPurposeIds, setSelectedPurposeIds] = useState([]);
+  const [selectedTypeId, setSelectedTypeId] = useState("");
+  const [selectedSubtypeIds, setSelectedSubtypeIds] = useState([]);
+  
+  // We'll use these to store the initial names until taxonomy is loaded
+  const [initialNames, setInitialNames] = useState({
+    purpose: initial.purpose,
+    type: initial.property_type,
+    subtype: initial.subtype
+  });
+
   // Default to Ghana only if no initial country provided
   const [country, setCountry] = useState(initial.country !== undefined ? initial.country : "Ghana");
   const [state, setState] = useState(initial.state || "");
@@ -651,6 +667,54 @@ const Filters = ({ onChange, initial = {} }) => {
   const isApplyingFiltersRef = useRef(false);
   const mountedRef = useRef(false);
 
+  // Fetch taxonomy data on component mount
+  useEffect(() => {
+    const fetchTaxonomyData = async () => {
+      try {
+        const response = await fetch('/api/property-taxonomy?include_subtypes=true');
+        if (response.ok) {
+          const result = await response.json();
+          setTaxonomyData(result.data);
+          
+          // Once data is loaded, try to resolve initial names to IDs if we haven't yet
+          if (initialNames.purpose || initialNames.type || initialNames.subtype) {
+            const purposes = result.data.purposes || [];
+            const types = result.data.propertyTypes || [];
+            const subtypes = result.data.subtypes || [];
+            
+            if (initialNames.purpose) {
+              // Handle comma-separated purposes if needed, but for now assume single
+              // Or if it's an array in initial
+              const purposeName = initialNames.purpose;
+              const found = purposes.find(p => p.name.toLowerCase() === purposeName.toLowerCase());
+              if (found) setSelectedPurposeIds([found.id]);
+            }
+            
+            if (initialNames.type) {
+              const typeName = initialNames.type;
+              const found = types.find(t => t.name.toLowerCase() === typeName.toLowerCase());
+              if (found) setSelectedTypeId(found.id);
+            }
+            
+            if (initialNames.subtype) {
+              const subtypeName = initialNames.subtype;
+              const found = subtypes.find(s => s.name.toLowerCase() === subtypeName.toLowerCase());
+              if (found) setSelectedSubtypeIds([found.id]);
+            }
+          }
+        } else {
+          console.error('Failed to fetch taxonomy data');
+        }
+      } catch (error) {
+        console.error('Error fetching taxonomy data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTaxonomyData();
+  }, []); // Run once on mount
+
   // Sync with initial prop changes (when URL params load) - but only if we're not applying filters
   useEffect(() => {
     // Skip sync if we're in the middle of applying filters
@@ -669,9 +733,8 @@ const Filters = ({ onChange, initial = {} }) => {
       
       // On first mount, always sync
       if (!mountedRef.current) {
-        if (Array.isArray(initial.purposeIds)) setSelectedPurposeIds(initial.purposeIds);
-        if (initial.typeId !== undefined) setSelectedTypeId(initial.typeId || "");
-        if (Array.isArray(initial.subtypeIds)) setSelectedSubtypeIds(initial.subtypeIds);
+        // We handle the name-to-ID resolution in the taxonomy fetch effect for the first load
+        // But we still need to set other fields
         if (initial.country !== undefined) setCountry(initial.country || "Ghana");
         if (initial.state !== undefined) setState(initial.state || "");
         if (initial.city !== undefined) setCity(initial.city || "");
@@ -750,9 +813,22 @@ const Filters = ({ onChange, initial = {} }) => {
       console.log('Current normalized:', currNormalized);
       
       // It's a real external change - sync everything
-      if (Array.isArray(initial.purposeIds)) setSelectedPurposeIds(initial.purposeIds);
-      if (initial.typeId !== undefined) setSelectedTypeId(initial.typeId || "");
-      if (Array.isArray(initial.subtypeIds)) setSelectedSubtypeIds(initial.subtypeIds);
+      // For names, we need to map to IDs again if taxonomy is loaded
+      if (taxonomyData.purposes.length > 0) {
+        if (initial.purpose) {
+          const found = taxonomyData.purposes.find(p => p.name.toLowerCase() === initial.purpose.toLowerCase());
+          if (found) setSelectedPurposeIds([found.id]);
+        }
+        if (initial.property_type) {
+          const found = taxonomyData.propertyTypes.find(t => t.name.toLowerCase() === initial.property_type.toLowerCase());
+          if (found) setSelectedTypeId(found.id);
+        }
+        if (initial.subtype) {
+          const found = taxonomyData.subtypes.find(s => s.name.toLowerCase() === initial.subtype.toLowerCase());
+          if (found) setSelectedSubtypeIds([found.id]);
+        }
+      }
+
       if (initial.country !== undefined) setCountry(initial.country || "Ghana");
       if (initial.state !== undefined) setState(initial.state || "");
       if (initial.city !== undefined) setCity(initial.city || "");
@@ -763,28 +839,7 @@ const Filters = ({ onChange, initial = {} }) => {
       if (initial.priceMin !== undefined) priceMinRef.current = initial.priceMin?.toString() || "";
       if (initial.priceMax !== undefined) priceMaxRef.current = initial.priceMax?.toString() || "";
     }
-  }, [initial]);
-
-  // Fetch taxonomy data on component mount
-  useEffect(() => {
-    const fetchTaxonomyData = async () => {
-      try {
-        const response = await fetch('/api/property-taxonomy?include_subtypes=true');
-        if (response.ok) {
-          const result = await response.json();
-          setTaxonomyData(result.data);
-        } else {
-          console.error('Failed to fetch taxonomy data');
-        }
-      } catch (error) {
-        console.error('Error fetching taxonomy data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTaxonomyData();
-  }, []);
+  }, [initial, taxonomyData]);
 
   // Compute dependent option lists based on real data
   const filteredPropertyTypes = useMemo(() => {
@@ -863,10 +918,34 @@ const Filters = ({ onChange, initial = {} }) => {
         });
       }
       
+      // Map IDs back to Names for the URL
+      let purposeName = undefined;
+      if (selectedPurposeIds.length > 0) {
+        const found = taxonomyData.purposes.find(p => p.id === selectedPurposeIds[0]);
+        if (found) purposeName = found.name;
+      }
+      
+      let typeName = undefined;
+      if (selectedTypeId) {
+        const found = taxonomyData.propertyTypes.find(t => t.id === selectedTypeId);
+        if (found) typeName = found.name;
+      }
+      
+      let subtypeName = undefined;
+      if (selectedSubtypeIds.length > 0) {
+        const found = taxonomyData.subtypes.find(s => s.id === selectedSubtypeIds[0]);
+        if (found) subtypeName = found.name;
+      }
+      
       const filterData = {
+        purpose: purposeName,
+        property_type: typeName,
+        subtype: subtypeName,
+        // Keep IDs for internal use if needed, but we focus on names for URL
         purposeIds: selectedPurposeIds,
         typeId: selectedTypeId,
         subtypeIds: selectedSubtypeIds,
+        
         country,
         state,
         city,
@@ -951,6 +1030,7 @@ const Filters = ({ onChange, initial = {} }) => {
     setSelectedPurposeIds([]);
     setSelectedTypeId("");
     setSelectedSubtypeIds([]);
+    setInitialNames({});
     locationInputRef.current = "Ghana";
     setCountry("Ghana");
     setState("");
@@ -961,6 +1041,57 @@ const Filters = ({ onChange, initial = {} }) => {
     setBedrooms("");
     setBathrooms("");
     setSpecifications({});
+    
+    // Trigger URL update immediately
+    if (onChange) {
+      isApplyingFiltersRef.current = true;
+      
+      const clearedFilters = {
+        purpose: undefined,
+        property_type: undefined,
+        subtype: undefined,
+        purposeIds: [],
+        typeId: "",
+        subtypeIds: [],
+        country: "Ghana",
+        state: "",
+        city: "",
+        town: "",
+        priceMin: undefined,
+        priceMax: undefined,
+        bedrooms: undefined,
+        bathrooms: undefined,
+        specifications: undefined
+      };
+      
+      // Update lastInitialRef to prevent sync loop
+      // We need to normalize it just like in applyFilters/useEffect
+      const normalizeForCompare = (obj) => {
+        if (!obj || typeof obj !== 'object') return '{}';
+        const normalized = {};
+        Object.keys(obj).forEach(key => {
+          const value = obj[key];
+          if (value !== null && value !== '' && value !== undefined) {
+             if (key === 'purposeIds' && Array.isArray(value)) {
+                normalized[key] = [...value].sort();
+             } else if (key === 'subtypeIds' && Array.isArray(value)) {
+                normalized[key] = [...value].sort();
+             } else {
+                normalized[key] = value;
+             }
+          }
+        });
+        return JSON.stringify(normalized);
+      };
+      
+      lastInitialRef.current = normalizeForCompare(clearedFilters);
+      
+      onChange(clearedFilters);
+      
+      setTimeout(() => {
+        isApplyingFiltersRef.current = false;
+      }, 1000);
+    }
   };
 
   if (loading) {
@@ -975,7 +1106,7 @@ const Filters = ({ onChange, initial = {} }) => {
   }
 
   return (
-    <div className="w-full h-screen rounded-2xl bg-white shadow-sm border border-primary_color/10 flex flex-col relative">
+    <div className="w-full h-full rounded-2xl bg-white shadow-sm border border-primary_color/10 flex flex-col relative">
       <div className="flex-shrink-0 px-4 md:px-6 pt-4 md:pt-6">
         <div className="flex items-center justify-between mb-4">
           <h6 className="text-primary_color font-semibold">Filters</h6>

@@ -10,12 +10,19 @@ export async function GET(request) {
     
     // Extract filter parameters
     // Support both single values and arrays
+    // IDs (backward compatibility)
     const purposeId = searchParams.get('purpose_id')
     const purposeIds = searchParams.getAll('purpose_id')
     const propertyTypeId = searchParams.get('property_type_id')
     const categoryId = searchParams.get('category_id')
     const subtypeId = searchParams.get('subtype_id')
     const subtypeIds = searchParams.getAll('subtype_id')
+    
+    // Names (new way)
+    const purposeName = searchParams.get('purpose')
+    const propertyTypeName = searchParams.get('property_type')
+    const subtypeName = searchParams.get('subtype')
+
     const country = searchParams.get('country')
     const state = searchParams.get('state')
     const city = searchParams.get('city')
@@ -37,6 +44,57 @@ export async function GET(request) {
         console.log('📋 Parsed specifications:', specifications)
       } catch (e) {
         console.error('Error parsing specifications:', e)
+      }
+    }
+
+    // Resolve Names to IDs if provided
+    let resolvedPurposeIds = [...purposeIds]
+    if (purposeId) resolvedPurposeIds.push(purposeId)
+    
+    let resolvedTypeId = propertyTypeId
+    
+    let resolvedSubtypeIds = [...subtypeIds]
+    if (subtypeId) resolvedSubtypeIds.push(subtypeId)
+
+    // Lookup Purpose ID if name provided
+    if (purposeName) {
+      const { data: purposeData } = await supabase
+        .from('property_purposes')
+        .select('id')
+        .ilike('name', purposeName) // Case-insensitive match
+        .single()
+      
+      if (purposeData) {
+        resolvedPurposeIds.push(purposeData.id)
+        console.log(`🔍 Resolved purpose '${purposeName}' to ID: ${purposeData.id}`)
+      }
+    }
+
+    // Lookup Property Type ID if name provided
+    if (propertyTypeName) {
+      const { data: typeData } = await supabase
+        .from('property_types')
+        .select('id')
+        .ilike('name', propertyTypeName) // Case-insensitive match
+        .single()
+      
+      if (typeData) {
+        resolvedTypeId = typeData.id
+        console.log(`🔍 Resolved property_type '${propertyTypeName}' to ID: ${typeData.id}`)
+      }
+    }
+
+    // Lookup Subtype ID if name provided
+    if (subtypeName) {
+      const { data: subtypeData } = await supabase
+        .from('property_subtypes')
+        .select('id')
+        .ilike('name', subtypeName) // Case-insensitive match
+        .single()
+      
+      if (subtypeData) {
+        resolvedSubtypeIds.push(subtypeData.id)
+        console.log(`🔍 Resolved subtype '${subtypeName}' to ID: ${subtypeData.id}`)
       }
     }
 
@@ -78,21 +136,19 @@ export async function GET(request) {
     // Apply filters - purposes, types, categories are JSONB arrays of UUID strings
     // Use Supabase's contains method to check if array contains the UUID
     
-    if (purposeIds.length > 0) {
-      console.log('🎯 Filtering by purpose IDs:', purposeIds)
+    if (resolvedPurposeIds.length > 0) {
+      console.log('🎯 Filtering by purpose IDs:', resolvedPurposeIds)
       // Use filter with PostgREST cs (contains) operator for JSONB arrays
       // Format: purposes.cs.["uuid"]
-      const purposeIdToUse = purposeIds[0] // Use first one for now
+      // For now we just take the first one if multiple are provided (as per original logic roughly)
+      // Ideally we should support OR for multiple purposes but original logic used first one
+      const purposeIdToUse = resolvedPurposeIds[0] 
       query = query.filter('purposes', 'cs', `["${purposeIdToUse}"]`)
-    } else if (purposeId) {
-      console.log('🎯 Filtering by single purpose ID:', purposeId)
-      // Single purpose filter - use filter with cs operator
-      query = query.filter('purposes', 'cs', `["${purposeId}"]`)
     }
     
-    if (propertyTypeId) {
-      console.log('🎯 Filtering by property type ID:', propertyTypeId)
-      query = query.filter('types', 'cs', `["${propertyTypeId}"]`)
+    if (resolvedTypeId) {
+      console.log('🎯 Filtering by property type ID:', resolvedTypeId)
+      query = query.filter('types', 'cs', `["${resolvedTypeId}"]`)
     }
     
     if (categoryId) {
@@ -101,15 +157,11 @@ export async function GET(request) {
     }
     
     // listing_types.database is an array of UUID strings within a JSONB object
-    if (subtypeIds.length > 0) {
-      console.log('🎯 Filtering by subtype IDs:', subtypeIds)
+    if (resolvedSubtypeIds.length > 0) {
+      console.log('🎯 Filtering by subtype IDs:', resolvedSubtypeIds)
       // Use filter with cs operator for nested JSONB array
-      const subtypeIdToUse = subtypeIds[0]
+      const subtypeIdToUse = resolvedSubtypeIds[0]
       query = query.filter('listing_types->database', 'cs', `["${subtypeIdToUse}"]`)
-    } else if (subtypeId) {
-      console.log('🎯 Filtering by single subtype ID:', subtypeId)
-      // Single subtype filter - use filter with cs operator
-      query = query.filter('listing_types->database', 'cs', `["${subtypeId}"]`)
     }
     
     if (country) {

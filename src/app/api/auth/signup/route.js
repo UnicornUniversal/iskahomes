@@ -123,23 +123,138 @@ export async function POST(request) {
     // Create user with Supabase Admin API - email confirmation disabled since we're using SendGrid
     console.log('📝 Creating user with Supabase Admin API:', { email, userType })
     
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: email,
-      password: password,
-      email_confirm: false, // We handle email verification ourselves via SendGrid
-      user_metadata: {
-        user_type: userType,
-        full_name: userData.fullName || '',
-        phone: userData.phone || '',
-        verification_token: verificationToken
-      }
+    // Validate Supabase configuration
+    // Service role key should be SUPABASE_SERVICE_ROLE_KEY (without NEXT_PUBLIC_ prefix)
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    
+    if (!serviceRoleKey) {
+      console.error('❌ SUPABASE_SERVICE_ROLE_KEY is missing from environment variables')
+      console.error('❌ Check your .env.local file and ensure SUPABASE_SERVICE_ROLE_KEY is set')
+      return NextResponse.json(
+        { error: 'Server configuration error. Please contact support.' },
+        { status: 500 }
+      )
+    }
+    
+    if (!supabaseUrl) {
+      console.error('❌ NEXT_PUBLIC_SUPABASE_URL is missing from environment variables')
+      return NextResponse.json(
+        { error: 'Server configuration error. Please contact support.' },
+        { status: 500 }
+      )
+    }
+    
+    console.log('✅ Supabase configuration validated:', {
+      hasUrl: !!supabaseUrl,
+      hasServiceRoleKey: !!serviceRoleKey,
+      urlLength: supabaseUrl?.length,
+      keyLength: serviceRoleKey?.length
     })
+    
+    if (!supabaseUrl) {
+      console.error('❌ NEXT_PUBLIC_SUPABASE_URL is missing from environment variables')
+      return NextResponse.json(
+        { error: 'Server configuration error. Please contact support.' },
+        { status: 500 }
+      )
+    }
+    
+    // Attempt to create user with retry logic
+    let authData = null
+    let authError = null
+    const maxRetries = 3
+    let retryCount = 0
+    
+    while (retryCount < maxRetries && !authData && !authError) {
+      try {
+        // Create a timeout promise
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout after 30 seconds')), 30000)
+        )
+        
+        // Create the actual request promise
+        const createUserPromise = supabaseAdmin.auth.admin.createUser({
+          email: email,
+          password: password,
+          email_confirm: false, // We handle email verification ourselves via SendGrid
+          user_metadata: {
+            user_type: userType,
+            full_name: userData.fullName || '',
+            phone: userData.phone || '',
+            verification_token: verificationToken
+          }
+        })
+        
+        // Race between the request and timeout
+        const result = await Promise.race([createUserPromise, timeoutPromise])
+        
+        authData = result.data
+        authError = result.error
+        
+        // If we have a user, it's a success - break out of retry loop
+        if (authData && authData.user) {
+          console.log(`✅ User created successfully on attempt ${retryCount + 1}`)
+          break
+        }
+        
+        // If there's an error, check if we should retry
+        if (authError) {
+          // If it's a 502 error, retry
+          const is502Error = authError.status === 502 || 
+                           authError.code === '502' || 
+                           (authError.message && authError.message.includes('502')) ||
+                           (authError.name && authError.name.includes('502'))
+          
+          if (is502Error) {
+            retryCount++
+            if (retryCount < maxRetries) {
+              console.log(`⚠️ Retry attempt ${retryCount} of ${maxRetries} after 502 error`)
+              await new Promise(resolve => setTimeout(resolve, 2000 * retryCount)) // Exponential backoff
+              authData = null // Reset for retry
+              authError = null // Reset for retry
+              continue
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`❌ Error on attempt ${retryCount + 1}:`, error)
+        if (error.message && error.message.includes('timeout')) {
+          retryCount++
+          if (retryCount < maxRetries) {
+            console.log(`⚠️ Retry attempt ${retryCount} of ${maxRetries} after timeout`)
+            await new Promise(resolve => setTimeout(resolve, 2000 * retryCount))
+            continue
+          }
+        }
+        authError = error
+      }
+    }
 
     if (authError) {
-      console.error('❌ Supabase admin user creation error:', authError)
+      console.error('❌ Supabase admin user creation error:', {
+        message: authError.message,
+        status: authError.status,
+        code: authError.code,
+        name: authError.name,
+        fullError: JSON.stringify(authError, Object.getOwnPropertyNames(authError))
+      })
+      
+      // Provide more helpful error messages
+      let errorMessage = 'Failed to create user account'
+      if (authError.status === 502) {
+        errorMessage = 'Unable to connect to authentication service. Please try again in a moment.'
+      } else if (authError.message) {
+        errorMessage = authError.message
+      } else if (authError.status === 400) {
+        errorMessage = 'Invalid request. Please check your information and try again.'
+      } else if (authError.status === 401 || authError.status === 403) {
+        errorMessage = 'Authentication service configuration error. Please contact support.'
+      }
+      
       return NextResponse.json(
-        { error: authError.message || 'Failed to create user account' },
-        { status: 400 }
+        { error: errorMessage },
+        { status: authError.status || 500 }
       )
     }
 
@@ -301,7 +416,7 @@ export async function POST(request) {
             company_locations: [],
             company_statistics: [],
             company_gallery: [],
-            commission_rate: { default: 3.0 },
+            commission_rates: [], // Will be set up later in agency settings (stored as JSONB array)
             // Signup status fields
             invitation_status: 'sent',
             signup_status: 'pending', // Will be 'verified' after email confirmation

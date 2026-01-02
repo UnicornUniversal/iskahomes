@@ -11,6 +11,7 @@ import {
   FaBuilding, 
   FaCity,
   FaUsers, 
+  FaSitemap,
   FaInfoCircle, 
   FaUserPlus, 
   FaSignInAlt, 
@@ -40,6 +41,7 @@ const Nav = () => {
     // { nav_name: "Sell A Property", nav_icon: FaHandshake, nav_link: "/projects" },
     { nav_name: "Developers", nav_icon: FaBuilding, nav_link: "/home/allDevelopers" },
     { nav_name: "All Developments", nav_icon: FaCity, nav_link: "/home/allDevelopments" },
+    { nav_name: "Agencies", nav_icon: FaSitemap, nav_link: "/home/allAgencies" },
     { nav_name: "Agents", nav_icon: FaUsers, nav_link: "/home/allAgents" },
     { nav_name: "About Us", nav_icon: FaInfoCircle, nav_link: "/home/aboutUs" },
     { nav_name: "Contact Us", nav_icon: FaEnvelope, nav_link: "/home/contactUs" },
@@ -60,7 +62,7 @@ const handleLogout = () => {
 };
 
   return (
-    <div className="fixed top-0   w-full  left-1/2 -translate-x-1/2    overflow-y z-100 backdrop-blur-md ">
+    <div className="fixed top-0   w-full  left-1/2 -translate-x-1/2    overflow-y z-[2000] backdrop-blur-md ">
       {/* Toggle button for small screens */}
       <div
         className="absolute top-4 right-4 md:hidden bg-secondary_color p-2 rounded-sm z-[200] cursor-pointer"
