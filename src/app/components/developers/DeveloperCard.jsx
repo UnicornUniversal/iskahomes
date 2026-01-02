@@ -74,7 +74,7 @@ const DeveloperCard = ({ developer, index = 0 }) => {
   }
 
   return (
-    <Link href={`/allDevelopers/${developer.slug}`} className="block">
+    <Link href={`/home/allDevelopers/${developer.slug}`} className="block">
       <div className="overflow-hidden transition-all duration-300 transform hover:-translate-y-1 cursor-pointer group flex flex-col w-full">
         {/* Cover Image Section */}
         <div className={`relative overflow-hidden w-full ${getImageHeightClasses()}`}>

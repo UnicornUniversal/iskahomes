@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import Layout1 from '@/app/layout/Layout1'
-import { FiSearch, FiFilter, FiStar, FiMapPin, FiHome, FiCheckCircle, FiX } from 'react-icons/fi'
+import { FiSearch, FiFilter, FiStar, FiMapPin, FiHome, FiCheckCircle, FiX, FiBriefcase } from 'react-icons/fi'
 import Link from 'next/link'
 
 const AllAgents = () => {
@@ -233,156 +233,162 @@ const AllAgents = () => {
     }
   ]
 
-  const clearFilters = () => {
-    setSearchTerm('')
-    setSelectedLocation('')
-    setSelectedSpecialization('')
-    setShowVerifiedOnly(false)
-    setSortBy('name')
-  }
-
   return (
     <Layout1>
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <div className="bg-white shadow-sm border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="text-center">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Find Your Perfect Agent</h1>
-              <p className="text-gray-600 max-w-2xl mx-auto">
-                Connect with experienced real estate agents across Ghana. Browse profiles, read reviews, and find the right agent for your property needs.
-              </p>
-            </div>
+      <div className="min-h-screen relative overflow-hidden">
+         {/* Background Element */}
+        <div className="fixed inset-0 pointer-events-none z-[-1] ocean-sunset_main_bg opacity-30"></div>
+        <div className="fixed inset-0 pointer-events-none z-[-2] bg-white/80"></div>
+
+        {/* Hero Section */}
+        <div className="relative pt-12 pb-20 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto text-center">
+            <h1 className="text-4xl md:text-5xl font-bold text-primary_color mb-6 tracking-tight">
+              Elite Real Estate Agents
+            </h1>
+            <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto font-light leading-relaxed">
+              Connect with top-tier real estate professionals. Experienced, verified, and ready to help you navigate the Ghanaian property market.
+            </p>
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Filters Section */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
-            <div className="flex flex-col lg:flex-row gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+          {/* Filters Section - Glassmorphic Design */}
+          <div className="design1 backdrop-blur-md p-6 mb-12 rounded-3xl border border-white/50 shadow-xl">
+            <div className="flex flex-col lg:flex-row gap-6 items-center">
               {/* Search */}
-              <div className="flex-1">
-                <div className="relative">
-                  <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <div className="flex-1 w-full">
+                <div className="relative group">
+                  <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-primary_color/50 group-focus-within:text-secondary_color transition-colors duration-300 w-5 h-5" />
                   <input
                     type="text"
-                    placeholder="Search agents by name, location, or specialization..."
+                    placeholder="Search agents by name or specialization..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full pl-12 pr-6 py-4 bg-white/40 border border-white/60 rounded-2xl focus:ring-2 focus:ring-secondary_color/20 focus:border-secondary_color text-primary_color placeholder-primary_color/40 transition-all duration-300 shadow-sm hover:shadow-md"
                   />
                 </div>
               </div>
 
               {/* Location Filter */}
-              {locations.length > 0 && (
-                <div className="lg:w-48">
-                  <select
-                    value={selectedLocation}
-                    onChange={(e) => setSelectedLocation(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">All Locations</option>
-                    {locations.map(location => (
-                      <option key={location} value={location}>{location}</option>
-                    ))}
-                  </select>
+               {locations.length > 0 && (
+                <div className="w-full lg:w-64">
+                    <div className="relative">
+                    <select
+                        value={selectedLocation}
+                        onChange={(e) => setSelectedLocation(e.target.value)}
+                        className="w-full pl-4 pr-10 py-4 bg-white/40 border border-white/60 rounded-2xl focus:ring-2 focus:ring-secondary_color/20 focus:border-secondary_color text-primary_color appearance-none cursor-pointer hover:bg-white/60 transition-all duration-300 shadow-sm"
+                        style={{ backgroundImage: 'none' }}
+                    >
+                        <option value="">All Locations</option>
+                        {locations.map(location => (
+                        <option key={location} value={location}>{location}</option>
+                        ))}
+                    </select>
+                    <FiMapPin className="absolute right-4 top-1/2 transform -translate-y-1/2 text-primary_color/50 pointer-events-none" />
+                    </div>
                 </div>
-              )}
-            </div>
+               )}
 
-            {/* Additional Filters */}
-            <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-gray-200">
+              {/* Clear Filters */}
               {(searchTerm || selectedLocation) && (
                 <button
                   onClick={clearFilters}
-                  className="flex items-center space-x-1 text-sm text-gray-600 hover:text-gray-800"
+                  className="p-4 text-red-500 hover:bg-red-50 rounded-2xl transition-colors duration-300 group"
+                  title="Clear Filters"
                 >
-                  <FiX className="w-4 h-4" />
-                  <span>Clear filters</span>
+                  <FiX className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
                 </button>
               )}
             </div>
           </div>
 
           {/* Results Count */}
-          <div className="flex justify-between items-center mb-6">
-            <p className="text-gray-600">
-              Showing {filteredAgents.length} of {agents.length} agents
+          <div className="flex justify-between items-center mb-8 px-2">
+            <p className="text-primary_color/70 font-medium">
+              Showing <span className="text-secondary_color font-bold">{filteredAgents.length}</span> professionals
             </p>
           </div>
 
           {/* Agents Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {filteredAgents.map(agent => (
               <Link
                 key={agent.id}
                 href={`/home/allAgents/${agent.slug}`}
-                className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow duration-300"
+                className="group relative bg-white rounded-3xl p-6 shadow-lg hover:shadow-2xl hover:shadow-primary_color/10 transition-all duration-500 border border-gray-100 flex flex-col items-center text-center transform hover:-translate-y-2"
               >
-                {/* Agent Image and Badge */}
-                <div className="relative h-48 bg-gradient-to-br from-blue-500 to-purple-600">
-                  {agent.profile_image ? (
-                    <img
-                      src={agent.profile_image}
-                      alt={agent.name}
-                      className="w-full h-48 object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <div className="text-white text-4xl font-bold">
-                        {agent.name?.charAt(0) || 'A'}
-                      </div>
+                {/* Agent Image */}
+                <div className="relative mb-6">
+                    <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-primary_color to-secondary_color shadow-lg group-hover:shadow-secondary_color/30 transition-shadow duration-300">
+                         <div className="w-full h-full rounded-full overflow-hidden border-4 border-white bg-white">
+                            {agent.profile_image ? (
+                                <img
+                                src={agent.profile_image}
+                                alt={agent.name}
+                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gray-50 text-primary_color">
+                                    <span className="text-4xl font-bold">{agent.name?.charAt(0)}</span>
+                                </div>
+                            )}
+                         </div>
                     </div>
-                  )}
+                     {/* Badge Overlay */}
+                     <div className="absolute bottom-1 right-1 bg-white rounded-full p-1.5 shadow-md border border-gray-100">
+                         <FiCheckCircle className="w-5 h-5 text-secondary_color" />
+                     </div>
                 </div>
 
                 {/* Agent Info */}
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 text-lg mb-1">{agent.name}</h3>
-                      {agent.agency && (
-                        <div className="flex items-center text-gray-600 text-sm mb-2">
-                          <FiMapPin className="w-4 h-4 mr-1" />
-                          <span className="line-clamp-1">{agent.agency.name}</span>
-                        </div>
-                      )}
+                <div className="w-full mb-6">
+                  <h3 className="text-xl font-bold text-primary_color group-hover:text-secondary_color transition-colors duration-300 mb-1">
+                    {agent.name}
+                  </h3>
+                  
+                   {agent.agency && (
+                    <div className="flex items-center justify-center text-gray-500 text-sm mb-3">
+                         <FiBriefcase className="w-3.5 h-3.5 mr-1.5" />
+                        <span className="line-clamp-1 font-medium">{agent.agency.name}</span>
                     </div>
-                  </div>
-
-                  {/* Bio */}
-                  {agent.bio && (
-                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                      {agent.bio}
-                    </p>
                   )}
 
-                  {/* Stats */}
-                  <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
-                    <div className="flex items-center">
-                      <FiHome className="w-4 h-4 mr-1" />
-                      <span>{agent.total_listings || 0} listings</span>
-                    </div>
-                  </div>
+                  {agent.bio && (
+                    <p className="text-gray-500 text-sm line-clamp-2 min-h-[2.5rem] px-2">
+                       {agent.bio}
+                    </p>
+                  )}
+                </div>
 
-                  {/* View Profile Button */}
-                  <div className="w-full bg-blue-600 text-white text-center py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200">
-                    View Profile
-                  </div>
+                {/* Footer / Stats */}
+                <div className="w-full mt-auto pt-4 border-t border-gray-100 flex justify-between items-center text-sm font-medium">
+                     <div className="flex items-center text-primary_color/80 bg-primary_color/5 px-3 py-1.5 rounded-lg">
+                        <FiHome className="w-4 h-4 mr-1.5" />
+                        <span>{agent.total_listings || 0} Properties</span>
+                    </div>
+                    <span className="text-primary_color group-hover:translate-x-1 transition-transform duration-300">
+                        →
+                    </span>
                 </div>
               </Link>
             ))}
           </div>
 
-          {/* No Results */}
+          {/* No Results State */}
           {filteredAgents.length === 0 && !loading && (
-            <div className="text-center py-12">
-              <div className="text-gray-400 mb-4">
-                <FiSearch className="w-16 h-16 mx-auto" />
+             <div className="text-center py-20 bg-white/50 rounded-3xl border border-white shadow-sm backdrop-blur-sm">
+              <div className="bg-gray-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                <FiSearch className="w-10 h-10 text-gray-400" />
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No agents found</h3>
-              <p className="text-gray-600">Try adjusting your search criteria or filters.</p>
+              <h3 className="text-2xl font-bold text-primary_color mb-2">No agents found</h3>
+              <p className="text-gray-500">We couldn't find any agents matching your criteria.</p>
+              <button 
+                onClick={clearFilters}
+                className="mt-6 px-8 py-3 bg-primary_color text-white rounded-full font-medium shadow-lg shadow-primary_color/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+              >
+                Clear all filters
+              </button>
             </div>
           )}
         </div>

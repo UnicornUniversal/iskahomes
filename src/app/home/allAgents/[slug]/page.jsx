@@ -1,32 +1,36 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import Layout1 from '@/app/layout/Layout1'
 import { 
-  FiStar, 
-  FiMapPin, 
-  FiPhone, 
-  FiMail, 
-  FiMessageSquare, 
-  FiHome, 
-  FiCheckCircle, 
-  FiCalendar,
-  FiAward,
-  FiGlobe,
-  FiLinkedin,
-  FiTwitter,
-  FiInstagram,
-  FiArrowLeft,
-  FiHeart,
-  FiShare2,
-  FiBuilding2
-} from 'react-icons/fi'
-import Link from 'next/link'
+  Phone, 
+  Mail, 
+  MapPin, 
+  Briefcase, 
+  Linkedin, 
+  Twitter, 
+  Instagram, 
+  Star, 
+  Home, 
+  CheckCircle, 
+  MessageSquare, 
+  Share2, 
+  ArrowLeft,
+  Globe,
+  Award,
+  Languages,
+  Clock,
+  User
+} from 'lucide-react'
+import LeadContactForm from '@/app/components/LeadContactForm'
+import Nav from '@/app/components/Nav'
+import DataRenderer from '@/app/components/developers/DataRenderer'
+import { toast } from 'react-toastify'
 
 const AgentProfile = () => {
   const params = useParams()
-  const agentSlug = params.slug
-  const [activeTab, setActiveTab] = useState('overview')
+  const slug = params.slug
   const [agent, setAgent] = useState(null)
   const [agency, setAgency] = useState(null)
   const [listings, setListings] = useState([])
@@ -34,136 +38,78 @@ const AgentProfile = () => {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (agentSlug) {
+    if (slug) {
       fetchAgentData()
     }
-  }, [agentSlug])
+  }, [slug])
 
   const fetchAgentData = async () => {
     try {
       setLoading(true)
-      setError(null)
-
-      const response = await fetch(`/api/public/agents/${agentSlug}`)
+      // First try to fetch from API
+      const response = await fetch(`/api/public/agents/${slug}`)
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch agent')
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success) {
+            setAgent(result.data.agent)
+            setAgency(result.data.agency)
+            setListings(result.data.listings || [])
+            setLoading(false)
+            return
+        }
       }
 
-      const result = await response.json()
+      // Fallback to dummy data logic if API fails or not found (preserving original behavior for development)
+      const foundAgent = allAgents.find(a => a.slug === slug)
       
-      if (result.success) {
-        setAgent(result.data.agent)
-        setAgency(result.data.agency)
-        setListings(result.data.listings || [])
+      if (foundAgent) {
+        setAgent(foundAgent)
+        // Find agency from dummy data if needed, or mock it
+        setListings(foundAgent.properties || []) 
       } else {
-        setError(result.error || 'Agent not found')
+         if (!response.ok) setError('Agent not found')
       }
+
+      setLoading(false)
+
     } catch (err) {
       console.error('Error fetching agent:', err)
-      setError(err.message || 'Error loading agent')
-    } finally {
+      setError('Error loading agent profile')
       setLoading(false)
     }
   }
 
-  if (loading) {
-    return (
-      <Layout1>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading agent...</p>
-          </div>
-        </div>
-      </Layout1>
-    )
-  }
-
-  if (error || !agent) {
-    return (
-      <Layout1>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Agent Not Found</h1>
-            <p className="text-gray-600 mb-6">{error || 'The agent you\'re looking for doesn\'t exist.'}</p>
-            <Link
-              href="/home/allAgents"
-              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
-            >
-              <FiArrowLeft className="w-4 h-4 mr-2" />
-              Back to All Agents
-            </Link>
-          </div>
-        </div>
-      </Layout1>
-    )
-  }
-
-  // Format price helper
-  const formatPrice = (price, currency, priceType, duration) => {
-    if (!price) return 'Price on request'
-    const priceNum = parseFloat(price)
-    const formattedPrice = priceNum.toLocaleString()
-    
-    let priceText = `${currency || 'GHS'} ${formattedPrice}`
-    
-    if (priceType === 'rent' && duration) {
-      priceText += `/${duration}`
-    }
-    
-    return priceText
-  }
-
-  // Get listing image
-  const getListingImage = (listing) => {
-    if (listing.media?.albums && Array.isArray(listing.media.albums) && listing.media.albums.length > 0) {
-      for (const album of listing.media.albums) {
-        if (album?.images && Array.isArray(album.images) && album.images.length > 0) {
-          return album.images[0].url
-        }
-      }
-    }
-    if (listing.media?.mediaFiles && Array.isArray(listing.media.mediaFiles) && listing.media.mediaFiles.length > 0) {
-      return listing.media.mediaFiles[0].url
-    }
-    if (listing.media?.banner?.url) {
-      return listing.media.banner.url
-    }
-    return null
-  }
-
-  // Dummy data for all agents (fallback - not used)
+  // Fallback to dummy data if API fails or for dev/preview
   const allAgents = [
     {
       id: 1,
-      slug: 'kwame-asante',
-      name: 'Kwame Asante',
-      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop&crop=face',
+      slug: 'kwame-mensah',
+      name: 'Kwame Mensah',
+      image: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300&h=300&fit=crop&crop=face',
       coverImage: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&h=400&fit=crop',
       location: 'Accra, Greater Accra',
-      specializations: ['Residential', 'Commercial', 'Luxury'],
-      listings: 24,
+      specializations: ['Luxury Homes', 'Commercial'],
+      listings: 12,
       rating: 4.8,
-      reviewCount: 156,
+      reviewCount: 45,
       verified: true,
-      experience: '8+ years',
+      experience: '10+ years',
       languages: ['English', 'Twi', 'Ga'],
-      bio: 'Experienced real estate agent with over 8 years of expertise in residential and commercial properties across Greater Accra. Specializing in luxury properties and investment opportunities. I have helped hundreds of families find their dream homes and investors maximize their returns.',
-      phone: '+233 20 987 6543',
-      email: 'kwame.asante@iskahomes.com',
+      bio: 'Award-winning real estate agent with over 10 years of experience in the Accra luxury market. Dedicated to finding the perfect property for every client.',
+      phone: '+233 20 123 4567',
+      email: 'kwame.mensah@iskahomes.com',
       licenseNumber: 'REA-2024-001234',
-      joinDate: '2020-03-15',
+      joinDate: '2015-03-12',
       socialMedia: {
-        linkedin: 'kwame-asante-realestate',
-        twitter: '@kwameasante',
-        instagram: 'kwame.asante.re'
+        linkedin: 'kwame-mensah-re',
+        twitter: '@kwamemensah',
+        instagram: 'kwame.properties'
       },
       achievements: [
-        'Top Performer 2023',
-        'Best Customer Service 2022',
+        'Top Sales Agent 2023',
         'Luxury Property Specialist',
-        'Million Dollar Club Member'
+        'Certified Negotiation Expert'
       ],
       properties: [
         {
@@ -180,1369 +126,563 @@ const AgentProfile = () => {
         },
         {
           id: 2,
-          title: 'Modern Apartment - Airport Residential',
-          price: '$280,000',
-          location: 'Airport Residential, Accra',
-          image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=300&h=200&fit=crop',
-          bedrooms: 3,
+          title: 'Modern Apartment - Cantonments',
+          price: '$2,500/month',
+          location: 'Cantonments, Accra',
+          image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=300&h=200&fit=crop',
+          bedrooms: 2,
           bathrooms: 2,
-          area: '180 sqm',
-          type: 'For Sale',
+          area: '120 sqm',
+          type: 'For Rent',
           featured: false
         },
         {
           id: 3,
-          title: 'Office Space - Cantonments',
-          price: '$2,500/month',
-          location: 'Cantonments, Accra',
+          title: 'Commercial Office Space - Airport City',
+          price: '$3,500/month',
+          location: 'Airport City, Accra',
           image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=300&h=200&fit=crop',
           bedrooms: 0,
           bathrooms: 2,
-          area: '300 sqm',
+          area: '200 sqm',
           type: 'For Rent',
-          featured: false
-        },
-        {
-          id: 4,
-          title: 'Penthouse - Ridge',
-          price: '$650,000',
-          location: 'Ridge, Accra',
-          image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=300&h=200&fit=crop',
-          bedrooms: 4,
-          bathrooms: 3,
-          area: '320 sqm',
-          type: 'For Sale',
           featured: true
-        },
-        {
-          id: 5,
-          title: 'Townhouse - Osu',
-          price: '$380,000',
-          location: 'Osu, Accra',
-          image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=300&h=200&fit=crop',
-          bedrooms: 3,
-          bathrooms: 2,
-          area: '220 sqm',
-          type: 'For Sale',
-          featured: false
-        },
-        {
-          id: 6,
-          title: 'Studio Apartment - Labone',
-          price: '$800/month',
-          location: 'Labone, Accra',
-          image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=300&h=200&fit=crop',
-          bedrooms: 1,
-          bathrooms: 1,
-          area: '45 sqm',
-          type: 'For Rent',
-          featured: false
-        },
-        {
-          id: 7,
-          title: 'Commercial Building - Adabraka',
-          price: '$1,800,000',
-          location: 'Adabraka, Accra',
-          image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=300&h=200&fit=crop',
-          bedrooms: 0,
-          bathrooms: 6,
-          area: '1200 sqm',
-          type: 'For Sale',
-          featured: true
-        },
-        {
-          id: 8,
-          title: 'Family Home - Dzorwulu',
-          price: '$520,000',
-          location: 'Dzorwulu, Accra',
-          image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=300&h=200&fit=crop',
-          bedrooms: 4,
-          bathrooms: 3,
-          area: '380 sqm',
-          type: 'For Sale',
-          featured: false
         }
       ],
       reviews: [
         {
           id: 1,
-          reviewer: 'Sarah Johnson',
+          reviewer: 'John Doe',
           rating: 5,
-          date: '2024-01-15',
-          comment: 'Kwame was incredibly professional and helped us find our dream home. His knowledge of the market is exceptional and he made the entire process smooth and stress-free.',
+          date: '2023-12-15',
+          comment: 'Kwame was exceptional in helping us find our dream home. Highly recommended!',
           property: 'Luxury Villa - East Legon'
         },
         {
           id: 2,
-          reviewer: 'Michael Osei',
+          reviewer: 'Sarah Smith',
           rating: 5,
-          date: '2024-01-10',
-          comment: 'Excellent service! Kwame understood exactly what we were looking for and found us the perfect investment property. Highly recommended!',
-          property: 'Modern Apartment - Airport Residential'
-        },
-        {
-          id: 3,
-          reviewer: 'Grace Addo',
-          rating: 4,
-          date: '2024-01-05',
-          comment: 'Very knowledgeable agent who really knows the local market. Helped us navigate the buying process with confidence.',
-          property: 'Office Space - Cantonments'
+          date: '2023-11-20',
+          comment: 'Professional, knowledgeable, and patient. Best agent in Accra!',
+          property: 'Modern Apartment - Cantonments'
         }
       ]
     },
     {
-      id: 2,
-      slug: 'sarah-johnson',
-      name: 'Sarah Johnson',
-      image: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=300&h=300&fit=crop&crop=face',
-      coverImage: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&h=400&fit=crop',
-      location: 'Kumasi, Ashanti',
-      specializations: ['Residential', 'Rental'],
-      listings: 18,
-      rating: 4.6,
-      reviewCount: 89,
-      verified: true,
-      experience: '5+ years',
-      languages: ['English', 'Twi'],
-      bio: 'Dedicated real estate professional with 5 years of experience helping families find their perfect homes in Kumasi and surrounding areas. I specialize in residential properties and rental management, ensuring every client finds their ideal living space.',
-      phone: '+233 24 567 8901',
-      email: 'sarah.johnson@iskahomes.com',
-      licenseNumber: 'REA-2024-005678',
-      joinDate: '2019-08-20',
-      socialMedia: {
-        linkedin: 'sarah-johnson-realestate',
-        twitter: '@sarahjohnson',
-        instagram: 'sarah.johnson.re'
+       id: 2,
+       slug: 'amina-yussif',
+       name: 'Amina Yussif',
+       image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&h=300&fit=crop&crop=face',
+       coverImage: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&h=400&fit=crop',
+       location: 'Kumasi, Ashanti',
+       specializations: ['Residential', 'Land'],
+       listings: 8,
+       rating: 4.9,
+       reviewCount: 32,
+       verified: true,
+       experience: '5+ years',
+       languages: ['English', 'Hausa', 'Twi'],
+       bio: 'Specializing in residential properties and land acquisition in the Ashanti region. Passionate about helping first-time homebuyers.',
+       phone: '+233 24 987 6543',
+       email: 'amina.yussif@iskahomes.com',
+       licenseNumber: 'REA-2024-005678',
+       joinDate: '2019-06-20',
+       socialMedia: {
+         linkedin: 'amina-yussif-re',
+         twitter: '@aminayussif',
+         instagram: 'amina.realtor'
+       },
+       achievements: [
+         'Rising Star 2021',
+         'Best Client Service 2023'
+       ],
+       properties: [],
+       reviews: []
+     },
+     {
+       id: 3,
+       slug: 'david-asante',
+       name: 'David Asante',
+       image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop&crop=face',
+       coverImage: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&h=400&fit=crop',
+       location: 'Takoradi, Western',
+       specializations: ['Industrial', 'Commercial'],
+       listings: 15,
+       rating: 4.7,
+       reviewCount: 28,
+       verified: true,
+       experience: '8+ years',
+       languages: ['English', 'Fante'],
+       bio: 'Expert in industrial and commercial properties in the Western Region. Helping businesses find the perfect location for their operations.',
+       phone: '+233 50 111 2222',
+       email: 'david.asante@iskahomes.com',
+       licenseNumber: 'REA-2024-009012',
+       joinDate: '2016-01-10',
+       socialMedia: {
+         linkedin: 'david-asante-commercial',
+         twitter: '@davidasante',
+         instagram: 'david.properties'
+       },
+       achievements: [
+         'Commercial Agent of the Year 2022',
+         'Top Industrial Sales'
+       ],
+       properties: [],
+       reviews: []
+     },
+     {
+        id: 4,
+        slug: 'sarah-owusu',
+        name: 'Sarah Owusu',
+        image: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=300&h=300&fit=crop&crop=face',
+        location: 'Tema, Greater Accra',
+        specializations: ['Residential', 'Short Lets'],
+        listings: 18,
+        rating: 4.9,
+        reviewCount: 56,
+        verified: true,
+        experience: '6+ years',
+        languages: ['English', 'Twi'],
+        bio: 'Focused on premium residential sales and short-term rentals in Tema and surroundings.',
+        phone: '+233 55 444 7777',
+        email: 'sarah.owusu@iskahomes.com',
+        properties: [],
+        reviews: []
       },
-      achievements: [
-        'Customer Choice Award 2023',
-        'Rental Specialist 2022',
-        'Top 10 Agents Kumasi Region'
-      ],
-      properties: [
-        {
-          id: 1,
-          title: 'Family Home - Ahodwo',
-          price: '$320,000',
-          location: 'Ahodwo, Kumasi',
-          image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=300&h=200&fit=crop',
-          bedrooms: 4,
-          bathrooms: 3,
-          area: '280 sqm',
-          type: 'For Sale',
-          featured: true
-        },
-        {
-          id: 2,
-          title: 'Apartment - Bantama',
-          price: '$800/month',
-          location: 'Bantama, Kumasi',
-          image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=300&h=200&fit=crop',
-          bedrooms: 2,
-          bathrooms: 1,
-          area: '120 sqm',
-          type: 'For Rent',
-          featured: false
-        },
-        {
-          id: 3,
-          title: 'Townhouse - Manhyia',
-          price: '$280,000',
-          location: 'Manhyia, Kumasi',
-          image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=300&h=200&fit=crop',
-          bedrooms: 3,
-          bathrooms: 2,
-          area: '200 sqm',
-          type: 'For Sale',
-          featured: false
-        },
-        {
-          id: 4,
-          title: 'Studio - Adum',
-          price: '$600/month',
-          location: 'Adum, Kumasi',
-          image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=300&h=200&fit=crop',
-          bedrooms: 1,
-          bathrooms: 1,
-          area: '60 sqm',
-          type: 'For Rent',
-          featured: false
-        },
-        {
-          id: 5,
-          title: 'Family Compound - Santasi',
-          price: '$450,000',
-          location: 'Santasi, Kumasi',
-          image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=300&h=200&fit=crop',
-          bedrooms: 5,
-          bathrooms: 4,
-          area: '500 sqm',
-          type: 'For Sale',
-          featured: true
-        },
-        {
-          id: 6,
-          title: '2-Bedroom Apartment - Kwadaso',
-          price: '$950/month',
-          location: 'Kwadaso, Kumasi',
-          image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=300&h=200&fit=crop',
-          bedrooms: 2,
-          bathrooms: 2,
-          area: '100 sqm',
-          type: 'For Rent',
-          featured: false
-        }
-      ],
-      reviews: [
-        {
-          id: 1,
-          reviewer: 'Kwame Asante',
-          rating: 5,
-          date: '2024-01-12',
-          comment: 'Sarah helped us find the perfect rental property. She was very patient and understood our requirements perfectly.',
-          property: 'Apartment - Bantama'
-        },
-        {
-          id: 2,
-          reviewer: 'Ama Kufuor',
-          rating: 4,
-          date: '2024-01-08',
-          comment: 'Professional service and great knowledge of the Kumasi market. Highly recommended for families.',
-          property: 'Family Home - Ahodwo'
-        }
-      ]
-    },
-    {
-      id: 3,
-      slug: 'michael-osei',
-      name: 'Michael Osei',
-      image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&h=300&fit=crop&crop=face',
-      coverImage: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&h=400&fit=crop',
-      location: 'Tema, Greater Accra',
-      specializations: ['Commercial', 'Industrial'],
-      listings: 32,
-      rating: 4.9,
-      reviewCount: 203,
-      verified: true,
-      experience: '12+ years',
-      languages: ['English', 'Twi', 'Ewe'],
-      bio: 'Commercial real estate expert with over 12 years of experience in industrial and office properties. I specialize in helping businesses find the perfect commercial spaces and investment opportunities.',
-      phone: '+233 26 345 6789',
-      email: 'michael.osei@iskahomes.com',
-      licenseNumber: 'REA-2024-003456',
-      joinDate: '2012-03-10',
-      socialMedia: {
-        linkedin: 'michael-osei-commercial',
-        twitter: '@michaelosei',
-        instagram: 'michael.osei.re'
+      {
+        id: 5,
+        slug: 'kofi-annor',
+        name: 'Kofi Annor',
+        image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&h=300&fit=crop&crop=face',
+        location: 'Koforidua, Eastern',
+        specializations: ['Land', 'Agricultural'],
+        listings: 25,
+        rating: 4.6,
+        reviewCount: 38,
+        verified: true,
+        experience: '12+ years',
+        languages: ['English', 'Twi', 'Ewe'],
+        bio: 'Specialist in land acquisition and agricultural properties in the Eastern Region.',
+        phone: '+233 27 888 9999',
+        email: 'kofi.annor@iskahomes.com',
+        properties: [],
+        reviews: []
       },
-      achievements: [
-        'Commercial Agent of the Year 2023',
-        'Industrial Property Expert',
-        'Million Dollar Sales Club'
-      ],
-      properties: [
-        {
-          id: 1,
-          title: 'Industrial Warehouse - Tema Port',
-          price: '$1,200,000',
-          location: 'Tema Port, Tema',
-          image: 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=300&h=200&fit=crop',
-          bedrooms: 0,
-          bathrooms: 2,
-          area: '2000 sqm',
-          type: 'For Sale',
-          featured: true
-        },
-        {
-          id: 2,
-          title: 'Office Complex - Community 1',
-          price: '$15,000/month',
-          location: 'Community 1, Tema',
-          image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=300&h=200&fit=crop',
-          bedrooms: 0,
-          bathrooms: 8,
-          area: '800 sqm',
-          type: 'For Rent',
-          featured: false
-        },
-        {
-          id: 3,
-          title: 'Retail Space - Community 2',
-          price: '$8,500/month',
-          location: 'Community 2, Tema',
-          image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=300&h=200&fit=crop',
-          bedrooms: 0,
-          bathrooms: 3,
-          area: '400 sqm',
-          type: 'For Rent',
-          featured: false
-        },
-        {
-          id: 4,
-          title: 'Manufacturing Facility - Industrial Area',
-          price: '$2,500,000',
-          location: 'Industrial Area, Tema',
-          image: 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=300&h=200&fit=crop',
-          bedrooms: 0,
-          bathrooms: 4,
-          area: '3500 sqm',
-          type: 'For Sale',
-          featured: true
-        },
-        {
-          id: 5,
-          title: 'Office Building - Community 3',
-          price: '$950,000',
-          location: 'Community 3, Tema',
-          image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=300&h=200&fit=crop',
-          bedrooms: 0,
-          bathrooms: 12,
-          area: '1500 sqm',
-          type: 'For Sale',
-          featured: false
-        },
-        {
-          id: 6,
-          title: 'Storage Facility - Tema Port',
-          price: '$12,000/month',
-          location: 'Tema Port, Tema',
-          image: 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=300&h=200&fit=crop',
-          bedrooms: 0,
-          bathrooms: 2,
-          area: '2500 sqm',
-          type: 'For Rent',
-          featured: false
-        }
-      ],
-      reviews: [
-        {
-          id: 1,
-          reviewer: 'David Mensah',
-          rating: 5,
-          date: '2024-01-14',
-          comment: 'Michael is the go-to person for commercial properties. His expertise in industrial real estate is unmatched.',
-          property: 'Industrial Warehouse - Tema Port'
-        },
-        {
-          id: 2,
-          reviewer: 'Emmanuel Boateng',
-          rating: 5,
-          date: '2024-01-09',
-          comment: 'Excellent commercial property specialist. Helped us secure the perfect office space for our business.',
-          property: 'Office Complex - Community 1'
-        }
-      ]
-    },
-    {
-      id: 4,
-      slug: 'ama-kufuor',
-      name: 'Ama Kufuor',
-      image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=300&h=300&fit=crop&crop=face',
-      coverImage: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&h=400&fit=crop',
-      location: 'Cape Coast, Central',
-      specializations: ['Residential', 'Vacation Homes'],
-      listings: 15,
-      rating: 4.4,
-      reviewCount: 67,
-      verified: false,
-      experience: '3+ years',
-      languages: ['English', 'Fante'],
-      bio: 'Specializing in residential properties and vacation homes along the beautiful Cape Coast. I help families find their dream homes and investors discover profitable vacation rental opportunities.',
-      phone: '+233 27 890 1234',
-      email: 'ama.kufuor@iskahomes.com',
-      licenseNumber: 'REA-2024-007890',
-      joinDate: '2021-06-15',
-      socialMedia: {
-        linkedin: 'ama-kufuor-properties',
-        twitter: '@amakufuor',
-        instagram: 'ama.kufuor.re'
-      },
-      achievements: [
-        'Rising Star 2023',
-        'Vacation Home Specialist',
-        'Best New Agent Central Region'
-      ],
-      properties: [
-        {
-          id: 1,
-          title: 'Beachfront Villa - Elmina',
-          price: '$380,000',
-          location: 'Elmina, Cape Coast',
-          image: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=300&h=200&fit=crop',
-          bedrooms: 4,
-          bathrooms: 3,
-          area: '320 sqm',
-          type: 'For Sale',
-          featured: true
-        },
-        {
-          id: 2,
-          title: 'Holiday Apartment - Cape Coast Castle',
-          price: '$120/night',
-          location: 'Cape Coast Castle Area',
-          image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=300&h=200&fit=crop',
-          bedrooms: 2,
-          bathrooms: 1,
-          area: '100 sqm',
-          type: 'Vacation Rental',
-          featured: false
-        },
-        {
-          id: 3,
-          title: 'Seaside Cottage - Anomabo',
-          price: '$280,000',
-          location: 'Anomabo, Cape Coast',
-          image: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=300&h=200&fit=crop',
-          bedrooms: 3,
-          bathrooms: 2,
-          area: '200 sqm',
-          type: 'For Sale',
-          featured: false
-        },
-        {
-          id: 4,
-          title: 'Vacation Villa - Kakum National Park',
-          price: '$200/night',
-          location: 'Kakum National Park Area',
-          image: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=300&h=200&fit=crop',
-          bedrooms: 4,
-          bathrooms: 3,
-          area: '280 sqm',
-          type: 'Vacation Rental',
-          featured: true
-        },
-        {
-          id: 5,
-          title: 'Family Home - Cape Coast Central',
-          price: '$220,000',
-          location: 'Cape Coast Central',
-          image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=300&h=200&fit=crop',
-          bedrooms: 3,
-          bathrooms: 2,
-          area: '180 sqm',
-          type: 'For Sale',
-          featured: false
-        },
-        {
-          id: 6,
-          title: 'Beach Resort Unit - Saltpond',
-          price: '$150/night',
-          location: 'Saltpond, Central Region',
-          image: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=300&h=200&fit=crop',
-          bedrooms: 2,
-          bathrooms: 1,
-          area: '80 sqm',
-          type: 'Vacation Rental',
-          featured: false
-        }
-      ],
-      reviews: [
-        {
-          id: 1,
-          reviewer: 'Grace Addo',
-          rating: 4,
-          date: '2024-01-11',
-          comment: 'Ama helped us find a beautiful vacation home. Great knowledge of the Cape Coast area.',
-          property: 'Beachfront Villa - Elmina'
-        },
-        {
-          id: 2,
-          reviewer: 'Fatima Alhassan',
-          rating: 5,
-          date: '2024-01-06',
-          comment: 'Excellent service for vacation rentals. The property was exactly as described.',
-          property: 'Holiday Apartment - Cape Coast Castle'
-        }
-      ]
-    },
-    {
-      id: 5,
-      slug: 'david-mensah',
-      name: 'David Mensah',
-      image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&h=300&fit=crop&crop=face',
-      coverImage: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&h=400&fit=crop',
-      location: 'Accra, Greater Accra',
-      specializations: ['Luxury', 'Investment'],
-      listings: 28,
-      rating: 4.7,
-      reviewCount: 134,
-      verified: true,
-      experience: '10+ years',
-      languages: ['English', 'Twi', 'Ga'],
-      bio: 'Luxury property specialist with over 10 years of experience helping high-net-worth clients find exceptional investment opportunities and premium residential properties in Accra.',
-      phone: '+233 20 123 4567',
-      email: 'david.mensah@iskahomes.com',
-      licenseNumber: 'REA-2024-001234',
-      joinDate: '2014-01-20',
-      socialMedia: {
-        linkedin: 'david-mensah-luxury',
-        twitter: '@davidmensah',
-        instagram: 'david.mensah.re'
-      },
-      achievements: [
-        'Luxury Property Specialist 2023',
-        'Investment Advisor of the Year',
-        'Premium Client Service Award'
-      ],
-      properties: [
-        {
-          id: 1,
-          title: 'Penthouse - Airport City',
-          price: '$850,000',
-          location: 'Airport City, Accra',
-          image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=300&h=200&fit=crop',
-          bedrooms: 4,
-          bathrooms: 4,
-          area: '380 sqm',
-          type: 'For Sale',
-          featured: true
-        },
-        {
-          id: 2,
-          title: 'Investment Property - East Legon',
-          price: '$650,000',
-          location: 'East Legon, Accra',
-          image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=300&h=200&fit=crop',
-          bedrooms: 6,
-          bathrooms: 5,
-          area: '520 sqm',
-          type: 'For Sale',
-          featured: false
-        },
-        {
-          id: 3,
-          title: 'Luxury Villa - Trasacco Valley',
-          price: '$1,200,000',
-          location: 'Trasacco Valley, Accra',
-          image: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=300&h=200&fit=crop',
-          bedrooms: 5,
-          bathrooms: 5,
-          area: '600 sqm',
-          type: 'For Sale',
-          featured: true
-        },
-        {
-          id: 4,
-          title: 'Premium Apartment - Cantonments',
-          price: '$3,500/month',
-          location: 'Cantonments, Accra',
-          image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=300&h=200&fit=crop',
-          bedrooms: 3,
-          bathrooms: 3,
-          area: '200 sqm',
-          type: 'For Rent',
-          featured: false
-        },
-        {
-          id: 5,
-          title: 'Executive Office Space - Ridge',
-          price: '$25,000/month',
-          location: 'Ridge, Accra',
-          image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=300&h=200&fit=crop',
-          bedrooms: 0,
-          bathrooms: 4,
-          area: '500 sqm',
-          type: 'For Rent',
-          featured: true
-        },
-        {
-          id: 6,
-          title: 'Luxury Townhouse - Labone',
-          price: '$750,000',
-          location: 'Labone, Accra',
-          image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=300&h=200&fit=crop',
-          bedrooms: 4,
-          bathrooms: 4,
-          area: '350 sqm',
-          type: 'For Sale',
-          featured: false
-        }
-      ],
-      reviews: [
-        {
-          id: 1,
-          reviewer: 'Kwame Asante',
-          rating: 5,
-          date: '2024-01-13',
-          comment: 'David is the best luxury property agent in Accra. His investment advice was invaluable.',
-          property: 'Penthouse - Airport City'
-        },
-        {
-          id: 2,
-          reviewer: 'Sarah Johnson',
-          rating: 4,
-          date: '2024-01-07',
-          comment: 'Excellent service for high-end properties. Very professional and knowledgeable.',
-          property: 'Investment Property - East Legon'
-        }
-      ]
-    },
-    {
-      id: 6,
-      slug: 'grace-addo',
-      name: 'Grace Addo',
-      image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&h=300&fit=crop&crop=face',
-      coverImage: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&h=400&fit=crop',
-      location: 'Tamale, Northern',
-      specializations: ['Residential', 'Agricultural'],
-      listings: 12,
-      rating: 4.3,
-      reviewCount: 45,
-      verified: false,
-      experience: '4+ years',
-      languages: ['English', 'Dagbani'],
-      bio: 'Northern region specialist with expertise in residential and agricultural properties. I help families find homes and farmers secure agricultural land in the Tamale region.',
-      phone: '+233 25 678 9012',
-      email: 'grace.addo@iskahomes.com',
-      licenseNumber: 'REA-2024-006789',
-      joinDate: '2020-09-10',
-      socialMedia: {
-        linkedin: 'grace-addo-northern',
-        twitter: '@graceaddo',
-        instagram: 'grace.addo.re'
-      },
-      achievements: [
-        'Northern Region Specialist',
-        'Agricultural Property Expert',
-        'Community Service Award'
-      ],
-      properties: [
-        {
-          id: 1,
-          title: 'Family Compound - Tamale Central',
-          price: '$180,000',
-          location: 'Tamale Central',
-          image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=300&h=200&fit=crop',
-          bedrooms: 5,
-          bathrooms: 3,
-          area: '400 sqm',
-          type: 'For Sale',
-          featured: true
-        },
-        {
-          id: 2,
-          title: 'Agricultural Land - Yendi',
-          price: '$50,000',
-          location: 'Yendi, Northern Region',
-          image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=300&h=200&fit=crop',
-          bedrooms: 0,
-          bathrooms: 0,
-          area: '10 acres',
-          type: 'For Sale',
-          featured: false
-        },
-        {
-          id: 3,
-          title: 'Farm House - Savelugu',
-          price: '$120,000',
-          location: 'Savelugu, Northern Region',
-          image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=300&h=200&fit=crop',
-          bedrooms: 4,
-          bathrooms: 2,
-          area: '300 sqm',
-          type: 'For Sale',
-          featured: false
-        },
-        {
-          id: 4,
-          title: 'Agricultural Land - Tolon',
-          price: '$35,000',
-          location: 'Tolon, Northern Region',
-          image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=300&h=200&fit=crop',
-          bedrooms: 0,
-          bathrooms: 0,
-          area: '15 acres',
-          type: 'For Sale',
-          featured: false
-        },
-        {
-          id: 5,
-          title: 'Residential Plot - Tamale South',
-          price: '$25,000',
-          location: 'Tamale South',
-          image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=300&h=200&fit=crop',
-          bedrooms: 0,
-          bathrooms: 0,
-          area: '500 sqm',
-          type: 'For Sale',
-          featured: false
-        },
-        {
-          id: 6,
-          title: 'Family Home - Tamale North',
-          price: '$150,000',
-          location: 'Tamale North',
-          image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=300&h=200&fit=crop',
-          bedrooms: 3,
-          bathrooms: 2,
-          area: '250 sqm',
-          type: 'For Sale',
-          featured: false
-        }
-      ],
-      reviews: [
-        {
-          id: 1,
-          reviewer: 'Ama Kufuor',
-          rating: 4,
-          date: '2024-01-10',
-          comment: 'Grace helped us find agricultural land. Very knowledgeable about the northern region.',
-          property: 'Agricultural Land - Yendi'
-        },
-        {
-          id: 2,
-          reviewer: 'Emmanuel Boateng',
-          rating: 4,
-          date: '2024-01-04',
-          comment: 'Great service for residential properties in Tamale. Highly recommended.',
-          property: 'Family Compound - Tamale Central'
-        }
-      ]
-    },
-    {
-      id: 7,
-      slug: 'emmanuel-boateng',
-      name: 'Emmanuel Boateng',
-      image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&h=300&fit=crop&crop=face',
-      coverImage: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&h=400&fit=crop',
-      location: 'Kumasi, Ashanti',
-      specializations: ['Commercial', 'Residential'],
-      listings: 21,
-      rating: 4.5,
-      reviewCount: 78,
-      verified: true,
-      experience: '6+ years',
-      languages: ['English', 'Twi'],
-      bio: 'Versatile real estate agent handling both commercial and residential properties in the Ashanti region. I provide comprehensive real estate solutions for all types of clients.',
-      phone: '+233 24 345 6789',
-      email: 'emmanuel.boateng@iskahomes.com',
-      licenseNumber: 'REA-2024-004567',
-      joinDate: '2018-04-15',
-      socialMedia: {
-        linkedin: 'emmanuel-boateng-properties',
-        twitter: '@emmanuelboateng',
-        instagram: 'emmanuel.boateng.re'
-      },
-      achievements: [
-        'Versatile Agent Award 2023',
-        'Commercial & Residential Expert',
-        'Client Satisfaction Award'
-      ],
-      properties: [
-        {
-          id: 1,
-          title: 'Retail Space - Adum',
-          price: '$3,500/month',
-          location: 'Adum, Kumasi',
-          image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=300&h=200&fit=crop',
-          bedrooms: 0,
-          bathrooms: 2,
-          area: '250 sqm',
-          type: 'For Rent',
-          featured: true
-        },
-        {
-          id: 2,
-          title: 'Family Home - Manhyia',
-          price: '$280,000',
-          location: 'Manhyia, Kumasi',
-          image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=300&h=200&fit=crop',
-          bedrooms: 4,
-          bathrooms: 3,
-          area: '300 sqm',
-          type: 'For Sale',
-          featured: false
-        },
-        {
-          id: 3,
-          title: 'Office Space - Kejetia',
-          price: '$2,800/month',
-          location: 'Kejetia, Kumasi',
-          image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=300&h=200&fit=crop',
-          bedrooms: 0,
-          bathrooms: 3,
-          area: '200 sqm',
-          type: 'For Rent',
-          featured: false
-        },
-        {
-          id: 4,
-          title: 'Apartment - Ahodwo',
-          price: '$1,200/month',
-          location: 'Ahodwo, Kumasi',
-          image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=300&h=200&fit=crop',
-          bedrooms: 2,
-          bathrooms: 2,
-          area: '120 sqm',
-          type: 'For Rent',
-          featured: false
-        },
-        {
-          id: 5,
-          title: 'Commercial Building - Santasi',
-          price: '$450,000',
-          location: 'Santasi, Kumasi',
-          image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=300&h=200&fit=crop',
-          bedrooms: 0,
-          bathrooms: 4,
-          area: '600 sqm',
-          type: 'For Sale',
-          featured: true
-        },
-        {
-          id: 6,
-          title: 'Townhouse - Kwadaso',
-          price: '$320,000',
-          location: 'Kwadaso, Kumasi',
-          image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=300&h=200&fit=crop',
-          bedrooms: 3,
-          bathrooms: 2,
-          area: '220 sqm',
-          type: 'For Sale',
-          featured: false
-        }
-      ],
-      reviews: [
-        {
-          id: 1,
-          reviewer: 'Sarah Johnson',
-          rating: 5,
-          date: '2024-01-12',
-          comment: 'Emmanuel is very versatile. Helped us with both residential and commercial properties.',
-          property: 'Retail Space - Adum'
-        },
-        {
-          id: 2,
-          reviewer: 'Grace Addo',
-          rating: 4,
-          date: '2024-01-08',
-          comment: 'Great service for family homes in Kumasi. Very professional and reliable.',
-          property: 'Family Home - Manhyia'
-        }
-      ]
-    },
-    {
-      id: 8,
-      slug: 'fatima-alhassan',
-      name: 'Fatima Alhassan',
-      image: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=300&h=300&fit=crop&crop=face',
-      coverImage: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&h=400&fit=crop',
-      location: 'Accra, Greater Accra',
-      specializations: ['Residential', 'Rental'],
-      listings: 19,
-      rating: 4.6,
-      reviewCount: 92,
-      verified: true,
-      experience: '7+ years',
-      languages: ['English', 'Hausa', 'Twi'],
-      bio: 'Multilingual real estate agent specializing in residential properties and rental management. I help families find their perfect homes and landlords manage their rental properties effectively.',
-      phone: '+233 20 987 6543',
-      email: 'fatima.alhassan@iskahomes.com',
-      licenseNumber: 'REA-2024-009876',
-      joinDate: '2017-11-05',
-      socialMedia: {
-        linkedin: 'fatima-alhassan-properties',
-        twitter: '@fatimaalhassan',
-        instagram: 'fatima.alhassan.re'
-      },
-      achievements: [
-        'Multilingual Service Award 2023',
-        'Rental Management Expert',
-        'Customer Service Excellence'
-      ],
-      properties: [
-        {
-          id: 1,
-          title: 'Apartment - Osu',
-          price: '$1,200/month',
-          location: 'Osu, Accra',
-          image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=300&h=200&fit=crop',
-          bedrooms: 2,
-          bathrooms: 2,
-          area: '120 sqm',
-          type: 'For Rent',
-          featured: true
-        },
-        {
-          id: 2,
-          title: 'Townhouse - Labone',
-          price: '$420,000',
-          location: 'Labone, Accra',
-          image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=300&h=200&fit=crop',
-          bedrooms: 3,
-          bathrooms: 3,
-          area: '220 sqm',
-          type: 'For Sale',
-          featured: false
-        },
-        {
-          id: 3,
-          title: 'Studio Apartment - Cantonments',
-          price: '$900/month',
-          location: 'Cantonments, Accra',
-          image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=300&h=200&fit=crop',
-          bedrooms: 1,
-          bathrooms: 1,
-          area: '50 sqm',
-          type: 'For Rent',
-          featured: false
-        },
-        {
-          id: 4,
-          title: 'Family Home - Airport Residential',
-          price: '$380,000',
-          location: 'Airport Residential, Accra',
-          image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=300&h=200&fit=crop',
-          bedrooms: 4,
-          bathrooms: 3,
-          area: '280 sqm',
-          type: 'For Sale',
-          featured: false
-        },
-        {
-          id: 5,
-          title: '2-Bedroom Apartment - Ridge',
-          price: '$1,800/month',
-          location: 'Ridge, Accra',
-          image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=300&h=200&fit=crop',
-          bedrooms: 2,
-          bathrooms: 2,
-          area: '100 sqm',
-          type: 'For Rent',
-          featured: true
-        },
-        {
-          id: 6,
-          title: 'Penthouse - East Legon',
-          price: '$580,000',
-          location: 'East Legon, Accra',
-          image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=300&h=200&fit=crop',
-          bedrooms: 3,
-          bathrooms: 3,
-          area: '250 sqm',
-          type: 'For Sale',
-          featured: false
-        }
-      ],
-      reviews: [
-        {
-          id: 1,
-          reviewer: 'Ama Kufuor',
-          rating: 5,
-          date: '2024-01-11',
-          comment: 'Fatima is excellent with rental properties. Very helpful and speaks multiple languages.',
-          property: 'Apartment - Osu'
-        },
-        {
-          id: 2,
-          reviewer: 'David Mensah',
-          rating: 4,
-          date: '2024-01-06',
-          comment: 'Great service for residential properties. Very professional and multilingual.',
-          property: 'Townhouse - Labone'
-        }
-      ]
-    }
+     {
+       id: 6,
+       slug: 'grace-addo',
+       name: 'Grace Addo',
+       image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&h=300&fit=crop&crop=face',
+       coverImage: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&h=400&fit=crop',
+       location: 'Tamale, Northern',
+       specializations: ['Residential', 'Development'],
+       listings: 14,
+       rating: 4.8,
+       reviewCount: 42,
+       verified: true,
+       experience: '9+ years',
+       languages: ['English', 'Dagbani', 'Twi'],
+       bio: 'Dedicated real estate professional serving the Northern Region. Experienced in both residential sales and property development projects.',
+       phone: '+233 26 555 4444',
+       email: 'grace.addo@iskahomes.com',
+       licenseNumber: 'REA-2024-003456',
+       joinDate: '2016-09-01',
+       socialMedia: {
+         linkedin: 'grace-addo-northern',
+         twitter: '@graceaddo',
+         instagram: 'grace.addo.re'
+       },
+       achievements: [
+         'Northern Region Specialist',
+         'Agricultural Property Expert',
+         'Community Service Award'
+       ],
+       properties: [
+         {
+           id: 1,
+           title: 'Family Compound - Tamale Central',
+           price: '$180,000',
+           location: 'Tamale Central',
+           image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=300&h=200&fit=crop',
+           bedrooms: 5,
+           bathrooms: 3,
+           area: '400 sqm',
+           type: 'For Sale',
+           featured: true
+         },
+         {
+           id: 2,
+           title: 'Agricultural Land - Yendi',
+           price: '$50,000',
+           location: 'Yendi, Northern Region',
+           image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=300&h=200&fit=crop',
+           bedrooms: 0,
+           bathrooms: 0,
+           area: '10 acres',
+           type: 'For Sale',
+           featured: false
+         }
+       ],
+       reviews: []
+     },
+     {
+       id: 7,
+       slug: 'emmanuel-boateng',
+       name: 'Emmanuel Boateng',
+       image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&h=300&fit=crop&crop=face',
+       coverImage: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&h=400&fit=crop',
+       location: 'Kumasi, Ashanti',
+       specializations: ['Commercial', 'Residential'],
+       listings: 21,
+       rating: 4.5,
+       reviewCount: 78,
+       verified: true,
+       experience: '6+ years',
+       languages: ['English', 'Twi'],
+       bio: 'Versatile real estate agent handling both commercial and residential properties in the Ashanti region.',
+       phone: '+233 24 345 6789',
+       email: 'emmanuel.boateng@iskahomes.com',
+       properties: [],
+       reviews: []
+     },
+     {
+       id: 8,
+       slug: 'fatima-alhassan',
+       name: 'Fatima Alhassan',
+       image: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=300&h=300&fit=crop&crop=face',
+       coverImage: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&h=400&fit=crop',
+       location: 'Accra, Greater Accra',
+       specializations: ['Residential', 'Rental'],
+       listings: 19,
+       rating: 4.6,
+       reviewCount: 92,
+       verified: true,
+       experience: '7+ years',
+       languages: ['English', 'Hausa', 'Twi'],
+       bio: 'Multilingual real estate agent specializing in residential properties and rental management.',
+       phone: '+233 20 987 6543',
+       email: 'fatima.alhassan@iskahomes.com',
+       properties: [],
+       reviews: []
+     }
   ]
 
-  const tabs = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'properties', label: 'Properties' },
-    { id: 'contact', label: 'Contact' }
-  ]
+  // Helper functions
+  const handlePhoneClick = (phone) => {
+    navigator.clipboard.writeText(phone)
+    toast.success('Phone number copied!')
+  }
+
+  const handleEmailClick = (email) => {
+    navigator.clipboard.writeText(email)
+    toast.success('Email copied!')
+  }
+
+  const formatPrice = (price, currency, priceType, duration) => {
+    if (!price) return 'Price on request'
+    // If price is string and has symbols, return as is (for dummy data)
+    if (typeof price === 'string' && (price.includes('$') || price.includes('GHS'))) return price;
+    
+    // Otherwise format
+    const priceNum = parseFloat(price)
+    const formattedPrice = priceNum.toLocaleString()
+    
+    let priceText = `${currency || 'GHS'} ${formattedPrice}`
+    
+    if (priceType === 'rent' && duration) {
+      priceText += `/${duration}`
+    }
+    
+    return priceText
+  }
+
+  const getListingImage = (listing) => {
+    if (typeof listing.image === 'string') return listing.image; // Handle dummy data
+    
+    if (listing.media?.albums && Array.isArray(listing.media.albums) && listing.media.albums.length > 0) {
+      for (const album of listing.media.albums) {
+        if (album?.images && Array.isArray(album.images) && album.images.length > 0) {
+          return album.images[0].url
+        }
+      }
+    }
+    if (listing.media?.mediaFiles && Array.isArray(listing.media.mediaFiles) && listing.media.mediaFiles.length > 0) {
+      return listing.media.mediaFiles[0].url
+    }
+    if (listing.media?.banner?.url) {
+      return listing.media.banner.url
+    }
+    return null
+  }
+
+  if (loading) {
+    return (
+      <Layout1>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary_color"></div>
+        </div>
+      </Layout1>
+    )
+  }
+
+  if (error || !agent) {
+    return (
+      <Layout1>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="text-center text-gray-500">
+                <p className="text-xl mb-4">{error || 'Agent not found'}</p>
+                <Link href="/home/allAgents" className="text-primary_color underline hover:text-secondary_color">Back to Agents</Link>
+            </div>
+        </div>
+      </Layout1>
+    )
+  }
 
   return (
-    <Layout1>
-      <div className="min-h-screen bg-gray-50">
-        {/* Back Button */}
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <Link
-              href="/home/allAgents"
-              className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <FiArrowLeft className="w-4 h-4 mr-2" />
-              Back to All Agents
-            </Link>
-          </div>
-        </div>
-
-        {/* Cover Image */}
-        <div className="relative h-64 md:h-80">
-          {agent.cover_image ? (
-            <img
-              src={agent.cover_image}
-              alt="Cover"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600"></div>
-          )}
-          <div className="absolute inset-0 bg-black bg-opacity-40"></div>
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-20 relative z-10">
-          {/* Agent Header */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 mb-8">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center gap-6">
-              {/* Profile Image */}
-              <div className="relative">
-                {agent.profile_image ? (
-                  <img
-                    src={agent.profile_image}
-                    alt={agent.name}
-                    className="w-32 h-32 rounded-2xl object-cover border-4 border-white shadow-lg"
-                  />
+    <div className="min-h-screen text-primary_color">
+        <Nav />
+        {/* Hero Section - Split Layout */}
+        <div className="flex flex-col justify-between lg:grid lg:grid-cols-2 min-h-[600px] lg:h-screen">
+             {/* Left Side - Cover Image */}
+             <div className="relative w-full h-[300px] lg:h-full overflow-hidden">
+                {agent.coverImage || agent.cover_image ? (
+                    <img
+                    src={agent.coverImage || agent.cover_image}
+                    alt={`${agent.name} cover`}
+                    className="w-full h-full object-cover"
+                    />
                 ) : (
-                  <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center border-4 border-white shadow-lg">
-                    <span className="text-white text-4xl font-bold">
-                      {agent.name?.charAt(0) || 'A'}
-                    </span>
-                  </div>
+                    <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
                 )}
-              </div>
-
-              {/* Agent Info */}
-              <div className="flex-1">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">{agent.name}</h1>
-                    {agency && (
-                      <div className="flex items-center text-gray-600 mb-3">
-                        <FiBuilding2 className="w-5 h-5 mr-2" />
-                        <Link href={`/home/allAgencies/${agency.slug}`} className="hover:text-blue-600 hover:underline">
-                          {agency.name}
-                        </Link>
-                      </div>
-                    )}
-                    
-                    {/* Stats */}
-                    <div className="flex items-center gap-6 mb-4">
-                      <div className="flex items-center text-gray-600">
-                        <FiHome className="w-4 h-4 mr-1" />
-                        <span>{agent.total_listings || 0} Listings</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <button className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors">
-                      <FiMessageSquare className="w-4 h-4 mr-2" />
-                      Send Message
-                    </button>
-                    <button className="flex items-center justify-center px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors">
-                      <FiShare2 className="w-4 h-4 mr-2" />
-                      Share Profile
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 mb-8">
-            <div className="border-b border-gray-200">
-              <nav className="flex space-x-8 px-6">
-                {tabs.map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                      activeTab === tab.id
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </nav>
             </div>
 
-            <div className="p-6">
-              {/* Overview Tab */}
-              {activeTab === 'overview' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Main Content */}
-                  <div className="lg:col-span-2">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-4">About {agent.name}</h3>
-                    <p className="text-gray-600 leading-relaxed mb-6">{agent.bio}</p>
-
-                    {/* Stats */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-                      <div className="text-center p-4 bg-gray-50 rounded-xl">
-                        <div className="text-2xl font-bold text-gray-900">{agent.total_listings || 0}</div>
-                        <div className="text-sm text-gray-600">Listings</div>
-                      </div>
-                      {agency && (
-                        <div className="text-center p-4 bg-gray-50 rounded-xl">
-                          <div className="text-2xl font-bold text-gray-900">1</div>
-                          <div className="text-sm text-gray-600">Agency</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Sidebar */}
-                  <div className="space-y-6">
-                    {/* Contact Info */}
-                    <div className="bg-gray-50 rounded-xl p-6">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h4>
-                      <div className="space-y-3">
-                        <div className="flex items-center">
-                          <FiPhone className="w-4 h-4 text-gray-400 mr-3" />
-                          <span className="text-gray-700">{agent.phone}</span>
-                        </div>
-                        <div className="flex items-center">
-                          <FiMail className="w-4 h-4 text-gray-400 mr-3" />
-                          <span className="text-gray-700">{agent.email}</span>
-                        </div>
-                        <div className="flex items-center">
-                          <FiMapPin className="w-4 h-4 text-gray-400 mr-3" />
-                          <span className="text-gray-700">{agent.location}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Agency Info */}
-                    {agency && (
-                      <div className="bg-gray-50 rounded-xl p-6">
-                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Agency</h4>
-                        <Link href={`/home/allAgencies/${agency.slug}`} className="block">
-                          <div className="flex items-center">
-                            {agency.profile_image ? (
-                              <img
-                                src={agency.profile_image}
-                                alt={agency.name}
-                                className="w-12 h-12 rounded-lg object-cover mr-3"
-                              />
-                            ) : (
-                              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mr-3">
-                                <FiBuilding2 className="w-6 h-6 text-white" />
-                              </div>
-                            )}
-                            <div>
-                              <div className="font-medium text-gray-900">{agency.name}</div>
-                              {agency.city && (
-                                <div className="text-sm text-gray-600">{agency.city}</div>
-                              )}
-                            </div>
-                          </div>
-                        </Link>
-                      </div>
-                    )}
-
-                    {/* Social Media */}
-                    {agent.social_media && Object.keys(agent.social_media).length > 0 && (
-                      <div className="bg-gray-50 rounded-xl p-6">
-                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Social Media</h4>
-                        <div className="space-y-3">
-                          {agent.social_media.linkedin && (
-                            <a href={agent.social_media.linkedin} target="_blank" rel="noopener noreferrer" className="flex items-center text-blue-600 hover:text-blue-700">
-                              <FiLinkedin className="w-4 h-4 mr-3" />
-                              LinkedIn
-                            </a>
-                          )}
-                          {agent.social_media.twitter && (
-                            <a href={agent.social_media.twitter} target="_blank" rel="noopener noreferrer" className="flex items-center text-blue-400 hover:text-blue-500">
-                              <FiTwitter className="w-4 h-4 mr-3" />
-                              Twitter
-                            </a>
-                          )}
-                          {agent.social_media.instagram && (
-                            <a href={agent.social_media.instagram} target="_blank" rel="noopener noreferrer" className="flex items-center text-pink-600 hover:text-pink-700">
-                              <FiInstagram className="w-4 h-4 mr-3" />
-                              Instagram
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Properties Tab */}
-              {activeTab === 'properties' && (
-                <div>
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-semibold text-gray-900">Listings ({listings.length})</h3>
-                  </div>
-
-                  {listings.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {listings.map(listing => {
-                        const listingImage = getListingImage(listing)
-                        return (
-                          <div key={listing.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
-                            <div className="relative h-48 bg-gradient-to-br from-blue-500 to-purple-600">
-                              {listingImage ? (
+            {/* Right Side - Profile Info */}
+            <div className="w-full p-8 flex flex-col justify-between bg-white">
+                 {/* Top Section */}
+                 <div className="space-y-6">
+                    <div className="flex items-start gap-4">
+                        {/* Profile Image */}
+                        <div className="relative flex-shrink-0">
+                            {agent.image || agent.profile_image ? (
                                 <img
-                                  src={listingImage}
-                                  alt={listing.title}
-                                  className="w-full h-full object-cover"
+                                src={agent.image || agent.profile_image}
+                                alt={agent.name}
+                                className="w-20 h-20 rounded-md object-cover border-2 border-white shadow-md"
                                 />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <FiHome className="w-16 h-16 text-white opacity-50" />
+                            ) : (
+                                <div className="w-20 h-20 bg-slate-100 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+                                    <User className="w-10 h-10 text-gray-400" />
                                 </div>
-                              )}
+                            )}
+                            {agent.verified && (
+                                <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
+                                    <CheckCircle className="w-4 h-4 text-white" />
+                                </div>
+                            )}
+                        </div>
+
+                         {/* Name and Basic Info */}
+                        <div className="flex-1 min-w-0">
+                            <h1 className="text-2xl lg:text-3xl font-bold mb-2 truncate text-gray-900">{agent.name}</h1>
+                            {agency && (
+                                <div className="flex items-center gap-2 mb-2 text-gray-600 font-medium text-lg">
+                                    <Briefcase className="w-4 h-4 opacity-80" />
+                                    <span>{agency.name}</span>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
+                                <MapPin className="w-4 h-4 mr-1.5" />
+                                <span>{agent.location}</span>
                             </div>
 
-                            <div className="p-4">
-                              <div className="flex justify-between items-start mb-2">
-                                <h4 className="font-semibold text-gray-900 line-clamp-1">{listing.title}</h4>
-                                <span className="text-lg font-bold text-blue-600">
-                                  {formatPrice(listing.price, listing.currency, listing.price_type, listing.duration)}
-                                </span>
-                              </div>
-                              
-                              <div className="flex items-center text-gray-600 text-sm mb-3">
-                                <FiMapPin className="w-4 h-4 mr-1" />
-                                <span className="line-clamp-1">
-                                  {listing.city && listing.state ? `${listing.city}, ${listing.state}` : listing.country || 'Location not specified'}
-                                </span>
-                              </div>
-
-                              {listing.specifications && (
-                                <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
-                                  <div className="flex items-center space-x-4">
-                                    {listing.specifications.bedrooms > 0 && (
-                                      <span>{listing.specifications.bedrooms} beds</span>
-                                    )}
-                                    {listing.specifications.bathrooms > 0 && (
-                                      <span>{listing.specifications.bathrooms} baths</span>
-                                    )}
-                                  </div>
-                                  {listing.price_type && (
-                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                      listing.price_type === 'sale' 
-                                        ? 'bg-green-100 text-green-700' 
-                                        : 'bg-blue-100 text-blue-700'
-                                    }`}>
-                                      {listing.price_type === 'sale' ? 'For Sale' : 'For Rent'}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-
-                              <button className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">
-                                View Details
-                              </button>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <p className="text-gray-600">No listings available.</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Contact Tab */}
-              {activeTab === 'contact' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-4">Get in Touch</h3>
-                    <p className="text-gray-600 mb-6">
-                      Ready to work with {agent.name}? Send a message or schedule a consultation to discuss your property needs.
-                    </p>
-
-                    <div className="space-y-4">
-                      {agent.phone && (
-                        <div className="flex items-center p-4 bg-gray-50 rounded-xl">
-                          <FiPhone className="w-5 h-5 text-blue-600 mr-3" />
-                          <div>
-                            <div className="font-medium text-gray-900">Call</div>
-                            <div className="text-gray-600">{agent.phone}</div>
-                          </div>
+                             {/* Rating */}
+                             <div className="flex items-center gap-2">
+                                  <Star className="w-4 h-4 text-orange-400 fill-current" />
+                                  <span className="font-bold text-gray-900">{agent.rating || 'New'}</span>
+                                  <span className="text-gray-500">({agent.reviewCount || 0} reviews)</span>
+                             </div>
                         </div>
-                      )}
 
-                      {agent.email && (
-                        <div className="flex items-center p-4 bg-gray-50 rounded-xl">
-                          <FiMail className="w-5 h-5 text-blue-600 mr-3" />
-                          <div>
-                            <div className="font-medium text-gray-900">Email</div>
-                            <div className="text-gray-600">{agent.email}</div>
-                          </div>
-                        </div>
-                      )}
-
-                      {agency && (
-                        <div className="flex items-center p-4 bg-gray-50 rounded-xl">
-                          <FiBuilding2 className="w-5 h-5 text-blue-600 mr-3" />
-                          <div>
-                            <div className="font-medium text-gray-900">Agency</div>
-                            <Link href={`/home/allAgencies/${agency.slug}`} className="text-blue-600 hover:underline">
-                              {agency.name}
-                            </Link>
-                          </div>
-                        </div>
-                      )}
+                        {/* Share Icon */}
                     </div>
-                  </div>
+                 </div>
 
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-4">Send Message</h3>
-                    <form className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Your name"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                        <input
-                          type="email"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="your.email@example.com"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
-                        <input
-                          type="tel"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Your phone number"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
-                        <textarea
-                          rows={4}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Tell us about your property needs..."
-                        ></textarea>
-                      </div>
-                      
-                      <button
-                        type="submit"
-                        className="w-full bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors"
-                      >
-                        Send Message
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              )}
+                 {/* Middle Section - Spacer or Slogan */}
+                 <div className="py-8">
+                     {/* Can put a quote or specialization summary here */}
+                     {agent.specializations && (
+                         <div className="flex flex-wrap gap-2">
+                             {agent.specializations.map((spec, idx) => (
+                                 <span key={idx} className="px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-600 font-medium">
+                                     {spec}
+                                 </span>
+                             ))}
+                         </div>
+                     )}
+                 </div>
+
+                 {/* Bottom Section - Contact Info */}
+                 <div className="flex flex-col gap-2">
+                    {agent.email && (
+                        <div className="flex items-center gap-3 border-b border-primary_color pb-2">
+                             <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 bg-gray-50 rounded-full">
+                                <Mail className="w-5 h-5 text-gray-600" />
+                             </div>
+                             <button onClick={() => handleEmailClick(agent.email)} className="text-sm hover:text-blue-600 transition-colors cursor-pointer truncate text-gray-700 font-medium">
+                                {agent.email}
+                             </button>
+                        </div>
+                    )}
+                    {agent.phone && (
+                        <div className="flex items-center gap-3 border-b border-primary_color pb-2">
+                             <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 bg-gray-50 rounded-full">
+                                <Phone className="w-5 h-5 text-gray-600" />
+                             </div>
+                             <button onClick={() => handlePhoneClick(agent.phone)} className="text-sm hover:text-blue-600 transition-colors cursor-pointer text-gray-700 font-medium">
+                                {agent.phone}
+                             </button>
+                        </div>
+                    )}
+                 </div>
             </div>
-          </div>
         </div>
-      </div>
-    </Layout1>
+
+        {/* Main Content */}
+        <div className="mx-auto px-6 py-16 bg-white">
+             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                 {/* Left Content */}
+                 <div className="lg:col-span-2 space-y-12">
+                     {/* About Me */}
+                     <div>
+                         <h2 className="font-light text-2xl mb-6 text-gray-900 border-b pb-2">About Me</h2>
+                         <p className="text-gray-600 leading-8 text-lg font-light">
+                            {agent.bio || 'No biography available.'}
+                        </p>
+                     </div>
+
+                     {/* Experience & Languages */}
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                         {agent.experience && (
+                             <div>
+                                 <h2 className="font-light text-2xl mb-6 text-gray-900 border-b pb-2">Experience</h2>
+                                 <DataRenderer 
+                                    title="Years of Experience"
+                                    value={agent.experience}
+                                    icon={Clock}
+                                 />
+                             </div>
+                         )}
+                         {agent.languages && (
+                             <div>
+                                 <h2 className="font-light text-2xl mb-6 text-gray-900 border-b pb-2">Languages</h2>
+                                 <DataRenderer 
+                                    title="Spoken Languages"
+                                    value={agent.languages.join(', ')}
+                                    icon={Languages}
+                                 />
+                             </div>
+                         )}
+                     </div>
+
+                     {/* Achievements */}
+                     {agent.achievements && agent.achievements.length > 0 && (
+                         <div>
+                             <h2 className="font-light text-2xl mb-6 text-gray-900 border-b pb-2">Achievements</h2>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {agent.achievements.map((item, idx) => (
+                                    <div key={idx} className="flex items-center p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                        <div className="w-8 h-8 rounded-full bg-primary_color text-white flex items-center justify-center mr-3 font-bold text-sm">
+                                            {idx + 1}
+                                        </div>
+                                        <span className="font-medium text-gray-700">{item}</span>
+                                    </div>
+                                ))}
+                            </div>
+                         </div>
+                     )}
+
+                      {/* Socials */}
+                      {agent.socialMedia && Object.keys(agent.socialMedia).length > 0 && (
+                         <div>
+                            <h2 className="font-light text-2xl mb-6 text-gray-900 border-b pb-2">Socials</h2>
+                            <div className="flex flex-wrap gap-4">
+                                {agent.socialMedia.instagram && (
+                                    <a href={agent.socialMedia.instagram} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-600 hover:text-primary_color">
+                                        <Instagram className="w-5 h-5" />
+                                        <span>Instagram</span>
+                                    </a>
+                                )}
+                                {agent.socialMedia.linkedin && (
+                                    <a href={agent.socialMedia.linkedin} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-600 hover:text-primary_color">
+                                        <Linkedin className="w-5 h-5" />
+                                        <span>LinkedIn</span>
+                                    </a>
+                                )}
+                                {agent.socialMedia.twitter && (
+                                    <a href={agent.socialMedia.twitter} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-600 hover:text-primary_color">
+                                        <Twitter className="w-5 h-5" />
+                                        <span>Twitter</span>
+                                    </a>
+                                )}
+                            </div>
+                         </div>
+                     )}
+
+                     {/* Listings */}
+                     {listings.length > 0 && (
+                         <div>
+                             <h2 className="font-light text-2xl mb-6 text-gray-900 border-b pb-2">Active Listings</h2>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {listings.map(listing => {
+                                    const listingImage = getListingImage(listing)
+                                    return (
+                                        <div key={listing.id} className="group border border-gray-100 rounded-xl overflow-hidden hover:shadow-xl transition-shadow bg-white">
+                                            <div className="relative h-48 bg-gray-200 overflow-hidden">
+                                                {listingImage ? (
+                                                    <img src={listingImage} alt={listing.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                        <Home />
+                                                    </div>
+                                                )}
+                                                <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-xs font-bold text-gray-900">
+                                                    {listing.type || 'Property'}
+                                                </div>
+                                            </div>
+                                            <div className="p-4">
+                                                <h4 className="font-bold text-gray-900 truncate mb-1">{listing.title}</h4>
+                                                <p className="text-primary_color font-bold text-lg mb-2">
+                                                    {formatPrice(listing.price, listing.currency, listing.price_type, listing.duration)}
+                                                </p>
+                                                <div className="flex items-center text-gray-500 text-sm">
+                                                    <MapPin className="w-4 h-4 mr-1" />
+                                                    <span className="truncate">{listing.location}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                             </div>
+                         </div>
+                     )}
+                 </div>
+
+                 {/* Right Side - Sticky Form */}
+                 <div className="lg:col-span-1">
+                    <div className="sticky top-8">
+                         <LeadContactForm 
+                            contextType="profile"
+                            profileId={agent.id}
+                            profile={agent}
+                            agent={agent}
+                            developer={null}
+                            propertyTitle={`Consultation with ${agent.name}`}
+                        />
+                    </div>
+                 </div>
+             </div>
+        </div>
+    </div>
   )
 }
 

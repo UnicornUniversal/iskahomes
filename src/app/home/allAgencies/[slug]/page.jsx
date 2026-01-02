@@ -1,32 +1,33 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import Image from 'next/image'
+import Link from 'next/link'
 import Layout1 from '@/app/layout/Layout1'
 import { 
-  FiStar, 
-  FiMapPin, 
-  FiPhone, 
-  FiMail, 
-  FiMessageSquare, 
-  FiBuilding2, 
-  FiCheckCircle, 
-  FiCalendar,
-  FiAward,
-  FiGlobe,
-  FiLinkedin,
-  FiTwitter,
-  FiInstagram,
-  FiArrowLeft,
-  FiShare2,
-  FiHome,
-  FiUsers
-} from 'react-icons/fi'
-import Link from 'next/link'
+  MapPin, 
+  Phone, 
+  Mail, 
+  Globe, 
+  Building2, 
+  Calendar, 
+  Users, 
+  CheckCircle, 
+  Instagram, 
+  Linkedin, 
+  Twitter,
+  Share2,
+  Home,
+  User
+} from 'lucide-react'
+import LeadContactForm from '@/app/components/LeadContactForm'
+import Nav from '@/app/components/Nav'
+import DataRenderer from '@/app/components/developers/DataRenderer'
+import { toast } from 'react-toastify'
 
 const AgencyProfile = () => {
   const params = useParams()
   const agencySlug = params.slug
-  const [activeTab, setActiveTab] = useState('overview')
   const [agency, setAgency] = useState(null)
   const [agents, setAgents] = useState([])
   const [listings, setListings] = useState([])
@@ -67,62 +68,28 @@ const AgencyProfile = () => {
     }
   }
 
-  if (loading) {
-    return (
-      <Layout1>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading agency...</p>
-          </div>
-        </div>
-      </Layout1>
-    )
+  // Helper functions
+  const handlePhoneClick = (phone) => {
+    navigator.clipboard.writeText(phone)
+    toast.success('Phone number copied!')
   }
 
-  if (error || !agency) {
-    return (
-      <Layout1>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Agency Not Found</h1>
-            <p className="text-gray-600 mb-6">{error || 'The agency you\'re looking for doesn\'t exist.'}</p>
-            <Link
-              href="/home/allAgencies"
-              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
-            >
-              <FiArrowLeft className="w-4 h-4 mr-2" />
-              Back to All Agencies
-            </Link>
-          </div>
-        </div>
-      </Layout1>
-    )
+  const handleEmailClick = (email) => {
+    navigator.clipboard.writeText(email)
+    toast.success('Email copied!')
   }
-
-  const tabs = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'agents', label: 'Agents' },
-    { id: 'listings', label: 'Listings' },
-    { id: 'contact', label: 'Contact' }
-  ]
-
-  // Format price helper
+  
   const formatPrice = (price, currency, priceType, duration) => {
     if (!price) return 'Price on request'
     const priceNum = parseFloat(price)
     const formattedPrice = priceNum.toLocaleString()
-    
     let priceText = `${currency || 'GHS'} ${formattedPrice}`
-    
     if (priceType === 'rent' && duration) {
       priceText += `/${duration}`
     }
-    
     return priceText
   }
 
-  // Get listing image
   const getListingImage = (listing) => {
     if (listing.media?.albums && Array.isArray(listing.media.albums) && listing.media.albums.length > 0) {
       for (const album of listing.media.albums) {
@@ -140,430 +107,286 @@ const AgencyProfile = () => {
     return null
   }
 
+  if (loading) {
+    return (
+      <Layout1>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary_color"></div>
+        </div>
+      </Layout1>
+    )
+  }
+
+  if (error || !agency) {
+    return (
+      <Layout1>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+           <div className="text-center">
+            <h1 className="font-bold text-gray-600 mb-4">Agency Not Found</h1>
+            <p className="text-gray-500">{error || "The agency you're looking for doesn't exist."}</p>
+             <Link href="/home/allAgencies" className="text-primary_color hover:underline mt-4 block">Back to All Agencies</Link>
+          </div>
+        </div>
+      </Layout1>
+    )
+  }
+
+  // Parse location
+  const locationString = [agency.city, agency.region, agency.country].filter(Boolean).join(', ') || agency.address || 'Location not specified'
+
   return (
-    <Layout1>
-      <div className="min-h-screen bg-gray-50">
-        {/* Back Button */}
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <Link
-              href="/home/allAgencies"
-              className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <FiArrowLeft className="w-4 h-4 mr-2" />
-              Back to All Agencies
-            </Link>
-          </div>
-        </div>
-
-        {/* Cover Image */}
-        <div className="relative h-64 md:h-80">
-          {agency.cover_image ? (
-            <img
-              src={agency.cover_image}
-              alt="Cover"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600"></div>
-          )}
-          <div className="absolute inset-0 bg-black bg-opacity-40"></div>
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-20 relative z-10">
-          {/* Agency Header */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 mb-8">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center gap-6">
-              {/* Profile Image */}
-              <div className="relative">
-                {agency.profile_image ? (
-                  <img
-                    src={agency.profile_image}
-                    alt={agency.name}
-                    className="w-32 h-32 rounded-2xl object-cover border-4 border-white shadow-lg"
-                  />
+    <div className="min-h-screen text-primary_color">
+        <Nav />
+        {/* Hero Section - Split Layout */}
+        <div className="flex flex-col justify-between lg:grid lg:grid-cols-2 min-h-[600px] lg:h-screen">
+            {/* Left Side - Cover Image */}
+            <div className="relative w-full h-[300px] lg:h-full overflow-hidden">
+                {agency.cover_image ? (
+                    <img
+                        src={agency.cover_image}
+                        alt={`${agency.name} cover`}
+                        className="w-full h-full object-cover"
+                    />
                 ) : (
-                  <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center border-4 border-white shadow-lg">
-                    <FiBuilding2 className="w-16 h-16 text-white" />
-                  </div>
+                    <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
                 )}
-                {agency.verified && (
-                  <div className="absolute -top-2 -right-2 bg-blue-600 text-white p-2 rounded-full">
-                    <FiCheckCircle className="w-4 h-4" />
-                  </div>
-                )}
-              </div>
-
-              {/* Agency Info */}
-              <div className="flex-1">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">{agency.name}</h1>
-                    <div className="flex items-center text-gray-600 mb-3">
-                      <FiMapPin className="w-5 h-5 mr-2" />
-                      <span>
-                        {agency.city && agency.country ? `${agency.city}, ${agency.country}` : agency.country || agency.city || 'Location not specified'}
-                      </span>
-                    </div>
-                    
-                    {/* Stats */}
-                    <div className="flex items-center gap-6 mb-4">
-                      <div className="flex items-center text-gray-600">
-                        <FiUsers className="w-4 h-4 mr-1" />
-                        <span>{agency.total_agents || 0} Agents</span>
-                      </div>
-                      <div className="flex items-center text-gray-600">
-                        <FiHome className="w-4 h-4 mr-1" />
-                        <span>{agency.total_listings || 0} Listings</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <button className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors">
-                      <FiMessageSquare className="w-4 h-4 mr-2" />
-                      Send Message
-                    </button>
-                    <button className="flex items-center justify-center px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors">
-                      <FiShare2 className="w-4 h-4 mr-2" />
-                      Share Profile
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 mb-8">
-            <div className="border-b border-gray-200">
-              <nav className="flex space-x-8 px-6">
-                {tabs.map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                      activeTab === tab.id
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </nav>
             </div>
 
-            <div className="p-6">
-              {/* Overview Tab */}
-              {activeTab === 'overview' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Main Content */}
-                  <div className="lg:col-span-2">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-4">About {agency.name}</h3>
-                    {agency.description ? (
-                      <p className="text-gray-600 leading-relaxed mb-6">{agency.description}</p>
-                    ) : (
-                      <p className="text-gray-600 leading-relaxed mb-6">No description available.</p>
-                    )}
-
-                    {/* Stats */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                      <div className="text-center p-4 bg-gray-50 rounded-xl">
-                        <div className="text-2xl font-bold text-gray-900">{agency.total_listings || 0}</div>
-                        <div className="text-sm text-gray-600">Listings</div>
-                      </div>
-                      <div className="text-center p-4 bg-gray-50 rounded-xl">
-                        <div className="text-2xl font-bold text-gray-900">{agency.total_agents || 0}</div>
-                        <div className="text-sm text-gray-600">Agents</div>
-                      </div>
-                      {agency.founded_year && (
-                        <div className="text-center p-4 bg-gray-50 rounded-xl">
-                          <div className="text-2xl font-bold text-gray-900">{agency.founded_year}</div>
-                          <div className="text-sm text-gray-600">Founded</div>
-                        </div>
-                      )}
-                      {agency.company_size && (
-                        <div className="text-center p-4 bg-gray-50 rounded-xl">
-                          <div className="text-2xl font-bold text-gray-900">{agency.company_size}</div>
-                          <div className="text-sm text-gray-600">Size</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Sidebar */}
-                  <div className="space-y-6">
-                    {/* Contact Info */}
-                    <div className="bg-gray-50 rounded-xl p-6">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h4>
-                      <div className="space-y-3">
-                        {agency.phone && (
-                          <div className="flex items-center">
-                            <FiPhone className="w-4 h-4 text-gray-400 mr-3" />
-                            <span className="text-gray-700">{agency.phone}</span>
-                          </div>
-                        )}
-                        {agency.email && (
-                          <div className="flex items-center">
-                            <FiMail className="w-4 h-4 text-gray-400 mr-3" />
-                            <span className="text-gray-700">{agency.email}</span>
-                          </div>
-                        )}
-                        {agency.website && (
-                          <div className="flex items-center">
-                            <FiGlobe className="w-4 h-4 text-gray-400 mr-3" />
-                            <a href={agency.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                              Visit Website
-                            </a>
-                          </div>
-                        )}
-                        <div className="flex items-center">
-                          <FiMapPin className="w-4 h-4 text-gray-400 mr-3" />
-                          <span className="text-gray-700">
-                            {agency.address || `${agency.city || ''} ${agency.country || ''}`.trim() || 'Address not available'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Social Media */}
-                    {agency.social_media && Object.keys(agency.social_media).length > 0 && (
-                      <div className="bg-gray-50 rounded-xl p-6">
-                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Social Media</h4>
-                        <div className="space-y-3">
-                          {agency.social_media.linkedin && (
-                            <a href={agency.social_media.linkedin} target="_blank" rel="noopener noreferrer" className="flex items-center text-blue-600 hover:text-blue-700">
-                              <FiLinkedin className="w-4 h-4 mr-3" />
-                              LinkedIn
-                            </a>
-                          )}
-                          {agency.social_media.twitter && (
-                            <a href={agency.social_media.twitter} target="_blank" rel="noopener noreferrer" className="flex items-center text-blue-400 hover:text-blue-500">
-                              <FiTwitter className="w-4 h-4 mr-3" />
-                              Twitter
-                            </a>
-                          )}
-                          {agency.social_media.instagram && (
-                            <a href={agency.social_media.instagram} target="_blank" rel="noopener noreferrer" className="flex items-center text-pink-600 hover:text-pink-700">
-                              <FiInstagram className="w-4 h-4 mr-3" />
-                              Instagram
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Agents Tab */}
-              {activeTab === 'agents' && (
-                <div>
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-semibold text-gray-900">Agents ({agents.length})</h3>
-                  </div>
-
-                  {agents.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {agents.map(agent => (
-                        <Link
-                          key={agent.id}
-                          href={`/home/allAgents/${agent.slug}`}
-                          className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow"
-                        >
-                          <div className="relative h-48 bg-gradient-to-br from-blue-500 to-purple-600">
-                            {agent.profile_image ? (
-                              <img
-                                src={agent.profile_image}
-                                alt={agent.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <FiUsers className="w-16 h-16 text-white opacity-50" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="p-4">
-                            <h4 className="font-semibold text-gray-900 mb-1">{agent.name}</h4>
-                            {agent.bio && (
-                              <p className="text-gray-600 text-sm mb-2 line-clamp-2">{agent.bio}</p>
-                            )}
-                            <div className="text-sm text-gray-600">
-                              {agent.total_listings || 0} listings
-                            </div>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <p className="text-gray-600">No agents available.</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Listings Tab */}
-              {activeTab === 'listings' && (
-                <div>
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-semibold text-gray-900">Listings ({listings.length})</h3>
-                  </div>
-
-                  {listings.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {listings.map(listing => {
-                        const listingImage = getListingImage(listing)
-                        return (
-                          <div key={listing.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
-                            <div className="relative h-48 bg-gradient-to-br from-blue-500 to-purple-600">
-                              {listingImage ? (
+            {/* Right Side - Profile Info */}
+            <div className="w-full p-8 flex flex-col justify-between bg-white">
+                 {/* Top Section */}
+                 <div className="space-y-6">
+                    <div className="flex items-start gap-4">
+                        {/* Profile Image */}
+                        <div className="relative flex-shrink-0">
+                            {agency.profile_image ? (
                                 <img
-                                  src={listingImage}
-                                  alt={listing.title}
-                                  className="w-full h-full object-cover"
+                                    src={agency.profile_image}
+                                    alt={agency.name}
+                                    className="w-20 h-20 rounded-md object-cover border-2 border-white shadow-md"
                                 />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <FiHome className="w-16 h-16 text-white opacity-50" />
+                            ) : (
+                                <div className="w-20 h-20 bg-slate-100 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+                                    <Building2 className="w-10 h-10 text-gray-400" />
                                 </div>
-                              )}
-                            </div>
-                            <div className="p-4">
-                              <h4 className="font-semibold text-gray-900 mb-2 line-clamp-1">{listing.title}</h4>
-                              <div className="flex items-center text-gray-600 text-sm mb-2">
-                                <FiMapPin className="w-4 h-4 mr-1" />
-                                <span className="line-clamp-1">
-                                  {listing.city && listing.state ? `${listing.city}, ${listing.state}` : listing.country || 'Location not specified'}
+                            )}
+                            {agency.verified && (
+                                <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
+                                    <CheckCircle className="w-4 h-4 text-white" />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Name and Location */}
+                        <div className="flex-1 min-w-0">
+                            <h1 className="text-2xl lg:text-3xl font-bold mb-2 truncate text-gray-900">
+                                {agency.name}
+                            </h1>
+                            <div className="flex items-center gap-2 text-sm mb-3 text-gray-600">
+                                <MapPin className="w-4 h-4 flex-shrink-0" />
+                                <span className="truncate">
+                                    {locationString}
                                 </span>
-                              </div>
-                              <div className="text-lg font-bold text-blue-600 mb-2">
-                                {formatPrice(listing.price, listing.currency, listing.price_type, listing.duration)}
-                              </div>
-                              {listing.specifications && (
-                                <div className="flex items-center gap-4 text-sm text-gray-600">
-                                  {listing.specifications.bedrooms > 0 && (
-                                    <span>{listing.specifications.bedrooms} beds</span>
-                                  )}
-                                  {listing.specifications.bathrooms > 0 && (
-                                    <span>{listing.specifications.bathrooms} baths</span>
-                                  )}
-                                </div>
-                              )}
                             </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <p className="text-gray-600">No listings available.</p>
-                    </div>
-                  )}
-                </div>
-              )}
 
-              {/* Contact Tab */}
-              {activeTab === 'contact' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-4">Get in Touch</h3>
-                    <p className="text-gray-600 mb-6">
-                      Ready to work with {agency.name}? Send a message or contact them directly.
-                    </p>
-
-                    <div className="space-y-4">
-                      {agency.phone && (
-                        <div className="flex items-center p-4 bg-gray-50 rounded-xl">
-                          <FiPhone className="w-5 h-5 text-blue-600 mr-3" />
-                          <div>
-                            <div className="font-medium text-gray-900">Call</div>
-                            <div className="text-gray-600">{agency.phone}</div>
-                          </div>
+                            {/* Stats */}
+                            <div className="flex items-center gap-4 text-primary_color">
+                                 <div className="flex items-center gap-1">
+                                    <Home className="w-7 h-7 bg-primary_color rounded-md p-1 text-white" />
+                                    <span className="font-medium">{agency.total_listings || 0} Listings</span>
+                                 </div>
+                                 <div className="flex items-center gap-1">
+                                    <Users className="w-7 h-7 bg-primary_color rounded-md p-1 text-white" />
+                                    <span className="font-medium">{agency.total_agents || 0} Agents</span>
+                                 </div>
+                            </div>
                         </div>
-                      )}
 
-                      {agency.email && (
-                        <div className="flex items-center p-4 bg-gray-50 rounded-xl">
-                          <FiMail className="w-5 h-5 text-blue-600 mr-3" />
-                          <div>
-                            <div className="font-medium text-gray-900">Email</div>
-                            <div className="text-gray-600">{agency.email}</div>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex items-center p-4 bg-gray-50 rounded-xl">
-                        <FiMapPin className="w-5 h-5 text-blue-600 mr-3" />
-                        <div>
-                          <div className="font-medium text-gray-900">Location</div>
-                          <div className="text-gray-600">
-                            {agency.address || `${agency.city || ''} ${agency.country || ''}`.trim() || 'Address not available'}
-                          </div>
-                        </div>
-                      </div>
+                         {/* Share Icon usually goes here */}
                     </div>
-                  </div>
+                 </div>
 
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-4">Send Message</h3>
-                    <form className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Your name"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                        <input
-                          type="email"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="your.email@example.com"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
-                        <input
-                          type="tel"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Your phone number"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
-                        <textarea
-                          rows={4}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Tell us about your property needs..."
-                        ></textarea>
-                      </div>
-                      
-                      <button
-                        type="submit"
-                        className="w-full bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors"
-                      >
-                        Send Message
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              )}
+                 {/* Middle Section - Slogan (Optional) */}
+                 <div className="py-8">
+                    {/* Placeholder for slogan if agency had one, fitting the design pattern */}
+                 </div>
+
+                 {/* Bottom Section - Contact Info */}
+                 <div className="flex flex-col gap-2">
+                    {agency.email && (
+                        <div className="flex items-center gap-3 border-b border-primary_color pb-2">
+                             <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 bg-gray-50 rounded-full">
+                                <Mail className="w-5 h-5 text-gray-600" />
+                             </div>
+                             <button onClick={() => handleEmailClick(agency.email)} className="text-sm hover:text-blue-600 transition-colors cursor-pointer truncate text-gray-700 font-medium">
+                                {agency.email}
+                             </button>
+                        </div>
+                    )}
+                    {agency.phone && (
+                        <div className="flex items-center gap-3 border-b border-primary_color pb-2">
+                             <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 bg-gray-50 rounded-full">
+                                <Phone className="w-5 h-5 text-gray-600" />
+                             </div>
+                             <button onClick={() => handlePhoneClick(agency.phone)} className="text-sm hover:text-blue-600 transition-colors cursor-pointer text-gray-700 font-medium">
+                                {agency.phone}
+                             </button>
+                        </div>
+                    )}
+                    {agency.website && (
+                         <div className="flex items-center gap-3 border-b border-primary_color pb-2">
+                             <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 bg-gray-50 rounded-full">
+                                <Globe className="w-5 h-5 text-gray-600" />
+                             </div>
+                             <a href={agency.website} target="_blank" rel="noopener noreferrer" className="text-sm hover:text-blue-600 transition-colors truncate text-gray-700 font-medium">
+                                {agency.website}
+                             </a>
+                         </div>
+                    )}
+                 </div>
             </div>
-          </div>
         </div>
-      </div>
-    </Layout1>
+
+        {/* Main Content */}
+        <div className="mx-auto px-6 py-16 bg-white">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left Side - All Information */}
+                <div className="lg:col-span-2 space-y-12">
+                     {/* About Us */}
+                     {agency.description && (
+                         <div>
+                             <h2 className="font-light text-2xl mb-6 text-gray-900 border-b pb-2">About Us</h2>
+                             <div className="prose prose-lg text-gray-600 leading-relaxed">
+                                <p className="whitespace-pre-line">{agency.description}</p>
+                             </div>
+                         </div>
+                     )}
+
+                     {/* Company Overview */}
+                     {agency.founded_year && (
+                         <div>
+                             <h2 className="font-light text-2xl mb-6 text-gray-900 border-b pb-2">Company Overview</h2>
+                             <div className="space-y-2">
+                                <DataRenderer 
+                                    title="Founded In"
+                                    value={agency.founded_year}
+                                    icon={Calendar}
+                                />
+                             </div>
+                         </div>
+                     )}
+
+                     {/* Agents Section */}
+                     {agents.length > 0 && (
+                         <div>
+                             <h2 className="font-light text-2xl mb-6 text-gray-900 border-b pb-2">Our Team</h2>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {agents.map(agent => (
+                                    <Link key={agent.id} href={`/home/allAgents/${agent.slug}`} className="bg-white rounded-xl p-4 flex items-center gap-4 hover:shadow-lg transition-all border border-gray-100 group">
+                                         <div className="w-16 h-16 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
+                                            {agent.profile_image ? (
+                                                <img src={agent.profile_image} alt={agent.name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                    <User />
+                                                </div>
+                                            )}
+                                         </div>
+                                         <div>
+                                             <h4 className="font-bold text-gray-900 group-hover:text-primary_color transition-colors">{agent.name}</h4>
+                                             <p className="text-sm text-gray-500">{agent.total_listings || 0} listings</p>
+                                         </div>
+                                    </Link>
+                                ))}
+                             </div>
+                         </div>
+                     )}
+
+                     {/* Socials */}
+                     {agency.social_media && Object.keys(agency.social_media).length > 0 && (
+                         <div>
+                            <h2 className="font-light text-2xl mb-6 text-gray-900 border-b pb-2">Socials</h2>
+                            <div className="flex flex-wrap gap-4">
+                                {agency.social_media.instagram && (
+                                    <a href={agency.social_media.instagram} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-600 hover:text-primary_color">
+                                        <Instagram className="w-5 h-5" />
+                                        <span>Instagram</span>
+                                    </a>
+                                )}
+                                {agency.social_media.linkedin && (
+                                    <a href={agency.social_media.linkedin} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-600 hover:text-primary_color">
+                                        <Linkedin className="w-5 h-5" />
+                                        <span>LinkedIn</span>
+                                    </a>
+                                )}
+                                {agency.social_media.twitter && (
+                                    <a href={agency.social_media.twitter} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-600 hover:text-primary_color">
+                                        <Twitter className="w-5 h-5" />
+                                        <span>Twitter</span>
+                                    </a>
+                                )}
+                            </div>
+                         </div>
+                     )}
+
+                     {/* Listings Section */}
+                     {listings.length > 0 && (
+                         <div>
+                             <h2 className="font-light text-2xl mb-6 text-gray-900 border-b pb-2">Our Listings</h2>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {listings.map(listing => {
+                                    const listingImage = getListingImage(listing)
+                                    return (
+                                        <div key={listing.id} className="group border border-gray-100 rounded-xl overflow-hidden hover:shadow-xl transition-shadow bg-white">
+                                            <div className="relative h-48 bg-gray-200 overflow-hidden">
+                                                {listingImage ? (
+                                                    <img src={listingImage} alt={listing.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                        <Home />
+                                                    </div>
+                                                )}
+                                                <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-xs font-bold text-gray-900">
+                                                    {listing.category?.name || 'Property'}
+                                                </div>
+                                            </div>
+                                            <div className="p-4">
+                                                <h4 className="font-bold text-gray-900 truncate mb-1">{listing.title}</h4>
+                                                <p className="text-primary_color font-bold text-lg mb-2">
+                                                    {formatPrice(listing.price, listing.currency, listing.price_type, listing.duration)}
+                                                </p>
+                                                <div className="flex items-center text-gray-500 text-sm">
+                                                    <MapPin className="w-4 h-4 mr-1" />
+                                                    <span className="truncate">{listing.city}, {listing.country}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                             </div>
+                         </div>
+                     )}
+                </div>
+
+                {/* Right Side - Sticky Lead Form */}
+                <div className="lg:col-span-1">
+                    <div className="sticky top-8">
+                        {agency.id && (
+                             <LeadContactForm 
+                                contextType="profile"
+                                profileId={agency.id} // Assuming agency has an ID
+                                profile={agency}
+                                agency={agency} // Pass as agency
+                                developer={null}
+                                propertyTitle={`Consultation with ${agency.name}`}
+                            />
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
   )
 }
 
 export default AgencyProfile
-

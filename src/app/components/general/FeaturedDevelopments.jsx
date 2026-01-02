@@ -138,7 +138,7 @@ const FeaturedDevelopments = () => {
 
           return (
             <SwiperSlide key={development.id}>
-              <Link href={`/developments/${development.slug}`}>
+              <Link href={`/home/allDevelopments/${development.slug}`}>
                 <div className="relative h-96 w-full overflow-hidden hover:scale-105 transition-transform duration-300 cursor-pointer">
                   <img
                     src={bannerImage}
