@@ -12,14 +12,19 @@ import {
     FiCalendar,
     FiUser,
     FiMessageSquare,
-    FiTrendingUp
+    FiTrendingUp,
+    FiLogOut
 } from 'react-icons/fi'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
+import { toast } from 'react-toastify'
 
 const AgencyNav = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const [isLoggingOut, setIsLoggingOut] = useState(false)
     const pathname = usePathname()
+    const { logout } = useAuth()
 
     // Extract slug from pathname (e.g., /agency/premier-realty/dashboard -> premier-realty)
     const getSlug = () => {
@@ -91,6 +96,73 @@ const AgencyNav = () => {
         }
         // For other routes, check if pathname starts with href
         return pathname === href || pathname?.startsWith(href + '/')
+    }
+
+    const handleLogout = async () => {
+        if (isLoggingOut) return; // Prevent multiple clicks
+        
+        setIsLoggingOut(true);
+        setIsMobileMenuOpen(false);
+        
+        // Show loading toast
+        const loadingToastId = toast.loading('Logging out...', {
+            position: "top-center",
+            autoClose: false,
+            hideProgressBar: false,
+            closeOnClick: false,
+            pauseOnHover: true,
+            draggable: false,
+        });
+        
+        try {
+            const result = await logout();
+            if (result.success) {
+                // Show success toast
+                toast.update(loadingToastId, {
+                    render: 'Logged out successfully!',
+                    type: 'success',
+                    autoClose: 2000,
+                    isLoading: false,
+                });
+                
+                // Redirect to home page after successful logout
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1000);
+            } else {
+                console.error('Logout failed:', result.error);
+                
+                // Show error toast but still redirect
+                toast.update(loadingToastId, {
+                    render: 'Logout completed with warnings',
+                    type: 'warning',
+                    autoClose: 2000,
+                    isLoading: false,
+                });
+                
+                // Still redirect even if logout had issues to prevent stuck state
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1000);
+            }
+        } catch (error) {
+            console.error('Logout error:', error);
+            
+            // Show error toast but still redirect
+            toast.update(loadingToastId, {
+                render: 'Logout completed with errors',
+                type: 'error',
+                autoClose: 2000,
+                isLoading: false,
+            });
+            
+            // Still redirect even if logout had issues to prevent stuck state
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1000);
+        } finally {
+            setIsLoggingOut(false);
+        }
     }
 
     return (
@@ -169,6 +241,22 @@ const AgencyNav = () => {
                             </Link>
                         )
                     })}
+                </div>
+
+                {/* Logout Button */}
+                <div className="mt-4 mb-4">
+                    <button
+                        onClick={handleLogout}
+                        disabled={isLoggingOut}
+                        className="group relative text-sm flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 ease-in-out transform hover:scale-105 bg-red-600 hover:bg-red-700 text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {/* Icon */}
+                        <FiLogOut className="w-5 h-5" />
+                        {/* Label */}
+                        <span className="font-medium">
+                            {isLoggingOut ? 'Logging out...' : 'Logout'}
+                        </span>
+                    </button>
                 </div>
 
                 {/* Agency Info Footer */}

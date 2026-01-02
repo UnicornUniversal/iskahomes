@@ -15,9 +15,11 @@ import {
     FiTrendingUp
 } from 'react-icons/fi'
 import { useAuth } from '@/contexts/AuthContext'
+import { toast } from 'react-toastify'
 
 const AgentNav = ({ active }) => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const [isLoggingOut, setIsLoggingOut] = useState(false)
     const pathname = usePathname()
     const params = useParams()
     const { logout } = useAuth()
@@ -82,6 +84,73 @@ const AgentNav = ({ active }) => {
 
     const toggleMobileMenu = () => {
         setIsMobileMenuOpen(!isMobileMenuOpen)
+    }
+
+    const handleLogout = async () => {
+        if (isLoggingOut) return; // Prevent multiple clicks
+        
+        setIsLoggingOut(true);
+        setIsMobileMenuOpen(false);
+        
+        // Show loading toast
+        const loadingToastId = toast.loading('Logging out...', {
+            position: "top-center",
+            autoClose: false,
+            hideProgressBar: false,
+            closeOnClick: false,
+            pauseOnHover: true,
+            draggable: false,
+        });
+        
+        try {
+            const result = await logout();
+            if (result.success) {
+                // Show success toast
+                toast.update(loadingToastId, {
+                    render: 'Logged out successfully!',
+                    type: 'success',
+                    autoClose: 2000,
+                    isLoading: false,
+                });
+                
+                // Redirect to home page after successful logout
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1000);
+            } else {
+                console.error('Logout failed:', result.error);
+                
+                // Show error toast but still redirect
+                toast.update(loadingToastId, {
+                    render: 'Logout completed with warnings',
+                    type: 'warning',
+                    autoClose: 2000,
+                    isLoading: false,
+                });
+                
+                // Still redirect even if logout had issues to prevent stuck state
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1000);
+            }
+        } catch (error) {
+            console.error('Logout error:', error);
+            
+            // Show error toast but still redirect
+            toast.update(loadingToastId, {
+                render: 'Logout completed with errors',
+                type: 'error',
+                autoClose: 2000,
+                isLoading: false,
+            });
+            
+            // Still redirect even if logout had issues to prevent stuck state
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1000);
+        } finally {
+            setIsLoggingOut(false);
+        }
     }
 
     return (
@@ -171,19 +240,17 @@ const AgentNav = ({ active }) => {
 
                 {/* Logout */}
                 <br/>
-                <div className="mb-4 space-y-2 w-full rounded-xl shadow-primary_red/25 bg-primary_red cursor-pointer">
+                <div className="mb-4 space-y-2 w-full rounded-xl shadow-primary_red/25 bg-primary_red">
                     <button
-                        onClick={() => {
-                            setIsMobileMenuOpen(false)
-                            logout()
-                        }}
-                        className="group relative text-[0.8em] flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 ease-in-out transform hover:scale-105"
+                        onClick={handleLogout}
+                        disabled={isLoggingOut}
+                        className="group relative text-[0.8em] flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {/* Icon */}
                         <FiLogOut color='white' className="w-5 h-5" />
                         {/* Label */}
                         <span className="font-medium transition-all duration-300 text-white">
-                            Logout
+                            {isLoggingOut ? 'Logging out...' : 'Logout'}
                         </span>
                     </button>
                 </div>

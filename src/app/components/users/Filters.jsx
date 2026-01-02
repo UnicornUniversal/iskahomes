@@ -3,6 +3,616 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { getSpecificationDataByTypeId } from '../Data/StaticData';
 
+// --- Extracted Components ---
+
+const Select = ({ label, value, onChange, options, placeholder, disabled }) => {
+  const handleChange = (e) => {
+    // Prevent scroll to top when selecting
+    const scrollContainer = e.target.closest('.overflow-y-auto');
+    const scrollTop = scrollContainer?.scrollTop || 0;
+    onChange(e.target.value);
+    // Restore scroll position after state update
+    requestAnimationFrame(() => {
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollTop;
+      }
+    });
+  };
+
+  return (
+    <div className="flex-1 min-w-[220px] text-sm ">
+      <label className="block mb-1 text-primary_color font-medium text-xs text-left">{label}</label>
+      <select
+        className={`w-full px-3 py-2 rounded-xl border text-primary_color bg-white outline-none border-primary_color/20 focus:border-primary_color focus:ring-2 focus:ring-secondary_color/30 disabled:opacity-60 text-sm`}
+        value={value}
+        onChange={handleChange}
+        disabled={disabled}
+      >
+        <option value="">{placeholder}</option>
+        {options.map(opt => (
+          <option key={opt.id} value={opt.id}>{opt.name}</option>
+        ))}
+      </select>
+    </div>
+  );
+};
+
+const SimpleSelect = ({ label, value, onChange, options, placeholder, disabled }) => {
+  const handleChange = (e) => {
+    // Prevent scroll to top when selecting
+    const scrollContainer = e.target.closest('.overflow-y-auto');
+    const scrollTop = scrollContainer?.scrollTop || 0;
+    onChange(e.target.value);
+    // Restore scroll position after state update
+    requestAnimationFrame(() => {
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollTop;
+      }
+    });
+  };
+
+  return (
+    <div className="flex-1 min-w-[220px] text-sm">
+      <label className="block mb-1 text-primary_color font-medium text-sm">{label}</label>
+      <select
+        className={`w-full px-3 py-2 rounded-xl border text-primary_color bg-white outline-none border-primary_color/20 focus:border-primary_color focus:ring-2 focus:ring-secondary_color/30 disabled:opacity-60 text-sm`}
+        value={value}
+        onChange={handleChange}
+        disabled={disabled}
+      >
+        <option value="">{placeholder}</option>
+        {options.map(opt => (
+          <option key={opt} value={opt}>{opt}</option>
+        ))}
+      </select>
+    </div>
+  );
+};
+
+const NumberInput = React.memo(({ label, valueRef, value, onChange, placeholder, min = 0, step = 1, icon: Icon }) => {
+  const inputRef = useRef(null);
+  // Use local state for display - completely isolated from parent
+  // Initialize from valueRef or value prop
+  const [localValue, setLocalValue] = useState(valueRef?.current || value || "");
+
+  // Sync with ref value only when component mounts or ref changes externally
+  useEffect(() => {
+    if (valueRef && valueRef.current !== localValue && document.activeElement !== inputRef.current) {
+      setLocalValue(valueRef.current || "");
+    }
+  }, [valueRef?.current]);
+
+  // Sync with value prop if provided (for controlled mode)
+  useEffect(() => {
+    if (value !== undefined && value !== localValue && document.activeElement !== inputRef.current) {
+      setLocalValue(value || "");
+    }
+  }, [value]);
+
+  const handleChange = useCallback((e) => {
+    const newValue = e.target.value;
+    
+    // Update ref immediately (no re-render, no API calls)
+    if (valueRef) {
+      valueRef.current = newValue;
+    }
+
+    // Call onChange if provided (for controlled mode)
+    if (onChange) {
+      onChange(newValue);
+    }
+    
+    // Update local display state (completely isolated - doesn't trigger parent re-render)
+    setLocalValue(newValue);
+    
+    // For number inputs, we can't use setSelectionRange, so just ensure focus
+    // The browser handles cursor position automatically for number inputs
+    requestAnimationFrame(() => {
+      if (inputRef.current && document.activeElement !== inputRef.current) {
+        inputRef.current.focus();
+      }
+    });
+  }, [valueRef, onChange]);
+
+  return (
+    <div className="w-full text-sm">
+      <label className="block mb-1 text-primary_color font-medium text-sm flex items-center gap-2">
+        {Icon && <Icon className="w-4 h-4" />}
+        {label}
+      </label>
+      <input
+        ref={inputRef}
+        type="number"
+        min={min}
+        step={step}
+        value={localValue}
+        onChange={handleChange}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 rounded-xl border text-primary_color bg-white outline-none border-primary_color/20 focus:border-primary_color focus:ring-2 focus:ring-secondary_color/30 text-sm"
+      />
+    </div>
+  );
+});
+
+const SpecificationSelect = ({ label, value, onChange, options, placeholder, icon: Icon }) => {
+  const handleChange = (e) => {
+    // Prevent scroll to top when selecting
+    const scrollContainer = e.target.closest('.overflow-y-auto');
+    const scrollTop = scrollContainer?.scrollTop || 0;
+    onChange(e.target.value);
+    // Restore scroll position after state update
+    requestAnimationFrame(() => {
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollTop;
+      }
+    });
+  };
+
+  return (
+    <div className="w-full text-sm">
+      <label className="block mb-1 text-primary_color font-medium text-sm flex items-center gap-2">
+        {Icon && <Icon className="w-4 h-4" />}
+        {label}
+      </label>
+      <select
+        className="w-full px-3 py-2 rounded-xl border text-primary_color bg-white outline-none border-primary_color/20 focus:border-primary_color focus:ring-2 focus:ring-secondary_color/30 text-sm"
+        value={value || ""}
+        onChange={handleChange}
+      >
+        <option value="">{placeholder}</option>
+        {options.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+};
+
+const SpecificationTextInput = React.memo(({ label, value, onChange, placeholder, icon: Icon }) => {
+  const inputRef = useRef(null);
+  // Use local state for display - completely isolated from parent
+  const [localValue, setLocalValue] = useState(value || "");
+
+  // Sync with prop value only when component mounts or value changes externally
+  useEffect(() => {
+    if (value !== localValue && document.activeElement !== inputRef.current) {
+      setLocalValue(value || "");
+    }
+  }, [value]);
+
+  const handleChange = useCallback((e) => {
+    const newValue = e.target.value;
+    const cursorPosition = e.target.selectionStart;
+    
+    // Update local display state immediately (completely isolated - doesn't trigger parent re-render)
+    setLocalValue(newValue);
+    
+    // Update parent via onChange (but parent won't re-render Filters component)
+    if (onChange) {
+      onChange(newValue);
+    }
+    
+    // Restore cursor position for text inputs
+    requestAnimationFrame(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        const newPosition = Math.min(cursorPosition, newValue.length);
+        // Only use setSelectionRange for text inputs
+        if (inputRef.current.type === 'text') {
+          inputRef.current.setSelectionRange(newPosition, newPosition);
+        }
+      }
+    });
+  }, [onChange]);
+
+  return (
+    <div className="w-full text-sm">
+      <label className="block mb-1 text-primary_color font-medium text-sm flex items-center gap-2">
+        {Icon && <Icon className="w-4 h-4" />}
+        {label}
+      </label>
+      <input
+        ref={inputRef}
+        type="text"
+        value={localValue}
+        onChange={handleChange}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 rounded-xl border text-primary_color bg-white outline-none border-primary_color/20 focus:border-primary_color focus:ring-2 focus:ring-secondary_color/30 text-sm"
+      />
+    </div>
+  );
+});
+
+const LocationInput = React.memo(({ locationInputRef, setCountry, setState, setCity, setTown, setLocationDisplayKey, locationDisplayKey }) => {
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
+  // Use local state for display - completely isolated from parent
+  // Start empty - don't show default country in input
+  const [localDisplay, setLocalDisplay] = useState("");
+  // Move search results state here to prevent parent re-renders
+  const [locationSearchResults, setLocationSearchResults] = useState([]);
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+
+  // Location search function
+  const triggerLocationSearch = useCallback(async (searchValue) => {
+    if (!searchValue || searchValue.trim().length < 1) {
+      return [];
+    }
+
+    try {
+      const response = await fetch(`/api/locations/search?q=${encodeURIComponent(searchValue.trim())}&limit=10`);
+      if (response.ok) {
+        const result = await response.json();
+        return result.data || [];
+      } else {
+        return [];
+      }
+    } catch (error) {
+      console.error('Error searching locations:', error);
+      return [];
+    }
+  }, []);
+
+  // Handle location selection
+  const handleLocationSelect = useCallback((location) => {
+    // Clear all location fields first
+    setCountry("");
+    setState("");
+    setCity("");
+    setTown("");
+
+    // Set the appropriate field based on location type
+    switch (location.type) {
+      case 'country':
+        setCountry(location.value);
+        locationInputRef.current = location.label;
+        break;
+      case 'state':
+        setState(location.value);
+        locationInputRef.current = location.label;
+        break;
+      case 'city':
+        setCity(location.value);
+        locationInputRef.current = location.label;
+        break;
+      case 'town':
+        setTown(location.value);
+        locationInputRef.current = location.label;
+        break;
+    }
+
+    // Trigger LocationInput to sync with ref (minimal re-render)
+    setLocationDisplayKey(prev => prev + 1);
+  }, [setCountry, setState, setCity, setTown, setLocationDisplayKey, locationInputRef]);
+
+  // Sync with ref value when locationDisplayKey changes (when location is selected or cleared)
+  // Only update if input is not focused (to prevent focus loss while typing)
+  useEffect(() => {
+    if (document.activeElement !== inputRef.current) {
+      const refValue = locationInputRef.current || "";
+      if (refValue !== localDisplay) {
+        setLocalDisplay(refValue);
+      }
+    }
+  }, [locationDisplayKey]); // Sync when key changes (location selected or cleared)
+  
+  const handleChange = useCallback((e) => {
+    const newValue = e.target.value;
+    const cursorPosition = e.target.selectionStart;
+    
+    // Update local display state immediately (completely isolated - doesn't trigger parent re-render)
+    setLocalDisplay(newValue);
+    
+    // Update ref immediately (no re-render, no API calls)
+    locationInputRef.current = newValue;
+    
+    // Debounce location search - only if there's a value
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    if (newValue.trim().length > 0) {
+      searchTimeoutRef.current = setTimeout(async () => {
+        // Search and update results without causing parent re-render
+        const results = await triggerLocationSearch(newValue);
+        setLocationSearchResults(results);
+        setShowLocationDropdown(results.length > 0);
+        // Ensure input maintains focus after search completes
+        if (inputRef.current && document.activeElement !== inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 300);
+    } else {
+      // Clear results if input is empty
+      setLocationSearchResults([]);
+      setShowLocationDropdown(false);
+    }
+    
+    // Restore cursor position immediately for text inputs
+    requestAnimationFrame(() => {
+      if (inputRef.current && document.activeElement === inputRef.current) {
+        const newPosition = Math.min(cursorPosition, newValue.length);
+        // Only use setSelectionRange for text inputs
+        if (inputRef.current.type === 'text') {
+          try {
+            inputRef.current.setSelectionRange(newPosition, newPosition);
+          } catch (e) {
+            // Ignore errors if input is not focused
+          }
+        }
+      }
+    });
+  }, [triggerLocationSearch, locationInputRef]);
+
+  const handleFocus = useCallback(() => {
+    // Don't trigger search on focus - only when typing
+    // This prevents unnecessary API calls
+  }, []);
+
+  const handleBlur = useCallback((e) => {
+    setTimeout(() => {
+      if (dropdownRef.current?.contains(document.activeElement)) {
+        return; // Keep dropdown open
+      }
+      setShowLocationDropdown(false);
+    }, 250);
+  }, []);
+
+  const handleLocationClick = useCallback((result) => {
+    handleLocationSelect(result);
+    if (inputRef.current) {
+      inputRef.current.blur();
+    }
+  }, [handleLocationSelect]);
+
+  return (
+    <div className="flex-1 min-w-[220px] text-sm relative">
+      <label className="block mb-1 text-primary_color font-medium text-sm">Location</label>
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={localDisplay}
+          onChange={handleChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          placeholder="Enter country, state, city, or town"
+          className="w-full px-3 py-2 pr-10 rounded-xl border text-primary_color bg-white outline-none border-primary_color/20 focus:border-primary_color focus:ring-2 focus:ring-secondary_color/30 text-sm"
+          autoComplete="off"
+        />
+        <svg
+          className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-primary_color/50 pointer-events-none"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        {showLocationDropdown && locationSearchResults.length > 0 && (
+          <div 
+            ref={dropdownRef}
+            className="location-dropdown absolute z-[100] w-full mt-1 bg-white border border-primary_color/20 rounded-xl shadow-lg max-h-60 overflow-y-auto"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            {locationSearchResults.map((result, index) => (
+              <button
+                key={`${result.type}-${result.value}-${index}`}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onClick={() => handleLocationClick(result)}
+                className="w-full text-left px-4 py-2 hover:bg-primary_color/10 transition-colors flex items-center gap-2"
+              >
+                <span className={`text-xs px-2 py-0.5 rounded ${
+                  result.type === 'country' ? 'bg-blue-100 text-blue-700' :
+                  result.type === 'state' ? 'bg-green-100 text-green-700' :
+                  result.type === 'city' ? 'bg-purple-100 text-purple-700' :
+                  'bg-orange-100 text-orange-700'
+                }`}>
+                  {result.type}
+                </span>
+                <span className="text-sm text-primary_color">{result.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+const SectionCard = React.memo(({ title, children, defaultOpen = false, controlledOpen, onToggle, onClear }) => {
+  // Use ref to persist state across re-renders
+  const internalOpenRef = useRef(defaultOpen);
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  
+  // Sync ref when defaultOpen changes (but only on mount, not on every render)
+  useEffect(() => {
+    internalOpenRef.current = defaultOpen;
+    setInternalOpen(defaultOpen);
+  }, []); // Empty deps - only set on mount
+  
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  
+  const handleToggle = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Prevent scroll to top when clicking section header
+    const scrollContainer = e.target.closest('.overflow-y-auto');
+    const scrollTop = scrollContainer?.scrollTop || 0;
+    
+    if (onToggle) {
+      onToggle(!open);
+    } else {
+      const newOpen = !internalOpenRef.current;
+      internalOpenRef.current = newOpen;
+      setInternalOpen(newOpen);
+    }
+    
+    // Restore scroll position
+    if (scrollContainer) {
+      requestAnimationFrame(() => {
+        scrollContainer.scrollTop = scrollTop;
+      });
+    }
+  }, [open, onToggle]);
+
+  const handleClear = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onClear) {
+      onClear();
+    }
+  }, [onClear]);
+  
+  return (
+    <div className="w-full rounded-xl border border-primary_color/15 overflow-visible mb-3">
+      <div className="bg-primary_color text-white px-3 py-2 text-xs font-semibold uppercase tracking-wide w-full flex items-center justify-between">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={handleToggle}
+          className="flex-1 flex items-center justify-between"
+        >
+          <span>{title}</span>
+          <span className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>⌃</span>
+        </button>
+        {onClear && (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="text-xs hover:underline ml-2"
+            title="Clear this section"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      <div className={`${open ? 'block' : 'hidden'} p-3 bg-white`}>{children}</div>
+    </div>
+  );
+});
+
+// Component to render dynamic specification fields based on property type
+const SpecificationFields = ({ propertyTypeId, specifications, bedrooms, bathrooms, onSpecificationsChange, onBedroomsChange, onBathroomsChange }) => {
+  const specData = getSpecificationDataByTypeId(propertyTypeId);
+  
+  if (!specData) {
+    return (
+      <div className="text-center py-4 text-gray-500">
+        <p className="text-sm">Specifications for this property type are not available</p>
+      </div>
+    );
+  }
+
+  const handleSpecificationChange = (fieldKey, value) => {
+    onSpecificationsChange({
+      ...specifications,
+      [fieldKey]: value
+    });
+  };
+
+  // Filter fields - show only relevant ones for filtering
+  // For houses/apartments, show bedrooms/bathrooms separately, then other specs
+  const isHousesApartments = propertyTypeId === '16f02534-40e4-445f-94f2-2a01531b8503';
+  
+  // Get fields that are useful for filtering (exclude some internal fields)
+  const filterableFields = specData.fields.filter(field => {
+    // For houses/apartments, exclude bedrooms/bathrooms as they're shown separately
+    if (isHousesApartments && (field.key === 'bedrooms' || field.key === 'bathrooms')) {
+      return false;
+    }
+    return true;
+  });
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Show bedrooms/bathrooms for houses/apartments */}
+      {isHousesApartments && (
+        <div className="flex flex-col w-full gap-3">
+          {specData.fields.find(f => f.key === 'bedrooms') && (
+            <NumberInput
+              label="Bedrooms"
+              value={bedrooms}
+              onChange={onBedroomsChange}
+              placeholder="Any"
+              min={0}
+              icon={specData.fields.find(f => f.key === 'bedrooms')?.icon}
+            />
+          )}
+          {specData.fields.find(f => f.key === 'bathrooms') && (
+            <NumberInput
+              label="Bathrooms"
+              value={bathrooms}
+              onChange={onBathroomsChange}
+              placeholder="Any"
+              min={0}
+              step={0.5}
+              icon={specData.fields.find(f => f.key === 'bathrooms')?.icon}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Render other specification fields */}
+      {filterableFields.length > 0 && (
+        <div className="flex flex-col gap-3">
+          {filterableFields.map(field => {
+            const fieldValue = specifications[field.key] || "";
+
+            if (field.type === 'number') {
+              return (
+                <NumberInput
+                  key={field.key}
+                  label={field.label}
+                  value={fieldValue}
+                  onChange={(value) => handleSpecificationChange(field.key, value === "" ? undefined : Number(value))}
+                  placeholder={field.placeholder || "Any"}
+                  min={field.min || 0}
+                  step={field.step || 1}
+                  icon={field.icon}
+                />
+              );
+            } else if (field.type === 'select') {
+              return (
+                <SpecificationSelect
+                  key={field.key}
+                  label={field.label}
+                  value={fieldValue}
+                  onChange={(value) => handleSpecificationChange(field.key, value || undefined)}
+                  options={field.options || []}
+                  placeholder={field.placeholder || `Select ${field.label.toLowerCase()}`}
+                  icon={field.icon}
+                />
+              );
+            } else if (field.type === 'text') {
+              return (
+                <SpecificationTextInput
+                  key={field.key}
+                  label={field.label}
+                  value={fieldValue}
+                  onChange={(value) => handleSpecificationChange(field.key, value || undefined)}
+                  placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
+                  icon={field.icon}
+                />
+              );
+            }
+            return null;
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Main Filters Component ---
+
 const Filters = ({ onChange, initial = {} }) => {
   console.log('🔄 Filters component rendering...');
   
@@ -26,8 +636,6 @@ const Filters = ({ onChange, initial = {} }) => {
   const [bedrooms, setBedrooms] = useState(initial.bedrooms || "");
   const [bathrooms, setBathrooms] = useState(initial.bathrooms || "");
   const [specifications, setSpecifications] = useState(initial.specifications || {});
-  
-  // Location dropdown state - moved to LocationInput component to prevent parent re-renders
   
   // State for taxonomy data
   const [taxonomyData, setTaxonomyData] = useState({
@@ -238,9 +846,6 @@ const Filters = ({ onChange, initial = {} }) => {
     return () => clearTimeout(timeoutId);
   }, [country, state, city, town]);
 
-  // Debounce location input changes (only when user selects from dropdown or applies filters)
-  // This is handled by handleLocationSelect, not on every keystroke
-
   // Apply filters function - only called when user clicks "Apply Filters"
   const applyFilters = () => {
     if (typeof onChange === "function") {
@@ -330,8 +935,6 @@ const Filters = ({ onChange, initial = {} }) => {
     // setSpecifications({});
   }, [selectedTypeId]);
 
-
-
   // Sync location input ref when location fields change externally
   useEffect(() => {
     const currentDisplay = town || city || state || country || "Ghana";
@@ -341,6 +944,8 @@ const Filters = ({ onChange, initial = {} }) => {
     }
   }, [country, state, city, town]);
 
+  // State to trigger LocationInput update when location is selected
+  const [locationDisplayKey, setLocationDisplayKey] = useState(0);
 
   const handleClear = () => {
     setSelectedPurposeIds([]);
@@ -356,602 +961,6 @@ const Filters = ({ onChange, initial = {} }) => {
     setBedrooms("");
     setBathrooms("");
     setSpecifications({});
-  };
-
-  const Select = ({ label, value, onChange, options, placeholder, disabled }) => {
-    const handleChange = (e) => {
-      // Prevent scroll to top when selecting
-      const scrollContainer = e.target.closest('.overflow-y-auto');
-      const scrollTop = scrollContainer?.scrollTop || 0;
-      onChange(e.target.value);
-      // Restore scroll position after state update
-      requestAnimationFrame(() => {
-        if (scrollContainer) {
-          scrollContainer.scrollTop = scrollTop;
-        }
-      });
-    };
-
-    return (
-      <div className="flex-1 min-w-[220px] text-sm ">
-        <label className="block mb-1 text-primary_color font-medium text-xs text-left">{label}</label>
-        <select
-          className={`w-full px-3 py-2 rounded-xl border text-primary_color bg-white outline-none border-primary_color/20 focus:border-primary_color focus:ring-2 focus:ring-secondary_color/30 disabled:opacity-60 text-sm`}
-          value={value}
-          onChange={handleChange}
-          disabled={disabled}
-        >
-          <option value="">{placeholder}</option>
-          {options.map(opt => (
-            <option key={opt.id} value={opt.id}>{opt.name}</option>
-          ))}
-        </select>
-      </div>
-    );
-  };
-
-  const SimpleSelect = ({ label, value, onChange, options, placeholder, disabled }) => {
-    const handleChange = (e) => {
-      // Prevent scroll to top when selecting
-      const scrollContainer = e.target.closest('.overflow-y-auto');
-      const scrollTop = scrollContainer?.scrollTop || 0;
-      onChange(e.target.value);
-      // Restore scroll position after state update
-      requestAnimationFrame(() => {
-        if (scrollContainer) {
-          scrollContainer.scrollTop = scrollTop;
-        }
-      });
-    };
-
-    return (
-      <div className="flex-1 min-w-[220px] text-sm">
-        <label className="block mb-1 text-primary_color font-medium text-sm">{label}</label>
-        <select
-          className={`w-full px-3 py-2 rounded-xl border text-primary_color bg-white outline-none border-primary_color/20 focus:border-primary_color focus:ring-2 focus:ring-secondary_color/30 disabled:opacity-60 text-sm`}
-          value={value}
-          onChange={handleChange}
-          disabled={disabled}
-        >
-          <option value="">{placeholder}</option>
-          {options.map(opt => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
-      </div>
-    );
-  };
-
-  const NumberInput = React.memo(({ label, valueRef, placeholder, min = 0, step = 1, icon: Icon }) => {
-    const inputRef = useRef(null);
-    // Use local state for display - completely isolated from parent
-    const [localValue, setLocalValue] = useState(valueRef?.current || "");
-
-    // Sync with ref value only when component mounts or ref changes externally
-    useEffect(() => {
-      if (valueRef?.current !== localValue && document.activeElement !== inputRef.current) {
-        setLocalValue(valueRef?.current || "");
-      }
-    }, [valueRef?.current]);
-
-    const handleChange = useCallback((e) => {
-      const newValue = e.target.value;
-      
-      // Update ref immediately (no re-render, no API calls)
-      if (valueRef) {
-        valueRef.current = newValue;
-      }
-      
-      // Update local display state (completely isolated - doesn't trigger parent re-render)
-      setLocalValue(newValue);
-      
-      // For number inputs, we can't use setSelectionRange, so just ensure focus
-      // The browser handles cursor position automatically for number inputs
-      requestAnimationFrame(() => {
-        if (inputRef.current && document.activeElement !== inputRef.current) {
-          inputRef.current.focus();
-        }
-      });
-    }, [valueRef]);
-
-    return (
-      <div className="w-full text-sm">
-        <label className="block mb-1 text-primary_color font-medium text-sm flex items-center gap-2">
-          {Icon && <Icon className="w-4 h-4" />}
-          {label}
-        </label>
-        <input
-          ref={inputRef}
-          type="number"
-          min={min}
-          step={step}
-          value={localValue}
-          onChange={handleChange}
-          placeholder={placeholder}
-          className="w-full px-3 py-2 rounded-xl border text-primary_color bg-white outline-none border-primary_color/20 focus:border-primary_color focus:ring-2 focus:ring-secondary_color/30 text-sm"
-        />
-      </div>
-    );
-  });
-
-  const SpecificationSelect = ({ label, value, onChange, options, placeholder, icon: Icon }) => {
-    const handleChange = (e) => {
-      // Prevent scroll to top when selecting
-      const scrollContainer = e.target.closest('.overflow-y-auto');
-      const scrollTop = scrollContainer?.scrollTop || 0;
-      onChange(e.target.value);
-      // Restore scroll position after state update
-      requestAnimationFrame(() => {
-        if (scrollContainer) {
-          scrollContainer.scrollTop = scrollTop;
-        }
-      });
-    };
-
-    return (
-      <div className="w-full text-sm">
-        <label className="block mb-1 text-primary_color font-medium text-sm flex items-center gap-2">
-          {Icon && <Icon className="w-4 h-4" />}
-          {label}
-        </label>
-        <select
-          className="w-full px-3 py-2 rounded-xl border text-primary_color bg-white outline-none border-primary_color/20 focus:border-primary_color focus:ring-2 focus:ring-secondary_color/30 text-sm"
-          value={value || ""}
-          onChange={handleChange}
-        >
-          <option value="">{placeholder}</option>
-          {options.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </div>
-    );
-  };
-
-  const SpecificationTextInput = React.memo(({ label, value, onChange, placeholder, icon: Icon }) => {
-    const inputRef = useRef(null);
-    // Use local state for display - completely isolated from parent
-    const [localValue, setLocalValue] = useState(value || "");
-
-    // Sync with prop value only when component mounts or value changes externally
-    useEffect(() => {
-      if (value !== localValue && document.activeElement !== inputRef.current) {
-        setLocalValue(value || "");
-      }
-    }, [value]);
-
-    const handleChange = useCallback((e) => {
-      const newValue = e.target.value;
-      const cursorPosition = e.target.selectionStart;
-      
-      // Update local display state immediately (completely isolated - doesn't trigger parent re-render)
-      setLocalValue(newValue);
-      
-      // Update parent via onChange (but parent won't re-render Filters component)
-      if (onChange) {
-        onChange(newValue);
-      }
-      
-      // Restore cursor position for text inputs
-      requestAnimationFrame(() => {
-        if (inputRef.current) {
-          inputRef.current.focus();
-          const newPosition = Math.min(cursorPosition, newValue.length);
-          // Only use setSelectionRange for text inputs
-          if (inputRef.current.type === 'text') {
-            inputRef.current.setSelectionRange(newPosition, newPosition);
-          }
-        }
-      });
-    }, [onChange]);
-
-    return (
-      <div className="w-full text-sm">
-        <label className="block mb-1 text-primary_color font-medium text-sm flex items-center gap-2">
-          {Icon && <Icon className="w-4 h-4" />}
-          {label}
-        </label>
-        <input
-          ref={inputRef}
-          type="text"
-          value={localValue}
-          onChange={handleChange}
-          placeholder={placeholder}
-          className="w-full px-3 py-2 rounded-xl border text-primary_color bg-white outline-none border-primary_color/20 focus:border-primary_color focus:ring-2 focus:ring-secondary_color/30 text-sm"
-        />
-      </div>
-    );
-  });
-
-  // Location search function - passed to LocationInput to avoid parent re-renders
-  const triggerLocationSearch = useCallback(async (searchValue) => {
-    if (!searchValue || searchValue.trim().length < 1) {
-      return [];
-    }
-
-    try {
-      const response = await fetch(`/api/locations/search?q=${encodeURIComponent(searchValue.trim())}&limit=10`);
-      if (response.ok) {
-        const result = await response.json();
-        return result.data || [];
-      } else {
-        return [];
-      }
-    } catch (error) {
-      console.error('Error searching locations:', error);
-      return [];
-    }
-  }, []);
-
-  // State to trigger LocationInput update when location is selected
-  const [locationDisplayKey, setLocationDisplayKey] = useState(0);
-
-  // Handle location selection
-  const handleLocationSelect = useCallback((location) => {
-    // Clear all location fields first
-    setCountry("");
-    setState("");
-    setCity("");
-    setTown("");
-
-    // Set the appropriate field based on location type
-    switch (location.type) {
-      case 'country':
-        setCountry(location.value);
-        locationInputRef.current = location.label;
-        break;
-      case 'state':
-        setState(location.value);
-        locationInputRef.current = location.label;
-        break;
-      case 'city':
-        setCity(location.value);
-        locationInputRef.current = location.label;
-        break;
-      case 'town':
-        setTown(location.value);
-            locationInputRef.current = location.label;
-        break;
-    }
-
-    // Trigger LocationInput to sync with ref (minimal re-render)
-    setLocationDisplayKey(prev => prev + 1);
-  }, []);
-
-  const LocationInput = React.memo(() => {
-    const inputRef = useRef(null);
-    const dropdownRef = useRef(null);
-    const searchTimeoutRef = useRef(null);
-    // Use local state for display - completely isolated from parent
-    // Start empty - don't show default country in input
-    const [localDisplay, setLocalDisplay] = useState("");
-    // Move search results state here to prevent parent re-renders
-    const [locationSearchResults, setLocationSearchResults] = useState([]);
-    const [showLocationDropdown, setShowLocationDropdown] = useState(false);
-
-    // Sync with ref value when locationDisplayKey changes (when location is selected or cleared)
-    // Only update if input is not focused (to prevent focus loss while typing)
-    useEffect(() => {
-      if (document.activeElement !== inputRef.current) {
-        const refValue = locationInputRef.current || "";
-        if (refValue !== localDisplay) {
-          setLocalDisplay(refValue);
-        }
-      }
-    }, [locationDisplayKey]); // Sync when key changes (location selected or cleared)
-    
-    const handleChange = useCallback((e) => {
-      const newValue = e.target.value;
-      const cursorPosition = e.target.selectionStart;
-      
-      // Update local display state immediately (completely isolated - doesn't trigger parent re-render)
-      setLocalDisplay(newValue);
-      
-      // Update ref immediately (no re-render, no API calls)
-      locationInputRef.current = newValue;
-      
-      // Debounce location search - only if there's a value
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-      
-      if (newValue.trim().length > 0) {
-        searchTimeoutRef.current = setTimeout(async () => {
-          // Search and update results without causing parent re-render
-          const results = await triggerLocationSearch(newValue);
-          setLocationSearchResults(results);
-          setShowLocationDropdown(results.length > 0);
-          // Ensure input maintains focus after search completes
-          if (inputRef.current && document.activeElement !== inputRef.current) {
-            inputRef.current.focus();
-          }
-        }, 300);
-      } else {
-        // Clear results if input is empty
-        setLocationSearchResults([]);
-        setShowLocationDropdown(false);
-      }
-      
-      // Restore cursor position immediately for text inputs
-      requestAnimationFrame(() => {
-        if (inputRef.current && document.activeElement === inputRef.current) {
-          const newPosition = Math.min(cursorPosition, newValue.length);
-          // Only use setSelectionRange for text inputs
-          if (inputRef.current.type === 'text') {
-            try {
-              inputRef.current.setSelectionRange(newPosition, newPosition);
-            } catch (e) {
-              // Ignore errors if input is not focused
-            }
-          }
-        }
-      });
-    }, [triggerLocationSearch]);
-
-    const handleFocus = useCallback(() => {
-      // Don't trigger search on focus - only when typing
-      // This prevents unnecessary API calls
-    }, []);
-
-    const handleBlur = useCallback((e) => {
-      setTimeout(() => {
-        if (dropdownRef.current?.contains(document.activeElement)) {
-          return; // Keep dropdown open
-        }
-        setShowLocationDropdown(false);
-      }, 250);
-    }, []);
-
-    const handleLocationClick = useCallback((result) => {
-      handleLocationSelect(result);
-      if (inputRef.current) {
-        inputRef.current.blur();
-      }
-    }, [handleLocationSelect]);
-
-    return (
-      <div className="flex-1 min-w-[220px] text-sm relative">
-        <label className="block mb-1 text-primary_color font-medium text-sm">Location</label>
-        <div className="relative">
-          <input
-            ref={inputRef}
-            type="text"
-            value={localDisplay}
-            onChange={handleChange}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-            placeholder="Enter country, state, city, or town"
-            className="w-full px-3 py-2 pr-10 rounded-xl border text-primary_color bg-white outline-none border-primary_color/20 focus:border-primary_color focus:ring-2 focus:ring-secondary_color/30 text-sm"
-            autoComplete="off"
-          />
-          <svg
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-primary_color/50 pointer-events-none"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          {showLocationDropdown && locationSearchResults.length > 0 && (
-            <div 
-              ref={dropdownRef}
-              className="location-dropdown absolute z-[100] w-full mt-1 bg-white border border-primary_color/20 rounded-xl shadow-lg max-h-60 overflow-y-auto"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-            >
-              {locationSearchResults.map((result, index) => (
-                <button
-                  key={`${result.type}-${result.value}-${index}`}
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }}
-                  onClick={() => handleLocationClick(result)}
-                  className="w-full text-left px-4 py-2 hover:bg-primary_color/10 transition-colors flex items-center gap-2"
-                >
-                  <span className={`text-xs px-2 py-0.5 rounded ${
-                    result.type === 'country' ? 'bg-blue-100 text-blue-700' :
-                    result.type === 'state' ? 'bg-green-100 text-green-700' :
-                    result.type === 'city' ? 'bg-purple-100 text-purple-700' :
-                    'bg-orange-100 text-orange-700'
-                  }`}>
-                    {result.type}
-                  </span>
-                  <span className="text-sm text-primary_color">{result.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  });
-
-  const SectionCard = React.memo(({ title, children, defaultOpen = false, controlledOpen, onToggle, onClear }) => {
-    // Use ref to persist state across re-renders
-    const internalOpenRef = useRef(defaultOpen);
-    const [internalOpen, setInternalOpen] = useState(defaultOpen);
-    
-    // Sync ref when defaultOpen changes (but only on mount, not on every render)
-    useEffect(() => {
-      internalOpenRef.current = defaultOpen;
-      setInternalOpen(defaultOpen);
-    }, []); // Empty deps - only set on mount
-    
-    const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
-    
-    const handleToggle = useCallback((e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      // Prevent scroll to top when clicking section header
-      const scrollContainer = e.target.closest('.overflow-y-auto');
-      const scrollTop = scrollContainer?.scrollTop || 0;
-      
-      if (onToggle) {
-        onToggle(!open);
-      } else {
-        const newOpen = !internalOpenRef.current;
-        internalOpenRef.current = newOpen;
-        setInternalOpen(newOpen);
-      }
-      
-      // Restore scroll position
-      if (scrollContainer) {
-        requestAnimationFrame(() => {
-          scrollContainer.scrollTop = scrollTop;
-        });
-      }
-    }, [open, onToggle]);
-
-    const handleClear = useCallback((e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (onClear) {
-        onClear();
-      }
-    }, [onClear]);
-    
-    return (
-      <div className="w-full rounded-xl border border-primary_color/15 overflow-visible mb-3">
-        <div className="bg-primary_color text-white px-3 py-2 text-xs font-semibold uppercase tracking-wide w-full flex items-center justify-between">
-          <button
-            type="button"
-            aria-expanded={open}
-            onClick={handleToggle}
-            className="flex-1 flex items-center justify-between"
-          >
-            <span>{title}</span>
-            <span className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>⌃</span>
-          </button>
-          {onClear && (
-            <button
-              type="button"
-              onClick={handleClear}
-              className="text-xs hover:underline ml-2"
-              title="Clear this section"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-        <div className={`${open ? 'block' : 'hidden'} p-3 bg-white`}>{children}</div>
-      </div>
-    );
-  });
-
-  // Component to render dynamic specification fields based on property type
-  const SpecificationFields = ({ propertyTypeId, specifications, bedrooms, bathrooms, onSpecificationsChange, onBedroomsChange, onBathroomsChange }) => {
-    const specData = getSpecificationDataByTypeId(propertyTypeId);
-    
-    if (!specData) {
-      return (
-        <div className="text-center py-4 text-gray-500">
-          <p className="text-sm">Specifications for this property type are not available</p>
-        </div>
-      );
-    }
-
-    const handleSpecificationChange = (fieldKey, value) => {
-      onSpecificationsChange({
-        ...specifications,
-        [fieldKey]: value
-      });
-    };
-
-    // Filter fields - show only relevant ones for filtering
-    // For houses/apartments, show bedrooms/bathrooms separately, then other specs
-    const isHousesApartments = propertyTypeId === '16f02534-40e4-445f-94f2-2a01531b8503';
-    
-    // Get fields that are useful for filtering (exclude some internal fields)
-    const filterableFields = specData.fields.filter(field => {
-      // For houses/apartments, exclude bedrooms/bathrooms as they're shown separately
-      if (isHousesApartments && (field.key === 'bedrooms' || field.key === 'bathrooms')) {
-        return false;
-      }
-      return true;
-    });
-
-    return (
-      <div className="flex flex-col gap-3">
-        {/* Show bedrooms/bathrooms for houses/apartments */}
-        {isHousesApartments && (
-          <div className="flex flex-col w-full gap-3">
-            {specData.fields.find(f => f.key === 'bedrooms') && (
-              <NumberInput
-                label="Bedrooms"
-                value={bedrooms}
-                onChange={onBedroomsChange}
-                placeholder="Any"
-                min={0}
-                icon={specData.fields.find(f => f.key === 'bedrooms')?.icon}
-              />
-            )}
-            {specData.fields.find(f => f.key === 'bathrooms') && (
-              <NumberInput
-                label="Bathrooms"
-                value={bathrooms}
-                onChange={onBathroomsChange}
-                placeholder="Any"
-                min={0}
-                step={0.5}
-                icon={specData.fields.find(f => f.key === 'bathrooms')?.icon}
-              />
-            )}
-          </div>
-        )}
-
-        {/* Render other specification fields */}
-        {filterableFields.length > 0 && (
-          <div className="flex flex-col gap-3">
-            {filterableFields.map(field => {
-              const fieldValue = specifications[field.key] || "";
-
-              if (field.type === 'number') {
-                return (
-                  <NumberInput
-                    key={field.key}
-                    label={field.label}
-                    value={fieldValue}
-                    onChange={(value) => handleSpecificationChange(field.key, value === "" ? undefined : Number(value))}
-                    placeholder={field.placeholder || "Any"}
-                    min={field.min || 0}
-                    step={field.step || 1}
-                    icon={field.icon}
-                  />
-                );
-              } else if (field.type === 'select') {
-                return (
-                  <SpecificationSelect
-                    key={field.key}
-                    label={field.label}
-                    value={fieldValue}
-                    onChange={(value) => handleSpecificationChange(field.key, value || undefined)}
-                    options={field.options || []}
-                    placeholder={field.placeholder || `Select ${field.label.toLowerCase()}`}
-                    icon={field.icon}
-                  />
-                );
-              } else if (field.type === 'text') {
-                return (
-                  <SpecificationTextInput
-                    key={field.key}
-                    label={field.label}
-                    value={fieldValue}
-                    onChange={(value) => handleSpecificationChange(field.key, value || undefined)}
-                    placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
-                    icon={field.icon}
-                  />
-                );
-              }
-              return null;
-            })}
-          </div>
-        )}
-      </div>
-    );
   };
 
   if (loading) {
@@ -1072,7 +1081,15 @@ const Filters = ({ onChange, initial = {} }) => {
           }}
         >
           <div className="flex flex-col gap-3">
-            <LocationInput />
+            <LocationInput 
+              locationInputRef={locationInputRef}
+              setCountry={setCountry}
+              setState={setState}
+              setCity={setCity}
+              setTown={setTown}
+              setLocationDisplayKey={setLocationDisplayKey}
+              locationDisplayKey={locationDisplayKey}
+            />
           </div>
         </SectionCard>
 
@@ -1129,53 +1146,6 @@ const Filters = ({ onChange, initial = {} }) => {
         )}
         </div>
       </div>
-
-      {/* <div className="mt-6 flex flex-wrap items-center gap-3">
-        {selectedPurposeIds.map(purposeId => (
-          <span key={purposeId} className="px-3 py-1 rounded-full bg-primary_color/10 text-primary_color">
-            {taxonomyData.purposes.find(p => p.id === purposeId)?.name}
-          </span>
-        ))}
-        {selectedTypeId && (
-          <span className="px-3 py-1 rounded-full bg-primary_color/10 text-primary_color">
-            {taxonomyData.propertyTypes.find(t => t.id === selectedTypeId)?.name}
-          </span>
-        )}
-        {selectedSubtypeIds.map(subtypeId => (
-          <span key={subtypeId} className="px-3 py-1 rounded-full bg-primary_color/10 text-primary_color">
-            {taxonomyData.subtypes.find(s => s.id === subtypeId)?.name}
-          </span>
-        ))}
-        {(country || state || city || town) && (
-          <span className="px-3 py-1 rounded-full bg-primary_color/10 text-primary_color">
-            {town || city || state || country}
-          </span>
-        )}
-        {(priceMinRef.current !== "" || priceMaxRef.current !== "") && (
-          <span className="px-3 py-1 rounded-full bg-secondary_color/10 text-secondary_color">{detectedCurrency} {priceMinRef.current || 0} - {priceMaxRef.current || 'Any'}</span>
-        )}
-        {(bedrooms || bathrooms) && (
-          <span className="px-3 py-1 rounded-full bg-primary_color/10 text-primary_color">{bedrooms ? `${bedrooms} BR` : ''} {bathrooms ? `${bathrooms} BA` : ''}</span>
-        )}
-        {Object.keys(specifications).length > 0 && Object.entries(specifications).map(([key, value]) => {
-          if (value === undefined || value === null || value === "") return null;
-          const specData = selectedTypeId ? getSpecificationDataByTypeId(selectedTypeId) : null;
-          const field = specData?.fields.find(f => f.key === key);
-          if (!field) return null;
-          
-          let displayValue = value;
-          if (field.type === 'select' && field.options) {
-            const option = field.options.find(opt => opt.value === value);
-            displayValue = option ? option.label : value;
-          }
-          
-          return (
-            <span key={key} className="px-3 py-1 rounded-full bg-primary_color/10 text-primary_color text-xs">
-              {field.label}: {displayValue}
-            </span>
-          );
-        })}
-      </div> */}
 
       {/* Apply Filters Button - Absolute at bottom overlaying content */}
       <div className="absolute bottom-0 left-0 right-0 bg-white pt-4 pb-4 md:pb-6 px-4 md:px-6 border-t border-primary_color/10 shadow-lg z-10">

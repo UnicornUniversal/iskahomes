@@ -81,7 +81,8 @@ const ExplorePropertiesContent = () => {
     const specifications = searchParams.get('specifications');
     if (specifications) {
       try {
-        urlFilters.specifications = JSON.parse(decodeURIComponent(specifications));
+        // URLSearchParams handles decoding automatically, so we just parse the JSON
+        urlFilters.specifications = JSON.parse(specifications);
         console.log('📋 Parsed specifications from URL:', urlFilters.specifications);
       } catch (e) {
         console.error('Error parsing specifications from URL:', e);
@@ -133,16 +134,16 @@ const ExplorePropertiesContent = () => {
     if (newFilters.city) params.append('city', newFilters.city);
     if (newFilters.town) params.append('town', newFilters.town);
     
-    if (newFilters.priceMin) params.append('price_min', newFilters.priceMin.toString());
-    if (newFilters.priceMax) params.append('price_max', newFilters.priceMax.toString());
+    if (newFilters.priceMin !== undefined && newFilters.priceMin !== null) params.append('price_min', newFilters.priceMin.toString());
+    if (newFilters.priceMax !== undefined && newFilters.priceMax !== null) params.append('price_max', newFilters.priceMax.toString());
     
-    if (newFilters.bedrooms) params.append('bedrooms', newFilters.bedrooms.toString());
-    if (newFilters.bathrooms) params.append('bathrooms', newFilters.bathrooms.toString());
+    if (newFilters.bedrooms !== undefined && newFilters.bedrooms !== null) params.append('bedrooms', newFilters.bedrooms.toString());
+    if (newFilters.bathrooms !== undefined && newFilters.bathrooms !== null) params.append('bathrooms', newFilters.bathrooms.toString());
     
-    // Add specifications to URL - encode it properly
+    // Add specifications to URL - let URLSearchParams handle encoding
     if (newFilters.specifications && Object.keys(newFilters.specifications).length > 0) {
       const specsJson = JSON.stringify(newFilters.specifications);
-      params.append('specifications', encodeURIComponent(specsJson));
+      params.append('specifications', specsJson);
       console.log('✅ Adding specifications to URL:', specsJson);
     }
     
