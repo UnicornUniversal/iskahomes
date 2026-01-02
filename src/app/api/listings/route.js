@@ -419,8 +419,16 @@ async function updateDeveloperAfterListing(userId, operation = 'create') {
     let estimatedRevenue = 0
     if (!allError && allListings) {
       allListings.forEach(listing => {
-        if (listing.estimated_revenue && typeof listing.estimated_revenue === 'object') {
-          const revenueValue = listing.estimated_revenue.estimated_revenue || listing.estimated_revenue.price || 0
+        if (listing.estimated_revenue) {
+          let revenueValue = 0
+          if (typeof listing.estimated_revenue === 'object') {
+            revenueValue = listing.estimated_revenue.estimated_revenue || listing.estimated_revenue.price || 0
+          } else if (typeof listing.estimated_revenue === 'number') {
+            revenueValue = listing.estimated_revenue
+          } else if (typeof listing.estimated_revenue === 'string') {
+            revenueValue = parseFloat(listing.estimated_revenue) || 0
+          }
+          
           if (typeof revenueValue === 'number' && revenueValue > 0) {
             estimatedRevenue += revenueValue
           }
@@ -857,6 +865,23 @@ export async function POST(request) {
       )
     }
     
+    // Get agency_id for agents - check both propertyData and existingListing
+    let agencyId = null
+    const accountType = propertyData.account_type || existingListing?.account_type
+    if (accountType === 'agent') {
+      const { data: agent, error: agentError } = await supabaseAdmin
+        .from('agents')
+        .select('agency_id')
+        .eq('agent_id', userId)
+        .single()
+      
+      if (!agentError && agent?.agency_id) {
+        agencyId = agent.agency_id
+      } else {
+        console.warn('⚠️ Agent not found or agency_id missing for user:', userId)
+      }
+    }
+    
     // Extract basic listing data from parsed propertyData
     const listingData = {
       account_type: propertyData.account_type || 'developer',
@@ -941,7 +966,7 @@ export async function POST(request) {
       slug: propertyData.slug || null,
       floor_plan: propertyData.floor_plan || null,
       // Agent-specific fields
-      listing_agency_id: propertyData.account_type === 'agent' && agencyId ? agencyId : null,
+      listing_agency_id: accountType === 'agent' && agencyId ? agencyId : (existingListing?.listing_agency_id || null),
       commission_rate: propertyData.commission_rate || null
     }
 
@@ -1455,6 +1480,16 @@ export async function POST(request) {
     // STEP 6.5: Update developer total_units if this is a developer unit
     if (listingData.account_type === 'developer' && userId) {
       await updateDeveloperAfterListing(userId, 'create')
+    }
+
+    // STEP 6.6: Update agent metrics if this is an agent listing
+    if (listingData.account_type === 'agent' && userId) {
+      await updateAgentAfterListing(userId, 'create')
+      
+      // Also update agency metrics
+      if (agencyId) {
+        await updateAgencyAfterListing(agencyId, 'create')
+      }
     }
 
     // STEP 7: Final step - Mark as completed and set listing_status

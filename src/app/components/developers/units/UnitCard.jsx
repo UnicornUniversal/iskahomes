@@ -6,6 +6,7 @@ import { Heart, MapPin, Bed, Bath, Car, Square } from 'lucide-react'
 const UnitCard = ({ unit, developerSlug, accountType = 'developer' }) => {
   const router = useRouter()
   const isAgent = accountType === 'agent'
+  const isAgency = accountType === 'agency'
 
   const formatPrice = (price, currency = 'GHS') => {
     const numPrice = parseFloat(price)
@@ -71,15 +72,17 @@ const UnitCard = ({ unit, developerSlug, accountType = 'developer' }) => {
     
     // Navigate to single unit/property page based on account type
     const slug = developerSlug || 'default'
-    const unitId = unit.id
+    const unitId = unit.id || unit.slug
     
     if (!unitId) {
-      console.error(`${isAgent ? 'Property' : 'Unit'} ID is missing:`, unit)
+      console.error(`${isAgent || isAgency ? 'Property' : 'Unit'} ID is missing:`, unit)
       return
     }
     
-    console.log(`Navigating to ${isAgent ? 'property' : 'unit'}:`, { slug, unitId, unit })
-    if (isAgent) {
+    console.log(`Navigating to ${isAgent || isAgency ? 'property' : 'unit'}:`, { slug, unitId, unit, accountType })
+    if (isAgency) {
+      router.push(`/agency/${slug}/properties/${unitId}`)
+    } else if (isAgent) {
       router.push(`/agents/${slug}/properties/${unitId}`)
     } else {
       router.push(`/developer/${slug}/units/${unitId}`)

@@ -14,15 +14,40 @@ export async function GET(request) {
     const token = authHeader.split(' ')[1]
     const decoded = verifyToken(token)
     
-    if (!decoded || decoded.user_type !== 'agency') {
-      return NextResponse.json({ error: 'Invalid token or user type' }, { status: 401 })
+    if (!decoded) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    }
+
+    let agencyId = null
+
+    // Allow both agency and agent user types
+    if (decoded.user_type === 'agency') {
+      // Agency accessing their own profile
+      agencyId = decoded.user_id
+    } else if (decoded.user_type === 'agent') {
+      // Agent accessing their agency's profile (for commission rates)
+      const { data: agent, error: agentError } = await supabaseAdmin
+        .from('agents')
+        .select('agency_id')
+        .eq('agent_id', decoded.user_id)
+        .single()
+      
+      if (agentError || !agent || !agent.agency_id) {
+        return NextResponse.json({ 
+          error: 'Agent not found or not associated with an agency' 
+        }, { status: 404 })
+      }
+      
+      agencyId = agent.agency_id
+    } else {
+      return NextResponse.json({ error: 'Invalid user type. Must be agency or agent.' }, { status: 401 })
     }
 
     // Get agency profile
     const { data: agency, error } = await supabaseAdmin
       .from('agencies')
       .select('*')
-      .eq('agency_id', decoded.user_id)
+      .eq('agency_id', agencyId)
       .single()
 
     if (error) {

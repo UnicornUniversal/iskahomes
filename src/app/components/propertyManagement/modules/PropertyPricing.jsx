@@ -139,43 +139,110 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
   const [commissionRate, setCommissionRate] = useState(null) // { selectedRate: {...}, percentage: number, amount: number, currency: string }
   
   // Helper function to get commission rate from agency rates
+  // Handles both array format: [{id, type, purpose, commission_rate}] and JSONB format: {default: 3.0, Rent: [...]}
   const getCommissionRate = (commissionRates, purpose, propertyTypeId, propertySubtypeId = null) => {
-    if (!commissionRates || typeof commissionRates !== 'object') {
-      return commissionRates?.default || 3.0
-    }
-    
-    // Capitalize purpose to match structure (Rent, Sale, Lease)
-    const purposeKey = purpose ? purpose.charAt(0).toUpperCase() + purpose.slice(1).toLowerCase() : null
-    
-    // If purpose not found, return default
-    if (!purposeKey || !commissionRates[purposeKey] || !Array.isArray(commissionRates[purposeKey])) {
-      return commissionRates?.default || 3.0
+    if (!commissionRates) {
+      return { percentage: 3.0, category: 'default', id: null, rateSource: 'Default Rate' }
     }
 
-    const purposeRates = commissionRates[purposeKey]
+    // Handle array format (from agency commission_rates field)
+    if (Array.isArray(commissionRates)) {
+      // Capitalize purpose name for matching
+      const purposeName = purpose ? purpose.charAt(0).toUpperCase() + purpose.slice(1).toLowerCase() : null
+      
+      // Filter rates by purpose
+      const purposeRates = commissionRates.filter(rate => {
+        if (!rate.purpose) return false
+        const ratePurposeName = rate.purpose.name ? rate.purpose.name.charAt(0).toUpperCase() + rate.purpose.name.slice(1).toLowerCase() : null
+        return ratePurposeName === purposeName
+      })
 
-    // Priority 1: Check for subtype match (if subtype provided)
-    if (propertySubtypeId) {
-      const subtypeMatch = purposeRates.find(
-        rate => rate.category === "property_subtype" && rate.id === propertySubtypeId
-      )
-      if (subtypeMatch) {
-        return subtypeMatch
+      if (purposeRates.length === 0) {
+        // No matching purpose, use first available rate or default
+        const defaultRate = commissionRates[0]
+        if (defaultRate) {
+          return {
+            percentage: defaultRate.commission_rate || 3.0,
+            category: 'default',
+            id: null,
+            rateSource: 'Default Rate',
+            rateData: defaultRate
+          }
+        }
+        return { percentage: 3.0, category: 'default', id: null, rateSource: 'Default Rate' }
+      }
+
+      // Priority 1: Check for type match (if type provided)
+      if (propertyTypeId && purposeRates.length > 0) {
+        const typeMatch = purposeRates.find(rate => {
+          if (!rate.type) return false
+          return rate.type.id === propertyTypeId
+        })
+        if (typeMatch) {
+          return {
+            percentage: typeMatch.commission_rate || 3.0,
+            category: 'property_type',
+            id: propertyTypeId,
+            rateSource: `Property Type: ${typeMatch.type?.name || 'Unknown'}`,
+            rateData: typeMatch
+          }
+        }
+      }
+
+      // Priority 2: Use first matching purpose rate (no specific type match)
+      const firstRate = purposeRates[0]
+      if (firstRate) {
+        const rateSource = firstRate.type 
+          ? `Property Type: ${firstRate.type.name}` 
+          : `Purpose: ${firstRate.purpose?.name || purposeName}`
+        return {
+          percentage: firstRate.commission_rate || 3.0,
+          category: firstRate.type ? 'property_type' : 'purpose',
+          id: firstRate.type?.id || firstRate.purpose?.id || null,
+          rateSource: rateSource,
+          rateData: firstRate
+        }
       }
     }
 
-    // Priority 2: Check for type match
-    if (propertyTypeId) {
-      const typeMatch = purposeRates.find(
-        rate => rate.category === "property_type" && rate.id === propertyTypeId
-      )
-      if (typeMatch) {
-        return typeMatch
+    // Handle JSONB format (legacy format)
+    if (typeof commissionRates === 'object' && !Array.isArray(commissionRates)) {
+      // Capitalize purpose to match structure (Rent, Sale, Lease)
+      const purposeKey = purpose ? purpose.charAt(0).toUpperCase() + purpose.slice(1).toLowerCase() : null
+      
+      // If purpose not found, return default
+      if (!purposeKey || !commissionRates[purposeKey] || !Array.isArray(commissionRates[purposeKey])) {
+        return { percentage: commissionRates?.default || 3.0, category: 'default', id: null, rateSource: 'Default Rate' }
       }
+
+      const purposeRates = commissionRates[purposeKey]
+
+      // Priority 1: Check for subtype match (if subtype provided)
+      if (propertySubtypeId) {
+        const subtypeMatch = purposeRates.find(
+          rate => rate.category === "property_subtype" && rate.id === propertySubtypeId
+        )
+        if (subtypeMatch) {
+          return { ...subtypeMatch, rateSource: 'Property Subtype' }
+        }
+      }
+
+      // Priority 2: Check for type match
+      if (propertyTypeId) {
+        const typeMatch = purposeRates.find(
+          rate => rate.category === "property_type" && rate.id === propertyTypeId
+        )
+        if (typeMatch) {
+          return { ...typeMatch, rateSource: 'Property Type' }
+        }
+      }
+
+      // Priority 3: Use default
+      return { percentage: commissionRates?.default || 3.0, category: 'default', id: null, rateSource: 'Default Rate' }
     }
 
-    // Priority 3: Use default
-    return { percentage: commissionRates?.default || 3.0, category: 'default', id: null }
+    // Fallback
+    return { percentage: 3.0, category: 'default', id: null, rateSource: 'Default Rate' }
   }
   
   // Fetch agency commission rates for agents
@@ -195,8 +262,19 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
           
           if (response.ok) {
             const result = await response.json()
-            if (result.success && result.data?.commission_rate) {
-              setAgencyCommissionRates(result.data.commission_rate)
+            // Handle both commission_rate and commission_rates field names
+            const rates = result.data?.commission_rates || result.data?.commission_rate
+            if (rates) {
+              // Parse if it's a string (JSON string)
+              if (typeof rates === 'string') {
+                try {
+                  setAgencyCommissionRates(JSON.parse(rates))
+                } catch (e) {
+                  setAgencyCommissionRates(rates)
+                }
+              } else {
+                setAgencyCommissionRates(rates)
+              }
             }
           }
         } catch (error) {
@@ -223,7 +301,7 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
       const propertySubtypeName = null // Will be populated if needed
       
       const selectedRate = getCommissionRate(agencyCommissionRates, purpose, propertyTypeId, propertySubtypeId)
-      const percentage = selectedRate?.percentage || selectedRate || 3.0
+      const percentage = selectedRate?.percentage || 3.0
       
       // Calculate estimated revenue if not set (for display purposes)
       let estimatedRevenue = parseFloat(pricingData.estimated_revenue) || 0
@@ -239,50 +317,23 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
         }
       }
       
+      // Calculate commission amount using property's currency (not agency currency)
       const commissionAmount = (estimatedRevenue * percentage) / 100
       
-      // Get agency default currency from company_locations or default_currency
-      let agencyCurrency = 'GHS'
-      if (user?.profile?.default_currency) {
-        agencyCurrency = user.profile.default_currency
-      } else if (user?.profile?.company_locations) {
-        let locations = user.profile.company_locations
-        if (typeof locations === 'string') {
-          try {
-            locations = JSON.parse(locations)
-          } catch (e) {
-            // ignore
-          }
-        }
-        if (Array.isArray(locations)) {
-          const primaryLocation = locations.find(loc => loc.primary_location === true)
-          if (primaryLocation?.currency) {
-            agencyCurrency = primaryLocation.currency
-          }
-        }
-      }
-      
-      // Determine rate source for display
-      let rateSource = 'Default'
-      if (selectedRate?.category === 'property_subtype' && propertySubtypeName) {
-        rateSource = `Property Subtype: ${propertySubtypeName}`
-      } else if (selectedRate?.category === 'property_type' && propertyTypeName) {
-        rateSource = `Property Type: ${propertyTypeName}`
-      } else if (selectedRate?.category === 'default') {
-        rateSource = 'Default Rate'
-      }
+      // Use property's currency for commission display (same as pricing currency)
+      const commissionCurrency = pricingData.currency || defaultCurrency
       
       const commissionData = {
         selectedRate: selectedRate,
         percentage: percentage,
         amount: commissionAmount > 0 ? commissionAmount.toFixed(2) : '0.00',
-        currency: agencyCurrency,
+        currency: commissionCurrency, // Use property's currency
         purpose: purpose,
         propertyTypeId: propertyTypeId,
         propertySubtypeId: propertySubtypeId,
         propertyTypeName: propertyTypeName,
         propertySubtypeName: propertySubtypeName,
-        rateSource: rateSource,
+        rateSource: selectedRate?.rateSource || 'Default Rate',
         estimatedRevenue: estimatedRevenue
       }
       
@@ -307,50 +358,22 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
       const propertyTypeName = formData.types?.[0]?.name || formData.types?.[0]?.label || null
       
       const selectedRate = getCommissionRate(agencyCommissionRates, purpose, propertyTypeId, propertySubtypeId)
-      const percentage = selectedRate?.percentage || selectedRate || 3.0
+      const percentage = selectedRate?.percentage || 3.0
       
-      // Get agency default currency
-      let agencyCurrency = 'GHS'
-      if (user?.profile?.default_currency) {
-        agencyCurrency = user.profile.default_currency
-      } else if (user?.profile?.company_locations) {
-        let locations = user.profile.company_locations
-        if (typeof locations === 'string') {
-          try {
-            locations = JSON.parse(locations)
-          } catch (e) {
-            // ignore
-          }
-        }
-        if (Array.isArray(locations)) {
-          const primaryLocation = locations.find(loc => loc.primary_location === true)
-          if (primaryLocation?.currency) {
-            agencyCurrency = primaryLocation.currency
-          }
-        }
-      }
-      
-      // Determine rate source for display
-      let rateSource = 'Default Rate'
-      if (selectedRate?.category === 'property_subtype' && propertySubtypeId) {
-        rateSource = 'Property Subtype'
-      } else if (selectedRate?.category === 'property_type' && propertyTypeName) {
-        rateSource = `Property Type: ${propertyTypeName}`
-      } else if (selectedRate?.category === 'default') {
-        rateSource = 'Default Rate'
-      }
+      // Use property's currency for commission display (same as pricing currency)
+      const commissionCurrency = pricingData.currency || defaultCurrency
       
       const commissionData = {
         selectedRate: selectedRate,
         percentage: percentage,
         amount: '0.00',
-        currency: agencyCurrency,
+        currency: commissionCurrency, // Use property's currency
         purpose: purpose,
         propertyTypeId: propertyTypeId,
         propertySubtypeId: propertySubtypeId,
         propertyTypeName: propertyTypeName,
         propertySubtypeName: null,
-        rateSource: rateSource,
+        rateSource: selectedRate?.rateSource || 'Default Rate',
         estimatedRevenue: 0
       }
       
@@ -822,7 +845,7 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Estimated Revenue (Auto-calculated) *
+              Estimated Revenue
             </label>
             <Input
               type="text"
@@ -836,7 +859,7 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
               required
             />
             <p className="text-xs text-gray-500 mt-1">
-              Price × Ideal Duration (in {pricingData.currency})
+              Price × Ideal Duration  (in {pricingData.currency})  (Auto-calculated) 
             </p>
           </div>
         </div>

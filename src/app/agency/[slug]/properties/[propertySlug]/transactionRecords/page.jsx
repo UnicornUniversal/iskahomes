@@ -1,13 +1,12 @@
 'use client'
 
 import React from 'react'
-import { useAuth } from '@/contexts/AuthContext'
 import TransactionRecords from '@/app/components/transactionsRecords/TransactionRecords'
 
 const TransactionRecordsPage = () => {
-  const { agentToken } = useAuth()
+  const agencyToken = typeof window !== 'undefined' ? localStorage.getItem('agency_token') : null
 
-  return <TransactionRecords token={agentToken} />
+  return <TransactionRecords token={agencyToken} />
 }
 
 export default TransactionRecordsPage

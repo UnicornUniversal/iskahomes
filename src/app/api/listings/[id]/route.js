@@ -443,8 +443,16 @@ async function updateDeveloperAfterListing(userId, operation = 'update') {
     let estimatedRevenue = 0
     if (!allError && allListings) {
       allListings.forEach(listing => {
-        if (listing.estimated_revenue && typeof listing.estimated_revenue === 'object') {
-          const revenueValue = listing.estimated_revenue.estimated_revenue || listing.estimated_revenue.price || 0
+        if (listing.estimated_revenue) {
+          let revenueValue = 0
+          if (typeof listing.estimated_revenue === 'object') {
+            revenueValue = listing.estimated_revenue.estimated_revenue || listing.estimated_revenue.price || 0
+          } else if (typeof listing.estimated_revenue === 'number') {
+            revenueValue = listing.estimated_revenue
+          } else if (typeof listing.estimated_revenue === 'string') {
+            revenueValue = parseFloat(listing.estimated_revenue) || 0
+          }
+          
           if (typeof revenueValue === 'number' && revenueValue > 0) {
             estimatedRevenue += revenueValue
           }
@@ -497,6 +505,277 @@ async function updateDeveloperAfterListing(userId, operation = 'update') {
     }
   } catch (error) {
     console.error('Error in updateDeveloperAfterListing:', error)
+    console.error('Error stack:', error.stack)
+  }
+}
+
+// Helper function to recalculate and update agent metrics from actual listings
+async function updateAgentAfterListing(userId, operation = 'update') {
+  if (!userId) return
+
+  try {
+    console.log('🔄 Recalculating agent metrics for user:', userId, 'operation:', operation)
+    
+    // Get agent record by agent_id (which matches listings.user_id)
+    const { data: agent, error: agentError } = await supabaseAdmin
+      .from('agents')
+      .select('id, agent_id, total_listings, active_listings, total_commission, estimated_revenue')
+      .eq('agent_id', userId)
+      .single()
+
+    if (agentError || !agent) {
+      console.error('Error fetching agent:', agentError)
+      return
+    }
+
+    // Recalculate total_listings from actual listings count (all completed listings)
+    const { count: totalListingsCount, error: listingsError } = await supabaseAdmin
+      .from('listings')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('account_type', 'agent')
+      .in('listing_status', ['active', 'sold', 'rented', 'draft'])
+
+    if (listingsError) {
+      console.error('Error counting listings:', listingsError)
+    }
+
+    // Recalculate active_listings (only active listings)
+    const { count: activeListingsCount, error: activeError } = await supabaseAdmin
+      .from('listings')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('account_type', 'agent')
+      .eq('listing_status', 'active')
+
+    if (activeError) {
+      console.error('Error counting active listings:', activeError)
+    }
+
+    // Recalculate estimated_revenue and total_commission from all listings
+    const { data: allListings, error: allError } = await supabaseAdmin
+      .from('listings')
+      .select('estimated_revenue, commission_rate, listing_status')
+      .eq('user_id', userId)
+      .eq('account_type', 'agent')
+      .in('listing_status', ['active', 'sold', 'rented'])
+
+    let totalEstimatedRevenue = 0
+    let totalCommission = 0
+
+    if (!allError && allListings) {
+      allListings.forEach(listing => {
+        // Calculate estimated revenue
+        if (listing.estimated_revenue) {
+          let revenueValue = 0
+          if (typeof listing.estimated_revenue === 'object') {
+            revenueValue = listing.estimated_revenue.estimated_revenue || listing.estimated_revenue.price || 0
+          } else if (typeof listing.estimated_revenue === 'number') {
+            revenueValue = listing.estimated_revenue
+          } else if (typeof listing.estimated_revenue === 'string') {
+            revenueValue = parseFloat(listing.estimated_revenue) || 0
+          }
+          
+          if (revenueValue > 0) {
+            totalEstimatedRevenue += revenueValue
+          }
+        }
+
+        // Calculate commission from commission_rate
+        if (listing.commission_rate) {
+          let commissionPercentage = 0
+          if (typeof listing.commission_rate === 'object') {
+            commissionPercentage = listing.commission_rate.percentage || 0
+          } else if (typeof listing.commission_rate === 'number') {
+            commissionPercentage = listing.commission_rate
+          }
+
+          if (commissionPercentage > 0 && listing.estimated_revenue) {
+            let revenueValue = 0
+            if (typeof listing.estimated_revenue === 'object') {
+              revenueValue = listing.estimated_revenue.estimated_revenue || listing.estimated_revenue.price || 0
+            } else if (typeof listing.estimated_revenue === 'number') {
+              revenueValue = listing.estimated_revenue
+            } else if (typeof listing.estimated_revenue === 'string') {
+              revenueValue = parseFloat(listing.estimated_revenue) || 0
+            }
+            
+            const commissionAmount = (revenueValue * commissionPercentage) / 100
+            totalCommission += commissionAmount
+          }
+        }
+      })
+    }
+
+    // Update agent table
+    const updateData = {
+      total_listings: totalListingsCount || 0,
+      active_listings: activeListingsCount || 0,
+      estimated_revenue: totalEstimatedRevenue.toFixed(2),
+      total_commission: totalCommission.toFixed(2)
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from('agents')
+      .update(updateData)
+      .eq('agent_id', userId)
+
+    if (updateError) {
+      console.error('Error updating agent metrics:', updateError)
+    } else {
+      console.log('✅ Agent metrics updated:', {
+        agentId: userId,
+        total_listings: updateData.total_listings,
+        active_listings: updateData.active_listings,
+        estimated_revenue: updateData.estimated_revenue,
+        total_commission: updateData.total_commission
+      })
+    }
+  } catch (error) {
+    console.error('Error in updateAgentAfterListing:', error)
+    console.error('Error stack:', error.stack)
+  }
+}
+
+// Helper function to recalculate and update agency metrics from all agent listings
+async function updateAgencyAfterListing(agencyId, operation = 'update') {
+  if (!agencyId) return
+
+  try {
+    console.log('🔄 Recalculating agency metrics for agency:', agencyId, 'operation:', operation)
+    
+    // Get agency record
+    const { data: agency, error: agencyError } = await supabaseAdmin
+      .from('agencies')
+      .select('id, agency_id, total_listings, estimated_revenue, agents_total_revenue, agents_total_sales')
+      .eq('agency_id', agencyId)
+      .single()
+
+    if (agencyError || !agency) {
+      console.error('Error fetching agency:', agencyError)
+      return
+    }
+
+    // Get all agents in this agency
+    const { data: agents, error: agentsError } = await supabaseAdmin
+      .from('agents')
+      .select('agent_id')
+      .eq('agency_id', agencyId)
+      .eq('account_status', 'active')
+
+    if (agentsError) {
+      console.error('Error fetching agents:', agentsError)
+      return
+    }
+
+    if (!agents || agents.length === 0) {
+      // No agents, reset agency metrics
+      const { error: updateError } = await supabaseAdmin
+        .from('agencies')
+        .update({
+          total_listings: 0,
+          estimated_revenue: '0.00',
+          agents_total_revenue: '0.00',
+          agents_total_sales: 0
+        })
+        .eq('agency_id', agencyId)
+      
+      if (updateError) {
+        console.error('Error resetting agency metrics:', updateError)
+      }
+      return
+    }
+
+    const agentIds = agents.map(agent => agent.agent_id)
+
+    // Recalculate total_listings from all agent listings
+    const { count: totalListingsCount, error: listingsError } = await supabaseAdmin
+      .from('listings')
+      .select('*', { count: 'exact', head: true })
+      .in('user_id', agentIds)
+      .eq('account_type', 'agent')
+      .in('listing_status', ['active', 'sold', 'rented', 'draft'])
+
+    if (listingsError) {
+      console.error('Error counting listings:', listingsError)
+    }
+
+    // Recalculate estimated_revenue from all agent listings
+    const { data: allListings, error: allError } = await supabaseAdmin
+      .from('listings')
+      .select('estimated_revenue, listing_status')
+      .in('user_id', agentIds)
+      .eq('account_type', 'agent')
+      .in('listing_status', ['active', 'sold', 'rented'])
+
+    let totalEstimatedRevenue = 0
+
+    if (!allError && allListings) {
+      allListings.forEach(listing => {
+        if (listing.estimated_revenue) {
+          let revenueValue = 0
+          if (typeof listing.estimated_revenue === 'object') {
+            revenueValue = listing.estimated_revenue.estimated_revenue || listing.estimated_revenue.price || 0
+          } else if (typeof listing.estimated_revenue === 'number') {
+            revenueValue = listing.estimated_revenue
+          } else if (typeof listing.estimated_revenue === 'string') {
+            revenueValue = parseFloat(listing.estimated_revenue) || 0
+          }
+          
+          if (revenueValue > 0) {
+            totalEstimatedRevenue += revenueValue
+          }
+        }
+      })
+    }
+
+    // Recalculate agents_total_revenue and agents_total_sales from sales_listings
+    const { data: salesListings, error: salesError } = await supabaseAdmin
+      .from('sales_listings')
+      .select('sale_price')
+      .in('user_id', agentIds)
+
+    let agentsTotalRevenue = 0
+    let agentsTotalSales = 0
+
+    if (!salesError && salesListings) {
+      agentsTotalSales = salesListings.length
+      salesListings.forEach(sale => {
+        const salePrice = typeof sale.sale_price === 'string' 
+          ? parseFloat(sale.sale_price) 
+          : (sale.sale_price || 0)
+        if (typeof salePrice === 'number' && salePrice > 0) {
+          agentsTotalRevenue += salePrice
+        }
+      })
+    }
+
+    // Update agency table
+    const updateData = {
+      total_listings: totalListingsCount || 0,
+      estimated_revenue: totalEstimatedRevenue.toFixed(2),
+      agents_total_revenue: agentsTotalRevenue.toFixed(2),
+      agents_total_sales: agentsTotalSales
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from('agencies')
+      .update(updateData)
+      .eq('agency_id', agencyId)
+
+    if (updateError) {
+      console.error('Error updating agency metrics:', updateError)
+    } else {
+      console.log('✅ Agency metrics updated:', {
+        agencyId: agencyId,
+        total_listings: updateData.total_listings,
+        estimated_revenue: updateData.estimated_revenue,
+        agents_total_revenue: updateData.agents_total_revenue,
+        agents_total_sales: updateData.agents_total_sales
+      })
+    }
+  } catch (error) {
+    console.error('Error in updateAgencyAfterListing:', error)
     console.error('Error stack:', error.stack)
   }
 }
@@ -1220,6 +1499,20 @@ export async function PUT(request, { params }) {
     
     // Use the actual listing ID (UUID) for all operations
     const listingId = existingListing.id
+    
+    // Get agency_id for agents if listing_agency_id is not set
+    let agencyId = existingListing.listing_agency_id
+    if (existingListing.account_type === 'agent' && !agencyId) {
+      const { data: agent, error: agentError } = await supabaseAdmin
+        .from('agents')
+        .select('agency_id')
+        .eq('agent_id', userId)
+        .single()
+      
+      if (!agentError && agent?.agency_id) {
+        agencyId = agent.agency_id
+      }
+    }
 
     // Check content type to handle both JSON and FormData
     const contentType = request.headers.get('content-type') || ''
@@ -1561,7 +1854,7 @@ export async function PUT(request, { params }) {
       additional_information: formData.get('additional_information') || existingListing.additional_information,
       // Agent-specific fields
       commission_rate: formData.get('commission_rate') ? JSON.parse(formData.get('commission_rate')) : (existingListing.commission_rate || null),
-      listing_agency_id: formData.get('listing_agency_id') || existingListing.listing_agency_id || null,
+      listing_agency_id: formData.get('listing_agency_id') || agencyId || existingListing.listing_agency_id || null,
       listing_status: formData.get('listing_status') || existingListing.listing_status,
       is_featured: formData.get('is_featured') !== null ? formData.get('is_featured') === 'true' : existingListing.is_featured,
       is_verified: formData.get('is_verified') !== null ? formData.get('is_verified') === 'true' : existingListing.is_verified,
@@ -1987,6 +2280,24 @@ export async function PUT(request, { params }) {
     if (updatedListing.account_type === 'developer' && userId) {
       console.log('🔄 Updating developer metrics after listing update...')
       await updateDeveloperAfterListing(userId, 'update')
+    }
+
+    // Update agent stats if this is an agent listing (for any updates, especially pricing changes)
+    // Recalculate all metrics from actual listings data
+    if (updatedListing.account_type === 'agent' && userId) {
+      console.log('🔄 Updating agent metrics after listing update...')
+      await updateAgentAfterListing(userId, 'update')
+      
+      // Also update agency metrics
+      const { data: agent } = await supabaseAdmin
+        .from('agents')
+        .select('agency_id')
+        .eq('agent_id', userId)
+        .single()
+      
+      if (agent?.agency_id) {
+        await updateAgencyAfterListing(agent.agency_id, 'update')
+      }
     }
 
     // Update admin analytics (only count completed listings)

@@ -7,7 +7,11 @@ import { MapPin, DollarSign, TrendingUp, Users, Eye } from 'lucide-react'
 import DataCard from '@/app/components/developers/DataCard'
 import LatestLeads from '@/app/components/developers/DataStats/LatestLeads'
 import RecentMessages from '@/app/components/developers/DataStats/RecentMessages'
-import Appointments from '@/app/components/developers/Appointments'
+import PopularListings from '@/app/components/developers/DataStats/PopularListings'
+import LatestAppointments from '@/app/components/developers/LatestAppointments'
+import LatestReminders from '@/app/components/developers/DataStats/LatestReminders'
+import StatisticsView from '@/app/components/developers/DataStats/StatisticsView'
+import RecentTransactions from './RecentTransactions'
 import { formatCurrency } from '@/lib/utils'
 
 const formatNumber = (num) => {
@@ -149,19 +153,37 @@ const AgentDashboard = () => {
         />
       </div>
 
-      {/* Recent Messages | Latest Leads */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Analytics - Statistics View */}
+      <div className="w-full">
+        <StatisticsView userId={listerId} accountType="agent" />
+      </div>
+
+      {/* Recent Messages | Latest Leads | Recent Transactions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="secondary_bg p-4 rounded-2xl shadow-sm">
           <RecentMessages userId={listerId} accountType="agent" />
         </div>
         <div className="secondary_bg p-4 rounded-2xl shadow-sm">
           <LatestLeads listerId={listerId} listerType="agent" />
         </div>
+        <div className="secondary_bg p-4 rounded-2xl shadow-sm">
+          <RecentTransactions agentId={agent?.id} limit={5} />
+        </div>
       </div>
 
-      {/* Appointments */}
+      {/* Latest Appointments | Latest Reminders */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="secondary_bg p-4 rounded-2xl shadow-sm">
+          <LatestAppointments />
+        </div>
+        <div className="secondary_bg p-4 rounded-2xl shadow-sm">
+          <LatestReminders />
+        </div>
+      </div>
+
+      {/* Popular Listings */}
       <div className="w-full">
-        <Appointments accountId={listerId} accountType="agent" />
+        <PopularListings limit={4} userId={listerId} accountType="agent" />
       </div>
     </div>
   )

@@ -4,7 +4,8 @@ import DataCard from '../components/Data/DataCard'
 import SimplePropertyCard from '../components/Data/SimplePropertyCard'
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination, EffectCoverflow } from 'swiper/modules';
-import SearchGeneral from './SearchGeneral';
+import HeaderSearch from './HeaderSearch';
+import Link from 'next/link';
 import 'swiper/css';
 import 'swiper/css/autoplay';
 import 'swiper/css/navigation';
@@ -48,11 +49,11 @@ const Header = () => {
 
   // 5 real estate images from Unsplash
   const loadingImages = [
-    "https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0",
-    "https://images.unsplash.com/photo-1568605114967-8130f3a36994?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0",
-    "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0",
-    "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0",
-    "https://images.unsplash.com/photo-1568605117034-6095e1e87e1e?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0"
+    "https://images.unsplash.com/photo-1593696140826-c58b021acf8b?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    "https://images.unsplash.com/photo-1639851097191-f13149bb05ae?q=80&w=764&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    "https://images.unsplash.com/photo-1565402170291-8491f14678db?q=80&w=1117&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    "https://images.unsplash.com/photo-1565953522043-baea26b83b7e?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    "https://images.unsplash.com/photo-1723110994499-df46435aa4b3?q=80&w=1179&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
   ]
 
   // Cross-fade through images while loading
@@ -303,7 +304,7 @@ const Header = () => {
             Whether you're buying, renting, or investing, we make your property journey seamless and successful.
           </p> */}
           <motion.div variants={itemVariants} className='w-full'>
-            <SearchGeneral />
+            <HeaderSearch />
           </motion.div>
           {/* 
           <motion.div variants={itemVariants} className='grid grid-cols-3 gap-4 w-full'>
@@ -315,10 +316,14 @@ const Header = () => {
 
        <div className='flex items-center gap-4'>
        <motion.div variants={itemVariants}>
+            <Link href="/home/signup">
             <button className="secondary_button">Get Started </button>
+            </Link>
           </motion.div>
        <motion.div variants={itemVariants}>
+            <Link href="/home/exploreProperties">
             <button className="secondary_button">Explore Properties</button>
+            </Link>
           </motion.div>
        
        </div>
@@ -333,7 +338,7 @@ const Header = () => {
               animate={{ scale: 0.7, opacity: 1 }}
               exit={{ scale: 1, opacity: 0 }}
               transition={{ duration: 0.5 }}
-              className="h-full w-full relative rounded-xl overflow-hidden shadow-lg border-t-4"
+              className="h-[450px] sm:h-[550px] md:h-[650px] lg:h-[700px] w-full relative rounded-t-full overflow-hidden shadow-lg border-t-4"
               style={{
                 borderTopColor: 'var(--color-primary_color)',
               }}

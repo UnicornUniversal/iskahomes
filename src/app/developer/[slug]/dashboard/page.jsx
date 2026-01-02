@@ -110,13 +110,9 @@ const page = () => {
 
 {/* this si the main content of the dashboard */}
       <div className='w-full flex flex-col gap-4'>
-        <div className=' grid lg:grid-cols-3 gap-4'>
-          <div className="col-span-2">
-            <StatisticsView />
-          </div>
-          <div>
-            <SimpleServices />
-          </div>
+        {/* Analytics - Statistics View */}
+        <div className='w-full'>
+          <StatisticsView />
         </div>
 
 

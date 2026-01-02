@@ -17,13 +17,14 @@ const AllUnits = ({ accountType = 'developer' }) => {
   
   // Determine labels based on account type
   const isAgent = accountType === 'agent'
-  const itemLabel = isAgent ? 'Property' : 'Unit'
-  const itemLabelPlural = isAgent ? 'Properties' : 'Units'
-  const addButtonLabel = isAgent ? 'Add New Property' : 'Add New Unit'
-  const pageTitle = isAgent ? 'All Properties' : 'All Units'
-  const emptyStateTitle = isAgent ? 'No properties found' : 'No units found'
-  const emptyStateMessage = isAgent ? 'Get started by creating your first property' : 'Get started by creating your first unit'
-  const emptyStateButton = isAgent ? 'Create Your First Property' : 'Create Your First Unit'
+  const isAgency = accountType === 'agency'
+  const itemLabel = isAgent || isAgency ? 'Property' : 'Unit'
+  const itemLabelPlural = isAgent || isAgency ? 'Properties' : 'Units'
+  const addButtonLabel = isAgent || isAgency ? 'Add New Property' : 'Add New Unit'
+  const pageTitle = isAgent || isAgency ? 'All Properties' : 'All Units'
+  const emptyStateTitle = isAgent || isAgency ? 'No properties found' : 'No units found'
+  const emptyStateMessage = isAgent || isAgency ? 'Get started by creating your first property' : 'Get started by creating your first unit'
+  const emptyStateButton = isAgent || isAgency ? 'Create Your First Property' : 'Create Your First Unit'
   const [units, setUnits] = useState([])
   const [filteredUnits, setFilteredUnits] = useState([])
   const [loading, setLoading] = useState(true)
@@ -80,6 +81,8 @@ const AllUnits = ({ accountType = 'developer' }) => {
   // Get ID from user profile based on account type
   const accountId = isAgent 
     ? (user?.profile?.agent_id || user?.id)
+    : isAgency
+    ? (user?.profile?.agency_id || user?.id)
     : (user?.profile?.developer_id || user?.id)
 
   useEffect(() => {
@@ -93,6 +96,8 @@ const AllUnits = ({ accountType = 'developer' }) => {
       setLoading(true)
       const token = isAgent 
         ? localStorage.getItem('agent_token')
+        : isAgency
+        ? localStorage.getItem('agency_token')
         : localStorage.getItem('developer_token')
       
       if (!token) {
@@ -100,8 +105,16 @@ const AllUnits = ({ accountType = 'developer' }) => {
         return
       }
 
-      const listingType = isAgent ? 'property' : 'unit'
-      const response = await fetch(`/api/user-listings?listing_type=${listingType}`, {
+      const listingType = isAgent || isAgency ? 'property' : 'unit'
+      
+      // For agencies, we need to filter by listing_agency_id
+      let apiUrl = `/api/user-listings?listing_type=${listingType}`
+      if (isAgency && user?.profile?.agency_id) {
+        // Use a custom endpoint to filter by listing_agency_id
+        apiUrl = `/api/listings/by-agency?agency_id=${user.profile.agency_id}&listing_type=${listingType}`
+      }
+      
+      const response = await fetch(apiUrl, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -287,16 +300,17 @@ const AllUnits = ({ accountType = 'developer' }) => {
   if (loading) {
     return (
       <div className="w-full p-6">
-        <div className="flex justify-between items-center mb-6">
+        <div className="w-full flex justify-between items-center mb-6">
           <h1 className=" font-bold ">{pageTitle}</h1>
-          <button 
-            onClick={handleAddUnit}
-            className="primary_button flex items-center gap-2"
-          >
-           
-            {addButtonLabel}
-            <Plus className="w-4 h-4" />
-          </button>
+          {!isAgency && (
+            <button 
+              onClick={handleAddUnit}
+              className="primary_button flex items-center gap-2"
+            >
+              {addButtonLabel}
+              <Plus className="w-4 h-4" />
+            </button>
+          )}
         </div>
         
         <div className="flex justify-center items-center py-12">
@@ -312,15 +326,17 @@ const AllUnits = ({ accountType = 'developer' }) => {
   if (error) {
     return (
       <div className="w-full p-6">
-        <div className="flex justify-between items-center mb-6">
+        <div className="w-full flex justify-between items-center mb-6">
           <h1 className="">{pageTitle}</h1>
-          <button 
-            onClick={handleAddUnit}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-          >
-            <Plus className="w-4 h-4" />
-            {addButtonLabel}
-          </button>
+          {!isAgency && (
+            <button 
+              onClick={handleAddUnit}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            >
+              <Plus className="w-4 h-4" />
+              {addButtonLabel}
+            </button>
+          )}
         </div>
         
         <div className="text-center py-12">
@@ -343,52 +359,59 @@ const AllUnits = ({ accountType = 'developer' }) => {
   }
 
   return (
-    <div className="w-full flex items-start gap-6 p-6 relative">
-      {/* Mobile Filter Button - Absolutely positioned at upper right */}
-      <button
-        onClick={() => setShowFilters(!showFilters)}
-        className="lg:hidden fixed top-20 right-4 z-40 w-12 h-12 rounded-full bg-primary_color text-white shadow-lg hover:bg-primary_color/90 transition-colors flex items-center justify-center"
-        title="Show Filters"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-        </svg>
-      </button>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col gap-4">
-        {/* Header */}
-        <div className="flex justify-between items-center flex-wrap gap-4">
-          <div>
-            <p>Manage all your</p>
-            <h1 className="text-[4em]">Listings {itemLabelPlural}</h1>
-            <p className="mt-1">
-              Showing {filteredUnits.length} of {units.length} {units.length === 1 ? itemLabel.toLowerCase() : itemLabelPlural.toLowerCase()}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Filter Toggle Button - Desktop only, before Add New Unit */}
-            <button
-              onClick={() => setShowDesktopFilters(!showDesktopFilters)}
-              className="hidden lg:flex items-center justify-center w-10 h-10 !p-2  secondary_button !rounded-md hover:bg-gray-50 transition-colors"
-              title={showDesktopFilters ? "Hide Filters" : "Show Filters"}
-            >
-              <svg className="w-5 h-5 text-primary_color" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-              </svg>
-            </button>
-            <button 
-              onClick={handleAddUnit}
-              className="primary_button transition-colors flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              {addButtonLabel}
-            </button>
-          </div>
+    <div className="w-full p-6">
+      {/* Header - Full Width */}
+      <div className="w-full flex justify-between items-center flex-wrap gap-4 mb-6">
+        <div>
+          <p>Manage all your</p>
+          <h1 className="text-[4em]">Listings {itemLabelPlural}</h1>
+          <p className="mt-1">
+            Showing {filteredUnits.length} of {units.length} {units.length === 1 ? itemLabel.toLowerCase() : itemLabelPlural.toLowerCase()}
+          </p>
         </div>
+        {/* Conditionally render Add New Property button - only for agents and developers */}
+        {!isAgency && (
+          <button 
+            onClick={handleAddUnit}
+            className="primary_button transition-colors flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            {addButtonLabel}
+          </button>
+        )}
+      </div>
 
-        {/* Units List */}
-        {units.length === 0 ? (
+      {/* Filters and List Container - Same Div */}
+      <div className="w-full flex items-start gap-6 relative">
+        {/* Mobile Filter Button - Absolutely positioned at upper right */}
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="lg:hidden fixed top-20 right-4 z-40 w-12 h-12 rounded-full bg-primary_color text-white shadow-lg hover:bg-primary_color/90 transition-colors flex items-center justify-center"
+          title="Show Filters"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          </svg>
+        </button>
+
+        {/* Main Content Area with Filters and List */}
+        <div className="flex-1 flex flex-col gap-4">
+          {/* Filter Toggle Button - Desktop only, show when filters are hidden */}
+          {!showDesktopFilters && (
+            <div className="hidden lg:flex items-center justify-end mb-2">
+              <button
+                onClick={() => setShowDesktopFilters(true)}
+                className="flex items-center justify-center w-10 h-10 !p-2 secondary_button !rounded-md hover:bg-gray-50 transition-colors"
+                title="Show Filters"
+              >
+                <svg className="w-5 h-5 text-primary_color" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+              </button>
+            </div>
+          )}
+          {/* Units List */}
+          {units.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-gray-400 mb-4">
               <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -397,12 +420,14 @@ const AllUnits = ({ accountType = 'developer' }) => {
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">{emptyStateTitle}</h3>
             <p className="text-gray-600 mb-6">{emptyStateMessage}</p>
-            <button 
-              onClick={handleAddUnit}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              {emptyStateButton}
-            </button>
+            {!isAgency && (
+              <button 
+                onClick={handleAddUnit}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                {emptyStateButton}
+              </button>
+            )}
           </div>
         ) : filteredUnits.length === 0 ? (
           <div className="flex justify-center items-center h-64">
@@ -430,22 +455,33 @@ const AllUnits = ({ accountType = 'developer' }) => {
             ))}
           </div>
         )}
-      </div>
+        </div>
 
-      {/* Filters Sidebar - Hidden on small/medium, conditionally visible on large+ */}
-      {showDesktopFilters && (
+        {/* Filters Sidebar - Hidden on small/medium, conditionally visible on large+ */}
+        {showDesktopFilters && (
         <div className="hidden lg:block w-80 flex-shrink-0 sticky top-20 self-start">
           <div className="border-l border-gray-200 p-4 max-h-[calc(100vh-5rem)] overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Filters</h2>
-            {(searchQuery || selectedLocation || selectedStatus || selectedPurpose || selectedType) && (
+            <div className="flex items-center gap-2">
+              {(searchQuery || selectedLocation || selectedStatus || selectedPurpose || selectedType) && (
+                <button
+                  onClick={clearFilters}
+                  className="secondary_button text-sm"
+                >
+                  Clear All
+                </button>
+              )}
               <button
-                onClick={clearFilters}
-                className="secondary_button text-sm"
+                onClick={() => setShowDesktopFilters(false)}
+                className="secondary_button text-sm !p-2"
+                title="Hide Filters"
               >
-                Clear All
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
-            )}
+            </div>
           </div>
 
           {/* Search by Name */}
@@ -719,7 +755,8 @@ const AllUnits = ({ accountType = 'developer' }) => {
             </div>
           </div>
         </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

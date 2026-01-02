@@ -619,7 +619,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
       <ToastContainer position="top-right" autoClose={3000} />
       {/* Data Cards - Only show when NOT viewing a specific listing (since it's shown in ListingLeadsInsights) */}
       {!listingId && totalLeadsData && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:grid-rows-2 gap-6 mb-8">
           <DataCard
             title="Total Leads"
             value={(totalLeadsData.total_leads || 0).toLocaleString()}

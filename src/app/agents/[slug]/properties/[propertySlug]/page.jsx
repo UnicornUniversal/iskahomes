@@ -2,8 +2,6 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import PropertyManagement from '@/app/components/propertyManagement/PropertyManagement'
-import AgentNav from '@/app/components/agents/AgentNav'
-import AgentHeader from '@/app/components/agents/AgentHeader'
 
 const SinglePropertyPage = ({ params }) => {
   const router = useRouter()
@@ -25,18 +23,12 @@ const SinglePropertyPage = ({ params }) => {
   // Handle add new property case
   if (propertySlug === 'addNewProperty') {
     return (
-      <div className='w-full normal_div'>
-        <AgentNav active={2} />
-        <div className='w-full flex flex-col gap-[2em]'>
-          <AgentHeader />
-          <div className='flex-1 overflow-x-auto'>
-            <PropertyManagement 
-              slug="addNewProperty" 
-              propertyId={null} 
-              accountType="agent" 
-            />
-          </div>
-        </div>
+      <div className='flex-1 overflow-x-auto'>
+        <PropertyManagement 
+          slug="addNewProperty" 
+          propertyId={null} 
+          accountType="agent" 
+        />
       </div>
     )
   }
@@ -45,36 +37,24 @@ const SinglePropertyPage = ({ params }) => {
   if (propertySlug.endsWith('/edit')) {
     const propertyId = propertySlug.replace('/edit', '')
     return (
-      <div className='w-full normal_div'>
-        <AgentNav active={2} />
-        <div className='w-full flex flex-col gap-[2em]'>
-          <AgentHeader />
-          <div className='flex-1 overflow-x-auto'>
-            <PropertyManagement 
-              slug="editProperty" 
-              propertyId={propertyId} 
-              accountType="agent" 
-            />
-          </div>
-        </div>
+      <div className='flex-1 overflow-x-auto'>
+        <PropertyManagement 
+          slug="editProperty" 
+          propertyId={propertyId} 
+          accountType="agent" 
+        />
       </div>
     )
   }
 
   // For regular property viewing - show in edit mode
   return (
-    <div className='w-full normal_div'>
-      <AgentNav active={2} />
-      <div className='w-full flex flex-col gap-[2em]'>
-        <AgentHeader />
-        <div className='flex-1 overflow-x-auto'>
-          <PropertyManagement 
-            slug="editProperty" 
-            propertyId={propertySlug} 
-            accountType="agent" 
-          />
-        </div>
-      </div>
+    <div className='flex-1 overflow-x-auto'>
+      <PropertyManagement 
+        slug="editProperty" 
+        propertyId={propertySlug} 
+        accountType="agent" 
+      />
     </div>
   )
 }

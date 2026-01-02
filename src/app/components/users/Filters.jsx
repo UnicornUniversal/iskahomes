@@ -39,38 +39,121 @@ const Filters = ({ onChange, initial = {} }) => {
   const [loading, setLoading] = useState(true);
 
   // Track if we've synced from initial props to avoid loops
-  const hasSyncedRef = useRef(false);
-  const lastInitialRef = useRef(JSON.stringify(initial));
+  const lastInitialRef = useRef('');
+  const isApplyingFiltersRef = useRef(false);
+  const mountedRef = useRef(false);
 
-  // Sync with initial prop changes (when URL params load)
+  // Sync with initial prop changes (when URL params load) - but only if we're not applying filters
   useEffect(() => {
-    const currentInitialStr = JSON.stringify(initial);
+    // Skip sync if we're in the middle of applying filters
+    if (isApplyingFiltersRef.current) {
+      console.log('⏸️ Skipping sync - applying filters in progress');
+      return;
+    }
+    
+    const currentInitialStr = JSON.stringify(initial || {});
     
     // Only sync if initial has actually changed
     if (currentInitialStr !== lastInitialRef.current) {
+      // Update ref immediately to prevent duplicate syncs
+      const previousRef = lastInitialRef.current;
       lastInitialRef.current = currentInitialStr;
       
+      // On first mount, always sync
+      if (!mountedRef.current) {
+        if (Array.isArray(initial.purposeIds)) setSelectedPurposeIds(initial.purposeIds);
+        if (initial.typeId !== undefined) setSelectedTypeId(initial.typeId || "");
+        if (Array.isArray(initial.subtypeIds)) setSelectedSubtypeIds(initial.subtypeIds);
+        if (initial.country !== undefined) setCountry(initial.country || "Ghana");
+        if (initial.state !== undefined) setState(initial.state || "");
+        if (initial.city !== undefined) setCity(initial.city || "");
+        if (initial.town !== undefined) setTown(initial.town || "");
+        if (initial.bedrooms !== undefined) setBedrooms(initial.bedrooms || "");
+        if (initial.bathrooms !== undefined) setBathrooms(initial.bathrooms || "");
+        if (initial.specifications !== undefined) setSpecifications(initial.specifications || {});
+        if (initial.priceMin !== undefined) priceMinRef.current = initial.priceMin?.toString() || "";
+        if (initial.priceMax !== undefined) priceMaxRef.current = initial.priceMax?.toString() || "";
+        mountedRef.current = true;
+        return;
+      }
+      
+      // After mount, compare FULL objects to see if it's really different
+      // This prevents resetting when we apply our own filters
+      let prevInitial = {};
+      try {
+        prevInitial = JSON.parse(lastInitialRef.current || '{}');
+      } catch (e) {
+        prevInitial = {};
+      }
+      
+      const currentInitial = initial || {};
+      
+      // Normalize both objects for comparison (sort arrays, handle undefined, remove empty)
+      const normalizeForCompare = (obj) => {
+        if (!obj || typeof obj !== 'object') return '{}';
+        
+        const normalized = {};
+        
+        // Copy all properties, handling arrays and objects
+        Object.keys(obj).forEach(key => {
+          const value = obj[key];
+          // Skip undefined values
+          if (value === undefined) return;
+          
+          if (key === 'purposeIds' && Array.isArray(value)) {
+            normalized[key] = [...value].sort();
+          } else if (key === 'subtypeIds' && Array.isArray(value)) {
+            normalized[key] = [...value].sort();
+          } else if (key === 'specifications' && value && typeof value === 'object') {
+            // Sort specification keys for consistent comparison
+            const sortedSpecs = {};
+            Object.keys(value).sort().forEach(specKey => {
+              if (value[specKey] !== undefined && value[specKey] !== null && value[specKey] !== '') {
+                sortedSpecs[specKey] = value[specKey];
+              }
+            });
+            // Only include if not empty
+            if (Object.keys(sortedSpecs).length > 0) {
+              normalized[key] = sortedSpecs;
+            }
+          } else {
+            // For other values, include if not empty
+            if (value !== null && value !== '' && value !== undefined) {
+              normalized[key] = value;
+            }
+          }
+        });
+        
+        return JSON.stringify(normalized);
+      };
+      
+      const prevNormalized = normalizeForCompare(prevInitial);
+      const currNormalized = normalizeForCompare(currentInitial);
+      
+      // If they're the same, it's our own update - skip sync to prevent reset
+      if (prevNormalized === currNormalized) {
+        console.log('🔄 Skipping sync - filters unchanged (our own update)');
+        console.log('Normalized comparison:', prevNormalized);
+        return;
+      }
+      
+      console.log('🔄 Syncing filters from external change');
+      console.log('Previous normalized:', prevNormalized);
+      console.log('Current normalized:', currNormalized);
+      
+      // It's a real external change - sync everything
       if (Array.isArray(initial.purposeIds)) setSelectedPurposeIds(initial.purposeIds);
       if (initial.typeId !== undefined) setSelectedTypeId(initial.typeId || "");
       if (Array.isArray(initial.subtypeIds)) setSelectedSubtypeIds(initial.subtypeIds);
-      // Only set country if it's explicitly provided, otherwise keep default
-      if (initial.country !== undefined) {
-        setCountry(initial.country || "Ghana");
-      }
+      if (initial.country !== undefined) setCountry(initial.country || "Ghana");
       if (initial.state !== undefined) setState(initial.state || "");
       if (initial.city !== undefined) setCity(initial.city || "");
       if (initial.town !== undefined) setTown(initial.town || "");
       if (initial.bedrooms !== undefined) setBedrooms(initial.bedrooms || "");
       if (initial.bathrooms !== undefined) setBathrooms(initial.bathrooms || "");
       if (initial.specifications !== undefined) setSpecifications(initial.specifications || {});
-      if (initial.priceMin !== undefined) {
-        priceMinRef.current = initial.priceMin?.toString() || "";
-      }
-      if (initial.priceMax !== undefined) {
-        priceMaxRef.current = initial.priceMax?.toString() || "";
-      }
-      
-      hasSyncedRef.current = true;
+      if (initial.priceMin !== undefined) priceMinRef.current = initial.priceMin?.toString() || "";
+      if (initial.priceMax !== undefined) priceMaxRef.current = initial.priceMax?.toString() || "";
     }
   }, [initial]);
 
@@ -161,7 +244,20 @@ const Filters = ({ onChange, initial = {} }) => {
   // Apply filters function - only called when user clicks "Apply Filters"
   const applyFilters = () => {
     if (typeof onChange === "function") {
+      // Mark that we're applying filters to prevent sync reset
+      isApplyingFiltersRef.current = true;
+      
       // Get values from refs (for price) and state (for everything else)
+      // Clean specifications - remove empty values
+      const cleanedSpecifications = {};
+      if (specifications && typeof specifications === 'object') {
+        Object.entries(specifications).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            cleanedSpecifications[key] = value;
+          }
+        });
+      }
+      
       const filterData = {
         purposeIds: selectedPurposeIds,
         typeId: selectedTypeId,
@@ -174,10 +270,50 @@ const Filters = ({ onChange, initial = {} }) => {
         priceMax: priceMaxRef.current === "" ? undefined : Number(priceMaxRef.current),
         bedrooms: bedrooms === "" ? undefined : Number(bedrooms),
         bathrooms: bathrooms === "" ? undefined : Number(bathrooms),
-        specifications
+        specifications: Object.keys(cleanedSpecifications).length > 0 ? cleanedSpecifications : undefined
       };
+      
+      // Normalize filterData for consistent comparison (same logic as in useEffect)
+      const normalizeForCompare = (obj) => {
+        if (!obj || typeof obj !== 'object') return '{}';
+        const normalized = {};
+        Object.keys(obj).forEach(key => {
+          const value = obj[key];
+          if (value === undefined) return;
+          if (key === 'purposeIds' && Array.isArray(value)) {
+            normalized[key] = [...value].sort();
+          } else if (key === 'subtypeIds' && Array.isArray(value)) {
+            normalized[key] = [...value].sort();
+          } else if (key === 'specifications' && value && typeof value === 'object') {
+            const sortedSpecs = {};
+            Object.keys(value).sort().forEach(specKey => {
+              if (value[specKey] !== undefined && value[specKey] !== null && value[specKey] !== '') {
+                sortedSpecs[specKey] = value[specKey];
+              }
+            });
+            if (Object.keys(sortedSpecs).length > 0) {
+              normalized[key] = sortedSpecs;
+            }
+          } else if (value !== null && value !== '' && value !== undefined) {
+            normalized[key] = value;
+          }
+        });
+        return JSON.stringify(normalized);
+      };
+      
+      // Update lastInitialRef with normalized version to match what will come back
+      lastInitialRef.current = normalizeForCompare(filterData);
+      
       console.log('📤 Filters applied:', filterData);
+      console.log('📋 Specifications being sent:', cleanedSpecifications);
+      
+      // Call onChange
       onChange(filterData);
+      
+      // Reset flag after a longer delay to ensure URL update completes
+      setTimeout(() => {
+        isApplyingFiltersRef.current = false;
+      }, 1000);
     }
   };
 
@@ -830,15 +966,18 @@ const Filters = ({ onChange, initial = {} }) => {
   }
 
   return (
-    <div className="w-full h-screen overflow-y-auto rounded-2xl bg-white shadow-sm p-4 md:p-6 border border-primary_color/10">
-      <div className="flex items-center justify-between mb-4">
-        <h6 className="text-primary_color font-semibold">Filters</h6>
-        <button type="button" onClick={handleClear} className="bg-white text-secondary_color border border-secondary_color hover:bg-secondary_color hover:text-white px-4 py-2 rounded-full">
-          Clear
-        </button>
+    <div className="w-full h-screen rounded-2xl bg-white shadow-sm border border-primary_color/10 flex flex-col relative">
+      <div className="flex-shrink-0 px-4 md:px-6 pt-4 md:pt-6">
+        <div className="flex items-center justify-between mb-4">
+          <h6 className="text-primary_color font-semibold">Filters</h6>
+          <button type="button" onClick={handleClear} className="bg-white text-secondary_color border border-secondary_color hover:bg-secondary_color hover:text-white px-4 py-2 rounded-full">
+            Clear
+          </button>
+        </div>
       </div>
 
-      <div className="flex flex-col items-start gap-2 text-sm">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-20">
+        <div className="flex flex-col items-start gap-2 text-sm">
         <SectionCard title="Property" defaultOpen>
           <div className="flex flex-col gap-3">
             {/* Purpose - Radio Buttons (Multiple Selection) */}
@@ -988,6 +1127,7 @@ const Filters = ({ onChange, initial = {} }) => {
             </div>
           </SectionCard>
         )}
+        </div>
       </div>
 
       {/* <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -1037,8 +1177,8 @@ const Filters = ({ onChange, initial = {} }) => {
         })}
       </div> */}
 
-      {/* Apply Filters Button */}
-      <div className="mt-6 sticky bottom-0 bg-white pt-4 border-t border-primary_color/10">
+      {/* Apply Filters Button - Absolute at bottom overlaying content */}
+      <div className="absolute bottom-0 left-0 right-0 bg-white pt-4 pb-4 md:pb-6 px-4 md:px-6 border-t border-primary_color/10 shadow-lg z-10">
         <button
           type="button"
           onClick={applyFilters}

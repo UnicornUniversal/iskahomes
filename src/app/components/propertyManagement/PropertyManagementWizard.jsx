@@ -278,6 +278,8 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType = 'developer' 
         case 'pricing':
           stepData = {
             pricing: formData.pricing || {},
+            // Include commission_rate for agents (calculated from agency rates)
+            commission_rate: formData.commission_rate || null,
             // Include sales_info if status is sold/rented/taken
             sales_info: formData.sales_info || null
           }

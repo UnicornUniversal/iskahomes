@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from 'react'
+import React, { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Filters from '@/app/components/users/Filters'
 import SearchProperties from '@/app/components/users/SearchProperties'
@@ -26,8 +26,17 @@ const ExplorePropertiesContent = () => {
   const [filters, setFilters] = useState({});
   const [showFiltersModal, setShowFiltersModal] = useState(false);
 
-  // Read URL params on mount to restore filters
+  // Track URL updates to prevent reset loops
+  const isUpdatingUrlRef = useRef(false);
+  const lastAppliedFiltersRef = useRef(null);
+  
+  // Read URL params ONLY when URL changes externally (browser back/forward, direct navigation)
   useEffect(() => {
+    // Skip if we're the ones updating the URL
+    if (isUpdatingUrlRef.current) {
+      return;
+    }
+    
     const urlFilters = {};
     
     // Purpose IDs
@@ -68,27 +77,41 @@ const ExplorePropertiesContent = () => {
     if (bedrooms) urlFilters.bedrooms = Number(bedrooms);
     if (bathrooms) urlFilters.bathrooms = Number(bathrooms);
     
+    // Parse specifications from URL
     const specifications = searchParams.get('specifications');
     if (specifications) {
       try {
-        urlFilters.specifications = JSON.parse(specifications);
+        urlFilters.specifications = JSON.parse(decodeURIComponent(specifications));
+        console.log('📋 Parsed specifications from URL:', urlFilters.specifications);
       } catch (e) {
         console.error('Error parsing specifications from URL:', e);
       }
     }
     
-    // Set filters - this will trigger Filters component to sync and SearchProperties to fetch
-    if (Object.keys(urlFilters).length > 0) {
-      setFilters(urlFilters);
-    } else {
-      // Even if empty, set empty object to ensure Filters component initializes correctly
-      setFilters({});
+    // Only update if filters actually changed from what we last applied
+    const urlFiltersStr = JSON.stringify(urlFilters);
+    const lastAppliedStr = lastAppliedFiltersRef.current ? JSON.stringify(lastAppliedFiltersRef.current) : null;
+    
+    // If this matches what we last applied, don't update (prevents loop)
+    if (urlFiltersStr === lastAppliedStr) {
+      return;
     }
+    
+    // Update filters from URL
+    setFilters(urlFilters);
   }, [searchParams]);
-
-  // Update URL when filters change
+  
   const handleFiltersChange = (newFilters) => {
+    console.log('🔧 handleFiltersChange called with:', newFilters);
+    
+    // Store what we're applying to prevent reset loop
+    lastAppliedFiltersRef.current = newFilters;
+    
+    // Update filters state immediately (no page reload)
     setFilters(newFilters);
+    
+    // Mark that we're updating URL to prevent reset loop
+    isUpdatingUrlRef.current = true;
     
     // Build URL params from filters
     const params = new URLSearchParams();
@@ -116,16 +139,26 @@ const ExplorePropertiesContent = () => {
     if (newFilters.bedrooms) params.append('bedrooms', newFilters.bedrooms.toString());
     if (newFilters.bathrooms) params.append('bathrooms', newFilters.bathrooms.toString());
     
+    // Add specifications to URL - encode it properly
     if (newFilters.specifications && Object.keys(newFilters.specifications).length > 0) {
-      params.append('specifications', JSON.stringify(newFilters.specifications));
+      const specsJson = JSON.stringify(newFilters.specifications);
+      params.append('specifications', encodeURIComponent(specsJson));
+      console.log('✅ Adding specifications to URL:', specsJson);
     }
     
     // Update URL without page reload
     const newUrl = params.toString() 
-      ? `/exploreProperties?${params.toString()}`
-      : '/exploreProperties';
+      ? `/home/exploreProperties?${params.toString()}`
+      : '/home/exploreProperties';
+    
+    console.log('🔗 Updating URL to:', newUrl);
     
     router.replace(newUrl, { scroll: false });
+    
+    // Reset flag after navigation completes
+    setTimeout(() => {
+      isUpdatingUrlRef.current = false;
+    }, 300);
   };
 
   return (

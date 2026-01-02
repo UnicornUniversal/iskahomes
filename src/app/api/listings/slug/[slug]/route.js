@@ -27,23 +27,10 @@ export async function GET(request, { params }) {
 
     const searchField = isUUID(slugOrId) ? 'id' : 'slug'
 
+    // Fetch all listing fields
     let query = supabaseAdmin
       .from('listings')
-      .select(
-        `
-          id,
-          slug,
-          title,
-          listing_type,
-          account_type,
-          user_id,
-          development_id,
-          status,
-          listing_status,
-          created_at,
-          updated_at
-        `
-      )
+      .select('*')
       .eq(searchField, slugOrId)
       .limit(1)
       .maybeSingle()
@@ -77,9 +64,24 @@ export async function GET(request, { params }) {
       )
     }
 
+    // Fetch social amenities for this listing
+    let socialAmenities = null
+    const { data: amenitiesData, error: amenitiesError } = await supabaseAdmin
+      .from('social_amenities')
+      .select('*')
+      .eq('listing_id', listing.id)
+      .single()
+
+    if (!amenitiesError && amenitiesData) {
+      socialAmenities = amenitiesData
+    }
+
     return NextResponse.json({
       success: true,
-      data: listing
+      data: {
+        ...listing,
+        social_amenities: socialAmenities
+      }
     })
   } catch (error) {
     console.error('Error in GET /api/listings/slug/[slug]:', error)
