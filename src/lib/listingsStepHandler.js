@@ -37,6 +37,69 @@ function isStatusSoldRentedOrTaken(status) {
   return ['sold', 'rented out', 'taken'].includes(statusLower)
 }
 
+// Helper function to generate slug from title
+function generateSlug(title) {
+  if (!title) return null
+  
+  // Convert to lowercase, remove special characters, replace spaces with hyphens
+  let slug = title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+    .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
+  
+  // If slug is empty after processing, use a fallback
+  if (!slug || slug.length === 0) {
+    return null
+  }
+  
+  return slug
+}
+
+// Helper function to generate unique slug
+async function generateUniqueSlug(baseSlug, listingId = null) {
+  if (!baseSlug) return null
+  
+  let slug = baseSlug
+  let counter = 0
+  let isUnique = false
+  
+  while (!isUnique) {
+    // Check if slug exists
+    let query = supabaseAdmin
+      .from('listings')
+      .select('id')
+      .eq('slug', slug)
+      .limit(1)
+    
+    // If updating existing listing, exclude it from the check
+    if (listingId) {
+      query = query.neq('id', listingId)
+    }
+    
+    const { data, error } = await query
+    
+    if (error) {
+      console.error('Error checking slug uniqueness:', error)
+      // If error, append timestamp to make it unique
+      return `${baseSlug}-${Date.now()}`
+    }
+    
+    if (!data || data.length === 0) {
+      // Slug is unique
+      isUnique = true
+    } else {
+      // Slug exists, append counter
+      counter++
+      slug = `${baseSlug}-${counter}`
+    }
+  }
+  
+  return slug
+}
+
 // Helper function to calculate development stats from listings
 async function calculateDevelopmentStats(developmentId) {
   try {
@@ -1262,6 +1325,15 @@ export async function handleStepUpdate(request, params, isNewListing) {
         
         // Create new draft listing
         // For developer accounts, development_id is required by constraint
+        const draftTitle = 'Draft Listing'
+        // Generate slug for draft listing
+        let draftSlug = null
+        const baseDraftSlug = generateSlug(draftTitle)
+        if (baseDraftSlug) {
+          // Use timestamp to make draft slug unique
+          draftSlug = `${baseDraftSlug}-${Date.now()}`
+        }
+        
         const draftData = {
           account_type: accountType,
           user_id: userId,
@@ -1271,9 +1343,10 @@ export async function handleStepUpdate(request, params, isNewListing) {
           listing_status: 'draft', // Default is 'draft', but set explicitly for clarity
           listing_condition: 'adding', // Default is 'adding', but set explicitly for clarity
           upload_status: 'incomplete', // Default is 'incomplete', but set explicitly for clarity
-          title: 'Draft Listing',
+          title: draftTitle,
           description: '',
-          status: 'Available'
+          status: 'Available',
+          slug: draftSlug // Generate slug even for draft
         }
         
         // Add development_id if it's a developer account (required by constraint)
@@ -1330,9 +1403,11 @@ export async function handleStepUpdate(request, params, isNewListing) {
             : existingListing.listing_status
         }
         
-        // Get agency_id for agents if not already set
+        // Get agency_id for agents - always fetch and set if agent has an agency
         let agencyId = existingListing.listing_agency_id
-        if (accountType === 'agent' && !agencyId) {
+        if (accountType === 'agent') {
+          // Always fetch agency_id to ensure it's set, even if listing already has it
+          // This ensures listings always have the correct agency_id
           const { data: agent, error: agentError } = await supabaseAdmin
             .from('agents')
             .select('agency_id')
@@ -1341,6 +1416,25 @@ export async function handleStepUpdate(request, params, isNewListing) {
           
           if (!agentError && agent?.agency_id) {
             agencyId = agent.agency_id
+          } else if (!agencyId) {
+            console.warn('⚠️ Agent not found or agency_id missing for user:', userId)
+          }
+        }
+        
+        // Generate slug from title if title is provided and slug doesn't exist
+        let slugToUse = existingListing.slug
+        const titleToUse = stepData.title || existingListing.title
+        if (titleToUse && (!existingListing.slug || existingListing.slug === '')) {
+          // Generate slug from title
+          const baseSlug = generateSlug(titleToUse)
+          if (baseSlug) {
+            slugToUse = await generateUniqueSlug(baseSlug, existingListing.id)
+          }
+        } else if (titleToUse && stepData.title && stepData.title !== existingListing.title) {
+          // Title changed, regenerate slug
+          const baseSlug = generateSlug(stepData.title)
+          if (baseSlug) {
+            slugToUse = await generateUniqueSlug(baseSlug, existingListing.id)
           }
         }
         
@@ -1355,7 +1449,9 @@ export async function handleStepUpdate(request, params, isNewListing) {
             ? (stepData.development_id || null) 
             : existingListing.development_id,
           // Set listing_agency_id for agents
-          listing_agency_id: accountType === 'agent' && agencyId ? agencyId : existingListing.listing_agency_id
+          listing_agency_id: accountType === 'agent' && agencyId ? agencyId : existingListing.listing_agency_id,
+          // Set slug if generated
+          slug: slugToUse || existingListing.slug
         }
         break
 

@@ -91,43 +91,96 @@ export async function GET(request, { params }) {
       // Don't fail the request, just return empty agents
     }
 
-    // 3. Fetch agency's listings
-    // First try to get listings directly by listing_agency_id
+    // 3. Fetch agency's listings - show ALL listings regardless of status (for now)
     let listings = []
+    
+    console.log('🔍 Fetching listings for agency_id:', agency.agency_id)
+    
+    // First try to get listings directly by listing_agency_id
     const { data: directListings, error: directListingsError } = await supabase
       .from('listings')
       .select('*')
       .eq('listing_agency_id', agency.agency_id)
-      .eq('listing_status', 'active')
       .order('created_at', { ascending: false })
-      .limit(20)
+      .limit(50)
 
-    if (!directListingsError && directListings) {
+    console.log('📊 Direct listings by listing_agency_id:', {
+      count: directListings?.length || 0,
+      error: directListingsError?.message,
+      agency_id: agency.agency_id
+    })
+
+    if (!directListingsError && directListings && directListings.length > 0) {
       listings = directListings
+      console.log('✅ Using direct listings:', listings.length)
     } else {
       // Fallback: Get listings from all agents in the agency
+      console.log('🔄 Trying fallback: getting listings from agents')
       if (agents && agents.length > 0) {
         const agentIds = agents.map(a => a.agent_id).filter(Boolean)
+        console.log('👥 Agent IDs:', agentIds)
+        
         if (agentIds.length > 0) {
           const { data: agentListings, error: agentListingsError } = await supabase
             .from('listings')
             .select('*')
             .in('user_id', agentIds)
-            .eq('listing_status', 'active')
             .order('created_at', { ascending: false })
-            .limit(20)
+            .limit(50)
 
-          if (!agentListingsError && agentListings) {
+          console.log('📊 Agent listings:', {
+            count: agentListings?.length || 0,
+            error: agentListingsError?.message
+          })
+
+          if (!agentListingsError && agentListings && agentListings.length > 0) {
             listings = agentListings
+            console.log('✅ Using agent listings:', listings.length)
           }
         }
       }
     }
 
-    if (directListingsError) {
-      console.error('Error fetching listings:', directListingsError)
-      // Don't fail the request, just return empty listings
+    // Also try combining both approaches - get all listings and merge
+    if (listings.length === 0) {
+      console.log('⚠️ No listings found with either method. Trying combined approach...')
+      const allAgentIds = agents?.map(a => a.agent_id).filter(Boolean) || []
+      
+      if (allAgentIds.length > 0) {
+        // Get listings by listing_agency_id
+        const { data: agencyListings } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('listing_agency_id', agency.agency_id)
+        
+        // Get listings by agent user_ids
+        const { data: agentListings } = await supabase
+          .from('listings')
+          .select('*')
+          .in('user_id', allAgentIds)
+        
+        // Combine and deduplicate by id
+        const allListings = [...(agencyListings || []), ...(agentListings || [])]
+        const uniqueListings = Array.from(
+          new Map(allListings.map(listing => [listing.id, listing])).values()
+        )
+        
+        console.log('📊 Combined listings:', {
+          agencyListings: agencyListings?.length || 0,
+          agentListings: agentListings?.length || 0,
+          unique: uniqueListings.length
+        })
+        
+        if (uniqueListings.length > 0) {
+          listings = uniqueListings.sort((a, b) => 
+            new Date(b.created_at) - new Date(a.created_at)
+          ).slice(0, 50)
+          console.log('✅ Using combined listings:', listings.length)
+        }
+      }
     }
+
+    console.log('📦 Final listings count:', listings.length)
 
     // 4. Return combined data
     return NextResponse.json({

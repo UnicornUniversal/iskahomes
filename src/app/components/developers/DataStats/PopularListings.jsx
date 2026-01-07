@@ -115,7 +115,7 @@ const PopularListings = ({ limit = 7, userId: propUserId = null, accountType: pr
             {listings.map((listing, index) => (
               <SwiperSlide key={listing.id}>
                 <Link
-                  href={listing.slug ? `/property/${listing.listing_type}/${listing.slug}/${listing.id}` : '#'}
+                  href={listing.slug && listing.listing_type && listing.id ? `/home/property/${listing.listing_type}/${listing.slug}/${listing.id}` : '#'}
                   className="block h-full"
                 >
                   <div className="h-full flex flex-col -2xl ">

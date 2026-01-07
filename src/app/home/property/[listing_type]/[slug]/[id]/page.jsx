@@ -452,7 +452,7 @@ const PropertyDetailPage = () => {
       
       analytics.trackPhoneInteraction('click', {
         contextType: context,
-        listingId: id,
+        listingId: listing?.id,
         listing: listing, // Pass full listing object so lister_id can be extracted
         lister_id: listerId, // Explicitly pass lister_id as fallback
         lister_type: listerType, // Explicitly pass lister_type as fallback
@@ -475,7 +475,7 @@ const PropertyDetailPage = () => {
       
       analytics.trackMessageClick({
         contextType: context,
-        listingId: id,
+        listingId: listing?.id,
         listing: listing, // Pass full listing object so lister_id can be extracted
         lister_id: listerId, // Explicitly pass lister_id as fallback
         lister_type: listerType, // Explicitly pass lister_type as fallback
@@ -491,7 +491,7 @@ const PropertyDetailPage = () => {
   const handleWebsiteClick = (websiteUrl, context = 'listing') => {
       analytics.trackWebsiteClick(websiteUrl, {
       contextType: context,
-      listingId: id,
+      listingId: listing?.id,
       listing: listing // Pass full listing object so lister_id can be extracted
     })
   }
@@ -499,14 +499,14 @@ const PropertyDetailPage = () => {
   const handleSocialMediaClick = (platform, url, context = 'listing') => {
     analytics.trackSocialMediaClick(platform, {
       contextType: context,
-      listingId: id,
+      listingId: listing?.id,
       listing: listing // Pass full listing object so lister_id can be extracted
     })
   }
 
   const handleShareClick = (platform) => {
     analytics.trackShare('listing', platform, {
-      listingId: id,
+      listingId: listing?.id,
       listing: listing // Pass full listing object so lister_id can be extracted
     })
   }
@@ -514,7 +514,7 @@ const PropertyDetailPage = () => {
   const handleAppointmentClick = () => {
     analytics.trackAppointmentClick({
       contextType: 'listing',
-      listingId: id,
+      listingId: listing?.id,
       listing: listing, // Pass full listing object so lister_id can be extracted
       appointmentType: 'viewing'
     })
@@ -529,7 +529,7 @@ const PropertyDetailPage = () => {
     // Track message click
     analytics.trackMessageClick({
       contextType: 'listing',
-      listingId: id,
+      listingId: listing?.id,
       listing: listing, // Pass full listing object so lister_id can be extracted
       lister_id: listerId, // Explicitly pass lister_id as fallback
       lister_type: listerType, // Explicitly pass lister_type as fallback
@@ -555,7 +555,7 @@ const PropertyDetailPage = () => {
         body: JSON.stringify({
           otherUserId: listing?.user_id || developers?.developer_id || developers?.agent_id,
           otherUserType: listing?.account_type || 'developer',
-          listingId: id,
+          listingId: listing?.id,
           conversationType: 'listing_inquiry',
           subject: `Inquiry about ${title}`
           // No firstMessage - user will type their own message
@@ -1111,7 +1111,7 @@ const PropertyDetailPage = () => {
                 <div className=" rounded-2xl  p-6">
                   <LeadContactForm 
                     contextType="listing"
-                    propertyId={id}
+                    propertyId={listing?.id}
                     propertyTitle={title}
                     propertyType={listing_type}
                     developer={developers}

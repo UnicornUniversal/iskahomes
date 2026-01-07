@@ -247,6 +247,45 @@ const LeadContactForm = ({
   
   const handleAppointmentSubmit = async (e) => {
     e.preventDefault()
+    
+    // Check if user is logged in
+    if (!user) {
+      toast.error("Please log in to book an appointment", {
+        position: "bottom-center",
+        autoClose: 3000,
+      })
+      router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'))
+      return
+    }
+    
+    // Check if user is a property seeker
+    if (user.user_type !== 'property_seeker') {
+      toast.error("Only property seekers can book appointments", {
+        position: "bottom-center",
+        autoClose: 3000,
+      })
+      return
+    }
+    
+    // Validate required fields
+    if (!appointmentData.date || !appointmentData.time || !appointmentData.name || !appointmentData.email) {
+      toast.error("Please fill in all required fields", {
+        position: "bottom-center",
+        autoClose: 3000,
+      })
+      return
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(appointmentData.email)) {
+      toast.error("Please enter a valid email address", {
+        position: "bottom-center",
+        autoClose: 3000,
+      })
+      return
+    }
+    
     setLoading(true)
     
     try {
@@ -274,6 +313,44 @@ const LeadContactForm = ({
   
   const handleMessageSubmit = async (e) => {
     e.preventDefault()
+    
+    // Check if user is logged in
+    if (!user) {
+      toast.error("Please log in to send a message", {
+        position: "bottom-center",
+        autoClose: 3000,
+      })
+      router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'))
+      return
+    }
+    
+    // Check if user is a property seeker
+    if (user.user_type !== 'property_seeker') {
+      toast.error("Only property seekers can send messages", {
+        position: "bottom-center",
+        autoClose: 3000,
+      })
+      return
+    }
+    
+    // Validate message is not empty
+    if (!messageData.message || messageData.message.trim().length === 0) {
+      toast.error("Please enter a message", {
+        position: "bottom-center",
+        autoClose: 3000,
+      })
+      return
+    }
+    
+    // Validate minimum message length
+    if (messageData.message.trim().length < 10) {
+      toast.error("Message must be at least 10 characters long", {
+        position: "bottom-center",
+        autoClose: 3000,
+      })
+      return
+    }
+    
     setSendingMessage(true)
     
     try {
@@ -291,6 +368,8 @@ const LeadContactForm = ({
       setTimeout(() => {
         setSendingMessage(false)
         toast.success("Message sent!")
+        // Clear message after successful send
+        setMessageData({ message: '' })
       }, 1500)
     } catch (error) {
       console.error('Error sending message:', error)
@@ -407,6 +486,20 @@ const LeadContactForm = ({
 
       {/* --- CONTENT SECTION (Scrollable) --- */}
       <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0" style={{ maxHeight: '280px' }}>
+        {!user && (
+          <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+            <p className="text-xs text-orange-800 font-medium">
+              Please <Link href={`/login?redirect=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/')}`} className="underline font-bold">log in</Link> as a property seeker to book appointments or send messages.
+            </p>
+          </div>
+        )}
+        {user && user.user_type !== 'property_seeker' && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-xs text-red-800 font-medium">
+              Only property seekers can book appointments and send messages.
+            </p>
+          </div>
+        )}
         {activeTab === 'appointment' ? (
           <form onSubmit={handleAppointmentSubmit} className="space-y-4" id="appointment-form">
             <h2 className="text-base font-bold text-primary_color mb-1">
@@ -439,6 +532,7 @@ const LeadContactForm = ({
                     type="date"
                     name="date"
                     required
+                    min={new Date().toISOString().split('T')[0]}
                     value={appointmentData.date}
                     onChange={handleAppointmentInputChange}
                     className="w-full bg-gray-50 text-sm text-primary_color font-medium rounded-lg border border-gray-200 pl-10 pr-3 py-2.5 focus:ring-2 focus:ring-primary_color/20 focus:border-primary_color focus:bg-white transition-all outline-none"
@@ -475,6 +569,7 @@ const LeadContactForm = ({
                   value={appointmentData[field]}
                   onChange={handleAppointmentInputChange}
                   placeholder={`Enter your ${field}`}
+                  minLength={field === 'name' ? 2 : undefined}
                   className="w-full bg-gray-50 text-sm text-primary_color font-medium rounded-lg border border-gray-200 px-3 py-2.5 focus:ring-2 focus:ring-primary_color/20 focus:border-primary_color focus:bg-white transition-all outline-none placeholder-gray-400"
                 />
               </div>
@@ -504,6 +599,7 @@ const LeadContactForm = ({
                 name="message"
                 rows={5}
                 required
+                minLength={10}
                 value={messageData.message}
                 onChange={handleMessageInputChange}
                 placeholder="Hi, I am interested..."
@@ -519,7 +615,7 @@ const LeadContactForm = ({
         <button
           type="submit"
           onClick={activeTab === 'appointment' ? handleAppointmentSubmit : handleMessageSubmit}
-          disabled={loading || sendingMessage}
+          disabled={loading || sendingMessage || !user || user.user_type !== 'property_seeker'}
           className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg shadow-md shadow-orange-500/20 transform active:scale-[0.98] transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
         >
           {loading || sendingMessage ? (

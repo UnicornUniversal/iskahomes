@@ -121,7 +121,7 @@ const AppointmentsList = ({
                 {firstImage ? (
                   <div className="sm:w-48 md:w-56 lg:w-full flex-shrink-0 h-48 sm:h-auto lg:h-48">
                     <a 
-                      href={`/property/${listing?.listing_type}/${listing?.slug}/${listing?.id}`}
+                      href={`/home/property/${listing?.listing_type}/${listing?.slug}/${listing?.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block w-full h-full relative"
@@ -147,7 +147,7 @@ const AppointmentsList = ({
                     <div className="flex-1 min-w-0">
                       <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
                         <a 
-                          href={`/property/${listing?.listing_type}/${listing?.slug}/${listing?.id}`}
+                          href={`/home/property/${listing?.listing_type}/${listing?.slug}/${listing?.id}`}
                           className="hover:text-primary_color transition-colors"
                           target="_blank"
                           rel="noopener noreferrer"

@@ -12,6 +12,69 @@ if (typeof updateAdminAnalytics !== 'function') {
   console.error('❌ updateAdminAnalytics value:', updateAdminAnalytics)
 }
 
+// Helper function to generate slug from title
+function generateSlug(title) {
+  if (!title) return null
+  
+  // Convert to lowercase, remove special characters, replace spaces with hyphens
+  let slug = title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+    .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
+  
+  // If slug is empty after processing, use a fallback
+  if (!slug || slug.length === 0) {
+    return null
+  }
+  
+  return slug
+}
+
+// Helper function to generate unique slug
+async function generateUniqueSlug(baseSlug, listingId = null) {
+  if (!baseSlug) return null
+  
+  let slug = baseSlug
+  let counter = 0
+  let isUnique = false
+  
+  while (!isUnique) {
+    // Check if slug exists
+    let query = supabaseAdmin
+      .from('listings')
+      .select('id')
+      .eq('slug', slug)
+      .limit(1)
+    
+    // If updating existing listing, exclude it from the check
+    if (listingId) {
+      query = query.neq('id', listingId)
+    }
+    
+    const { data, error } = await query
+    
+    if (error) {
+      console.error('Error checking slug uniqueness:', error)
+      // If error, append timestamp to make it unique
+      return `${baseSlug}-${Date.now()}`
+    }
+    
+    if (!data || data.length === 0) {
+      // Slug is unique
+      isUnique = true
+    } else {
+      // Slug exists, append counter
+      counter++
+      slug = `${baseSlug}-${counter}`
+    }
+  }
+  
+  return slug
+}
+
 // Helper function to calculate development stats from listings
 async function calculateDevelopmentStats(developmentId) {
   try {
@@ -500,11 +563,12 @@ export async function GET(request) {
     const priceType = searchParams.get('price_type') || ''
     const offset = (page - 1) * limit
 
-    // Build query for listings
+    // Build query for listings - only active and complete listings for public display
     let query = supabase
       .from('listings')
       .select('*')
       .eq('listing_status', 'active')
+      .eq('listing_condition', 'completed')
       .order('created_at', { ascending: false })
 
     // Apply filters
@@ -553,9 +617,11 @@ export async function GET(request) {
       )
     }
 
-    // Get total count for pagination
+    // Get total count for pagination - only active and complete listings
     let countQuery = supabase
       .from('listings')
+      .eq('listing_status', 'active')
+      .eq('listing_condition', 'completed')
       .select('*', { count: 'exact', head: true })
       .eq('listing_status', 'active')
 
@@ -963,7 +1029,7 @@ export async function POST(request) {
       meta_description: propertyData.meta_description || null,
       meta_keywords: propertyData.meta_keywords || null,
       seo_title: propertyData.seo_title || null,
-      slug: propertyData.slug || null,
+      slug: propertyData.slug || null, // Will be generated below if not provided
       floor_plan: propertyData.floor_plan || null,
       // Agent-specific fields
       listing_agency_id: accountType === 'agent' && agencyId ? agencyId : (existingListing?.listing_agency_id || null),
@@ -978,6 +1044,14 @@ export async function POST(request) {
       listingData.additional_files = existingListing.additional_files || []
       listingData['3d_model'] = existingListing['3d_model'] || null
       listingData.floor_plan = existingListing.floor_plan || null
+    }
+
+    // Generate slug from title if not provided
+    if (!listingData.slug && listingData.title) {
+      const baseSlug = generateSlug(listingData.title)
+      if (baseSlug) {
+        listingData.slug = await generateUniqueSlug(baseSlug, existingListing?.id || null)
+      }
     }
 
     // STEP 1: Create or update listing record first (draft-first approach)

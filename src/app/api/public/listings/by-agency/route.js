@@ -24,6 +24,7 @@ export async function GET(request) {
       .select('*')
       .eq('listing_agency_id', agencyId)
       .eq('listing_status', 'active')
+      .eq('listing_condition', 'completed')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
@@ -41,6 +42,7 @@ export async function GET(request) {
       .select('*', { count: 'exact', head: true })
       .eq('listing_agency_id', agencyId)
       .eq('listing_status', 'active')
+      .eq('listing_condition', 'completed')
 
     return NextResponse.json({
       success: true,

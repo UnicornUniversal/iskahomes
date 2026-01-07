@@ -33,6 +33,69 @@ function isStatusSoldRentedOrTaken(status) {
   return ['sold', 'rented out', 'taken'].includes(statusLower)
 }
 
+// Helper function to generate slug from title
+function generateSlug(title) {
+  if (!title) return null
+  
+  // Convert to lowercase, remove special characters, replace spaces with hyphens
+  let slug = title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+    .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
+  
+  // If slug is empty after processing, use a fallback
+  if (!slug || slug.length === 0) {
+    return null
+  }
+  
+  return slug
+}
+
+// Helper function to generate unique slug
+async function generateUniqueSlug(baseSlug, listingId = null) {
+  if (!baseSlug) return null
+  
+  let slug = baseSlug
+  let counter = 0
+  let isUnique = false
+  
+  while (!isUnique) {
+    // Check if slug exists
+    let query = supabaseAdmin
+      .from('listings')
+      .select('id')
+      .eq('slug', slug)
+      .limit(1)
+    
+    // If updating existing listing, exclude it from the check
+    if (listingId) {
+      query = query.neq('id', listingId)
+    }
+    
+    const { data, error } = await query
+    
+    if (error) {
+      console.error('Error checking slug uniqueness:', error)
+      // If error, append timestamp to make it unique
+      return `${baseSlug}-${Date.now()}`
+    }
+    
+    if (!data || data.length === 0) {
+      // Slug is unique
+      isUnique = true
+    } else {
+      // Slug exists, append counter
+      counter++
+      slug = `${baseSlug}-${counter}`
+    }
+  }
+  
+  return slug
+}
+
 // Helper function to calculate development stats from listings
 async function calculateDevelopmentStats(developmentId) {
   try {
@@ -1865,6 +1928,19 @@ export async function PUT(request, { params }) {
       meta_keywords: formData.get('meta_keywords') || existingListing.meta_keywords,
       seo_title: formData.get('seo_title') || existingListing.seo_title,
       slug: formData.get('slug') || existingListing.slug
+      }
+    }
+
+    // Generate slug from title if title is provided and slug is missing or title changed
+    const newTitle = updateData.title || existingListing.title
+    const currentSlug = updateData.slug || existingListing.slug
+    if (newTitle) {
+      // If slug is missing or title changed, regenerate slug
+      if (!currentSlug || currentSlug === '' || (updateData.title && updateData.title !== existingListing.title)) {
+        const baseSlug = generateSlug(newTitle)
+        if (baseSlug) {
+          updateData.slug = await generateUniqueSlug(baseSlug, listingId)
+        }
       }
     }
 

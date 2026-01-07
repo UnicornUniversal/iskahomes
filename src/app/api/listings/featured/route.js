@@ -61,6 +61,7 @@ export async function GET(request) {
         listing_type
       `)
       .eq('listing_status', 'active')
+      .eq('listing_condition', 'completed')
       .eq('status', 'Available')
       .in('user_id', userIds)
       .limit(20) // Fetch more to account for filtering

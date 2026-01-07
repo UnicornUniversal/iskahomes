@@ -30,7 +30,14 @@ export async function GET(request) {
         agent_status,
         total_listings,
         location_id,
-        created_at
+        created_at,
+        agencies (
+            name,
+            slug,
+            profile_image,
+            city,
+            country
+        )
       `)
       .eq('account_status', 'active')
       .eq('agent_status', 'active')
@@ -58,25 +65,12 @@ export async function GET(request) {
         { status: 500 }
       )
     }
-
-    // Get agency info for each agent
-    const agentsWithAgency = await Promise.all(
-      (agents || []).map(async (agent) => {
-        if (agent.agency_id) {
-          const { data: agency } = await supabase
-            .from('agencies')
-            .select('name, slug, profile_image')
-            .eq('agency_id', agent.agency_id)
-            .single()
-          
-          return {
-            ...agent,
-            agency: agency || null
-          }
-        }
-        return { ...agent, agency: null }
-      })
-    )
+    
+    // Transform data to maintain consistent structure
+    const formattedAgents = agents.map(agent => ({
+        ...agent,
+        agency: agent.agencies // Map joined 'agencies' to 'agency' prop
+    }))
 
     // Get total count
     let countQuery = supabase
@@ -97,7 +91,7 @@ export async function GET(request) {
 
     return NextResponse.json({
       success: true,
-      data: agentsWithAgency || [],
+      data: formattedAgents || [],
       pagination: {
         page,
         limit,

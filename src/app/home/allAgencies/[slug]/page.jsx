@@ -16,13 +16,12 @@ import {
   Instagram, 
   Linkedin, 
   Twitter,
-  Share2,
-  Home,
-  User
+  Home
 } from 'lucide-react'
 import LeadContactForm from '@/app/components/LeadContactForm'
 import Nav from '@/app/components/Nav'
 import DataRenderer from '@/app/components/developers/DataRenderer'
+import AgentsSwiper from '@/app/components/agency/AgentsSwiper'
 import { toast } from 'react-toastify'
 
 const AgencyProfile = () => {
@@ -40,6 +39,10 @@ const AgencyProfile = () => {
     }
   }, [agencySlug])
 
+  useEffect(() => {
+    console.log('Listings state changed:', listings.length, listings)
+  }, [listings])
+
   const fetchAgencyData = async () => {
     try {
       setLoading(true)
@@ -56,7 +59,11 @@ const AgencyProfile = () => {
       if (result.success) {
         setAgency(result.data.agency)
         setAgents(result.data.agents || [])
-        setListings(result.data.listings || [])
+        const fetchedListings = result.data.listings || []
+        console.log('Fetched listings for agency:', fetchedListings.length, fetchedListings)
+        console.log('Setting listings state with:', fetchedListings)
+        setListings(fetchedListings)
+        console.log('Listings state should be set to:', fetchedListings)
       } else {
         setError(result.error || 'Agency not found')
       }
@@ -79,33 +86,7 @@ const AgencyProfile = () => {
     toast.success('Email copied!')
   }
   
-  const formatPrice = (price, currency, priceType, duration) => {
-    if (!price) return 'Price on request'
-    const priceNum = parseFloat(price)
-    const formattedPrice = priceNum.toLocaleString()
-    let priceText = `${currency || 'GHS'} ${formattedPrice}`
-    if (priceType === 'rent' && duration) {
-      priceText += `/${duration}`
-    }
-    return priceText
-  }
 
-  const getListingImage = (listing) => {
-    if (listing.media?.albums && Array.isArray(listing.media.albums) && listing.media.albums.length > 0) {
-      for (const album of listing.media.albums) {
-        if (album?.images && Array.isArray(album.images) && album.images.length > 0) {
-          return album.images[0].url
-        }
-      }
-    }
-    if (listing.media?.mediaFiles && Array.isArray(listing.media.mediaFiles) && listing.media.mediaFiles.length > 0) {
-      return listing.media.mediaFiles[0].url
-    }
-    if (listing.media?.banner?.url) {
-      return listing.media.banner.url
-    }
-    return null
-  }
 
   if (loading) {
     return (
@@ -122,8 +103,8 @@ const AgencyProfile = () => {
       <Layout1>
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
            <div className="text-center">
-            <h1 className="font-bold text-gray-600 mb-4">Agency Not Found</h1>
-            <p className="text-gray-500">{error || "The agency you're looking for doesn't exist."}</p>
+            <h1 className="font-bold text-primary_color mb-4">Agency Not Found</h1>
+            <p className="text-primary_color/70">{error || "The agency you're looking for doesn't exist."}</p>
              <Link href="/home/allAgencies" className="text-primary_color hover:underline mt-4 block">Back to All Agencies</Link>
           </div>
         </div>
@@ -179,10 +160,10 @@ const AgencyProfile = () => {
 
                         {/* Name and Location */}
                         <div className="flex-1 min-w-0">
-                            <h1 className="text-2xl lg:text-3xl font-bold mb-2 truncate text-gray-900">
+                            <h1 className="text-2xl lg:text-3xl font-bold mb-2 truncate text-primary_color">
                                 {agency.name}
                             </h1>
-                            <div className="flex items-center gap-2 text-sm mb-3 text-gray-600">
+                            <div className="flex items-center gap-2 text-sm mb-3 text-primary_color/70">
                                 <MapPin className="w-4 h-4 flex-shrink-0" />
                                 <span className="truncate">
                                     {locationString}
@@ -218,7 +199,7 @@ const AgencyProfile = () => {
                              <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 bg-gray-50 rounded-full">
                                 <Mail className="w-5 h-5 text-gray-600" />
                              </div>
-                             <button onClick={() => handleEmailClick(agency.email)} className="text-sm hover:text-blue-600 transition-colors cursor-pointer truncate text-gray-700 font-medium">
+                             <button onClick={() => handleEmailClick(agency.email)} className="text-sm hover:text-primary_color/80 transition-colors cursor-pointer truncate text-primary_color font-medium">
                                 {agency.email}
                              </button>
                         </div>
@@ -228,7 +209,7 @@ const AgencyProfile = () => {
                              <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 bg-gray-50 rounded-full">
                                 <Phone className="w-5 h-5 text-gray-600" />
                              </div>
-                             <button onClick={() => handlePhoneClick(agency.phone)} className="text-sm hover:text-blue-600 transition-colors cursor-pointer text-gray-700 font-medium">
+                             <button onClick={() => handlePhoneClick(agency.phone)} className="text-sm hover:text-primary_color/80 transition-colors cursor-pointer text-primary_color font-medium">
                                 {agency.phone}
                              </button>
                         </div>
@@ -238,7 +219,7 @@ const AgencyProfile = () => {
                              <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 bg-gray-50 rounded-full">
                                 <Globe className="w-5 h-5 text-gray-600" />
                              </div>
-                             <a href={agency.website} target="_blank" rel="noopener noreferrer" className="text-sm hover:text-blue-600 transition-colors truncate text-gray-700 font-medium">
+                             <a href={agency.website} target="_blank" rel="noopener noreferrer" className="text-sm hover:text-primary_color/80 transition-colors truncate text-primary_color font-medium">
                                 {agency.website}
                              </a>
                          </div>
@@ -255,8 +236,8 @@ const AgencyProfile = () => {
                      {/* About Us */}
                      {agency.description && (
                          <div>
-                             <h2 className="font-light text-2xl mb-6 text-gray-900 border-b pb-2">About Us</h2>
-                             <div className="prose prose-lg text-gray-600 leading-relaxed">
+                             <h2 className="font-light text-2xl mb-6 text-primary_color border-b pb-2">About Us</h2>
+                             <div className="prose prose-lg text-primary_color/80 leading-relaxed">
                                 <p className="whitespace-pre-line">{agency.description}</p>
                              </div>
                          </div>
@@ -265,7 +246,7 @@ const AgencyProfile = () => {
                      {/* Company Overview */}
                      {agency.founded_year && (
                          <div>
-                             <h2 className="font-light text-2xl mb-6 text-gray-900 border-b pb-2">Company Overview</h2>
+                             <h2 className="font-light text-2xl mb-6 text-primary_color border-b pb-2">Company Overview</h2>
                              <div className="space-y-2">
                                 <DataRenderer 
                                     title="Founded In"
@@ -279,48 +260,30 @@ const AgencyProfile = () => {
                      {/* Agents Section */}
                      {agents.length > 0 && (
                          <div>
-                             <h2 className="font-light text-2xl mb-6 text-gray-900 border-b pb-2">Our Team</h2>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {agents.map(agent => (
-                                    <Link key={agent.id} href={`/home/allAgents/${agent.slug}`} className="bg-white rounded-xl p-4 flex items-center gap-4 hover:shadow-lg transition-all border border-gray-100 group">
-                                         <div className="w-16 h-16 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
-                                            {agent.profile_image ? (
-                                                <img src={agent.profile_image} alt={agent.name} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                                    <User />
-                                                </div>
-                                            )}
-                                         </div>
-                                         <div>
-                                             <h4 className="font-bold text-gray-900 group-hover:text-primary_color transition-colors">{agent.name}</h4>
-                                             <p className="text-sm text-gray-500">{agent.total_listings || 0} listings</p>
-                                         </div>
-                                    </Link>
-                                ))}
-                             </div>
+                             <h2 className="font-light text-2xl mb-6 text-primary_color border-b pb-2">Our Agents</h2>
+                             <AgentsSwiper agents={agents} />
                          </div>
                      )}
 
                      {/* Socials */}
                      {agency.social_media && Object.keys(agency.social_media).length > 0 && (
                          <div>
-                            <h2 className="font-light text-2xl mb-6 text-gray-900 border-b pb-2">Socials</h2>
+                            <h2 className="font-light text-2xl mb-6 text-primary_color border-b pb-2">Socials</h2>
                             <div className="flex flex-wrap gap-4">
                                 {agency.social_media.instagram && (
-                                    <a href={agency.social_media.instagram} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-600 hover:text-primary_color">
+                                    <a href={agency.social_media.instagram} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-primary_color/70 hover:text-primary_color transition-colors">
                                         <Instagram className="w-5 h-5" />
                                         <span>Instagram</span>
                                     </a>
                                 )}
                                 {agency.social_media.linkedin && (
-                                    <a href={agency.social_media.linkedin} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-600 hover:text-primary_color">
+                                    <a href={agency.social_media.linkedin} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-primary_color/70 hover:text-primary_color transition-colors">
                                         <Linkedin className="w-5 h-5" />
                                         <span>LinkedIn</span>
                                     </a>
                                 )}
                                 {agency.social_media.twitter && (
-                                    <a href={agency.social_media.twitter} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-600 hover:text-primary_color">
+                                    <a href={agency.social_media.twitter} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-primary_color/70 hover:text-primary_color transition-colors">
                                         <Twitter className="w-5 h-5" />
                                         <span>Twitter</span>
                                     </a>
@@ -329,43 +292,99 @@ const AgencyProfile = () => {
                          </div>
                      )}
 
-                     {/* Listings Section */}
-                     {listings.length > 0 && (
-                         <div>
-                             <h2 className="font-light text-2xl mb-6 text-gray-900 border-b pb-2">Our Listings</h2>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {listings.map(listing => {
-                                    const listingImage = getListingImage(listing)
-                                    return (
-                                        <div key={listing.id} className="group border border-gray-100 rounded-xl overflow-hidden hover:shadow-xl transition-shadow bg-white">
-                                            <div className="relative h-48 bg-gray-200 overflow-hidden">
-                                                {listingImage ? (
-                                                    <img src={listingImage} alt={listing.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                                        <Home />
-                                                    </div>
-                                                )}
-                                                <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-xs font-bold text-gray-900">
-                                                    {listing.category?.name || 'Property'}
-                                                </div>
-                                            </div>
-                                            <div className="p-4">
-                                                <h4 className="font-bold text-gray-900 truncate mb-1">{listing.title}</h4>
-                                                <p className="text-primary_color font-bold text-lg mb-2">
-                                                    {formatPrice(listing.price, listing.currency, listing.price_type, listing.duration)}
-                                                </p>
-                                                <div className="flex items-center text-gray-500 text-sm">
-                                                    <MapPin className="w-4 h-4 mr-1" />
-                                                    <span className="truncate">{listing.city}, {listing.country}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )
-                                })}
+                     {/* Listings Section - ALWAYS SHOW */}
+                     <div>
+                         <h2 className="font-light text-2xl mb-6 text-primary_color border-b pb-2">
+                             Our Listings ({listings?.length || 0})
+                         </h2>
+                         {listings && Array.isArray(listings) && listings.length > 0 ? (
+                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                 {listings.map((listing, index) => {
+                                     if (!listing) return null
+                                     
+                                     // Get image
+                                     let listingImage = null
+                                     if (listing.media?.albums && Array.isArray(listing.media.albums)) {
+                                         for (const album of listing.media.albums) {
+                                             if (album?.images && Array.isArray(album.images) && album.images.length > 0) {
+                                                 listingImage = album.images[0].url
+                                                 break
+                                             }
+                                         }
+                                     }
+                                     if (!listingImage && listing.media?.mediaFiles && Array.isArray(listing.media.mediaFiles) && listing.media.mediaFiles.length > 0) {
+                                         listingImage = listing.media.mediaFiles[0].url
+                                     }
+                                     if (!listingImage && listing.media?.banner?.url) {
+                                         listingImage = listing.media.banner.url
+                                     }
+                                     
+                                     // Format price
+                                     const formatPrice = () => {
+                                         if (!listing.price) return 'Price on request'
+                                         const priceNum = parseFloat(listing.price)
+                                         const formattedPrice = priceNum.toLocaleString()
+                                         let priceText = `${listing.currency || 'GHS'} ${formattedPrice}`
+                                         if (listing.price_type === 'rent' && listing.duration) {
+                                             priceText += `/${listing.duration}`
+                                         }
+                                         return priceText
+                                     }
+                                     
+                                     // Get location
+                                     const location = [listing.city, listing.country].filter(Boolean).join(', ') || 'Location not specified'
+                                     
+                                     return (
+                                         <Link 
+                                             key={listing.id || `listing-${index}`}
+                                             href={`/home/property/${listing.listing_type}/${listing.slug}/${listing.id}`}
+                                             className="group border border-gray-200 rounded-xl overflow-hidden hover:shadow-xl transition-all bg-white"
+                                         >
+                                             <div className="relative h-48 bg-gray-200 overflow-hidden">
+                                                 {listingImage ? (
+                                                     <img 
+                                                         src={listingImage} 
+                                                         alt={listing.title} 
+                                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                                                     />
+                                                 ) : (
+                                                     <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                                                         <Home className="w-12 h-12 text-gray-400" />
+                                                     </div>
+                                                 )}
+                                                 {listing.status && (
+                                                     <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-xs font-bold text-primary_color">
+                                                         {listing.status}
+                                                     </div>
+                                                 )}
+                                             </div>
+                                             <div className="p-4">
+                                                 <h4 className="font-bold text-primary_color truncate mb-1 text-lg">
+                                                     {listing.title}
+                                                 </h4>
+                                                 <p className="text-primary_color font-bold text-xl mb-2">
+                                                     {formatPrice()}
+                                                 </p>
+                                                 <div className="flex items-center text-primary_color/70 text-sm">
+                                                     <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
+                                                     <span className="truncate">{location}</span>
+                                                 </div>
+                                             </div>
+                                         </Link>
+                                     )
+                                 })}
                              </div>
-                         </div>
-                     )}
+                         ) : (
+                             <div className="text-center py-12 border-2 border-dashed border-primary_color/20 rounded-lg">
+                                 <p className="text-primary_color/70 text-lg font-medium">
+                                     No listings found for this agency.
+                                 </p>
+                                 <p className="text-primary_color/50 text-sm mt-2">
+                                     Listings count: {listings?.length || 0} | Is array: {Array.isArray(listings) ? 'Yes' : 'No'}
+                                 </p>
+                             </div>
+                         )}
+                     </div>
                 </div>
 
                 {/* Right Side - Sticky Lead Form */}

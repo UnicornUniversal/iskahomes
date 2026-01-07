@@ -163,7 +163,7 @@ const LatestLeads = ({ listerId: propListerId = null, listerType: propListerType
                   >
                     <td className="py-3 px-4">
                       <Link
-                        href={lead.listing?.slug ? `/property/${lead.listing.slug}/${lead.listingId}` : '#'}
+                        href={lead.listing?.slug && lead.listing?.listing_type && lead.listingId ? `/home/property/${lead.listing.listing_type}/${lead.listing.slug}/${lead.listingId}` : '#'}
                         className="flex items-center gap-3 group"
                       >
                         {lead.listing?.image ? (

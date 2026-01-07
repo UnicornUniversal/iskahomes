@@ -5,11 +5,12 @@ export async function GET(request) {
   try {
     console.log('Fetching all listings from /api/get-listings...')
     
-    // Fetch listings
+    // Fetch listings - only active and complete listings for public display
     const { data: listings, error } = await supabase
       .from('listings')
       .select('*')
       .eq('listing_status', 'active')
+      .eq('listing_condition', 'completed')
       .order('created_at', { ascending: false })
 
     console.log('Listings fetched:', listings?.length || 0)

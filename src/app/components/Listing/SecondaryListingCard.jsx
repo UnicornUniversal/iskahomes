@@ -209,7 +209,7 @@ const SecondaryListingCard = ({ listing, imageClasses = null }) => {
     })
     
     // Copy link to clipboard
-    const url = `${window.location.origin}/property/${listing_type}/${slug}/${id}`
+    const url = `${window.location.origin}/home/property/${listing_type}/${slug}/${id}`
     navigator.clipboard.writeText(url)
     toast.success('Link copied to clipboard!')
   }
@@ -226,6 +226,12 @@ const SecondaryListingCard = ({ listing, imageClasses = null }) => {
     return heightClasses.length > 0 
       ? `w-full ${heightClasses.join(' ')}` 
       : 'w-full h-[220px] md:h-[240px] lg:h-[260px]'
+  }
+
+  // Ensure we have all required fields for the URL
+  if (!listing_type || !slug || !id) {
+    console.warn('Missing required fields for property URL:', { listing_type, slug, id })
+    return null
   }
 
   return (

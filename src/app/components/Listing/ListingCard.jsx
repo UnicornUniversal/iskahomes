@@ -69,6 +69,12 @@ const ListingCard = ({ listing }) => {
 
   const specs = getSpecifications()
 
+  // Ensure we have all required fields for the URL
+  if (!listing_type || !slug || !id) {
+    console.warn('Missing required fields for property URL:', { listing_type, slug, id })
+    return null
+  }
+
   return (
     <Link href={`/home/property/${listing_type}/${slug}/${id}`}>
       <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer group">

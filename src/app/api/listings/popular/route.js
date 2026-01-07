@@ -20,6 +20,7 @@ export async function GET(request) {
       .select('id, title, slug, price, currency, media, total_views, city, state, country, town, full_address, listing_status, listing_type')
       .eq('user_id', userId)
       .eq('listing_status', 'active')
+      .eq('listing_condition', 'completed')
       .order('total_views', { ascending: false })
       .limit(limit)
 

@@ -167,8 +167,14 @@ const ExplorePropertyCard = ({ listing }) => {
     })
   }
 
+  // Ensure we have all required fields for the URL
+  if (!listing_type || !slug || !id) {
+    console.warn('Missing required fields for property URL:', { listing_type, slug, id })
+    return null
+  }
+
   return (
-    <Link href={`/property/${listing_type}/${slug}/${id}`} onClick={handleCardClick} className="block">
+    <Link href={`/home/property/${listing_type}/${slug}/${id}`} onClick={handleCardClick} className="block">
       <div className="bg-white rounded-lg border border-primary_color/10 overflow-hidden hover:shadow-lg transition-shadow duration-300">
         <div className="flex flex-row gap-4 p-4">
           {/* Image Section - Left */}

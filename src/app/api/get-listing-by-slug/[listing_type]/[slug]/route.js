@@ -5,24 +5,23 @@ export async function GET(request, { params }) {
   try {
     // Await params if it's a Promise (Next.js 15+)
     const resolvedParams = params instanceof Promise ? await params : params
-    const { id } = resolvedParams
+    const { listing_type, slug } = resolvedParams
 
-    if (!id) {
+    if (!listing_type || !slug) {
       return NextResponse.json(
-        { error: 'Listing ID is required' },
+        { error: 'Listing type and slug are required' },
         { status: 400 }
       )
     }
 
-    console.log('Fetching listing for end user:', id)
+    console.log('Fetching listing by slug for end user:', { listing_type, slug })
 
-    // Fetch the listing for end users - only active and complete listings for public display
+    // Fetch the listing for end users (no developer joins, just basic listing data)
     const { data: listing, error } = await supabase
       .from('listings')
       .select('*')
-      .eq('id', id)
-      .eq('listing_status', 'active')
-      .eq('listing_condition', 'completed')
+      .eq('listing_type', listing_type)
+      .eq('slug', slug)
       .single()
 
     if (error) {
@@ -110,7 +109,7 @@ export async function GET(request, { params }) {
           country
         `)
         .eq('user_id', listing.user_id)
-        .neq('id', id)
+        .neq('id', listing.id)
         .limit(6)
 
       if (!relatedError) {
@@ -123,14 +122,14 @@ export async function GET(request, { params }) {
     const { data: amenitiesData, error: amenitiesError } = await supabase
       .from('social_amenities')
       .select('*')
-      .eq('listing_id', id)
+      .eq('listing_id', listing.id)
       .single()
 
     if (!amenitiesError && amenitiesData) {
       socialAmenities = amenitiesData
     }
 
-    console.log('Listing fetched successfully for end user')
+    console.log('Listing fetched successfully for end user by slug')
 
     return NextResponse.json({
       success: true,
@@ -144,10 +143,11 @@ export async function GET(request, { params }) {
     })
 
   } catch (error) {
-    console.error('Get listing error:', error)
+    console.error('Get listing by slug error:', error)
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }
     )
   }
 }
+

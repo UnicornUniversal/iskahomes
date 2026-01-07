@@ -345,7 +345,7 @@ const UserMap = ({ filters = {} }) => {
                 <p className='text-primary_color/70 mb-2'>{m.subtitle}</p>
                 <div className='flex gap-2'>
                   <a
-                    href={`/property/${m.listing.listingType}/${m.listing.slug}/${m.listing.id}`}
+                    href={`/home/property/${m.listing.listingType}/${m.listing.slug}/${m.listing.id}`}
                     className='bg-primary_color text-white px-3 py-1 rounded text-xs hover:bg-blue-700 transition-colors'
                     target='_blank'
                     rel='noopener noreferrer'

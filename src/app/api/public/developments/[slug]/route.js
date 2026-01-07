@@ -98,7 +98,7 @@ export async function GET(request, { params }) {
       unitTypesWithNames = unitTypeData || []
     }
 
-    // Fetch units/listings for this development
+    // Fetch units/listings for this development - only active and complete listings (status field not filtered)
     const { data: units, error: unitsError } = await supabase
       .from('listings')
       .select(`
@@ -127,6 +127,8 @@ export async function GET(request, { params }) {
       .eq('development_id', development.id)
       .eq('account_type', 'developer')
       .eq('user_id', development.developer_id)
+      .eq('listing_status', 'active')
+      .eq('listing_condition', 'completed')
       .order('created_at', { ascending: false })
 
     if (unitsError) {

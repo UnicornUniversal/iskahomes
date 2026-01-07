@@ -27,11 +27,13 @@ export async function GET(request, { params }) {
 
     const searchField = isUUID(slugOrId) ? 'id' : 'slug'
 
-    // Fetch all listing fields
+    // Fetch all listing fields - only active and complete listings for public access
     let query = supabaseAdmin
       .from('listings')
       .select('*')
       .eq(searchField, slugOrId)
+      .eq('listing_status', 'active')
+      .eq('listing_condition', 'completed')
       .limit(1)
       .maybeSingle()
 

@@ -44,6 +44,7 @@ export async function GET(request) {
         created_at
       `)
       .eq('listing_status', 'active')
+      .eq('listing_condition', 'completed')
       .filter('types', 'cs', `["${typeId}"]`) // Contains operator for JSONB array
       .order('created_at', { ascending: false })
       .limit(5)

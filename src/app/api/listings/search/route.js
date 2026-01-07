@@ -132,6 +132,7 @@ export async function GET(request) {
         listing_types
       `, { count: 'exact' })
       .eq('listing_status', 'active')
+      .eq('listing_condition', 'completed')
 
     // Apply filters - purposes, types, categories are JSONB arrays of UUID strings
     // Use Supabase's contains method to check if array contains the UUID
@@ -222,7 +223,81 @@ export async function GET(request) {
     query = query.order('created_at', { ascending: false })
     query = query.range(offset, offset + limit - 1)
 
-    const { data: listings, error, count } = await query
+    // Get the count separately with all the same filters (before pagination)
+    // Build count query with same filters
+    let countQuery = supabase
+      .from('listings')
+      .select('*', { count: 'exact', head: true })
+      .eq('listing_status', 'active')
+      .eq('listing_condition', 'completed')
+    
+    // Apply all the same filters to count query
+    if (resolvedPurposeIds.length > 0) {
+      const purposeIdToUse = resolvedPurposeIds[0]
+      countQuery = countQuery.filter('purposes', 'cs', `["${purposeIdToUse}"]`)
+    }
+    
+    if (resolvedTypeId) {
+      countQuery = countQuery.filter('types', 'cs', `["${resolvedTypeId}"]`)
+    }
+    
+    if (categoryId) {
+      countQuery = countQuery.filter('categories', 'cs', `["${categoryId}"]`)
+    }
+    
+    if (resolvedSubtypeIds.length > 0) {
+      const subtypeIdToUse = resolvedSubtypeIds[0]
+      countQuery = countQuery.filter('listing_types->database', 'cs', `["${subtypeIdToUse}"]`)
+    }
+    
+    if (country) {
+      countQuery = countQuery.eq('country', country)
+    }
+    
+    if (state) {
+      countQuery = countQuery.eq('state', state)
+    }
+    
+    if (city) {
+      countQuery = countQuery.eq('city', city)
+    }
+    
+    if (town) {
+      countQuery = countQuery.eq('town', town)
+    }
+    
+    if (priceMin) {
+      countQuery = countQuery.gte('price', parseFloat(priceMin))
+    }
+    
+    if (priceMax) {
+      countQuery = countQuery.lte('price', parseFloat(priceMax))
+    }
+    
+    if (bedrooms) {
+      const bedroomsValue = parseFloat(bedrooms)
+      countQuery = countQuery.gte('specifications->bedrooms', bedroomsValue)
+    }
+    
+    if (bathrooms) {
+      const bathroomsValue = parseFloat(bathrooms)
+      countQuery = countQuery.gte('specifications->bathrooms', bathroomsValue)
+    }
+    
+    if (specifications && Object.keys(specifications).length > 0) {
+      Object.entries(specifications).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === '') return
+        
+        if (typeof value === 'number') {
+          countQuery = countQuery.gte(`specifications->${key}`, value)
+        } else if (typeof value === 'string') {
+          countQuery = countQuery.eq(`specifications->${key}`, value)
+        }
+      })
+    }
+
+    const { data: listings, error } = await query
+    const { count } = await countQuery
 
     if (error) {
       console.error('Error fetching listings:', error)
