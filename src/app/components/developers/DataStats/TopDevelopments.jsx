@@ -12,7 +12,12 @@ const TopDevelopments = () => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!user?.profile?.developer_id) {
+    // For team members, use organization_id; for developers, use developer_id
+    const developerId = user?.user_type === 'team_member' 
+      ? user?.profile?.organization_id 
+      : user?.profile?.developer_id
+    
+    if (!developerId) {
       setLoading(false)
       return
     }
@@ -21,7 +26,7 @@ const TopDevelopments = () => {
 
     const fetchTopDevelopments = async () => {
       try {
-        const response = await fetch(`/api/developments/top?developer_id=${user.profile.developer_id}&limit=7`)
+        const response = await fetch(`/api/developments/top?developer_id=${developerId}&limit=7`)
         if (response.ok) {
           const result = await response.json()
           if (isMounted) {
@@ -124,7 +129,7 @@ const TopDevelopments = () => {
               return (
                 <Link
                   key={dev.id}
-                  href={`/allDevelopments/${dev.slug}`}
+                  href={`/home/allDevelopments/${dev.slug}`}
                   className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-sm transition-all group"
                 >
                   {/* Rank Badge */}
@@ -196,7 +201,7 @@ const TopDevelopments = () => {
         <div className="px-6 py-4 border-t border-gray-200">
           <div className="text-center">
             <Link
-              href={`/developer/${user?.profile?.slug || user?.profile?.id}/analytics/properties`}
+              href={`/developer/${user?.profile?.organization_slug || user?.profile?.slug || user?.profile?.id}/analytics/properties`}
               className="text-primary_color hover:text-blue-700 font-medium text-sm"
             >
               View All Developments →

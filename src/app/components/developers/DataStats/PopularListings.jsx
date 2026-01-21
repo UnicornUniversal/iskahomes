@@ -18,8 +18,9 @@ const PopularListings = ({ limit = 7, userId: propUserId = null, accountType: pr
   const [loading, setLoading] = useState(true)
 
   // Use provided userId/accountType or fall back to auth user
-  const userId = propUserId || user?.id
+  // Use developer_id from profile (already set in AuthContext for team members)
   const accountType = propAccountType || user?.profile?.account_type || 'developer'
+  const userId = propUserId || (user?.profile?.developer_id || user?.id)
 
   useEffect(() => {
     if (!userId) {
@@ -84,7 +85,7 @@ const PopularListings = ({ limit = 7, userId: propUserId = null, accountType: pr
           </div>
           <div>
             <h5 className="text-xl font-semibold">Popular Listings</h5>
-            <p className="text-xs uppercase tracking-widest">Top {limit} this period</p>
+            <p className="text-xs uppercase tracking-widest">Top {limit} by views</p>
           </div>
         </div>
         <span className="text-sm font-medium">{listings.length} showing</span>
@@ -179,7 +180,7 @@ const PopularListings = ({ limit = 7, userId: propUserId = null, accountType: pr
         <div className="px-6 py-4 border-t border-white/40">
           <div className="text-center">
             <Link
-              href={`/developer/${user?.profile?.slug || user?.profile?.id}/analytics/properties`}
+              href={`/developer/${user?.profile?.organization_slug || user?.profile?.slug || user?.profile?.id}/analytics/properties`}
               className="font-medium text-sm"
             >
               View All Properties →

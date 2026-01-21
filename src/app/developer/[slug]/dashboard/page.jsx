@@ -1,5 +1,5 @@
 'use client'
-import React, { useMemo } from 'react'
+import React, { useMemo, useEffect, useState, useRef } from 'react'
 import DeveloperHeader from '@/app/components/developers/DeveloperHeader'
 import DataCard from '@/app/components/developers/DataCard'
 import StatisticsView from '@/app/components/developers/DataStats/StatisticsView'
@@ -19,8 +19,54 @@ import LatestReminders from '@/app/components/developers/DataStats/LatestReminde
 import { formatCurrency } from '@/lib/utils'
 import Notifications from '@/app/components/general/Notifications'    
 import SimpleServices from '@/app/components/general/SimpleServices'
+import { supabase } from '@/lib/supabase'
 const page = () => {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
+  const [refreshing, setRefreshing] = useState(false)
+  const [localUserData, setLocalUserData] = useState(null)
+  const hasRefreshedRef = useRef(false)
+
+  // Refresh user data when component mounts to ensure we have latest stats
+  useEffect(() => {
+    const refreshUserData = async () => {
+      // Allow both developers and team members
+      const isDeveloper = user?.user_type === 'developer'
+      const isTeamMember = user?.user_type === 'team_member' && user?.profile?.organization_type === 'developer'
+      
+      if (!user?.id || (!isDeveloper && !isTeamMember) || hasRefreshedRef.current) return
+      
+      hasRefreshedRef.current = true
+      setRefreshing(true)
+      try {
+        // For team members, use organization_id; for developers, use developer_id
+        const developerId = isTeamMember ? user.profile.organization_id : user.id
+        
+        const { data: userData, error } = await supabase
+          .from('developers')
+          .select('*')
+          .eq(isTeamMember ? 'id' : 'developer_id', developerId)
+          .single()
+
+        if (!error && userData) {
+          setLocalUserData(userData)
+        }
+      } catch (error) {
+        console.error('Error refreshing user data:', error)
+      } finally {
+        setRefreshing(false)
+      }
+    }
+
+    // Wait for auth to finish loading, then refresh data
+    if (!authLoading && user) {
+      // Small delay to ensure loadUser() in AuthContext has completed
+      const timer = setTimeout(() => {
+        refreshUserData()
+      }, 100)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [user?.id, authLoading]) // Only depend on user.id to avoid infinite loops
 
   // Format number with commas
   const formatNumber = (num) => {
@@ -30,10 +76,11 @@ const page = () => {
 
   // Get currency from company_locations primary_location
   const currency = useMemo(() => {
-    if (!user?.profile?.company_locations) return 'GHS'
+    const profileData = localUserData || user?.profile
+    if (!profileData?.company_locations) return 'GHS'
     
     // Parse company_locations if it's a string
-    let locations = user.profile.company_locations
+    let locations = profileData.company_locations
     if (typeof locations === 'string') {
       try {
         locations = JSON.parse(locations)
@@ -50,14 +97,17 @@ const page = () => {
     }
     
     return 'GHS'
-  }, [user?.profile?.company_locations])
+  }, [localUserData?.company_locations, user?.profile?.company_locations])
 
+  // Use local data if available (from refresh), otherwise use user profile
+  const profileData = localUserData || user?.profile
+  
   // Get values directly from user profile (for other metrics)
-  const totalUnits = user?.profile?.total_units ?? 0
-  const totalDevelopments = user?.profile?.total_developments ?? 0
-  const totalRevenue = user?.profile?.total_revenue ?? 0
-  const totalViews = user?.profile?.total_views ?? 0
-  const totalImpressions = user?.profile?.total_impressions ?? 0
+  const totalUnits = profileData?.total_units ?? 0
+  const totalDevelopments = profileData?.total_developments ?? 0
+  const totalRevenue = profileData?.total_revenue ?? 0
+  const totalViews = profileData?.total_views ?? 0
+  const totalImpressions = profileData?.total_impressions ?? 0
 
   return (
     <div className=' w-full flex flex-col gap-4  h-full overflow-y-auto'>
@@ -68,35 +118,35 @@ const page = () => {
         <DataCard 
           title='Total Units' 
           value={formatNumber(totalUnits)}
-          link={`/developer/${user?.profile?.slug || user?.profile?.id}/units`}
+          link={`/developer/${profileData?.slug || profileData?.id || user?.profile?.organization_slug || user?.profile?.slug || user?.profile?.id}/units`}
           linkText='View All' 
           icon={Home}
         />
         <DataCard 
           title='Total Views' 
           value={formatNumber(totalViews)}
-          link={`/developer/${user?.profile?.slug || user?.profile?.id}/analytics`}
+          link={`/developer/${profileData?.slug || profileData?.id || user?.profile?.slug || user?.profile?.id}/analytics`}
           linkText='View Analytics' 
           icon={Eye}
         />
         <DataCard 
           title='Total Impressions' 
           value={formatNumber(totalImpressions)}
-          link={`/developer/${user?.profile?.slug || user?.profile?.id}/analytics`}
+          link={`/developer/${profileData?.slug || profileData?.id || user?.profile?.slug || user?.profile?.id}/analytics`}
           linkText='View Analytics' 
           icon={BarChart3}
         />
         <DataCard 
           title='Total Revenue' 
           value={formatCurrency(totalRevenue, currency)}
-          link={`/developer/${user?.profile?.slug || user?.profile?.id}/analytics`}
+          link={`/developer/${profileData?.slug || profileData?.id || user?.profile?.slug || user?.profile?.id}/analytics`}
           linkText='View Analytics' 
           icon={DollarSign}
         />
         <DataCard 
           title='Total Developments' 
           value={formatNumber(totalDevelopments)}
-          link={`/developer/${user?.profile?.slug || user?.profile?.id}/developments`}
+          link={`/developer/${profileData?.slug || profileData?.id || user?.profile?.slug || user?.profile?.id}/developments`}
           linkText='View All' 
           icon={Building2}
         />
@@ -110,9 +160,14 @@ const page = () => {
 
 {/* this si the main content of the dashboard */}
       <div className='w-full flex flex-col gap-4'>
-        {/* Analytics - Statistics View */}
-        <div className='w-full'>
-          <StatisticsView />
+        {/* Analytics - Statistics View | Simple Services */}
+        <div className='grid grid-cols-1 lg:grid-cols-3 gap-4'>
+          <div className='lg:col-span-2'>
+            <StatisticsView />
+          </div>
+          <div>
+            <SimpleServices />
+          </div>
         </div>
 
 
@@ -121,6 +176,7 @@ const page = () => {
         <div className='secondary_bg p-4 rounded-2xl shadow-sm flex-1'>
             <RecentSales />
           </div>
+          <LatestLeads />  
 
         <div className='w-full flex justify-between gap-4 flex-col md:grid lg:grid-cols-3 gap-4'>
        
@@ -132,8 +188,11 @@ const page = () => {
             <LatestAppointments />
           </div>
 
-          <LatestReminders />
+          <div className='secondary_bg p-4 rounded-2xl shadow-sm flex-1'>
+            <LatestReminders />
+          </div>
         </div>
+     
 
 
         <div className='w-full grid grid-cols-1 lg:grid-cols-3 gap-4'>
@@ -141,19 +200,19 @@ const page = () => {
          <PropertiesByCategories />
     
     
-         <PropertiesBySubType />
+ 
 
      
          {/* <PropertiesByStatus /> */}
          <PropertiesByType />
-   
+         <PropertiesBySubType />
      </div>
 
 
         <div className='secondary_bg   rounded-2xl shadow-sm'>
           <PopularListings limit={4} />
         </div>
-        <LatestLeads />  
+     
    
        {/* <div className='w-full justify-between flex flex-col md:grid md:grid-cols-3 gap-4'>
 

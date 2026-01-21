@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
 // Calculate lead_score from lead_actions array
-// Scoring: Appointment=40, Phone=30, Direct Messaging=20, WhatsApp=15, Email=10
+// Scoring: Appointment=40, Phone=30, WhatsApp=25, Direct Messaging=20, Email=10
 function calculateLeadScore(leadActions) {
   if (!Array.isArray(leadActions) || leadActions.length === 0) {
     return 0
@@ -25,7 +25,7 @@ function calculateLeadScore(leadActions) {
       if (messageType === 'email') {
         score += 10
       } else if (messageType === 'whatsapp') {
-        score += 15
+        score += 25 // WhatsApp is more valuable than direct messaging (direct communication channel)
       } else {
         // Default to direct messaging
         score += 20
@@ -51,10 +51,13 @@ export async function GET(request) {
 
     // Fetch latest leads for the developer/agent
     // Note: We fetch all records first, then group them to avoid duplicates
+    // IMPORTANT: Exclude anonymous/unknown seekers - only get leads with user IDs (non-anonymous)
     const { data: allLeads, error: leadsError } = await supabase
       .from('leads')
       .select('id, listing_id, seeker_id, lister_id, lister_type, context_type, total_actions, lead_score, lead_actions, first_action_date, last_action_date, last_action_type, status, status_tracker, created_at')
       .eq('lister_id', listerId)
+      .not('seeker_id', 'is', null) // Only leads with seeker_id
+      .or('is_anonymous.is.null,is_anonymous.eq.false') // Exclude anonymous leads (only get non-anonymous leads)
       .order('last_action_date', { ascending: false })
       .order('created_at', { ascending: false })
 

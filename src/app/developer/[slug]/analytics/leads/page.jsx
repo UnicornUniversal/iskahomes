@@ -31,7 +31,22 @@ const LeadAnalytics = () => {
 
       setLoadingAnalytics(true)
       try {
-        const response = await fetch(`/api/leads/analytics?lister_id=${listerId}&lister_type=developer`)
+        // For team members, get the developer's developer_id (user_id) from developers table
+        let resolvedListerId = listerId
+        
+        if (user?.user_type === 'team_member' && user?.profile?.organization_type === 'developer') {
+          const { data: developer } = await supabase
+            .from('developers')
+            .select('developer_id')
+            .eq('id', user.profile.organization_id)
+            .single()
+          
+          if (developer?.developer_id) {
+            resolvedListerId = developer.developer_id
+          }
+        }
+        
+        const response = await fetch(`/api/leads/analytics?lister_id=${resolvedListerId}&lister_type=developer`)
         const result = await response.json()
         
         if (result.success) {

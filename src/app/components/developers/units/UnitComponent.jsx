@@ -129,7 +129,15 @@ const UnitComponent = ({ mode = 'add', unitId = null }) => {
         setHasFetched(true)
 
         const token = localStorage.getItem('developer_token')
-        const response = await fetch(`/api/developments?developer_id=${user.profile.developer_id}`, {
+        // Use developer_id from profile (already set in AuthContext for team members)
+        const developerId = user?.profile?.developer_id
+        
+        if (!developerId) {
+          console.error('Developer ID not found')
+          return
+        }
+        
+        const response = await fetch(`/api/developments?developer_id=${developerId}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -255,8 +263,16 @@ const UnitComponent = ({ mode = 'add', unitId = null }) => {
         }
       }
 
+      // Use developer_id from profile (already set in AuthContext for team members)
+      const developerId = user?.profile?.developer_id
+      
+      if (!developerId) {
+        toast.error('Developer ID not found. Please contact support.')
+        return
+      }
+      
       const unitData = {
-        developer_id: user.profile.developer_id,
+        developer_id: developerId,
         ...otherFormData,
         // Flatten location fields
         city: formData.location.city,
@@ -349,7 +365,7 @@ const UnitComponent = ({ mode = 'add', unitId = null }) => {
         toast.success(mode === 'add' ? 'Unit created successfully!' : 'Unit updated successfully!')
         // Redirect to units list
         setTimeout(() => {
-          window.location.href = `/developer/${user.profile?.slug || user.profile.developer_id}/units`
+          window.location.href = `/developer/${user.profile?.organization_slug || user.profile?.slug || user.profile?.organization_id || user.profile?.developer_id}/units`
         }, 2000)
       } else {
         const error = await response.json()

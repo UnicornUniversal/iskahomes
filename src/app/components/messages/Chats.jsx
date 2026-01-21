@@ -14,13 +14,15 @@ const Chats = ({ onChatSelect, selectedChatId, onConversationDataChange }) => {
   const { user, developerToken, propertySeekerToken, agentToken, agencyToken } = useAuth();
 
   // Get the appropriate token based on user type
-  const token = user?.user_type === 'developer' ? developerToken 
+  const token = user?.user_type === 'developer' || user?.user_type === 'team_member' ? developerToken 
               : user?.user_type === 'agent' ? agentToken
               : user?.user_type === 'agency' ? agencyToken
               : propertySeekerToken;
 
   // Fetch conversations and subscribe to realtime updates
+  // For team members, use the developer's ID from their organization
   const currentUserId = user?.user_type === 'developer' ? (user?.id || user?.profile?.developer_id)
+                      : user?.user_type === 'team_member' ? (user?.profile?.developer_id || user?.id)
                       : user?.user_type === 'agent' ? (user?.id || user?.profile?.agent_id)
                       : user?.user_type === 'agency' ? (user?.id || user?.profile?.agency_id)
                       : user?.id;

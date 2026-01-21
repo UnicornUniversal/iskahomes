@@ -25,8 +25,30 @@ export async function GET(request) {
     }
 
     // For developers, use developer_id. For agents, use agent_id. For agencies, use agency_id. For property_seekers, use id
-    const userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
-    const userType = decoded.user_type;
+    // For team members, use the developer's ID from their organization
+    let userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
+    let userType = decoded.user_type;
+
+    // For team members, we need to use the developer's ID to fetch messages
+    // Messages are stored with the developer's ID, not the team member's ID
+    if (decoded.user_type === 'team_member' && decoded.organization_type === 'developer') {
+      // Get the developer's ID from the organization
+      const { data: developer } = await supabaseAdmin
+        .from('developers')
+        .select('developer_id')
+        .eq('id', decoded.organization_id)
+        .single();
+
+      if (developer?.developer_id) {
+        userId = developer.developer_id;
+        userType = 'developer'; // Use 'developer' type for fetching messages
+      } else {
+        return NextResponse.json(
+          { error: 'Developer organization not found' },
+          { status: 404 }
+        );
+      }
+    }
 
     // Get conversation_id and pagination params from query
     const { searchParams } = new URL(request.url);
@@ -227,8 +249,29 @@ export async function POST(request) {
     }
 
     // For developers, use developer_id. For agents, use agent_id. For agencies, use agency_id. For property_seekers, use id
-    const userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
-    const userType = decoded.user_type;
+    // For team members, use the developer's ID from their organization
+    let userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
+    let userType = decoded.user_type;
+
+    // For team members, we need to use the developer's ID to send messages
+    if (decoded.user_type === 'team_member' && decoded.organization_type === 'developer') {
+      // Get the developer's ID from the organization
+      const { data: developer } = await supabaseAdmin
+        .from('developers')
+        .select('developer_id')
+        .eq('id', decoded.organization_id)
+        .single();
+
+      if (developer?.developer_id) {
+        userId = developer.developer_id;
+        userType = 'developer'; // Use 'developer' type for sending messages
+      } else {
+        return NextResponse.json(
+          { error: 'Developer organization not found' },
+          { status: 404 }
+        );
+      }
+    }
 
     const body = await request.json();
     const {

@@ -1,34 +1,22 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { verifyToken } from '@/lib/jwt'
+import { authenticateRequest, requirePermission } from '@/lib/apiPermissionMiddleware'
+import { sendTeamMemberInvitationEmail } from '@/lib/sendgrid'
 import crypto from 'crypto'
 
 // GET - Fetch all team members for a developer organization
 export async function GET(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authorization header missing' }, { status: 401 })
-    }
-
-    const token = authHeader.split(' ')[1]
-    const decoded = verifyToken(token)
+    // Authenticate and check permission
+    const { userInfo, error: authError, status } = await requirePermission(request, 'team.view')
     
-    if (!decoded || decoded.user_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid token or user type' }, { status: 401 })
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status })
     }
 
-    // Get developer info
-    const { data: developer, error: devError } = await supabaseAdmin
-      .from('developers')
-      .select('id')
-      .eq('developer_id', decoded.user_id)
-      .single()
-
-    if (devError || !developer) {
-      return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
-    }
+    // Get organization ID
+    const organizationId = userInfo.organization_id
+    const organizationType = userInfo.organization_type || 'developer'
 
     // Fetch all team members with role info
     const { data: teamMembers, error } = await supabaseAdmin
@@ -37,8 +25,8 @@ export async function GET(request) {
         *,
         role:organization_roles(id, name, description, is_system_role)
       `)
-      .eq('organization_type', 'developer')
-      .eq('organization_id', developer.id)
+      .eq('organization_type', organizationType)
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -72,56 +60,16 @@ export async function GET(request) {
 // POST - Invite a new team member
 export async function POST(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authorization header missing' }, { status: 401 })
-    }
-
-    const token = authHeader.split(' ')[1]
-    const decoded = verifyToken(token)
+    // Authenticate and check permission
+    const { userInfo, error: authError, status } = await requirePermission(request, 'team.invite')
     
-    if (!decoded || decoded.user_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid token or user type' }, { status: 401 })
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status })
     }
 
-    // Get developer info
-    const { data: developer, error: devError } = await supabaseAdmin
-      .from('developers')
-      .select('id')
-      .eq('developer_id', decoded.user_id)
-      .single()
-
-    if (devError || !developer) {
-      return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
-    }
-
-    // Check permissions - only Owner/Admin can invite
-    const { data: teamMember } = await supabaseAdmin
-      .from('organization_team_members')
-      .select('role_id, permissions')
-      .eq('organization_type', 'developer')
-      .eq('organization_id', developer.id)
-      .eq('user_id', decoded.user_id)
-      .eq('status', 'active')
-      .single()
-
-    if (!teamMember) {
-      return NextResponse.json({ error: 'Team member not found' }, { status: 403 })
-    }
-
-    const { data: userRole } = await supabaseAdmin
-      .from('organization_roles')
-      .select('name')
-      .eq('id', teamMember.role_id)
-      .single()
-
-    const permissions = teamMember.permissions || {}
-    const canInvite = permissions.team?.invite || userRole?.name === 'Owner' || userRole?.name === 'Admin'
-
-    if (!canInvite) {
-      return NextResponse.json({ error: 'Insufficient permissions to invite team members' }, { status: 403 })
-    }
+    // Get organization info
+    const organizationId = userInfo.organization_id
+    const organizationType = userInfo.organization_type || 'developer'
 
     const body = await request.json()
     const { email, role_id, first_name, last_name, phone, invitation_message } = body
@@ -130,13 +78,13 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Email and role_id are required' }, { status: 400 })
     }
 
-    // Verify role exists and belongs to this developer
+    // Verify role exists and belongs to this organization
     const { data: role } = await supabaseAdmin
       .from('organization_roles')
       .select('id, permissions')
       .eq('id', role_id)
-      .eq('organization_type', 'developer')
-      .eq('organization_id', developer.id)
+      .eq('organization_type', organizationType)
+      .eq('organization_id', organizationId)
       .single()
 
     if (!role) {
@@ -147,11 +95,11 @@ export async function POST(request) {
     const { data: existingMember } = await supabaseAdmin
       .from('organization_team_members')
       .select('id, status')
-      .eq('organization_type', 'developer')
-      .eq('organization_id', developer.id)
+      .eq('organization_type', organizationType)
+      .eq('organization_id', organizationId)
       .eq('email', email)
       .neq('status', 'inactive')
-      .single()
+      .maybeSingle()
 
     if (existingMember) {
       return NextResponse.json({ 
@@ -164,12 +112,63 @@ export async function POST(request) {
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 7) // 7 days expiration
 
-    // Create team member record
+    // Get organization name for email
+    let organizationName = 'the team'
+    if (organizationType === 'developer') {
+      const { data: developer } = await supabaseAdmin
+        .from('developers')
+        .select('name')
+        .eq('id', organizationId)
+        .single()
+      organizationName = developer?.name || 'the team'
+    } else if (organizationType === 'agency') {
+      const { data: agency } = await supabaseAdmin
+        .from('agencies')
+        .select('name')
+        .eq('id', organizationId)
+        .single()
+      organizationName = agency?.name || 'the team'
+    }
+
+    // Get role name for email
+    const roleName = role.name || null
+    const teamMemberName = first_name && last_name ? `${first_name} ${last_name}` : first_name || email.split('@')[0]
+
+    // CRITICAL: Send invitation email FIRST before creating database record
+    // This ensures we only create team members if the email was successfully sent
+    let emailResult
+    try {
+      emailResult = await sendTeamMemberInvitationEmail(
+        email,
+        teamMemberName,
+        organizationName,
+        roleName,
+        invitationToken,
+        organizationType,
+        invitation_message
+      )
+      
+      if (!emailResult.success) {
+        console.error('Failed to send invitation email:', emailResult.error)
+        return NextResponse.json(
+          { error: 'Failed to send invitation email. Please try again or contact support.' },
+          { status: 500 }
+        )
+      }
+    } catch (emailError) {
+      console.error('Error sending invitation email:', emailError)
+      return NextResponse.json(
+        { error: 'Failed to send invitation email. Please try again or contact support.' },
+        { status: 500 }
+      )
+    }
+
+    // Create team member record after email is sent successfully
     const { data: newMember, error } = await supabaseAdmin
       .from('organization_team_members')
       .insert({
-        organization_type: 'developer',
-        organization_id: developer.id,
+        organization_type: organizationType,
+        organization_id: organizationId,
         email,
         role_id,
         permissions: role.permissions, // Copy permissions from role
@@ -178,7 +177,7 @@ export async function POST(request) {
         phone: phone || null,
         status: 'pending',
         invitation_token: invitationToken,
-        invited_by: decoded.user_id,
+        invited_by: userInfo.user_id,
         expires_at: expiresAt.toISOString(),
         invitation_message: invitation_message || null
       })
@@ -198,11 +197,8 @@ export async function POST(request) {
 
     return NextResponse.json({ 
       success: true,
-      data: {
-        ...sanitized,
-        invitation_token // Include token in response so frontend can send email
-      },
-      message: 'Invitation created successfully'
+      data: sanitized,
+      message: 'Invitation sent successfully'
     })
 
   } catch (error) {

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { FiMessageCircle, FiEdit3, FiTrash2, FiPlus, FiX, FiSend, FiUser, FiCalendar, FiPhone, FiMail, FiImage, FiStar } from 'react-icons/fi'
-import { BarChart3, MessageCircle, Phone, Calendar, TrendingUp, UserX } from 'lucide-react'
+import { BarChart3, MessageCircle, Phone, Calendar, TrendingUp, Award } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import DataCard from '@/app/components/developers/DataCard'
 import { toast, ToastContainer } from 'react-toastify'
@@ -17,11 +17,101 @@ function getLeadCategory(score) {
   return { label: 'Base', color: 'bg-gray-100 text-secondary_color-800 border-gray-200' }
 }
 
+// Helper function to calculate score for a single action
+// Scoring: Appointment=40, Phone=30, WhatsApp=25, Direct Messaging=20, Email=10
+function calculateActionScore(action) {
+  if (!action) return 0
+  
+  const actionType = action?.action_type || ''
+  const metadata = action?.action_metadata || {}
+
+  if (actionType === 'lead_appointment') {
+    return 40
+  } else if (actionType === 'lead_phone') {
+    return 30
+  } else if (actionType === 'lead_message') {
+    // Check message_type in action_metadata
+    const messageType = String(metadata.message_type || metadata.messageType || 'direct_message').toLowerCase()
+    
+    if (messageType === 'email') {
+      return 10
+    } else if (messageType === 'whatsapp') {
+      return 25 // WhatsApp is more valuable than direct messaging (direct communication channel)
+    } else {
+      // Default to direct messaging
+      return 20
+    }
+  }
+  
+  return 0
+}
+
+// Helper function to format action name for display
+function formatActionName(action) {
+  if (!action) return 'Unknown Action'
+  
+  const actionType = action?.action_type || ''
+  const metadata = action?.action_metadata || {}
+
+  if (actionType === 'lead_appointment') {
+    const appointmentType = metadata?.appointment_type || 'viewing'
+    const formattedType = appointmentType.replace('_', ' ').split(' ').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ')
+    return `Appointment - ${formattedType}`
+  } else if (actionType === 'lead_phone') {
+    const phoneAction = metadata?.action || 'click'
+    const formattedAction = phoneAction.charAt(0).toUpperCase() + phoneAction.slice(1)
+    return `Phone ${formattedAction}`
+  } else if (actionType === 'lead_message') {
+    const messageType = String(metadata.message_type || metadata.messageType || 'direct_message').toLowerCase()
+    
+    if (messageType === 'email') {
+      return 'Email Message'
+    } else if (messageType === 'whatsapp') {
+      return "WhatsApp Message"
+    } else {
+      return 'Direct Message'
+    }
+  }
+  
+  return actionType.replace('lead_', '').replace('_', ' ').split(' ').map(word => 
+    word.charAt(0).toUpperCase() + word.slice(1)
+  ).join(' ')
+}
+
+// Helper function to get icon for action type
+function getActionIcon(action) {
+  if (!action) return MessageCircle
+  
+  const actionType = action?.action_type || ''
+  const metadata = action?.action_metadata || {}
+
+  if (actionType === 'lead_appointment') {
+    return Calendar
+  } else if (actionType === 'lead_phone') {
+    return Phone
+  } else if (actionType === 'lead_message') {
+    const messageType = String(metadata.message_type || metadata.messageType || 'direct_message').toLowerCase()
+    
+    if (messageType === 'email') {
+      return FiMail
+    } else if (messageType === 'whatsapp') {
+      return MessageCircle
+    } else {
+      return MessageCircle
+    }
+  }
+  
+  return MessageCircle
+}
+
 export default function LeadsManagement({ listerId, listerType = 'developer', listingId = null, pageSize = 20 }) {
   const { user, developerToken, propertySeekerToken } = useAuth()
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [developerProfile, setDeveloperProfile] = useState(null)
   const [statusFilter, setStatusFilter] = useState('')
   const [actionFilter, setActionFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
@@ -31,7 +121,6 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
   const [total, setTotal] = useState(0)
   const [selectedLead, setSelectedLead] = useState(null)
   const [newNoteText, setNewNoteText] = useState('')
-  const [showChat, setShowChat] = useState(false)
   const [chatMessage, setChatMessage] = useState('')
   const [sendingMessage, setSendingMessage] = useState(false)
   const [showFiltersModal, setShowFiltersModal] = useState(false)
@@ -45,6 +134,29 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
   const [remindersRefreshKey, setRemindersRefreshKey] = useState(0)
 
   const offset = useMemo(() => page * pageSize, [page, pageSize])
+
+  // Fetch developer profile for team members to get leads data
+  useEffect(() => {
+    const fetchDeveloperProfile = async () => {
+      if (user?.user_type === 'team_member' && user?.profile?.organization_type === 'developer') {
+        try {
+          const token = localStorage.getItem('developer_token')
+          const response = await fetch('/api/developers/profile', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+          if (response.ok) {
+            const result = await response.json()
+            setDeveloperProfile(result.data)
+          }
+        } catch (error) {
+          console.error('Error fetching developer profile:', error)
+        }
+      }
+    }
+    fetchDeveloperProfile()
+  }, [user?.user_type, user?.profile?.organization_type])
 
   async function loadLeads() {
     if (!listerId) return
@@ -515,7 +627,6 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         }
         
         setChatMessage('')
-        setShowChat(false)
         setMessageBoxLead(null)
         // Refresh leads list to show updated status (backend handles the update)
         loadLeads()
@@ -540,16 +651,19 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
 
   // Extract leads data for data cards
   const getTotalLeadsData = () => {
+    // For team members, use developer profile data; otherwise use user profile
+    const profileData = (user?.user_type === 'team_member' && developerProfile) ? developerProfile : user?.profile
+    
     // Only use user-wide stats (data cards are hidden when listingId is provided)
-    if (!user?.profile) return null
+    if (!profileData) return null
 
     // Parse leads_breakdown JSON
     let leadsBreakdown = null
-    if (user.profile.leads_breakdown) {
+    if (profileData.leads_breakdown) {
       try {
-        leadsBreakdown = typeof user.profile.leads_breakdown === 'string'
-          ? JSON.parse(user.profile.leads_breakdown)
-          : user.profile.leads_breakdown
+        leadsBreakdown = typeof profileData.leads_breakdown === 'string'
+          ? JSON.parse(profileData.leads_breakdown)
+          : profileData.leads_breakdown
       } catch (e) {
         console.error('Error parsing leads_breakdown:', e)
       }
@@ -557,10 +671,10 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
 
     // Parse conversion_rate (can be string or number)
     let conversionRate = 0
-    if (user.profile.conversion_rate) {
-      conversionRate = typeof user.profile.conversion_rate === 'string'
-        ? parseFloat(user.profile.conversion_rate)
-        : user.profile.conversion_rate
+    if (profileData.conversion_rate) {
+      conversionRate = typeof profileData.conversion_rate === 'string'
+        ? parseFloat(profileData.conversion_rate)
+        : profileData.conversion_rate
     }
 
     // Support both old structure (phone_leads, message_leads) and new structure (phone, messaging, whatsapp, direct_message)
@@ -574,31 +688,27 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
     const messageTotal = messagingData?.total ?? leadsBreakdown?.message_leads?.total ?? calculatedMessageTotal
     
     const emailLeads = leadsBreakdown?.email?.total ?? leadsBreakdown?.email_leads?.total ?? 0
-    const appointmentLeads = user.profile.total_appointments ?? leadsBreakdown?.appointment?.total ?? leadsBreakdown?.appointment_leads?.total ?? 0
+    const appointmentLeads = profileData.total_appointments ?? leadsBreakdown?.appointment?.total ?? leadsBreakdown?.appointment_leads?.total ?? 0
     const websiteLeads = leadsBreakdown?.website?.total ?? leadsBreakdown?.website_leads?.total ?? 0
 
-    // HYBRID APPROACH: Use aggregate total_unique_leads + total_anonymous_leads for developer-level display
-    // This shows unique individuals across ALL contexts (profile + listings + developments)
-    // For context-specific metrics, use unique_leads + anonymous_leads (profile-only)
-    const totalUniqueLeads = user.profile.total_unique_leads || 0 // Aggregate across all contexts
-    const totalAnonymousLeads = user.profile.total_anonymous_leads || 0 // Aggregate across all contexts
-    const totalLeads = totalUniqueLeads + totalAnonymousLeads // Total unique individuals across all contexts
+    // IGNORE ANONYMOUS/UNKNOWN SEEKERS: Only count leads with user IDs (non-anonymous)
+    // Anonymous seekers are only for aggregation purposes, not for lead management
+    // Use aggregate total_unique_leads (excludes anonymous) for developer-level display
+    // This shows unique logged-in individuals across ALL contexts (profile + listings + developments)
+    const totalUniqueLeads = profileData.total_unique_leads || 0 // Aggregate across all contexts (non-anonymous only)
     
     // Fallback to profile-specific if aggregate not available
-    const profileUniqueLeads = user.profile.unique_leads || 0 // Profile-specific only
-    const profileAnonymousLeads = user.profile.anonymous_leads || 0 // Profile-specific only
-    const profileTotalLeads = profileUniqueLeads + profileAnonymousLeads
+    const profileUniqueLeads = profileData.unique_leads || 0 // Profile-specific only (non-anonymous)
     
     // Use aggregate if available, otherwise fallback to profile-specific, then to total_leads
-    const totalLeadsFallback = profileTotalLeads > 0 ? profileTotalLeads : (leadsBreakdown?.total_leads || user.profile.total_leads || 0)
-    const finalTotalLeads = totalLeads > 0 ? totalLeads : totalLeadsFallback
+    // Note: We're excluding anonymous leads from the total
+    const totalLeadsFallback = profileUniqueLeads > 0 ? profileUniqueLeads : (leadsBreakdown?.total_leads || profileData.total_leads || 0)
+    const finalTotalLeads = totalUniqueLeads > 0 ? totalUniqueLeads : totalLeadsFallback
     
     return {
-      total_leads: finalTotalLeads, // Aggregate across all contexts (HYBRID APPROACH)
-      unique_leads: totalUniqueLeads, // Aggregate unique logged-in leads
-      anonymous_leads: totalAnonymousLeads, // Aggregate anonymous leads
-      profile_unique_leads: profileUniqueLeads, // Profile-specific only (for reference)
-      profile_anonymous_leads: profileAnonymousLeads, // Profile-specific only (for reference)
+      total_leads: finalTotalLeads, // Aggregate across all contexts (NON-ANONYMOUS ONLY)
+      unique_leads: totalUniqueLeads, // Aggregate unique logged-in leads (non-anonymous)
+      profile_unique_leads: profileUniqueLeads, // Profile-specific only (non-anonymous, for reference)
       phone_leads: phoneLeads,
       messaging: messagingData, // Nested messaging structure
       whatsapp_leads: whatsappLeads,
@@ -644,11 +754,6 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
             title="Appointments"
             value={(totalLeadsData.appointment_leads || 0).toLocaleString()}
             icon={Calendar}
-          />
-          <DataCard
-            title="Anonymous Leads"
-            value={(totalLeadsData.anonymous_leads || 0).toLocaleString()}
-            icon={UserX}
           />
         </div>
       )}
@@ -1358,6 +1463,39 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                     </div>
                   </div>
 
+                     {/* Message Component - Always Visible */}
+                     <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                    <h5 className="text-sm font-medium text-green-900 flex items-center gap-2 mb-3">
+                      <FiMessageCircle className="w-5 h-5" />
+                      Send Message
+                    </h5>
+                    <div className="space-y-3">
+                      <textarea
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none"
+                        rows="3"
+                        placeholder="Type your message here..."
+                        value={chatMessage}
+                        onChange={(e) => setChatMessage(e.target.value)}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          className="flex-1 px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={!chatMessage.trim() || sendingMessage || !selectedLead.seeker_id}
+                          onClick={() => sendMessage(selectedLead)}
+                        >
+                          <FiSend className="w-4 h-4" />
+                          {sendingMessage ? 'Sending...' : 'Send'}
+                        </button>
+                        <button
+                          className="px-3 py-2 text-sm font-medium text-secondary_color-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                          onClick={() => setChatMessage('')}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Status History */}
                   <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
                     <h4 className="text-base font-semibold text-secondary_color-900 mb-3">Status History</h4>
@@ -1374,6 +1512,8 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                       )}
                     </div>
                   </div>
+
+               
 
               
                 </div>
@@ -1418,46 +1558,41 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
 
                       const formattedDate = formatDate(action.action_date)
                       const formattedTime = formatTime(action.action_timestamp)
+                      const actionScore = calculateActionScore(action)
+                      const actionName = formatActionName(action)
+                      const ActionIcon = getActionIcon(action)
 
                       return (
-                        <div key={action.action_id || index} className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
-                          <div className="flex-shrink-0 mt-0.5">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
-                              {action.action_type.replace('lead_', '').replace('_', ' ')}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-secondary_color-900 mb-1">
-                              {action.action_metadata?.message_type && (
-                                <span className="capitalize">Message: {action.action_metadata.message_type.replace('_', ' ')}</span>
-                              )}
-                              {action.action_metadata?.appointment_type && (
-                                <span className="capitalize">Appointment: {action.action_metadata.appointment_type.replace('_', ' ')}</span>
-                              )}
-                              {action.action_metadata?.action && (
-                                <span className="capitalize">Phone: {action.action_metadata.action}</span>
-                              )}
-                              {!action.action_metadata?.message_type && !action.action_metadata?.appointment_type && !action.action_metadata?.action && (
-                                <span className="capitalize">{action.action_type.replace('lead_', '').replace('_', ' ')}</span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-secondary_color-500">
-                              <span>{formattedDate}</span>
-                              {formattedTime && (
-                                <>
-                                  <span className="text-secondary_color-300">•</span>
-                                  <span>{formattedTime}</span>
-                                </>
-                              )}
+                        <div key={action.action_id || index} className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                          {/* Icon and Action Name on same line */}
+                          <div className="flex items-center gap-2 mb-2">
+                            <ActionIcon className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                            <div className="text-sm font-medium text-secondary_color-900">
+                              {actionName}
                             </div>
                           </div>
-                          <button
-                            className="flex-shrink-0 p-1 text-secondary_color-400 hover:text-blue-600 transition-colors"
-                            onClick={() => setShowChat(!showChat)}
-                            title="Send message"
-                          >
-                            <FiMessageCircle className="w-5 h-5" />
-                          </button>
+                          
+                          {/* Lead Score */}
+                          {actionScore > 0 && (
+                            <div className="flex items-center gap-1.5 mb-2">
+                              <Award className="w-4 h-4 text-secondary_color-600 flex-shrink-0" />
+                              <span className="text-xs font-medium text-secondary_color-600">
+                                Lead Score: {actionScore}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Date and Time */}
+                          <div className="flex items-between justify-between">
+                            <div className="text-xs font-medium text-secondary_color-700">
+                              {formattedDate}
+                            </div>
+                            {formattedTime && (
+                              <div className="text-xs text-secondary_color-500 mt-0.5">
+                                {formattedTime}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )
                     })}
@@ -1467,49 +1602,6 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                       </div>
                     )}
                   </div>
-
-                  {/* Inline Chat */}
-                  {showChat && (
-                    <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <h5 className="text-sm font-medium text-green-900 flex items-center gap-2">
-                          <FiMessageCircle className="w-5 h-5" />
-                          Quick Message
-                        </h5>
-                        <button
-                          className="text-green-600 hover:text-green-800"
-                          onClick={() => setShowChat(false)}
-                        >
-                          <FiX className="w-5 h-5" />
-                        </button>
-                      </div>
-                      <div className="space-y-3">
-                        <textarea
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none"
-                          rows="3"
-                          placeholder="Type your message here..."
-                          value={chatMessage}
-                          onChange={(e) => setChatMessage(e.target.value)}
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            className="flex-1 px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={!chatMessage.trim() || sendingMessage}
-                            onClick={() => sendMessage(selectedLead)}
-                          >
-                            <FiSend className="w-5 h-5" />
-                            {sendingMessage ? 'Sending...' : 'Send'}
-                          </button>
-                          <button
-                            className="px-3 py-2 text-sm font-medium text-secondary_color-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                            onClick={() => setChatMessage('')}
-                          >
-                            Clear
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Notes and Reminders */}

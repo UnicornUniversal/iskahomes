@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
+import { userHasPermission } from '@/lib/permissionHelpers'
 import { toast } from 'react-toastify'
 import TeamMembersList from '@/app/components/developers/team/TeamMembersList'
 import InviteMemberModal from '@/app/components/developers/team/InviteMemberModal'
@@ -27,17 +28,19 @@ const TeamPage = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Team Management</h1>
+          <h1 className="text-3xl font-bold text-primary_color mb-2">Team Management</h1>
           <p className="text-gray-600">Manage your team members, roles, and permissions</p>
         </div>
         <div className="flex gap-3">
-          <button
-            onClick={() => setShowInviteModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary_color text-white rounded-lg hover:bg-primary_color/90 transition-colors"
-          >
-            <FiPlus className="w-5 h-5" />
-            Invite Member
-          </button>
+          {(user?.user_type === 'agent' || userHasPermission(user, 'team.invite')) && (
+            <button
+              onClick={() => setShowInviteModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary_color text-white rounded-lg hover:bg-primary_color/90 transition-colors"
+            >
+              <FiPlus className="w-5 h-5" />
+              Invite Member
+            </button>
+          )}
         </div>
       </div>
 
@@ -45,6 +48,7 @@ const TeamPage = () => {
       <div className="flex gap-2 border-b border-gray-200 mb-6">
         <Link
           href={`/developer/${slug}/team`}
+          prefetch={false}
           className={`px-6 py-3 font-semibold transition-colors flex items-center gap-2 ${
             pathname === `/developer/${slug}/team`
               ? 'text-primary_color border-b-2 border-primary_color'
@@ -56,6 +60,7 @@ const TeamPage = () => {
         </Link>
         <Link
           href={`/developer/${slug}/team/roles`}
+          prefetch={false}
           className={`px-6 py-3 font-semibold transition-colors flex items-center gap-2 ${
             pathname === `/developer/${slug}/team/roles`
               ? 'text-primary_color border-b-2 border-primary_color'

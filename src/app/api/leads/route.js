@@ -8,7 +8,7 @@ function isUUID(str) {
 }
 
 // Calculate lead_score from lead_actions array
-// Scoring: Appointment=40, Phone=30, Direct Messaging=20, WhatsApp=15, Email=10
+// Scoring: Appointment=40, Phone=30, WhatsApp=25, Direct Messaging=20, Email=10
 function calculateLeadScore(leadActions) {
   if (!Array.isArray(leadActions) || leadActions.length === 0) {
     return 0
@@ -31,7 +31,7 @@ function calculateLeadScore(leadActions) {
       if (messageType === 'email') {
         score += 10
       } else if (messageType === 'whatsapp') {
-        score += 15
+        score += 25 // WhatsApp is more valuable than direct messaging (direct communication channel)
       } else {
         // Default to direct messaging
         score += 20
@@ -114,6 +114,7 @@ export async function GET(request) {
       .eq('lister_id', finalListerId)
       .eq('lister_type', listerType)
       .not('seeker_id', 'is', null) // Only leads with seeker_id
+      .or('is_anonymous.is.null,is_anonymous.eq.false') // Exclude anonymous leads (only get non-anonymous leads)
 
     // Filter by listing_id if provided
     if (listingId) {
@@ -130,6 +131,7 @@ export async function GET(request) {
 
     // Fetch ALL leads (no pagination yet - we'll group first)
     // We need all records to properly group by (seeker_id, listing_id)
+    // IMPORTANT: Exclude anonymous/unknown seekers - only get leads with user IDs (non-anonymous)
     let dataQuery = supabaseAdmin
       .from('leads')
       .select(`
@@ -153,7 +155,8 @@ export async function GET(request) {
       `)
       .eq('lister_id', finalListerId)
       .eq('lister_type', listerType)
-      .not('seeker_id', 'is', null)
+      .not('seeker_id', 'is', null) // Only leads with seeker_id
+      .or('is_anonymous.is.null,is_anonymous.eq.false') // Exclude anonymous leads (only get non-anonymous leads)
       
     console.log('🔍 Query filters:', {
       lister_id: finalListerId,

@@ -6,12 +6,13 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Plus, Loader2 } from 'lucide-react'
 import { toast } from 'react-toastify'
 import { CustomSelect } from '@/app/components/ui/custom-select'
+import { userHasPermission } from '@/lib/permissionHelpers'
 import { 
   usePropertyPurposes, 
   usePropertyTypes
 } from '@/hooks/useCachedData'
 
-const AllUnits = ({ accountType = 'developer' }) => {
+  const AllUnits = ({ accountType = 'developer' }) => {
   const router = useRouter()
   const { user } = useAuth()
   
@@ -25,10 +26,38 @@ const AllUnits = ({ accountType = 'developer' }) => {
   const emptyStateTitle = isAgent || isAgency ? 'No properties found' : 'No units found'
   const emptyStateMessage = isAgent || isAgency ? 'Get started by creating your first property' : 'Get started by creating your first unit'
   const emptyStateButton = isAgent || isAgency ? 'Create Your First Property' : 'Create Your First Unit'
+  
+  // State declarations
   const [units, setUnits] = useState([])
   const [filteredUnits, setFilteredUnits] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  
+  // Constraint states
+  const [requirementsMet, setRequirementsMet] = useState(false)
+  const [checkingRequirements, setCheckingRequirements] = useState(true)
+  const [requirementMessage, setRequirementMessage] = useState('')
+  
+  // Check if user can create units (only for developers/agencies/team members, not agents)
+  // Also check if requirements are met
+  const canCreate = useMemo(() => {
+    // Agents should not be able to list properties
+    if (isAgent) {
+      return false
+    }
+    
+    // Check permissions first
+    const hasPermission = (user?.user_type === 'developer' || user?.user_type === 'team_member' || user?.user_type === 'agency') 
+      ? userHasPermission(user, 'units.create') 
+      : true
+    
+    // Then check if requirements are met (for developers/team members)
+    if ((user?.user_type === 'developer' || user?.user_type === 'team_member') && !isAgency) {
+      return hasPermission && requirementsMet
+    }
+    
+    return hasPermission
+  }, [user, isAgent, isAgency, requirementsMet])
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('')
@@ -79,17 +108,172 @@ const AllUnits = ({ accountType = 'developer' }) => {
   ]
 
   // Get ID from user profile based on account type
+  // Use developer_id from profile (already set in AuthContext for team members)
   const accountId = isAgent 
     ? (user?.profile?.agent_id || user?.id)
     : isAgency
     ? (user?.profile?.agency_id || user?.id)
     : (user?.profile?.developer_id || user?.id)
 
+  // Check requirements before allowing unit creation
+  useEffect(() => {
+    if (!user) {
+      setCheckingRequirements(false)
+      return
+    }
+    checkRequirements()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isAgent, isAgency, accountId])
+
   useEffect(() => {
     if (accountId) {
       fetchUnits()
     }
   }, [accountId])
+
+  // Check if user meets requirements to add units/properties
+  const checkRequirements = async () => {
+    if (!user) {
+      setCheckingRequirements(false)
+      return
+    }
+    
+    setCheckingRequirements(true)
+    
+    try {
+      // For developers and team members
+      if (!isAgent && !isAgency && (user?.user_type === 'developer' || user?.user_type === 'team_member')) {
+        const token = localStorage.getItem('developer_token')
+        if (!token) {
+          setRequirementsMet(false)
+          setRequirementMessage('Authentication required')
+          setCheckingRequirements(false)
+          return
+        }
+
+        const response = await fetch('/api/developers/profile', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        if (response.ok) {
+          const { data } = await response.json()
+          
+          // Check if company_locations exists and has at least one location
+          const hasLocations = data.company_locations && 
+            Array.isArray(data.company_locations) && 
+            data.company_locations.length > 0
+          
+          // Check if default_currency is set
+          let hasDefaultCurrency = false
+          if (data.default_currency) {
+            // default_currency can be an object with {code, name} or just a string
+            if (typeof data.default_currency === 'object' && data.default_currency.code) {
+              hasDefaultCurrency = true
+            } else if (typeof data.default_currency === 'string' && data.default_currency.length > 0) {
+              hasDefaultCurrency = true
+            }
+          }
+          
+          // Also check if primary location has currency
+          if (!hasDefaultCurrency && hasLocations) {
+            const primaryLocation = data.company_locations.find(loc => loc.primary_location === true)
+            if (primaryLocation?.currency) {
+              hasDefaultCurrency = true
+            }
+          }
+
+          if (!hasLocations || !hasDefaultCurrency) {
+            setRequirementsMet(false)
+            const missing = []
+            if (!hasLocations) missing.push('location')
+            if (!hasDefaultCurrency) missing.push('default currency')
+            
+            let message = 'To add units, please complete your profile setup: '
+            if (missing.includes('location')) {
+              message += 'Add at least one location'
+            }
+            if (missing.length > 1) {
+              message += ' and '
+            }
+            if (missing.includes('default currency')) {
+              message += 'Set a default currency'
+            }
+            message += ' in your profile settings.'
+            setRequirementMessage(message)
+          } else {
+            setRequirementsMet(true)
+            setRequirementMessage('')
+          }
+        } else {
+          setRequirementsMet(false)
+          setRequirementMessage('Unable to verify profile requirements')
+        }
+      }
+      // For agents
+      else if (isAgent && user?.user_type === 'agent') {
+        const token = localStorage.getItem('agent_token')
+        if (!token) {
+          setRequirementsMet(false)
+          setRequirementMessage('Authentication required')
+          setCheckingRequirements(false)
+          return
+        }
+
+        // Fetch agency profile to check commission rates
+        const response = await fetch('/api/agencies/profile', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        if (response.ok) {
+          const { data } = await response.json()
+          
+          // Check if commission_rate exists and has a default value
+          let hasCommissionRates = false
+          if (data.commission_rate) {
+            try {
+              const rates = typeof data.commission_rate === 'string' 
+                ? JSON.parse(data.commission_rate) 
+                : data.commission_rate
+              
+              // Check if default rate exists
+              if (rates.default !== undefined && rates.default !== null) {
+                hasCommissionRates = true
+              }
+            } catch (e) {
+              console.error('Error parsing commission_rate:', e)
+            }
+          }
+
+          if (!hasCommissionRates) {
+            setRequirementsMet(false)
+            setRequirementMessage('Your agency needs to set commission rates before you can list properties. Please contact your agency administrator.')
+          } else {
+            // Agents shouldn't be able to list anyway, but we'll set this for the disclaimer
+            setRequirementsMet(true)
+            setRequirementMessage('')
+          }
+        } else {
+          setRequirementsMet(false)
+          setRequirementMessage('Unable to verify agency commission rates')
+        }
+      }
+      // For other account types, allow by default
+      else {
+        setRequirementsMet(true)
+        setRequirementMessage('')
+      }
+    } catch (error) {
+      console.error('Error checking requirements:', error)
+      setRequirementsMet(false)
+      setRequirementMessage('Error checking requirements')
+    } finally {
+      setCheckingRequirements(false)
+    }
+  }
 
   const fetchUnits = async () => {
     try {
@@ -142,14 +326,25 @@ const AllUnits = ({ accountType = 'developer' }) => {
 
 
   const handleAddUnit = () => {
-    if (!user?.profile?.slug) {
+    // Check requirements before navigating
+    if (!canCreate) {
+      if (requirementMessage) {
+        toast.error(requirementMessage)
+      } else {
+        toast.error('Please complete your profile requirements before adding units')
+      }
+      return
+    }
+    
+    const slug = user?.profile?.organization_slug || user?.profile?.slug
+    if (!slug) {
       toast.error(`${isAgent ? 'Agent' : 'Developer'} profile not found`)
       return
     }
     if (isAgent) {
-      router.push(`/agents/${user.profile.slug}/properties/addNewProperty`)
+      router.push(`/agents/${slug}/properties/addNewProperty`)
     } else {
-      router.push(`/developer/${user.profile.slug}/units/addNewUnit`)
+      router.push(`/developer/${slug}/units/addNewUnit`)
     }
   }
 
@@ -302,7 +497,7 @@ const AllUnits = ({ accountType = 'developer' }) => {
       <div className="w-full p-6">
         <div className="w-full flex justify-between items-center mb-6">
           <h1 className=" font-bold ">{pageTitle}</h1>
-          {!isAgency && (
+          {!isAgency && canCreate && (
             <button 
               onClick={handleAddUnit}
               className="primary_button flex items-center gap-2"
@@ -328,7 +523,7 @@ const AllUnits = ({ accountType = 'developer' }) => {
       <div className="w-full p-6">
         <div className="w-full flex justify-between items-center mb-6">
           <h1 className="">{pageTitle}</h1>
-          {!isAgency && (
+          {!isAgency && !isAgent && canCreate && (
             <button 
               onClick={handleAddUnit}
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
@@ -369,8 +564,8 @@ const AllUnits = ({ accountType = 'developer' }) => {
             Showing {filteredUnits.length} of {units.length} {units.length === 1 ? itemLabel.toLowerCase() : itemLabelPlural.toLowerCase()}
           </p>
         </div>
-        {/* Conditionally render Add New Property button - only for agents and developers */}
-        {!isAgency && (
+        {/* Conditionally render Add New Property button - only for developers/team members with permission and requirements met */}
+        {!isAgency && !isAgent && canCreate && (
           <button 
             onClick={handleAddUnit}
             className="primary_button transition-colors flex items-center gap-2"
@@ -381,12 +576,44 @@ const AllUnits = ({ accountType = 'developer' }) => {
         )}
       </div>
 
+      {/* Requirements Disclaimer */}
+      {!checkingRequirements && !canCreate && requirementMessage && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-yellow-800 mb-1">
+                {isAgent ? 'Commission Rates Required' : 'Profile Setup Required'}
+              </h3>
+              <p className="text-sm text-yellow-700 mb-2">
+                {requirementMessage}
+              </p>
+              {!isAgent && (
+                <button
+                  onClick={() => {
+                    const slug = user?.profile?.organization_slug || user?.profile?.slug
+                    if (slug) {
+                      router.push(`/developer/${slug}/profile`)
+                    }
+                  }}
+                  className="text-sm text-yellow-800 underline hover:text-yellow-900 font-medium"
+                >
+                  Go to Profile Settings →
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filters and List Container - Same Div */}
       <div className="w-full flex items-start gap-6 relative">
         {/* Mobile Filter Button - Absolutely positioned at upper right */}
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className="lg:hidden fixed top-20 right-4 z-40 w-12 h-12 rounded-full bg-primary_color text-white shadow-lg hover:bg-primary_color/90 transition-colors flex items-center justify-center"
+          className="lg:hidden fixed top-20 right-4 z-30 w-12 h-12 rounded-full bg-primary_color text-white shadow-lg hover:bg-primary_color/90 transition-colors flex items-center justify-center"
           title="Show Filters"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -420,13 +647,43 @@ const AllUnits = ({ accountType = 'developer' }) => {
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">{emptyStateTitle}</h3>
             <p className="text-gray-600 mb-6">{emptyStateMessage}</p>
-            {!isAgency && (
+            {!isAgency && !isAgent && canCreate && (
               <button 
                 onClick={handleAddUnit}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 {emptyStateButton}
               </button>
+            )}
+            {!checkingRequirements && !canCreate && requirementMessage && (
+              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg max-w-md mx-auto">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-yellow-800 mb-1">
+                      {isAgent ? 'Commission Rates Required' : 'Profile Setup Required'}
+                    </h3>
+                    <p className="text-sm text-yellow-700 mb-2">
+                      {requirementMessage}
+                    </p>
+                    {!isAgent && (
+                      <button
+                        onClick={() => {
+                          const slug = user?.profile?.organization_slug || user?.profile?.slug
+                          if (slug) {
+                            router.push(`/developer/${slug}/profile`)
+                          }
+                        }}
+                        className="text-sm text-yellow-800 underline hover:text-yellow-900 font-medium"
+                      >
+                        Go to Profile Settings →
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         ) : filteredUnits.length === 0 ? (
@@ -448,7 +705,7 @@ const AllUnits = ({ accountType = 'developer' }) => {
               <div key={unit.id} className="break-inside-avoid">
                 <UnitCard 
                   unit={unit}
-                  developerSlug={user?.profile?.slug}
+                  developerSlug={user?.profile?.organization_slug || user?.profile?.slug}
                   accountType={accountType}
                 />
               </div>
@@ -460,7 +717,7 @@ const AllUnits = ({ accountType = 'developer' }) => {
         {/* Filters Sidebar - Hidden on small/medium, conditionally visible on large+ */}
         {showDesktopFilters && (
         <div className="hidden lg:block w-80 flex-shrink-0 sticky top-20 self-start">
-          <div className="border-l border-gray-200 p-4 max-h-[calc(100vh-5rem)] overflow-y-auto">
+          <div className="lg:bg-white/50 border-l border-gray-200 p-4 max-h-[calc(100vh-5rem)] overflow-y-auto rounded-lg">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Filters</h2>
             <div className="flex items-center gap-2">

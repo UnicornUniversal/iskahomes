@@ -40,9 +40,12 @@ const InviteMemberModal = ({ isOpen, onClose, onSuccess }) => {
         if (defaultRole) {
           setFormData(prev => ({ ...prev, role_id: defaultRole.id }))
         }
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Failed to load roles')
       }
     } catch (error) {
-      console.error('Error fetching roles:', error)
+      toast.error('Failed to load roles')
     }
   }
 
@@ -67,18 +70,19 @@ const InviteMemberModal = ({ isOpen, onClose, onSuccess }) => {
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || 'Failed to send invitation')
+        // Check for duplicate email
+        if (error.error && (error.error.toLowerCase().includes('already') || error.error.toLowerCase().includes('exists'))) {
+          toast.error('This email is already a team member. Please use a different email address.')
+        } else {
+          throw new Error(error.error || 'Failed to send invitation')
+        }
+        return
       }
 
       const result = await response.json()
-      
-      // TODO: Send invitation email with token
-      // For now, just show success
-      console.log('Invitation token:', result.data.invitation_token)
-      
+      toast.success('Invitation sent successfully!')
       onSuccess()
     } catch (error) {
-      console.error('Error sending invitation:', error)
       toast.error(error.message || 'Failed to send invitation')
     } finally {
       setLoading(false)
@@ -88,11 +92,11 @@ const InviteMemberModal = ({ isOpen, onClose, onSuccess }) => {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-20">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">Invite Team Member</h2>
+          <h2 className="text-2xl font-bold text-primary_color">Invite Team Member</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"

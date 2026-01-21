@@ -27,25 +27,78 @@ ChartJS.register(
   Legend
 )
 
-// Views Chart Component
-const ViewsChart = ({ data }) => {
+// Views Chart Component - Shows both listing views and profile views
+const ViewsChart = ({ listingData, profileData, showListing, showProfile }) => {
+  // Get all unique dates from both datasets
+  const allDates = new Set()
+  listingData.forEach(item => {
+    if (item.date) allDates.add(item.date)
+  })
+  profileData.forEach(item => {
+    if (item.date) allDates.add(item.date)
+  })
+  
+  // Sort dates chronologically
+  const sortedDates = Array.from(allDates).sort()
+  
+  // Create maps for quick lookup by date
+  const listingMap = new Map(listingData.map(item => [item.date || '', item]))
+  const profileMap = new Map(profileData.map(item => [item.date || '', item]))
+  
+  // Build labels array - use the label from whichever dataset has it, or format the date
+  const labels = sortedDates.map(date => {
+    const listingItem = listingMap.get(date)
+    const profileItem = profileMap.get(date)
+    // Prefer label from listing data, fallback to profile data, or format date
+    return listingItem?.label || profileItem?.label || date
+  })
+  
+  // Build datasets array
+  const datasets = []
+  
+  // Primary color for listing views (blue)
+  if (showListing) {
+    datasets.push({
+      label: 'Listing Views',
+      data: sortedDates.map(date => {
+        const item = listingMap.get(date)
+        return item ? (item.value || 0) : 0
+      }),
+      borderColor: '#3B82F6', // Primary blue
+      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+      tension: 0.4,
+      fill: showProfile ? false : true, // Only fill if showing one dataset
+      pointRadius: 3,
+      pointHoverRadius: 5,
+      pointBackgroundColor: '#3B82F6',
+      pointBorderColor: '#fff',
+      pointBorderWidth: 2,
+    })
+  }
+  
+  // Secondary color for profile views (purple/indigo)
+  if (showProfile) {
+    datasets.push({
+      label: 'Profile Views',
+      data: sortedDates.map(date => {
+        const item = profileMap.get(date)
+        return item ? (item.value || 0) : 0
+      }),
+      borderColor: '#8B5CF6', // Secondary purple
+      backgroundColor: 'rgba(139, 92, 246, 0.1)',
+      tension: 0.4,
+      fill: showListing ? false : true, // Only fill if showing one dataset
+      pointRadius: 3,
+      pointHoverRadius: 5,
+      pointBackgroundColor: '#8B5CF6',
+      pointBorderColor: '#fff',
+      pointBorderWidth: 2,
+    })
+  }
+
   const chartData = {
-    labels: data.map(item => item.label),
-    datasets: [
-      {
-        label: 'Views',
-        data: data.map(item => item.value),
-        borderColor: '#3B82F6',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        tension: 0.4,
-        fill: true,
-        pointRadius: 3,
-        pointHoverRadius: 5,
-        pointBackgroundColor: '#3B82F6',
-        pointBorderColor: '#fff',
-        pointBorderWidth: 2,
-      },
-    ],
+    labels,
+    datasets,
   }
 
   const options = {
@@ -53,10 +106,23 @@ const ViewsChart = ({ data }) => {
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: false,
+        display: true,
+        position: 'top',
+        labels: {
+          usePointStyle: true,
+          padding: 15,
+          font: {
+            size: 12,
+          },
+          color: '#374151',
+        },
       },
       title: {
         display: false,
+      },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
       },
     },
     scales: {
@@ -83,6 +149,10 @@ const ViewsChart = ({ data }) => {
           color: '#6B7280',
         },
       },
+    },
+    interaction: {
+      mode: 'index',
+      intersect: false,
     },
   }
 
@@ -160,6 +230,8 @@ const StatisticsView = ({ userId: propUserId = null, accountType: propAccountTyp
   const [selectedMetric, setSelectedMetric] = useState('views')
   const [exporting, setExporting] = useState(false)
   const [viewsData, setViewsData] = useState([])
+  const [listingViewsData, setListingViewsData] = useState([])
+  const [profileViewsData, setProfileViewsData] = useState([])
   // const [impressionsData, setImpressionsData] = useState([]) // COMMENTED OUT: Impressions too slow
   const [loading, setLoading] = useState(true)
   const [summary, setSummary] = useState({ 
@@ -167,10 +239,14 @@ const StatisticsView = ({ userId: propUserId = null, accountType: propAccountTyp
     totalListingViews: 0, 
     totalProfileViews: 0 
   })
+  // Toggle states for showing/hiding datasets
+  const [showListingViews, setShowListingViews] = useState(true)
+  const [showProfileViews, setShowProfileViews] = useState(true)
 
   // Use provided userId/accountType or fall back to auth user
-  const userId = propUserId || user?.id
+  // Use developer_id from profile (already set in AuthContext for team members)
   const accountType = propAccountType || user?.profile?.account_type || 'developer'
+  const userId = propUserId || (user?.profile?.developer_id || user?.id)
 
   // Initialize with current month as default
   const getDefaultDateRange = () => {
@@ -257,19 +333,80 @@ const StatisticsView = ({ userId: propUserId = null, accountType: propAccountTyp
           const result = await response.json()
           
           if (isMounted) {
-            setViewsData(result.data?.timeSeries || [])
+            // Get all time series data
+            const timeSeries = result.data?.timeSeries || []
+            const timeSeriesListing = result.data?.timeSeriesListing || []
+            const timeSeriesProfile = result.data?.timeSeriesProfile || []
+            const groupBy = result.data?.groupBy || 'date'
+            
+            // Calculate date range to determine formatting
+            let daysDiff = 0
+            if (dateRange.startDate && dateRange.endDate) {
+              const start = new Date(dateRange.startDate)
+              const end = new Date(dateRange.endDate)
+              daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24))
+            }
+            
+            // Helper function to process time series data
+            const processTimeSeries = (timeSeriesData) => {
+              return timeSeriesData.map((item, index) => {
+                // Always create label from date if available
+                if (item.date) {
+                  try {
+                    const date = new Date(item.date)
+                    
+                    if (groupBy === 'hour') {
+                      // For hourly data, show time
+                      item.label = `${String(item.hour || 0).padStart(2, '0')}:00`
+                    } else if (groupBy === 'date') {
+                      // For daily data, format based on range length
+                      if (daysDiff <= 7) {
+                        // Show day name and date for week view
+                        item.label = date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })
+                      } else if (daysDiff <= 30) {
+                        // Show month and day for month view
+                        item.label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                      } else {
+                        // Show abbreviated format for longer ranges
+                        item.label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                      }
+                    } else if (groupBy === 'week') {
+                      // For weekly data, show week range or week number
+                      const weekStart = new Date(date)
+                      weekStart.setDate(date.getDate() - date.getDay())
+                      const weekEnd = new Date(weekStart)
+                      weekEnd.setDate(weekStart.getDate() + 6)
+                      item.label = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { day: 'numeric' })}`
+                    } else if (groupBy === 'month') {
+                      // For monthly data, show month and year
+                      item.label = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                    } else {
+                      // Fallback to date format
+                      item.label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    }
+                  } catch (e) {
+                    // If date parsing fails, use the date string as-is
+                    item.label = item.date
+                  }
+                } else if (item.label) {
+                  // Use existing label if present
+                  // No change needed
+                } else {
+                  // Last resort: create label from index
+                  item.label = `Point ${index + 1}`
+                }
+                return item
+              })
+            }
+            
+            setViewsData(processTimeSeries(timeSeries))
+            setListingViewsData(processTimeSeries(timeSeriesListing))
+            setProfileViewsData(processTimeSeries(timeSeriesProfile))
             setSummary(result.data?.summary || { 
               totalViews: 0, 
               totalListingViews: 0, 
               totalProfileViews: 0 
             })
-            // if (selectedMetric === 'views') {
-            //   setViewsData(result.data?.timeSeries || [])
-            //   setSummary(result.data?.summary || { total: 0, average: 0 })
-            // } else {
-            //   setImpressionsData(result.data?.timeSeries || [])
-            //   setSummary(result.data?.summary || { total: 0, average: 0 })
-            // }
           }
         }
       } catch (error) {
@@ -288,8 +425,6 @@ const StatisticsView = ({ userId: propUserId = null, accountType: propAccountTyp
     }
   }, [userId, accountType, selectedPeriod, selectedMetric, dateRange.startDate, dateRange.endDate])
 
-  // const currentData = selectedMetric === 'views' ? viewsData : impressionsData // COMMENTED OUT: Only views now
-  const currentData = viewsData
   const totalViews = summary.totalViews || 0
   const totalListingViews = summary.totalListingViews || 0
   const totalProfileViews = summary.totalProfileViews || 0
@@ -331,11 +466,17 @@ const StatisticsView = ({ userId: propUserId = null, accountType: propAccountTyp
                 setExporting(true)
                 try {
                   const exportData = [
-                    ['Date', 'Views'],
-                    ...currentData.map(item => [
-                      item.label || '',
-                      item.value || 0
-                    ])
+                    ['Date', 'Listing Views', 'Profile Views', 'Total Views'],
+                    ...viewsData.map((item, index) => {
+                      const listingItem = listingViewsData[index] || { value: 0 }
+                      const profileItem = profileViewsData[index] || { value: 0 }
+                      return [
+                        item.label || '',
+                        listingItem.value || 0,
+                        profileItem.value || 0,
+                        item.value || 0
+                      ]
+                    })
                   ]
                   
                   if (format === 'csv') {
@@ -369,38 +510,8 @@ const StatisticsView = ({ userId: propUserId = null, accountType: propAccountTyp
                   setExporting(false)
                 }
               }}
-              disabled={exporting || !dateRange.startDate || !dateRange.endDate || currentData.length === 0}
+              disabled={exporting || !dateRange.startDate || !dateRange.endDate || (listingViewsData.length === 0 && profileViewsData.length === 0)}
             />
-
-            {/* Metric Toggle Buttons */}
-            {/* COMMENTED OUT: Impressions button - query is too slow */}
-            {/* TODO: Re-enable when impressions query is optimized or using cached data */}
-            {/*
-            <div className="flex gap-2 rounded-lg p-1 border border-gray-200">
-              <button
-                onClick={() => setSelectedMetric('views')}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                  selectedMetric === 'views'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-                suppressHydrationWarning
-              >
-                Views
-              </button>
-              <button
-                onClick={() => setSelectedMetric('impressions')}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                  selectedMetric === 'impressions'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-                suppressHydrationWarning
-              >
-                Impressions
-              </button>
-            </div>
-            */}
           </div>
         </div>
       </div>
@@ -438,6 +549,54 @@ const StatisticsView = ({ userId: propUserId = null, accountType: propAccountTyp
         </div>
       </div>
 
+      {/* View Type Toggle Buttons */}
+      {/* <div className="px-6 py-3 border-b border-gray-100">
+        <div className="flex gap-2 rounded-lg p-1 border border-gray-200 bg-white w-fit">
+          <button
+            onClick={() => {
+              setShowListingViews(true)
+              setShowProfileViews(true)
+            }}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+              showListingViews && showProfileViews
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+            suppressHydrationWarning
+          >
+            Both
+          </button>
+          <button
+            onClick={() => {
+              setShowListingViews(true)
+              setShowProfileViews(false)
+            }}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+              showListingViews && !showProfileViews
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+            suppressHydrationWarning
+          >
+            Listing Views
+          </button>
+          <button
+            onClick={() => {
+              setShowListingViews(false)
+              setShowProfileViews(true)
+            }}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+              !showListingViews && showProfileViews
+                ? 'bg-purple-600 text-white shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+            suppressHydrationWarning
+          >
+            Profile Views
+          </button>
+        </div>
+      </div> */}
+
       {/* Chart Container */}
       <div className="px-6 py-4">
         <div className="h-[300px]">
@@ -446,12 +605,17 @@ const StatisticsView = ({ userId: propUserId = null, accountType: propAccountTyp
               <Loader2 className="w-6 h-6 animate-spin mr-2" />
               <span>Loading statistics...</span>
             </div>
-          ) : currentData.length === 0 ? (
+          ) : (listingViewsData.length === 0 && profileViewsData.length === 0) ? (
             <div className="flex items-center justify-center h-full">
               <span>No data available for this period</span>
             </div>
           ) : (
-            <ViewsChart data={currentData} />
+            <ViewsChart 
+              listingData={listingViewsData} 
+              profileData={profileViewsData}
+              showListing={showListingViews}
+              showProfile={showProfileViews}
+            />
           )}
           {/* COMMENTED OUT: Impressions chart - query too slow */}
           {/* : selectedMetric === 'views' ? (

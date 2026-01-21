@@ -1,30 +1,28 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { verifyToken } from '@/lib/jwt'
+import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
+import { getDeveloperId } from '@/lib/developerIdHelper'
 
 export async function GET(request) {
   try {
-    // Get authorization header
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Authorization token required' },
-        { status: 401 }
-      )
-    }
-
-    const token = authHeader.split(' ')[1]
+    // Authenticate request (handles both developers and team members)
+    const { userInfo, error: authError, status: authStatus } = await authenticateRequest(request)
     
-    // Verify the token and get user info
-    const decoded = verifyToken(token)
-    if (!decoded || !decoded.user_id) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      )
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status: authStatus })
     }
 
-    const userId = decoded.user_id
+    // Must be developer organization
+    if (userInfo.organization_type !== 'developer') {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
+    }
+
+    // Get the actual developer's user_id
+    const userId = await getDeveloperId(userInfo)
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Developer ID not found' }, { status: 404 })
+    }
 
     // Get query parameters
     const { searchParams } = new URL(request.url)

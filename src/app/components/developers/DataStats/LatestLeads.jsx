@@ -19,7 +19,8 @@ const LatestLeads = ({ listerId: propListerId = null, listerType: propListerType
   const [loading, setLoading] = useState(true)
 
   // Use provided listerId/listerType or fall back to auth user
-  const listerId = propListerId || user?.id
+  // Use developer_id from profile (already set in AuthContext for team members)
+  const listerId = propListerId || (user?.profile?.developer_id || user?.id)
   const listerType = propListerType || user?.profile?.account_type || 'developer'
 
   useEffect(() => {
@@ -136,16 +137,16 @@ const LatestLeads = ({ listerId: propListerId = null, listerType: propListerType
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wider">
-                    Property
+                    Source
                   </th>
                   <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wider">
-                    Action Type
+                    Last Action
                   </th>
                   <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wider">
                     Actions
                   </th>
                   <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wider">
-                    Score
+                    Lead Score
                   </th>
                   <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wider">
                     Status

@@ -25,9 +25,29 @@ export async function GET(request) {
     }
 
     // Get user info from token
-    // For developers, use developer_id. For agents, use agent_id. For agencies, use agency_id. For property_seekers, use id
-    const userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
-    const userType = decoded.user_type;
+    let userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
+    let userType = decoded.user_type;
+
+    // For team members, we need to use the developer's ID to fetch conversations
+    // Conversations are stored with the developer's ID, not the team member's ID
+    if (decoded.user_type === 'team_member' && decoded.organization_type === 'developer') {
+      // Get the developer's ID from the organization
+      const { data: developer } = await supabaseAdmin
+        .from('developers')
+        .select('developer_id')
+        .eq('id', decoded.organization_id)
+        .single();
+
+      if (developer?.developer_id) {
+        userId = developer.developer_id;
+        userType = 'developer'; // Use 'developer' type for fetching conversations
+      } else {
+        return NextResponse.json(
+          { error: 'Developer organization not found' },
+          { status: 404 }
+        );
+      }
+    }
 
     // Get pagination params
     const { searchParams } = new URL(request.url);
@@ -238,8 +258,29 @@ export async function POST(request) {
     } = body;
 
     // For developers, use developer_id. For property_seekers, use id
-    const userId = decoded.developer_id || decoded.id;
-    const userType = decoded.user_type;
+    // For team members, use the developer's ID from their organization
+    let userId = decoded.developer_id || decoded.id;
+    let userType = decoded.user_type;
+
+    // For team members, we need to use the developer's ID to create/find conversations
+    if (decoded.user_type === 'team_member' && decoded.organization_type === 'developer') {
+      // Get the developer's ID from the organization
+      const { data: developer } = await supabaseAdmin
+        .from('developers')
+        .select('developer_id')
+        .eq('id', decoded.organization_id)
+        .single();
+
+      if (developer?.developer_id) {
+        userId = developer.developer_id;
+        userType = 'developer'; // Use 'developer' type for conversation operations
+      } else {
+        return NextResponse.json(
+          { error: 'Developer organization not found' },
+          { status: 404 }
+        );
+      }
+    }
 
     if (!otherUserId || !otherUserType) {
       return NextResponse.json(

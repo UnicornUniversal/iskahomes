@@ -1,129 +1,101 @@
 /**
  * Roles and Permissions Configuration
  * Supports both 'developer' and 'agency' organization types
+ * 
+ * IMPORTANT: Permissions match actual project operations and routes
+ * - No redundant parent permissions (e.g., dashboard.dashboard)
+ * - Permissions match actual CRUD operations
+ * - Status changes are handled via edit permission (changing listing_status, status fields)
  */
 
 // Permission definitions for Developers
-// Each category has a parent permission (e.g., "messages") that grants access to the route/module
-// Then sub-permissions for specific actions within that module
+// Each category has actions that match actual operations in the system
 const developerPermissions = {
   dashboard: {
-    dashboard: 'dashboard.dashboard', // Parent permission - grants access to dashboard route
-    view: 'dashboard.view',
-    export: 'dashboard.export'
+    view: 'dashboard.view',        // Access dashboard route and view data
+    export: 'dashboard.export'    // Export dashboard data
   },
   messages: {
-    messages: 'messages.messages', // Parent permission - grants access to messages route
-    read: 'messages.read',
-    view: 'messages.view',
-    send: 'messages.send',
-    reply: 'messages.reply',
-    delete: 'messages.delete',
-    manage: 'messages.manage'
+    view: 'messages.view',        // View messages/conversations
+    send: 'messages.send'         // Send new messages
   },
   developments: {
-    developments: 'developments.developments', // Parent permission - grants access to developments route
-    view: 'developments.view',
-    create: 'developments.create',
-    edit: 'developments.edit',
-    delete: 'developments.delete',
-    publish: 'developments.publish',
-    unpublish: 'developments.unpublish',
-    manage: 'developments.manage'
+    view: 'developments.view',     // View developments list and details
+    create: 'developments.create', // Create new developments
+    edit: 'developments.edit',    // Edit developments (includes changing status/development_status)
+    delete: 'developments.delete' // Delete developments
   },
   units: {
-    units: 'units.units', // Parent permission - grants access to units route
-    view: 'units.view',
-    create: 'units.create',
-    edit: 'units.edit',
-    delete: 'units.delete',
-    publish: 'units.publish',
-    unpublish: 'units.unpublish',
-    feature: 'units.feature',
-    view_analytics: 'units.view_analytics',
-    view_leads: 'units.view_leads',
-    manage: 'units.manage'
+    view: 'units.view',           // View units list and details
+    create: 'units.create',       // Create new units
+    edit: 'units.edit',           // Edit units (includes changing listing_status, status, is_featured)
+    delete: 'units.delete',       // Delete units
+    view_analytics: 'units.view_analytics', // View unit analytics page
+    view_leads: 'units.view_leads'          // View unit leads page
   },
   appointments: {
-    appointments: 'appointments.appointments', // Parent permission - grants access to appointments route
-    view: 'appointments.view',
-    create: 'appointments.create',
-    edit: 'appointments.edit',
-    delete: 'appointments.delete',
-    cancel: 'appointments.cancel',
-    manage: 'appointments.manage'
+    view: 'appointments.view',    // View appointments list and calendar
+    create: 'appointments.create', // Create new appointments
+    edit: 'appointments.edit',    // Edit appointments (includes updating status)
+    delete: 'appointments.delete' // Delete appointments
   },
   leads: {
-    leads: 'leads.leads', // Parent permission - grants access to leads route
-    view: 'leads.view',
-    view_all: 'leads.view_all',
-    assign: 'leads.assign',
-    update: 'leads.update',
-    delete: 'leads.delete',
-    export: 'leads.export',
-    manage: 'leads.manage'
+    view: 'leads.view',           // View leads list
+    view_all: 'leads.view_all',  // View all leads (not just assigned)
+    edit: 'leads.edit',          // Edit lead information
+    update_status: 'leads.update_status', // Update lead status
+    add_notes: 'leads.add_notes', // Add notes to leads
+    assign: 'leads.assign',      // Assign leads to team members
+    delete: 'leads.delete',      // Delete leads
+    export: 'leads.export'       // Export leads data
   },
   team: {
-    team: 'team.team', // Parent permission - grants access to team route
-    view: 'team.view',
-    invite: 'team.invite',
-    edit: 'team.edit',
-    remove: 'team.remove',
-    manage_roles: 'team.manage_roles',
-    assign_roles: 'team.assign_roles',
-    manage_permissions: 'team.manage_permissions',
-    manage: 'team.manage'
+    view: 'team.view',            // View team members list
+    invite: 'team.invite',       // Invite new team members
+    edit: 'team.edit',           // Edit team member information
+    remove: 'team.remove',       // Remove team members
+    manage_roles: 'team.manage_roles',     // Manage roles (create/edit/delete roles)
+    assign_roles: 'team.assign_roles',     // Assign roles to team members
+    manage_permissions: 'team.manage_permissions' // Manage custom permissions
   },
   analytics: {
-    analytics: 'analytics.analytics', // Parent permission - grants access to analytics route
-    view: 'analytics.view',
-    view_overview: 'analytics.view_overview',
-    view_properties: 'analytics.view_properties',
-    view_leads: 'analytics.view_leads',
-    view_sales: 'analytics.view_sales',
-    view_profile_brand: 'analytics.view_profile_brand',
-    view_appointments: 'analytics.view_appointments',
-    view_messages: 'analytics.view_messages',
-    view_market: 'analytics.view_market',
-    export: 'analytics.export',
-    manage: 'analytics.manage'
+    view: 'analytics.view',       // Access analytics section
+    view_overview: 'analytics.view_overview',     // View analytics overview
+    view_properties: 'analytics.view_properties', // View properties analytics
+    view_leads: 'analytics.view_leads',           // View leads analytics
+    view_profile_brand: 'analytics.view_profile_brand', // View profile & brand analytics
+    view_appointments: 'analytics.view_appointments',   // View appointments analytics
+    view_messages: 'analytics.view_messages',          // View messages analytics
+    view_market: 'analytics.view_market',             // View market intelligence
+    export: 'analytics.export',   // Export analytics data
+    configure: 'analytics.configure' // Configure analytics settings
+  },
+  sales: {
+    view: 'sales.view'            // View sales page and analytics
   },
   profile: {
-    profile: 'profile.profile', // Parent permission - grants access to profile route
-    view: 'profile.view',
-    edit: 'profile.edit',
-    manage_branding: 'profile.manage_branding',
-    manage_settings: 'profile.manage_settings',
-    manage: 'profile.manage'
+    view: 'profile.view',         // View profile information
+    edit: 'profile.edit',        // Edit profile information
+    manage_branding: 'profile.manage_branding', // Manage branding (logo, colors, etc.)
+    manage_settings: 'profile.manage_settings',  // Manage profile settings
+    manage_locations: 'profile.manage_locations' // Manage company locations
   },
   subscriptions: {
-    subscriptions: 'subscriptions.subscriptions', // Parent permission - grants access to subscriptions route
-    view: 'subscriptions.view',
-    upgrade: 'subscriptions.upgrade',
-    downgrade: 'subscriptions.downgrade',
-    cancel: 'subscriptions.cancel',
-    manage: 'subscriptions.manage'
+    view: 'subscriptions.view',   // View subscription details
+    upgrade: 'subscriptions.upgrade',   // Upgrade subscription plan
+    downgrade: 'subscriptions.downgrade', // Downgrade subscription plan
+    cancel: 'subscriptions.cancel',     // Cancel subscription
+    manage: 'subscriptions.manage'      // Full subscription management
   },
   media: {
-    media: 'media.media', // Parent permission - grants access to media route
-    upload: 'media.upload',
-    delete: 'media.delete',
-    manage: 'media.manage'
-  },
-  financial: {
-    financial: 'financial.financial', // Parent permission - grants access to financial route
-    view: 'financial.view',
-    view_pricing: 'financial.view_pricing',
-    edit_pricing: 'financial.edit_pricing',
-    view_revenue: 'financial.view_revenue',
-    manage: 'financial.manage'
+    upload: 'media.upload',       // Upload media files
+    delete: 'media.delete',       // Delete media files
+    manage: 'media.manage'        // Full media management
   },
   favorites: {
-    favorites: 'favorites.favorites', // Parent permission - grants access to favorites route
-    view: 'favorites.view',
-    add: 'favorites.add',
-    remove: 'favorites.remove',
-    manage: 'favorites.manage'
+    view: 'favorites.view',       // View favorites
+    add: 'favorites.add',        // Add to favorites
+    remove: 'favorites.remove'  // Remove from favorites
   }
 }
 
@@ -135,41 +107,31 @@ const agencyPermissions = {
   },
   messages: {
     view: 'messages.view',
-    send: 'messages.send',
-    reply: 'messages.reply',
-    delete: 'messages.delete',
-    manage: 'messages.manage'
+    send: 'messages.send'
   },
   listings: {
     view: 'listings.view',
     create: 'listings.create',
-    edit: 'listings.edit',
+    edit: 'listings.edit',      // Includes changing listing_status, status, is_featured
     delete: 'listings.delete',
-    publish: 'listings.publish',
-    unpublish: 'listings.unpublish',
-    feature: 'listings.feature',
     view_analytics: 'listings.view_analytics',
-    view_leads: 'listings.view_leads',
-    manage: 'listings.manage'
+    view_leads: 'listings.view_leads'
   },
   appointments: {
     view: 'appointments.view',
     create: 'appointments.create',
-    edit: 'appointments.edit',
-    delete: 'appointments.delete',
-    cancel: 'appointments.cancel',
-    approve: 'appointments.approve',
-    reject: 'appointments.reject',
-    manage: 'appointments.manage'
+    edit: 'appointments.edit',   // Includes updating status
+    delete: 'appointments.delete'
   },
   leads: {
     view: 'leads.view',
     view_all: 'leads.view_all',
+    edit: 'leads.edit',
+    update_status: 'leads.update_status',
+    add_notes: 'leads.add_notes',
     assign: 'leads.assign',
-    update: 'leads.update',
     delete: 'leads.delete',
-    export: 'leads.export',
-    manage: 'leads.manage'
+    export: 'leads.export'
   },
   team: {
     view: 'team.view',
@@ -178,8 +140,7 @@ const agencyPermissions = {
     remove: 'team.remove',
     manage_roles: 'team.manage_roles',
     assign_roles: 'team.assign_roles',
-    manage_permissions: 'team.manage_permissions',
-    manage: 'team.manage'
+    manage_permissions: 'team.manage_permissions'
   },
   agents: {
     view: 'agents.view',
@@ -187,29 +148,29 @@ const agencyPermissions = {
     edit: 'agents.edit',
     remove: 'agents.remove',
     assign: 'agents.assign',
-    manage_commission: 'agents.manage_commission',
-    manage: 'agents.manage'
+    manage_commission: 'agents.manage_commission'
   },
   analytics: {
     view: 'analytics.view',
     view_overview: 'analytics.view_overview',
     view_properties: 'analytics.view_properties',
     view_leads: 'analytics.view_leads',
-    view_sales: 'analytics.view_sales',
     view_profile_brand: 'analytics.view_profile_brand',
     view_appointments: 'analytics.view_appointments',
     view_messages: 'analytics.view_messages',
     view_agents: 'analytics.view_agents',
     export: 'analytics.export',
-    manage: 'analytics.manage'
+    configure: 'analytics.configure'
+  },
+  sales: {
+    view: 'sales.view'            // View sales page and analytics
   },
   profile: {
     view: 'profile.view',
     edit: 'profile.edit',
     manage_branding: 'profile.manage_branding',
     manage_settings: 'profile.manage_settings',
-    manage_locations: 'profile.manage_locations',
-    manage: 'profile.manage'
+    manage_locations: 'profile.manage_locations'
   },
   subscriptions: {
     view: 'subscriptions.view',
@@ -223,66 +184,55 @@ const agencyPermissions = {
     delete: 'media.delete',
     manage: 'media.manage'
   },
-  financial: {
-    view: 'financial.view',
-    view_pricing: 'financial.view_pricing',
-    edit_pricing: 'financial.edit_pricing',
-    view_revenue: 'financial.view_revenue',
-    view_commission: 'financial.view_commission',
-    manage_commission: 'financial.manage_commission',
-    manage: 'financial.manage'
-  },
   reviews: {
     view: 'reviews.view',
     respond: 'reviews.respond',
-    delete: 'reviews.delete',
-    manage: 'reviews.manage'
+    delete: 'reviews.delete'
   }
 }
 
 // Default roles for Developers
 const developerDefaultRoles = {
   owner: {
-    name: 'Owner',
+    name: 'Super Admin',
     description: 'Full access to all features and settings. Cannot be removed or modified.',
     isSystemRole: true,
     isDefault: false,
     permissions: {
-      dashboard: { dashboard: true, view: true, export: true },
-      messages: { messages: true, read: true, view: true, send: true, reply: true, delete: true, manage: true },
-      developments: { developments: true, view: true, create: true, edit: true, delete: true, publish: true, unpublish: true, manage: true },
-      units: { units: true, view: true, create: true, edit: true, delete: true, publish: true, unpublish: true, feature: true, view_analytics: true, view_leads: true, manage: true },
-      appointments: { appointments: true, view: true, create: true, edit: true, delete: true, cancel: true, manage: true },
-      leads: { leads: true, view: true, view_all: true, assign: true, update: true, delete: true, export: true, manage: true },
-      team: { team: true, view: true, invite: true, edit: true, remove: true, manage_roles: true, assign_roles: true, manage_permissions: true, manage: true },
-      analytics: { analytics: true, view: true, view_overview: true, view_properties: true, view_leads: true, view_sales: true, view_profile_brand: true, view_appointments: true, view_messages: true, view_market: true, export: true, manage: true },
-      profile: { profile: true, view: true, edit: true, manage_branding: true, manage_settings: true, manage: true },
-      subscriptions: { subscriptions: true, view: true, upgrade: true, downgrade: true, cancel: true, manage: true },
-      media: { media: true, upload: true, delete: true, manage: true },
-      financial: { financial: true, view: true, view_pricing: true, edit_pricing: true, view_revenue: true, manage: true },
-      favorites: { favorites: true, view: true, add: true, remove: true, manage: true }
+      dashboard: { view: true, export: true },
+      messages: { view: true, send: true },
+      developments: { view: true, create: true, edit: true, delete: true },
+      units: { view: true, create: true, edit: true, delete: true, view_analytics: true, view_leads: true },
+      appointments: { view: true, create: true, edit: true, delete: true },
+      leads: { view: true, view_all: true, edit: true, update_status: true, add_notes: true, assign: true, delete: true, export: true },
+      team: { view: true, invite: true, edit: true, remove: true, manage_roles: true, assign_roles: true, manage_permissions: true },
+      analytics: { view: true, view_overview: true, view_properties: true, view_leads: true, view_profile_brand: true, view_appointments: true, view_messages: true, view_market: true, export: true, configure: true },
+      sales: { view: true },
+      profile: { view: true, edit: true, manage_branding: true, manage_settings: true, manage_locations: true },
+      subscriptions: { view: true, upgrade: true, downgrade: true, cancel: true, manage: true },
+      media: { upload: true, delete: true, manage: true },
+      favorites: { view: true, add: true, remove: true }
     }
   },
   admin: {
     name: 'Admin',
-    description: 'Full administrative access except subscription management and team owner removal.',
+    description: 'Full administrative access except subscription management and team Super Admin removal.',
     isSystemRole: false,
     isDefault: false,
     permissions: {
       dashboard: { view: true, export: true },
-      messages: { view: true, send: true, reply: true, delete: true, manage: true },
-      developments: { view: true, create: true, edit: true, delete: true, publish: true, unpublish: true, manage: true },
-      units: { view: true, create: true, edit: true, delete: true, publish: true, unpublish: true, feature: true, view_analytics: true, view_leads: true, manage: true },
-      appointments: { view: true, create: true, edit: true, delete: true, cancel: true, manage: true },
-      leads: { view: true, view_all: true, assign: true, update: true, delete: true, export: true, manage: true },
-      team: { view: true, invite: true, edit: true, remove: true, manage_roles: true, assign_roles: true, manage_permissions: true, manage: false },
-      analytics: { view: true, view_overview: true, view_properties: true, view_leads: true, view_sales: true, view_profile_brand: true, view_appointments: true, view_messages: true, view_market: true, export: true, manage: true },
-      profile: { view: true, edit: true, manage_branding: true, manage_settings: true, manage: true },
+      messages: { view: true, send: true },
+      developments: { view: true, create: true, edit: true, delete: true },
+      units: { view: true, create: true, edit: true, delete: true, view_analytics: true, view_leads: true },
+      appointments: { view: true, create: true, edit: true, delete: true },
+      leads: { view: true, view_all: true, edit: true, update_status: true, add_notes: true, assign: true, delete: true, export: true },
+      team: { view: true, invite: true, edit: true, remove: true, manage_roles: true, assign_roles: true, manage_permissions: true },
+      analytics: { view: true, view_overview: true, view_properties: true, view_leads: true, view_profile_brand: true, view_appointments: true, view_messages: true, view_market: true, export: true, configure: true },
+      sales: { view: true },
+      profile: { view: true, edit: true, manage_branding: true, manage_settings: true, manage_locations: true },
       subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: true, delete: true, manage: true },
-      financial: { view: true, view_pricing: true, edit_pricing: true, view_revenue: true, manage: true },
-      agents: { view: true, add: true, edit: true, remove: true, assign: true, manage: true },
-      favorites: { view: true, add: true, remove: true, manage: true }
+      favorites: { view: true, add: true, remove: true }
     }
   },
   manager: {
@@ -291,19 +241,19 @@ const developerDefaultRoles = {
     isSystemRole: false,
     isDefault: true,
     permissions: {
-      dashboard: { dashboard: true, view: true, export: true },
-      messages: { messages: true, read: true, view: true, send: true, reply: true, delete: false, manage: true },
-      developments: { developments: true, view: true, create: true, edit: true, delete: false, publish: true, unpublish: true, manage: false },
-      units: { units: true, view: true, create: true, edit: true, delete: false, publish: true, unpublish: true, feature: true, view_analytics: true, view_leads: true, manage: false },
-      appointments: { appointments: true, view: true, create: true, edit: true, delete: true, cancel: true, manage: true },
-      leads: { leads: true, view: true, view_all: true, assign: true, update: true, delete: false, export: true, manage: false },
-      team: { team: true, view: true, invite: false, edit: false, remove: false, manage_roles: false, assign_roles: false, manage_permissions: false, manage: false },
-      analytics: { analytics: true, view: true, view_overview: true, view_properties: true, view_leads: true, view_sales: true, view_profile_brand: true, view_appointments: true, view_messages: true, view_market: false, export: false, manage: false },
-      profile: { profile: true, view: true, edit: true, manage_branding: false, manage_settings: false, manage: false },
-      subscriptions: { subscriptions: true, view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
-      media: { media: true, upload: true, delete: true, manage: true },
-      financial: { financial: true, view: true, view_pricing: true, edit_pricing: true, view_revenue: true, manage: false },
-      favorites: { favorites: true, view: true, add: true, remove: true, manage: false }
+      dashboard: { view: true, export: true },
+      messages: { view: true, send: true },
+      developments: { view: true, create: true, edit: true, delete: false },
+      units: { view: true, create: true, edit: true, delete: false, view_analytics: true, view_leads: true },
+      appointments: { view: true, create: true, edit: true, delete: true },
+      leads: { view: true, view_all: true, edit: true, update_status: true, add_notes: true, assign: true, delete: false, export: true },
+      team: { view: true, invite: false, edit: false, remove: false, manage_roles: false, assign_roles: false, manage_permissions: false },
+      analytics: { view: true, view_overview: true, view_properties: true, view_leads: true, view_profile_brand: true, view_appointments: true, view_messages: true, view_market: false, export: false, configure: false },
+      sales: { view: true },
+      profile: { view: true, edit: true, manage_branding: false, manage_settings: false, manage_locations: false },
+      subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
+      media: { upload: true, delete: true, manage: true },
+      favorites: { view: true, add: true, remove: true }
     }
   },
   editor: {
@@ -312,19 +262,19 @@ const developerDefaultRoles = {
     isSystemRole: false,
     isDefault: false,
     permissions: {
-      dashboard: { dashboard: true, view: true, export: false },
-      messages: { messages: true, read: true, view: true, send: true, reply: true, delete: false, manage: false },
-      developments: { developments: true, view: true, create: true, edit: true, delete: false, publish: true, unpublish: false, manage: false },
-      units: { units: true, view: true, create: true, edit: true, delete: false, publish: true, unpublish: false, feature: false, view_analytics: true, view_leads: true, manage: false },
-      appointments: { appointments: true, view: true, create: true, edit: true, delete: false, cancel: false, manage: false },
-      leads: { leads: true, view: true, view_all: false, assign: false, update: true, delete: false, export: false, manage: false },
-      team: { team: true, view: true, invite: false, edit: false, remove: false, manage_roles: false, assign_roles: false, manage_permissions: false, manage: false },
-      analytics: { analytics: true, view: true, view_overview: true, view_properties: true, view_leads: true, view_sales: false, view_profile_brand: false, view_appointments: false, view_messages: false, view_market: false, export: false, manage: false },
-      profile: { profile: true, view: true, edit: true, manage_branding: false, manage_settings: false, manage: false },
-      subscriptions: { subscriptions: false, view: false, upgrade: false, downgrade: false, cancel: false, manage: false },
-      media: { media: true, upload: true, delete: true, manage: false },
-      financial: { financial: true, view: true, view_pricing: true, edit_pricing: true, view_revenue: false, manage: false },
-      favorites: { favorites: true, view: true, add: true, remove: true, manage: false }
+      dashboard: { view: true, export: false },
+      messages: { view: true, send: true },
+      developments: { view: true, create: true, edit: true, delete: false },
+      units: { view: true, create: true, edit: true, delete: false, view_analytics: true, view_leads: true },
+      appointments: { view: true, create: true, edit: true, delete: false },
+      leads: { view: true, view_all: false, edit: true, update_status: true, add_notes: true, assign: false, delete: false, export: false },
+      team: { view: true, invite: false, edit: false, remove: false, manage_roles: false, assign_roles: false, manage_permissions: false },
+      analytics: { view: true, view_overview: true, view_properties: true, view_leads: true, view_profile_brand: false, view_appointments: false, view_messages: false, view_market: false, export: false, configure: false },
+      sales: { view: false },
+      profile: { view: true, edit: true, manage_branding: false, manage_settings: false, manage_locations: false },
+      subscriptions: { view: false, upgrade: false, downgrade: false, cancel: false, manage: false },
+      media: { upload: true, delete: true, manage: false },
+      favorites: { view: true, add: true, remove: true }
     }
   },
   viewer: {
@@ -333,19 +283,19 @@ const developerDefaultRoles = {
     isSystemRole: false,
     isDefault: false,
     permissions: {
-      dashboard: { dashboard: true, view: true, export: false },
-      messages: { messages: true, read: true, view: true, send: false, reply: false, delete: false, manage: false },
-      developments: { developments: true, view: true, create: false, edit: false, delete: false, publish: false, unpublish: false, manage: false },
-      units: { units: true, view: true, create: false, edit: false, delete: false, publish: false, unpublish: false, feature: false, view_analytics: true, view_leads: true, manage: false },
-      appointments: { appointments: true, view: true, create: false, edit: false, delete: false, cancel: false, manage: false },
-      leads: { leads: true, view: true, view_all: false, assign: false, update: false, delete: false, export: false, manage: false },
-      team: { team: true, view: true, invite: false, edit: false, remove: false, manage_roles: false, assign_roles: false, manage_permissions: false, manage: false },
-      analytics: { analytics: true, view: true, view_overview: true, view_properties: true, view_leads: true, view_sales: false, view_profile_brand: false, view_appointments: false, view_messages: false, view_market: false, export: false, manage: false },
-      profile: { profile: true, view: true, edit: false, manage_branding: false, manage_settings: false, manage: false },
-      subscriptions: { subscriptions: true, view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
-      media: { media: false, upload: false, delete: false, manage: false },
-      financial: { financial: true, view: true, view_pricing: false, edit_pricing: false, view_revenue: false, manage: false },
-      favorites: { favorites: true, view: true, add: false, remove: false, manage: false }
+      dashboard: { view: true, export: false },
+      messages: { view: true, send: false },
+      developments: { view: true, create: false, edit: false, delete: false },
+      units: { view: true, create: false, edit: false, delete: false, view_analytics: true, view_leads: true },
+      appointments: { view: true, create: false, edit: false, delete: false },
+      leads: { view: true, view_all: false, edit: false, update_status: false, add_notes: false, assign: false, delete: false, export: false },
+      team: { view: true, invite: false, edit: false, remove: false, manage_roles: false, assign_roles: false, manage_permissions: false },
+      analytics: { view: true, view_overview: true, view_properties: true, view_leads: true, view_profile_brand: false, view_appointments: false, view_messages: false, view_market: false, export: false, configure: false },
+      sales: { view: false },
+      profile: { view: true, edit: false, manage_branding: false, manage_settings: false, manage_locations: false },
+      subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
+      media: { upload: false, delete: false, manage: false },
+      favorites: { view: true, add: false, remove: false }
     }
   }
 }
@@ -353,45 +303,45 @@ const developerDefaultRoles = {
 // Default roles for Agencies
 const agencyDefaultRoles = {
   owner: {
-    name: 'Owner',
+    name: 'Super Admin',
     description: 'Full access to all agency features and settings. Cannot be removed or modified.',
     isSystemRole: true,
     isDefault: false,
     permissions: {
       dashboard: { view: true, export: true },
-      messages: { view: true, send: true, reply: true, delete: true, manage: true },
-      listings: { view: true, create: true, edit: true, delete: true, publish: true, unpublish: true, feature: true, view_analytics: true, view_leads: true, manage: true },
-      appointments: { view: true, create: true, edit: true, delete: true, cancel: true, approve: true, reject: true, manage: true },
-      leads: { view: true, view_all: true, assign: true, update: true, delete: true, export: true, manage: true },
-      team: { view: true, invite: true, edit: true, remove: true, manage_roles: true, assign_roles: true, manage_permissions: true, manage: true },
-      agents: { view: true, add: true, edit: true, remove: true, assign: true, manage_commission: true, manage: true },
-      analytics: { view: true, view_overview: true, view_properties: true, view_leads: true, view_sales: true, view_profile_brand: true, view_appointments: true, view_messages: true, view_agents: true, export: true, manage: true },
-      profile: { view: true, edit: true, manage_branding: true, manage_settings: true, manage_locations: true, manage: true },
+      messages: { view: true, send: true },
+      listings: { view: true, create: true, edit: true, delete: true, view_analytics: true, view_leads: true },
+      appointments: { view: true, create: true, edit: true, delete: true },
+      leads: { view: true, view_all: true, edit: true, update_status: true, add_notes: true, assign: true, delete: true, export: true },
+      team: { view: true, invite: true, edit: true, remove: true, manage_roles: true, assign_roles: true, manage_permissions: true },
+      agents: { view: true, add: true, edit: true, remove: true, assign: true, manage_commission: true },
+      analytics: { view: true, view_overview: true, view_properties: true, view_leads: true, view_profile_brand: true, view_appointments: true, view_messages: true, view_agents: true, export: true, configure: true },
+      sales: { view: true },
+      profile: { view: true, edit: true, manage_branding: true, manage_settings: true, manage_locations: true },
       subscriptions: { view: true, upgrade: true, downgrade: true, cancel: true, manage: true },
       media: { upload: true, delete: true, manage: true },
-      financial: { view: true, view_pricing: true, edit_pricing: true, view_revenue: true, view_commission: true, manage_commission: true, manage: true },
-      reviews: { view: true, respond: true, delete: true, manage: true }
+      reviews: { view: true, respond: true, delete: true }
     }
   },
   admin: {
     name: 'Admin',
-    description: 'Full administrative access except subscription management and team owner removal.',
+    description: 'Full administrative access except subscription management and team Super Admin removal.',
     isSystemRole: false,
     isDefault: false,
     permissions: {
       dashboard: { view: true, export: true },
-      messages: { view: true, send: true, reply: true, delete: true, manage: true },
-      listings: { view: true, create: true, edit: true, delete: true, publish: true, unpublish: true, feature: true, view_analytics: true, view_leads: true, manage: true },
-      appointments: { view: true, create: true, edit: true, delete: true, cancel: true, approve: true, reject: true, manage: true },
-      leads: { view: true, view_all: true, assign: true, update: true, delete: true, export: true, manage: true },
-      team: { view: true, invite: true, edit: true, remove: true, manage_roles: true, assign_roles: true, manage_permissions: true, manage: false },
-      agents: { view: true, add: true, edit: true, remove: true, assign: true, manage_commission: true, manage: true },
-      analytics: { view: true, view_overview: true, view_properties: true, view_leads: true, view_sales: true, view_profile_brand: true, view_appointments: true, view_messages: true, view_agents: true, export: true, manage: true },
-      profile: { view: true, edit: true, manage_branding: true, manage_settings: true, manage_locations: true, manage: true },
+      messages: { view: true, send: true },
+      listings: { view: true, create: true, edit: true, delete: true, view_analytics: true, view_leads: true },
+      appointments: { view: true, create: true, edit: true, delete: true },
+      leads: { view: true, view_all: true, edit: true, update_status: true, add_notes: true, assign: true, delete: true, export: true },
+      team: { view: true, invite: true, edit: true, remove: true, manage_roles: true, assign_roles: true, manage_permissions: true },
+      agents: { view: true, add: true, edit: true, remove: true, assign: true, manage_commission: true },
+      analytics: { view: true, view_overview: true, view_properties: true, view_leads: true, view_profile_brand: true, view_appointments: true, view_messages: true, view_agents: true, export: true, configure: true },
+      sales: { view: true },
+      profile: { view: true, edit: true, manage_branding: true, manage_settings: true, manage_locations: true },
       subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: true, delete: true, manage: true },
-      financial: { view: true, view_pricing: true, edit_pricing: true, view_revenue: true, view_commission: true, manage_commission: true, manage: true },
-      reviews: { view: true, respond: true, delete: true, manage: true }
+      reviews: { view: true, respond: true, delete: true }
     }
   },
   agentManager: {
@@ -401,18 +351,18 @@ const agencyDefaultRoles = {
     isDefault: true,
     permissions: {
       dashboard: { view: true, export: true },
-      messages: { view: true, send: true, reply: true, delete: false, manage: true },
-      listings: { view: true, create: true, edit: true, delete: false, publish: true, unpublish: true, feature: true, view_analytics: true, view_leads: true, manage: false },
-      appointments: { view: true, create: true, edit: true, delete: true, cancel: true, approve: true, reject: true, manage: true },
-      leads: { view: true, view_all: true, assign: true, update: true, delete: false, export: true, manage: false },
-      team: { view: true, invite: false, edit: false, remove: false, manage_roles: false, assign_roles: false, manage_permissions: false, manage: false },
-      agents: { view: true, add: true, edit: true, remove: false, assign: true, manage_commission: false, manage: false },
-      analytics: { view: true, view_overview: true, view_properties: true, view_leads: true, view_sales: true, view_profile_brand: false, view_appointments: true, view_messages: true, view_agents: true, export: false, manage: false },
-      profile: { view: true, edit: true, manage_branding: false, manage_settings: false, manage_locations: false, manage: false },
+      messages: { view: true, send: true },
+      listings: { view: true, create: true, edit: true, delete: false, view_analytics: true, view_leads: true },
+      appointments: { view: true, create: true, edit: true, delete: true },
+      leads: { view: true, view_all: true, edit: true, update_status: true, add_notes: true, assign: true, delete: false, export: true },
+      team: { view: true, invite: false, edit: false, remove: false, manage_roles: false, assign_roles: false, manage_permissions: false },
+      agents: { view: true, add: true, edit: true, remove: false, assign: true, manage_commission: false },
+      analytics: { view: true, view_overview: true, view_properties: true, view_leads: true, view_profile_brand: false, view_appointments: true, view_messages: true, view_agents: true, export: false, configure: false },
+      sales: { view: true },
+      profile: { view: true, edit: true, manage_branding: false, manage_settings: false, manage_locations: false },
       subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: true, delete: true, manage: true },
-      financial: { view: true, view_pricing: true, edit_pricing: true, view_revenue: true, view_commission: true, manage_commission: false, manage: false },
-      reviews: { view: true, respond: true, delete: false, manage: false }
+      reviews: { view: true, respond: true, delete: false }
     }
   },
   editor: {
@@ -422,18 +372,18 @@ const agencyDefaultRoles = {
     isDefault: false,
     permissions: {
       dashboard: { view: true, export: false },
-      messages: { view: true, send: true, reply: true, delete: false, manage: false },
-      listings: { view: true, create: true, edit: true, delete: false, publish: true, unpublish: false, feature: false, view_analytics: true, view_leads: true, manage: false },
-      appointments: { view: true, create: true, edit: true, delete: false, cancel: false, approve: false, reject: false, manage: false },
-      leads: { view: true, view_all: false, assign: false, update: true, delete: false, export: false, manage: false },
-      team: { view: true, invite: false, edit: false, remove: false, manage_roles: false, assign_roles: false, manage_permissions: false, manage: false },
-      agents: { view: true, add: false, edit: false, remove: false, assign: false, manage_commission: false, manage: false },
-      analytics: { view: true, view_overview: true, view_properties: true, view_leads: true, view_sales: false, view_profile_brand: false, view_appointments: false, view_messages: false, view_agents: false, export: false, manage: false },
-      profile: { view: true, edit: true, manage_branding: false, manage_settings: false, manage_locations: false, manage: false },
+      messages: { view: true, send: true },
+      listings: { view: true, create: true, edit: true, delete: false, view_analytics: true, view_leads: true },
+      appointments: { view: true, create: true, edit: true, delete: false },
+      leads: { view: true, view_all: false, edit: true, update_status: true, add_notes: true, assign: false, delete: false, export: false },
+      team: { view: true, invite: false, edit: false, remove: false, manage_roles: false, assign_roles: false, manage_permissions: false },
+      agents: { view: true, add: false, edit: false, remove: false, assign: false, manage_commission: false },
+      analytics: { view: true, view_overview: true, view_properties: true, view_leads: true, view_profile_brand: false, view_appointments: false, view_messages: false, view_agents: false, export: false, configure: false },
+      sales: { view: false },
+      profile: { view: true, edit: true, manage_branding: false, manage_settings: false, manage_locations: false },
       subscriptions: { view: false, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: true, delete: true, manage: false },
-      financial: { view: true, view_pricing: true, edit_pricing: true, view_revenue: false, view_commission: false, manage_commission: false, manage: false },
-      reviews: { view: true, respond: false, delete: false, manage: false }
+      reviews: { view: true, respond: false, delete: false }
     }
   },
   viewer: {
@@ -443,18 +393,18 @@ const agencyDefaultRoles = {
     isDefault: false,
     permissions: {
       dashboard: { view: true, export: false },
-      messages: { view: true, send: false, reply: false, delete: false, manage: false },
-      listings: { view: true, create: false, edit: false, delete: false, publish: false, unpublish: false, feature: false, view_analytics: true, view_leads: true, manage: false },
-      appointments: { view: true, create: false, edit: false, delete: false, cancel: false, approve: false, reject: false, manage: false },
-      leads: { view: true, view_all: false, assign: false, update: false, delete: false, export: false, manage: false },
-      team: { view: true, invite: false, edit: false, remove: false, manage_roles: false, assign_roles: false, manage_permissions: false, manage: false },
-      agents: { view: true, add: false, edit: false, remove: false, assign: false, manage_commission: false, manage: false },
-      analytics: { view: true, view_overview: true, view_properties: true, view_leads: true, view_sales: false, view_profile_brand: false, view_appointments: false, view_messages: false, view_agents: false, export: false, manage: false },
-      profile: { view: true, edit: false, manage_branding: false, manage_settings: false, manage_locations: false, manage: false },
+      messages: { view: true, send: false },
+      listings: { view: true, create: false, edit: false, delete: false, view_analytics: true, view_leads: true },
+      appointments: { view: true, create: false, edit: false, delete: false },
+      leads: { view: true, view_all: false, edit: false, update_status: false, add_notes: false, assign: false, delete: false, export: false },
+      team: { view: true, invite: false, edit: false, remove: false, manage_roles: false, assign_roles: false, manage_permissions: false },
+      agents: { view: true, add: false, edit: false, remove: false, assign: false, manage_commission: false },
+      analytics: { view: true, view_overview: true, view_properties: true, view_leads: true, view_profile_brand: false, view_appointments: false, view_messages: false, view_agents: false, export: false, configure: false },
+      sales: { view: false },
+      profile: { view: true, edit: false, manage_branding: false, manage_settings: false, manage_locations: false },
       subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: false, delete: false, manage: false },
-      financial: { view: true, view_pricing: false, edit_pricing: false, view_revenue: false, view_commission: false, manage_commission: false, manage: false },
-      reviews: { view: true, respond: false, delete: false, manage: false }
+      reviews: { view: true, respond: false, delete: false }
     }
   }
 }
@@ -568,6 +518,18 @@ export const hasPermission = (userPermissions, permissionKey, organizationType) 
 }
 
 /**
+ * Check if user can access a route
+ * Route access requires at least 'view' permission for that category
+ * @param {Object} userPermissions - User's permissions object
+ * @param {string} routeCategory - Category name (e.g., 'dashboard', 'units')
+ * @param {string} organizationType - 'developer' or 'agency'
+ * @returns {boolean}
+ */
+export const canAccessRoute = (userPermissions, routeCategory, organizationType) => {
+  return hasPermission(userPermissions, `${routeCategory}.view`, organizationType)
+}
+
+/**
  * Get all permission keys as flat array
  * @param {string} organizationType - 'developer' or 'agency'
  * @returns {Array} Array of permission keys
@@ -593,10 +555,10 @@ export default {
   convertPermissionsArrayToObject,
   convertPermissionsObjectToArray,
   hasPermission,
+  canAccessRoute,
   getAllPermissionKeys,
   developerPermissions,
   agencyPermissions,
   developerDefaultRoles,
   agencyDefaultRoles
 }
-

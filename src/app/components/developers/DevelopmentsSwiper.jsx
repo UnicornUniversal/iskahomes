@@ -136,7 +136,7 @@ const DevelopmentsSwiper = ({ developerId }) => {
 
           return (
             <SwiperSlide key={development.id} style={{ width: 'auto' }}>
-              <Link href={`/allDevelopments/${development.slug}`} className="block">
+              <Link href={`/home/allDevelopments/${development.slug}`} className="block">
                 <div className="group cursor-pointer  overflow-hidden transition-all duration-300 ">
                   {/* Banner Image */}
                   <div className={`relative ${imageHeight} overflow-hidden`}>

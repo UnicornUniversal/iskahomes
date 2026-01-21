@@ -30,7 +30,8 @@ const Appointments = ({ accountId: propAccountId = null, accountType: propAccoun
   const [updatingStatus, setUpdatingStatus] = useState(null)
 
   // Use provided accountId/accountType or fall back to auth user
-  const accountId = propAccountId || user?.id
+  // For team members, use developer_id from profile (already set in AuthContext)
+  const accountId = propAccountId || (user?.profile?.developer_id || user?.profile?.agency_id || user?.profile?.agent_id || user?.id)
   const accountType = propAccountType || user?.profile?.account_type || 'developer'
 
   // Fetch appointments from API

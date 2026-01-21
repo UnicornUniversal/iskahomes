@@ -152,7 +152,7 @@ const DevelopmentHeaders = () => {
 
           return (
             <SwiperSlide key={developer.id}>
-              <Link href={`/allDevelopers/${developer.slug}`}>
+              <Link href={`/home/allDevelopers/${developer.slug}`}>
                 <div className="relative h-96 w-full overflow-hidden hover:scale-105 transition-transform duration-300 cursor-pointer">
                   <img
                     src={coverImageUrl}

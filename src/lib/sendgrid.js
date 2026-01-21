@@ -345,5 +345,151 @@ export async function sendAgentInvitationEmail(email, agentName, agencyName, inv
   }
 }
 
+/**
+ * Send team member invitation email
+ */
+export async function sendTeamMemberInvitationEmail(email, teamMemberName, organizationName, roleName, invitationToken, organizationType = 'developer', invitationMessage = null) {
+  // Use generic team invitation path - works for both developers and agencies
+  const invitationLink = `${process.env.FRONTEND_LINK}/team/invitation/accept?token=${invitationToken}`
+  
+  const msg = {
+    to: email,
+    from: {
+      email: process.env.SENDGRID_FROM_EMAIL,
+      name: process.env.SENDGRID_FROM_NAME
+    },
+    subject: `You've been invited to join ${organizationName} on Iska Homes`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Team Member Invitation</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px;">
+            <tr>
+              <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  <!-- Header -->
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #17637C 0%, #3B82F6 100%); padding: 40px 20px; text-align: center; border-radius: 8px 8px 0 0;">
+                      <h1 style="margin: 0; color: #ffffff; font-size: 28px;">You're Invited! 🎉</h1>
+                    </td>
+                  </tr>
+                  
+                  <!-- Body -->
+                  <tr>
+                    <td style="padding: 40px 30px;">
+                      <p style="font-size: 16px; color: #333333; line-height: 1.6; margin-bottom: 20px;">
+                        Hi ${teamMemberName || 'there'},
+                      </p>
+                      <p style="font-size: 16px; color: #333333; line-height: 1.6; margin-bottom: 20px;">
+                        <strong>${organizationName}</strong> has invited you to join their team${roleName ? ` as a <strong>${roleName}</strong>` : ''} on Iska Homes!
+                      </p>
+                      ${invitationMessage ? `
+                      <div style="background-color: #f9f9f9; border-left: 4px solid #17637C; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                        <p style="font-size: 14px; color: #666666; line-height: 1.6; margin: 0; font-style: italic;">
+                          "${invitationMessage}"
+                        </p>
+                      </div>
+                      ` : ''}
+                      <p style="font-size: 16px; color: #333333; line-height: 1.6; margin-bottom: 30px;">
+                        As a team member, you'll be able to:
+                      </p>
+                      
+                      <ul style="font-size: 14px; color: #666666; line-height: 1.8; margin-bottom: 30px; padding-left: 20px;">
+                        <li>Manage properties and developments</li>
+                        <li>Track leads and appointments</li>
+                        <li>View analytics and performance metrics</li>
+                        <li>Collaborate with your team</li>
+                        <li>Access your assigned features and permissions</li>
+                      </ul>
+                      
+                      <!-- CTA Button -->
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                          <td align="center" style="padding: 20px 0;">
+                            <a href="${invitationLink}" 
+                               style="display: inline-block; background: linear-gradient(135deg, #17637C 0%, #3B82F6 100%); 
+                                      color: #ffffff; text-decoration: none; padding: 15px 40px; 
+                                      border-radius: 6px; font-weight: bold; font-size: 16px;">
+                              Accept Invitation
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <p style="font-size: 14px; color: #666666; line-height: 1.6; margin-top: 30px;">
+                        If the button doesn't work, copy and paste this link into your browser:
+                      </p>
+                      <p style="font-size: 12px; color: #999999; word-break: break-all; background-color: #f9f9f9; padding: 10px; border-radius: 4px;">
+                        ${invitationLink}
+                      </p>
+                      
+                      <p style="font-size: 14px; color: #666666; line-height: 1.6; margin-top: 30px;">
+                        This invitation link will expire in 7 days. If you didn't expect this invitation, you can safely ignore this email.
+                      </p>
+                    </td>
+                  </tr>
+                  
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background-color: #f9f9f9; padding: 30px; text-align: center; border-radius: 0 0 8px 8px; border-top: 1px solid #e0e0e0;">
+                      <p style="font-size: 12px; color: #999999; margin: 0 0 10px 0;">
+                        © ${new Date().getFullYear()} Iska Homes. All rights reserved.
+                      </p>
+                      <p style="font-size: 12px; color: #999999; margin: 0;">
+                        This invitation was sent by ${organizationName} on Iska Homes.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>
+    `,
+    text: `
+      You're Invited!
+      
+      Hi ${teamMemberName || 'there'},
+      
+      ${organizationName} has invited you to join their team${roleName ? ` as a ${roleName}` : ''} on Iska Homes!
+      
+      ${invitationMessage ? `\nMessage from ${organizationName}:\n"${invitationMessage}"\n` : ''}
+      
+      As a team member, you'll be able to:
+      - Manage properties and developments
+      - Track leads and appointments
+      - View analytics and performance metrics
+      - Collaborate with your team
+      - Access your assigned features and permissions
+      
+      Accept your invitation by clicking this link:
+      ${invitationLink}
+      
+      This invitation link will expire in 7 days.
+      
+      If you didn't expect this invitation, you can safely ignore this email.
+      
+      © ${new Date().getFullYear()} Iska Homes. All rights reserved.
+    `
+  }
+  
+  try {
+    await sgMail.send(msg)
+    return { success: true }
+  } catch (error) {
+    console.error('❌ Error sending team member invitation email:', error)
+    if (error.response) {
+      console.error('SendGrid error details:', error.response.body)
+    }
+    return { success: false, error: error.message }
+  }
+}
+
 export default sgMail
 

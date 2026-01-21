@@ -3,7 +3,7 @@ import React from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 
-const DevelopmentCard = ({ development }) => {
+const DevelopmentCard = ({ development, viewMode = 'list' }) => {
   const params = useParams()
 
   // Get the first available image
@@ -41,16 +41,24 @@ const DevelopmentCard = ({ development }) => {
 
   // Format revenue
   const formatRevenue = (revenue, currency = 'GHS') => {
-    if (!revenue && revenue !== 0) return 'N/A'
+    if (!revenue && revenue !== 0) return `${currency} 0.000`
     return `${currency} ${revenue.toLocaleString()}`
   }
 
+  // Determine layout based on viewMode
+  const isGrid = viewMode === 'grid'
+  const isList = viewMode === 'list'
+
   return (
-    <Link href={`/developer/${params.slug}/developments/${development?.id}`}>
-      <div className='rounded-lg border border-primary_color text-primary_color overflow-hidden hover:shadow-lg transition-shadow duration-300 cursor-pointer'>
-        <div className='flex flex-col gap-2 md:flex-row '>
+    <Link href={`/developer/${params.slug}/developments/${development?.slug || development?.id}`}>
+      <div className='rounded-lg border border-primary_color text-primary_color overflow-hidden hover:shadow-lg transition-shadow duration-300 cursor-pointer h-full flex flex-col '>
+        <div className={`flex ${isGrid ? 'flex-col' : 'flex-col md:flex-row'} h-full`}>
           {/* Development Image */}
-          <div className='relative w-full md:w-80 lg:w-96 h-auto max-h-[200px] flex-shrink-0 flex items-center justify-center max-h-[300px]'>
+          <div className={`relative flex-shrink-0 overflow-hidden ${
+            isGrid 
+              ? 'w-full h-48 md:h-64' 
+              : 'w-full md:w-80 lg:w-96 h-48 md:h-auto md:max-h-[300px]'
+          }`}>
             {getDisplayImage() ? (
               <img 
                 src={getDisplayImage()} 
@@ -73,9 +81,9 @@ const DevelopmentCard = ({ development }) => {
           </div>
 
           {/* Development Info */}
-          <div className='flex-1 p-4 md:p-6 flex flex-col justify-between'>
+          <div className='flex-1 p-4 md:p-6 flex flex-col'>
             {/* Top Row - Status and Views */}
-            <div className='flex justify-between items-start mb-3'>
+            <div className='flex flex-wrap justify-between items-start gap-2 mb-3'>
               {development.status && (
                 <div className='bg-primary_color text-white px-3 py-1 rounded-full text-xs sm:text-sm font-medium'>
                   {development.status.charAt(0).toUpperCase() + development.status.slice(1)}
@@ -116,23 +124,19 @@ const DevelopmentCard = ({ development }) => {
             </div>
 
             {/* Development Details - Flex Wrap */}
-            <div className='flex flex-wrap gap-4 mb-4'>
-              <div>
-                <div className='text-xs mb-1'>Sizes</div>
-                <p className='font-medium text-sm'>
-                  {development.size || 'N/A'}
-                </p>
-              </div>
-              <div>
-                <div className='text-xs mb-1'>Buildings</div>
-                <p className='font-medium text-sm'>
-                  {development.number_of_buildings || '1'}
-                </p>
-              </div>
+            <div className='w-full flex flex-wrap justify-between gap-4'>
               <div>
                 <div className='text-xs mb-1'>Total Units</div>
                 <p className='font-medium text-sm'>
-                  {development.total_units || '1'}
+                  {development.total_units !== null && development.total_units !== undefined 
+                    ? development.total_units 
+                    : 'No units available'}
+                </p>
+              </div>
+              <div>
+                <div className='text-xs mb-1'>Estimated Revenue</div>
+                <p className='font-medium text-sm'>
+                  {formatRevenue(development.estimated_revenue || development.revenue || development.total_revenue || development.revenue_generated, development.currency)}
                 </p>
               </div>
               <div>
@@ -142,20 +146,6 @@ const DevelopmentCard = ({ development }) => {
                 </p>
               </div>
             </div>
-
-            {/* Unit Types */}
-            {getUnitTypeNames().length > 0 && (
-              <div className='pt-4 border-t border-gray-200'>
-                <div className='text-xs mb-2'>Unit Types</div>
-                <div className='flex flex-wrap gap-2'>
-                  {getUnitTypeNames().map((type, index) => (
-                    <span key={index} className='bg-primary_color text-white px-3 py-1 rounded-full text-xs font-medium'>
-                      {type}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

@@ -37,9 +37,16 @@ const CreateRoleModal = ({ isOpen, onClose, onSuccess, organizationType = 'devel
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || 'Failed to create role')
+        // Check for duplicate role name
+        if (error.error && error.error.toLowerCase().includes('already exists')) {
+          toast.error('A role with this name already exists. Please choose a different name.')
+        } else {
+          throw new Error(error.error || 'Failed to create role')
+        }
+        return
       }
 
+      toast.success('Role created successfully!')
       onSuccess()
       // Reset form
       setFormData({
@@ -49,8 +56,7 @@ const CreateRoleModal = ({ isOpen, onClose, onSuccess, organizationType = 'devel
         is_default: false
       })
     } catch (error) {
-      console.error('Error creating role:', error)
-      toast.error(error.message || 'Failed to create role')
+      toast.error(error.message || 'Failed to create role. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -63,7 +69,7 @@ const CreateRoleModal = ({ isOpen, onClose, onSuccess, organizationType = 'devel
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[85vh] overflow-y-auto mt-8">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">Create New Role</h2>
+          <h2 className="text-2xl font-bold text-primary_color">Create New Role</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"

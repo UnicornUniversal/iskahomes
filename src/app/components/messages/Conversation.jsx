@@ -6,6 +6,7 @@ import { Input } from '@/app/components/ui/input';
 import { Button } from '@/app/components/ui/button';
 import { Send, MoreVertical, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { userHasPermission } from '@/lib/permissionHelpers';
 import { supabase } from '@/lib/supabase';
 
 const Conversation = ({ selectedChatId, onBack, conversationData, onConversationDataChange }) => {
@@ -21,13 +22,15 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
   const { user, developerToken, propertySeekerToken, agentToken, agencyToken } = useAuth();
 
   // Get the appropriate token based on user type
-  const token = user?.user_type === 'developer' ? developerToken 
+  const token = user?.user_type === 'developer' || user?.user_type === 'team_member' ? developerToken 
               : user?.user_type === 'agent' ? agentToken
               : user?.user_type === 'agency' ? agencyToken
               : propertySeekerToken;
   
   // Get user ID based on user type
+  // For team members, use the developer's ID from their organization
   const currentUserId = user?.user_type === 'developer' ? (user?.id || user?.profile?.developer_id)
+                      : user?.user_type === 'team_member' ? (user?.profile?.developer_id || user?.id)
                       : user?.user_type === 'agent' ? (user?.id || user?.profile?.agent_id)
                       : user?.user_type === 'agency' ? (user?.id || user?.profile?.agency_id)
                       : user?.id;
@@ -635,7 +638,16 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
               </div>
             )}
             {messages.map((message) => {
-              const isMine = message.sender_id === currentUserId && message.sender_type === user?.user_type;
+              // For team members, check if message is from the developer they represent
+              // For other users, check if message is from them
+              let isMine = false;
+              if (user?.user_type === 'team_member' && user?.profile?.organization_type === 'developer') {
+                // Team member: message is "mine" if it's from the developer they represent
+                isMine = message.sender_id === currentUserId && message.sender_type === 'developer';
+              } else {
+                // Regular user: message is "mine" if sender matches current user
+                isMine = message.sender_id === currentUserId && message.sender_type === user?.user_type;
+              }
               const senderName = message.sender_name || 'User';
               
               return (
@@ -681,23 +693,25 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
         )}
       </div>
 
-      {/* Message Input */}
-      <div className="p-4 border-t border-primary_color/10 default_bg rounded-b-xl flex-shrink-0">
-        <div className="flex items-center space-x-2">
-          <Input
-            placeholder="Type a message..."
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            className="flex-1"
-            disabled={sending}
-            suppressHydrationWarning={true}
-          />
-          <Button onClick={handleSendMessage} disabled={!newMessage.trim() || sending}>
-            <Send className="h-4 w-4" />
-          </Button>
+      {/* Message Input - Only show if user has send permission */}
+      {(user?.user_type === 'agent' || userHasPermission(user, 'messages.send')) && (
+        <div className="p-4 border-t border-primary_color/10 default_bg rounded-b-xl flex-shrink-0">
+          <div className="flex items-center space-x-2">
+            <Input
+              placeholder="Type a message..."
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              className="flex-1"
+              disabled={sending}
+              suppressHydrationWarning={true}
+            />
+            <Button onClick={handleSendMessage} disabled={!newMessage.trim() || sending}>
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

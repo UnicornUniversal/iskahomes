@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import bcrypt from 'bcryptjs'
+import { createClient } from '@supabase/supabase-js'
 
-// POST - Accept invitation and set password
+// POST - Accept invitation and create Supabase Auth account
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { token, password, user_id } = body
+    const { token, password } = body
 
     if (!token || !password) {
       return NextResponse.json({ error: 'Token and password are required' }, { status: 400 })
@@ -19,7 +19,10 @@ export async function POST(request) {
     // Find team member by invitation token
     const { data: teamMember, error: findError } = await supabaseAdmin
       .from('organization_team_members')
-      .select('*')
+      .select(`
+        *,
+        role:organization_roles(id, name, description)
+      `)
       .eq('invitation_token', token)
       .eq('status', 'pending')
       .single()
@@ -33,19 +36,103 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invitation token has expired' }, { status: 400 })
     }
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10)
+    // Create Supabase client for auth
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-    // Update team member
+    // Check if user already exists in auth.users
+    let userId = null
+    try {
+      const { data: existingUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserByEmail(teamMember.email)
+      
+      if (!getUserError && existingUser?.user) {
+        userId = existingUser.user.id
+        console.log('User already exists in auth.users:', userId)
+      }
+    } catch (err) {
+      console.log('User does not exist, will create new account')
+    }
+
+    // Create user account in Supabase Auth if doesn't exist
+    if (!userId) {
+      const { data: newUser, error: signUpError } = await supabase.auth.signUp({
+        email: teamMember.email,
+        password: password,
+        options: {
+          emailRedirectTo: null, // Skip email verification for team members
+          data: {
+            user_type: 'team_member',
+            organization_type: teamMember.organization_type,
+            organization_id: teamMember.organization_id,
+            first_name: teamMember.first_name,
+            last_name: teamMember.last_name
+          }
+        }
+      })
+
+      if (signUpError || !newUser?.user) {
+        console.error('Error creating user:', signUpError)
+        return NextResponse.json(
+          { error: 'Failed to create account. Please try again.', details: signUpError?.message },
+          { status: 500 }
+        )
+      }
+
+      userId = newUser.user.id
+
+      // Auto-confirm email for team members (they were invited, so no need for email confirmation)
+      try {
+        await supabaseAdmin.auth.admin.updateUserById(userId, {
+          email_confirm: true,
+          user_metadata: {
+            user_type: 'team_member',
+            organization_type: teamMember.organization_type,
+            organization_id: teamMember.organization_id,
+            first_name: teamMember.first_name,
+            last_name: teamMember.last_name
+          }
+        })
+        console.log('✅ Team member email auto-confirmed successfully')
+      } catch (confirmErr) {
+        console.error('Error confirming team member email:', confirmErr)
+        // Continue anyway - user can still login
+      }
+    } else {
+      // User already exists - update password and ensure email is confirmed and metadata is set
+      try {
+        // Update password for existing user
+        await supabaseAdmin.auth.admin.updateUserById(userId, {
+          password: password,
+          email_confirm: true,
+          user_metadata: {
+            user_type: 'team_member',
+            organization_type: teamMember.organization_type,
+            organization_id: teamMember.organization_id,
+            first_name: teamMember.first_name,
+            last_name: teamMember.last_name
+          }
+        })
+        console.log('✅ Existing user password updated and metadata set')
+      } catch (updateErr) {
+        console.error('Error updating existing user:', updateErr)
+        return NextResponse.json(
+          { error: 'Failed to update account. Please try again.', details: updateErr?.message },
+          { status: 500 }
+        )
+      }
+    }
+
+    // Update team member record
     const { data: updatedMember, error: updateError } = await supabaseAdmin
       .from('organization_team_members')
       .update({
-        password_hash: passwordHash,
-        user_id: user_id || null, // If user_id provided (from auth.users), use it
+        user_id: userId, // Set user_id from auth.users
         status: 'active',
         accepted_at: new Date().toISOString(),
         invitation_token: null, // Clear token
         expires_at: null // Clear expiration
+        // Note: password_hash is kept for backward compatibility but not used for login
       })
       .eq('id', teamMember.id)
       .select(`
@@ -68,7 +155,7 @@ export async function POST(request) {
     return NextResponse.json({ 
       success: true,
       data: sanitized,
-      message: 'Invitation accepted successfully'
+      message: 'Invitation accepted successfully. You can now log in with your email and password.'
     })
 
   } catch (error) {

@@ -89,7 +89,7 @@ const PermissionsEditor = ({ permissions, onChange, organizationType = 'develope
       team: 'Team Management',
       agents: 'Agents',
       media: 'Media',
-      financial: 'Financial',
+      sales: 'Sales',
       favorites: 'Favorites',
       reviews: 'Reviews',
       settings: 'Settings'
@@ -98,28 +98,18 @@ const PermissionsEditor = ({ permissions, onChange, organizationType = 'develope
   }
 
   const getPermissionLabel = (permission, section) => {
-    // If permission name matches section name, it's the parent permission
-    if (permission === section) {
-      return `Access ${getSectionLabel(section)} Route`
-    }
-    
     const labels = {
-      read: 'Read',
       view: 'View',
       create: 'Create',
       edit: 'Edit',
       delete: 'Delete',
-      publish: 'Publish',
-      unpublish: 'Unpublish',
-      feature: 'Feature',
       view_analytics: 'View Analytics',
       view_leads: 'View Leads',
-      manage: 'Manage',
       send: 'Send',
-      reply: 'Reply',
       view_all: 'View All',
       assign: 'Assign',
-      update: 'Update',
+      update_status: 'Update Status',
+      add_notes: 'Add Notes',
       export: 'Export',
       invite: 'Invite',
       remove: 'Remove',
@@ -128,7 +118,6 @@ const PermissionsEditor = ({ permissions, onChange, organizationType = 'develope
       manage_permissions: 'Manage Permissions',
       view_overview: 'View Overview',
       view_properties: 'View Properties',
-      view_sales: 'View Sales',
       view_profile_brand: 'View Profile & Brand',
       view_appointments: 'View Appointments',
       view_messages: 'View Messages',
@@ -140,6 +129,7 @@ const PermissionsEditor = ({ permissions, onChange, organizationType = 'develope
       upgrade: 'Upgrade',
       downgrade: 'Downgrade',
       cancel: 'Cancel',
+      manage: 'Manage',
       upload: 'Upload',
       view_pricing: 'View Pricing',
       edit_pricing: 'Edit Pricing',
@@ -147,29 +137,22 @@ const PermissionsEditor = ({ permissions, onChange, organizationType = 'develope
       view_commission: 'View Commission',
       manage_commission: 'Manage Commission',
       add: 'Add',
-      remove: 'Remove',
-      approve: 'Approve',
-      reject: 'Reject',
+      configure: 'Configure',
       respond: 'Respond'
     }
     return labels[permission] || permission.charAt(0).toUpperCase() + permission.slice(1).replace(/_/g, ' ')
   }
 
-  // Check if permission is parent permission (matches section name)
-  const isParentPermission = (permission, section) => {
-    return permission === section
-  }
-
-  // Get sorted permissions - parent first, then others
-  const getSortedPermissions = (sectionPerms, section) => {
+  // Get sorted permissions - view first, then others alphabetically
+  const getSortedPermissions = (sectionPerms) => {
     const sorted = Object.keys(sectionPerms)
-    const parentIndex = sorted.indexOf(section)
-    if (parentIndex > -1) {
-      // Move parent to front
-      sorted.splice(parentIndex, 1)
-      return [section, ...sorted]
+    const viewIndex = sorted.indexOf('view')
+    if (viewIndex > -1) {
+      // Move view to front
+      sorted.splice(viewIndex, 1)
+      return ['view', ...sorted.sort()]
     }
-    return sorted
+    return sorted.sort()
   }
 
   return (
@@ -218,13 +201,13 @@ const PermissionsEditor = ({ permissions, onChange, organizationType = 'develope
             {/* Section Permissions */}
             {isExpanded && (
               <div className="p-4 bg-gray-50 space-y-2">
-                {getSortedPermissions(sectionPerms, section).map((permission) => {
-                  const isParent = isParentPermission(permission, section)
+                {getSortedPermissions(sectionPerms).map((permission) => {
+                  const isView = permission === 'view'
                   return (
                     <label
                       key={permission}
                       className={`flex items-center gap-3 p-3 hover:bg-white rounded cursor-pointer transition-colors ${
-                        isParent ? 'bg-blue-50 border-l-4 border-blue-500 font-semibold' : ''
+                        isView ? 'bg-blue-50 border-l-4 border-blue-500 font-semibold' : ''
                       }`}
                     >
                       <input
@@ -232,19 +215,19 @@ const PermissionsEditor = ({ permissions, onChange, organizationType = 'develope
                         checked={sectionPerms[permission] || false}
                         onChange={() => togglePermission(section, permission)}
                         className={`w-4 h-4 text-primary_color border-gray-300 rounded focus:ring-primary_color ${
-                          isParent ? 'border-blue-500' : ''
+                          isView ? 'border-blue-500' : ''
                         }`}
                       />
-                      <span className={`text-sm ${isParent ? 'text-blue-900 font-semibold' : 'text-gray-700'}`}>
+                      <span className={`text-sm ${isView ? 'text-blue-900 font-semibold' : 'text-gray-700'}`}>
                         {getPermissionLabel(permission, section)}
-                        {isParent && (
+                        {isView && (
                           <span className="ml-2 text-xs text-blue-600 font-normal">
                             (Route Access)
                           </span>
                         )}
                       </span>
                       {sectionPerms[permission] ? (
-                        <FiCheck className={`w-4 h-4 ml-auto ${isParent ? 'text-blue-600' : 'text-green-600'}`} />
+                        <FiCheck className={`w-4 h-4 ml-auto ${isView ? 'text-blue-600' : 'text-green-600'}`} />
                       ) : (
                         <FiX className="w-4 h-4 text-gray-300 ml-auto" />
                       )}

@@ -309,6 +309,11 @@ html::-webkit-scrollbar:vertical {
   h5 {
     @apply text-xl leading-[1.4];
   }
+
+  textarea{
+    /* @apply text-primary_color; */
+    @apply bg-white/17 text-primary_color  rounded-md  px-4 py-[0.65em]  shadow-lg text-[0.9em] hover:bg-primary_color/10 hover:border-primary_color outline-none shadow-primary_color/20 font-medium border border-1 border-white duration-500;
+  }
   
   h6 {
     @apply text-[1em] leading-[1.4];

@@ -1,13 +1,8 @@
 'use client'
 import React from 'react'
-import ListingNav from '@/app/components/Listing/ListingNav'
+// Don't wrap with ListingNav - let the parent DeveloperLayout handle navigation
 const UnitsLayout = ({ children }) => {
-  return (
-    <div>
-      <ListingNav />
-      {children}
-    </div>
-  )
+  return <>{children}</>
 }
 
 export default UnitsLayout

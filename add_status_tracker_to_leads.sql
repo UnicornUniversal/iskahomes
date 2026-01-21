@@ -20,7 +20,7 @@ WHERE status_tracker = '[]' AND status IS NOT NULL;
 
 -- Add lead_score field to leads table
 -- This field stores the aggregated points from all lead actions
--- Scoring: Appointment=40, Phone=30, Direct Messaging=20, WhatsApp=15, Email=10
+-- Scoring: Appointment=40, Phone=30, WhatsApp=25, Direct Messaging=20, Email=10
 
 ALTER TABLE leads 
 ADD COLUMN IF NOT EXISTS lead_score INTEGER DEFAULT 0;
@@ -63,7 +63,7 @@ BEGIN
       IF message_type = 'email' THEN
         score := score + 10;
       ELSIF message_type = 'whatsapp' THEN
-        score := score + 15;
+        score := score + 25; -- WhatsApp is more valuable than direct messaging (direct communication channel)
       ELSE
         -- Default to direct messaging
         score := score + 20;

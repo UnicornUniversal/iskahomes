@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabase'
 import { TrendingUp, Loader2 } from 'lucide-react'
 import { Line } from 'react-chartjs-2'
 import {
@@ -39,7 +40,23 @@ const RecentSales = () => {
 
     const fetchSales = async () => {
       try {
-        const response = await fetch(`/api/sales/recent?user_id=${user.id}&limit=7`)
+        // For team members, get the developer's user_id from organization
+        let userId = user.id
+        
+        if (user?.user_type === 'team_member' && user?.profile?.organization_type === 'developer') {
+          // Fetch developer's user_id from developers table
+          const { data: developer } = await supabase
+            .from('developers')
+            .select('developer_id')
+            .eq('id', user.profile.organization_id)
+            .single()
+          
+          if (developer?.developer_id) {
+            userId = developer.developer_id
+          }
+        }
+        
+        const response = await fetch(`/api/sales/recent?user_id=${userId}&limit=7`)
         if (response.ok) {
           const result = await response.json()
           if (isMounted) {
@@ -60,7 +77,7 @@ const RecentSales = () => {
     return () => {
       isMounted = false
     }
-  }, [user?.id])
+  }, [user?.id, user?.user_type, user?.profile?.organization_id])
 
 
   const totalRevenue = useMemo(() => {

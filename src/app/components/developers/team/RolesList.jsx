@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { userHasPermission } from '@/lib/permissionHelpers'
 import { toast } from 'react-toastify'
 import { FiShield, FiEdit, FiTrash2, FiUsers, FiLock } from 'react-icons/fi'
 import EditRoleModal from './EditRoleModal'
 
 const RolesList = ({ onRefresh }) => {
-  const { developerToken } = useAuth()
+  const { user, developerToken } = useAuth()
   const [roles, setRoles] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedRole, setSelectedRole] = useState(null)
@@ -42,10 +43,14 @@ const RolesList = ({ onRefresh }) => {
   }
 
   const handleDelete = async (roleId, roleName) => {
-    if (!confirm(`Are you sure you want to delete the role "${roleName}"? This action cannot be undone.`)) {
+    // Prevent deleting Super Admin
+    const roleToDelete = roles.find(r => r.id === roleId)
+    if (roleToDelete?.is_system_role && roleToDelete?.name === 'Super Admin') {
+      toast.error('Super Admin role cannot be deleted')
       return
     }
 
+    // Using toast for feedback instead of browser confirm
     try {
       const response = await fetch(`/api/developers/team/roles/${roleId}`, {
         method: 'DELETE',
@@ -59,11 +64,10 @@ const RolesList = ({ onRefresh }) => {
         throw new Error(error.error || 'Failed to delete role')
       }
 
-      toast.success('Role deleted successfully')
+      toast.success(`Role "${roleName}" deleted successfully`)
       fetchRoles()
       if (onRefresh) onRefresh()
     } catch (error) {
-      console.error('Error deleting role:', error)
       toast.error(error.message || 'Failed to delete role')
     }
   }
@@ -87,7 +91,7 @@ const RolesList = ({ onRefresh }) => {
           roles.map((role) => (
             <div
               key={role.id}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+              className="secondary_bg rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -99,7 +103,7 @@ const RolesList = ({ onRefresh }) => {
                     )}
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{role.name}</h3>
+                    <h3 className="text-lg font-semibold text-primary_color">{role.name}</h3>
                     {role.is_system_role && (
                       <span className="text-xs text-gray-500">System Role</span>
                     )}
@@ -109,25 +113,29 @@ const RolesList = ({ onRefresh }) => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!role.is_system_role && (
+                  {!(role.is_system_role && role.name === 'Super Admin') && (user?.user_type === 'agent' || userHasPermission(user, 'team.manage_roles')) && (
                     <>
-                      <button
-                        onClick={() => {
-                          setSelectedRole(role)
-                          setShowEditModal(true)
-                        }}
-                        className="text-primary_color hover:text-primary_color/80 transition-colors"
-                        title="Edit"
-                      >
-                        <FiEdit className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(role.id, role.name)}
-                        className="text-red-600 hover:text-red-800 transition-colors"
-                        title="Delete"
-                      >
-                        <FiTrash2 className="w-5 h-5" />
-                      </button>
+                      {!role.is_system_role && (
+                        <button
+                          onClick={() => {
+                            setSelectedRole(role)
+                            setShowEditModal(true)
+                          }}
+                          className="text-primary_color hover:text-primary_color/80 transition-colors"
+                          title="Edit"
+                        >
+                          <FiEdit className="w-5 h-5" />
+                        </button>
+                      )}
+                      {!role.is_system_role && (
+                        <button
+                          onClick={() => handleDelete(role.id, role.name)}
+                          className="text-red-600 hover:text-red-800 transition-colors"
+                          title="Delete"
+                        >
+                          <FiTrash2 className="w-5 h-5" />
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
@@ -148,7 +156,7 @@ const RolesList = ({ onRefresh }) => {
         )}
       </div>
 
-      {showEditModal && selectedRole && (
+      {showEditModal && selectedRole && !(selectedRole.is_system_role && selectedRole.name === 'Super Admin') && (
         <EditRoleModal
           isOpen={showEditModal}
           onClose={() => {

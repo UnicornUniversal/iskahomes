@@ -144,7 +144,7 @@ const CustomSelect = React.forwardRef(({
         </span>
         <FiChevronDown
           className={cn(
-            "w-4 h-4 transition-transform duration-200 flex-shrink-0 ml-2",
+            "w-4 h-4 transition-transform duration-200 flex-shrink-0 ml-2 text-primary_color",
             isOpen && "transform rotate-180"
           )}
         />

@@ -334,7 +334,7 @@ const Header = () => {
         </motion.div>
 
         {/* right side - Swiper carousel */}
-        <div className="w-full md:w-1/2 h-96 md:h-[500px] relative">
+        <div className="w-full md:w-1/2 h-[500px] md:h-[500px] relative">
           {loading ? (
             <motion.div
               initial={{ scale: 0.7, opacity: 0 }}

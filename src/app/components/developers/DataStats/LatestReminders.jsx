@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabase'
 import { Loader2 } from 'lucide-react'
 import { formatFullDate } from '@/lib/utils'
 
@@ -27,8 +28,26 @@ const LatestReminders = ({ limit = 10 }) => {
     setError(null)
 
     try {
+      // For team members, get the developer's user_id from organization
+      let userId = user.id
+      let userType = user.user_type
+      
+      if (user?.user_type === 'team_member' && user?.profile?.organization_type === 'developer') {
+        // Fetch developer's user_id from developers table
+        const { data: developer } = await supabase
+          .from('developers')
+          .select('developer_id')
+          .eq('id', user.profile.organization_id)
+          .single()
+        
+        if (developer?.developer_id) {
+          userId = developer.developer_id
+          userType = 'developer' // Use 'developer' as user_type for the API
+        }
+      }
+      
       const response = await fetch(
-        `/api/reminders/latest?user_id=${encodeURIComponent(user.id)}&user_type=${encodeURIComponent(user.user_type)}&limit=${limit}`
+        `/api/reminders/latest?user_id=${encodeURIComponent(userId)}&user_type=${encodeURIComponent(userType)}&limit=${limit}`
       )
 
       const result = await response.json()
@@ -106,8 +125,8 @@ const LatestReminders = ({ limit = 10 }) => {
   return (
     <div className="border  border-gray-200 rounded-lg p-6">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-base">Latest Reminders</h3>
-        <div className="text-sm">
+        <h3 className="text-base font-bold text-primary_color">Latest Reminders</h3>
+        <div className="text-sm text-primary_color">
           Total: {reminders.length}
         </div>
       </div>
@@ -117,39 +136,39 @@ const LatestReminders = ({ limit = 10 }) => {
           <Loader2 className="w-5 h-5 animate-spin" />
         </div>
       ) : error ? (
-        <div className="text-center py-12 text-sm">
+        <div className="text-center py-12 text-sm text-primary_color">
           {error}
         </div>
       ) : reminders.length > 0 ? (
         <div className="flex flex-col gap-4">
           {reminders.map((reminder) => (
-            <div key={reminder.id} className="border-b border-gray-100 pb-2  last:border-b-0">
+            <div key={reminder.id} className="bg-white/30 rounded-lg p-4 border border-gray-100/50">
               {/* Note */}
               <div className="mb-3">
-                <p className="text-xs mb-1">Note</p>
-                <p className="text-sm leading-relaxed">
+                <p className="text-xs mb-1 font-medium text-primary_color">Note</p>
+                <p className="text-xs leading-relaxed text-primary_color">
                   {reminder.note_text}
                 </p>
               </div>
 
               {/* Date, Time and Status */}
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="text-xs text-primary_color">
                   {formatFullDate(reminder.reminder_date)}
                 </p>
                 {reminder.reminder_time && (
-                  <p className="text-sm">
+                  <p className="text-xs text-primary_color">
                     {formatTime(reminder.reminder_time)}
                   </p>
                 )}
 
                 {/* Status */}
-                <span className={`inline-flex px-2 py-1 rounded text-xs ${
+                <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
                   reminder.status === 'completed' 
-                    ? 'bg-gray-100' 
+                    ? 'bg-gray-100 text-primary_color' 
                     : reminder.is_overdue 
-                      ? 'bg-red-50' 
-                      : 'bg-yellow-50'
+                      ? 'bg-red-50 text-red-700' 
+                      : 'bg-yellow-50 text-yellow-700'
                 }`}>
                   {getStatusText(reminder)}
                 </span>
@@ -157,14 +176,14 @@ const LatestReminders = ({ limit = 10 }) => {
 
               {/* Property Information */}
               {reminder.listing && (
-                <div className="mt-3 pt-3 border-t border-gray-100">
+                <div className="mt-3 pt-3 border-t border-gray-200/50">
                   {getPropertyTitle(reminder) && (
-                    <p className="text-sm mb-1">
+                    <p className="text-xs mb-1 font-medium text-primary_color">
                       {getPropertyTitle(reminder)}
                     </p>
                   )}
                   {getLocation(reminder) && (
-                    <p className="text-xs">
+                    <p className="text-xs text-primary_color">
                       {getLocation(reminder)}
                     </p>
                   )}
@@ -174,7 +193,7 @@ const LatestReminders = ({ limit = 10 }) => {
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 text-sm">
+        <div className="text-center py-12 text-sm text-primary_color">
           No reminders found
         </div>
       )}

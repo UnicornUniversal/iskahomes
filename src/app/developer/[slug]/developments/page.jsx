@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { CustomSelect } from '@/app/components/ui/custom-select'
+import { userHasPermission } from '@/lib/permissionHelpers'
 import { 
   usePropertyPurposes, 
   usePropertyTypes, 
@@ -68,8 +69,8 @@ const page = () => {
   // View mode state
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
   
-  // Filter visibility for mobile/tablet
-  const [showFilters, setShowFilters] = useState(false)
+  // Filter visibility - default to true on desktop, false on mobile
+  const [showFilters, setShowFilters] = useState(true)
 
   // Debug user object
   useEffect(() => {
@@ -81,6 +82,7 @@ const page = () => {
         profile: user.profile ? {
           id: user.profile.id,
           developer_id: user.profile.developer_id,
+          organization_id: user.profile.organization_id,
           name: user.profile.name
         } : null
       } : null
@@ -111,9 +113,19 @@ const page = () => {
           return
         }
 
-        console.log('Fetching developments for developer_id:', user.profile.developer_id)
+        // Use developer_id from profile (already set in AuthContext for team members)
+        const developerId = user.profile.developer_id
         
-        const response = await fetch(`/api/developments?developer_id=${user.profile.developer_id}`, {
+        if (!developerId) {
+          console.error('Developer ID not found')
+          setError('Developer profile not found')
+          setLoading(false)
+          return
+        }
+        
+        console.log('Fetching developments for developer_id:', developerId)
+        
+        const response = await fetch(`/api/developments?developer_id=${developerId}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -206,9 +218,16 @@ const page = () => {
         const token = localStorage.getItem('developer_token')
         if (!token) return
 
+        // Use developer_id from profile (already set in AuthContext for team members)
+        const developerId = user.profile.developer_id
+        
+        if (!developerId) {
+          return
+        }
+        
         // Build query parameters
         const params = new URLSearchParams({
-          developer_id: user.profile.developer_id
+          developer_id: developerId
         })
 
         if (searchQuery) params.append('search', searchQuery)
@@ -375,66 +394,67 @@ const page = () => {
   }
 
   return (
-    <div className='normal_div'>
+    <div className='normal_div relative'>
+      {/* Sticky Filter Toggle Button - Always visible on right side */}
+      <button
+        onClick={() => setShowFilters(!showFilters)}
+        className='fixed right-4 top-24 z-40 bg-primary_color text-white flex items-center justify-center w-12 h-12 rounded-full shadow-lg hover:shadow-xl transition-all'
+        title={showFilters ? 'Hide Filters' : 'Show Filters'}
+      >
+        <svg className='w-5 h-5 text-white' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+          <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z' />
+        </svg>
+      </button>
+
       <div className='w-full flex items-start gap-6 p-6'>
         {/* Main Content Area */}
         <div className='flex-1 flex flex-col gap-4'>
           {/* Header */}
-          <div className='flex justify-between items-center flex-wrap gap-4 '>
+          <div className='flex justify-between items-center flex-wrap gap-4'>
             <h1 className="">Manage your Developments</h1>
-            <div className='flex items-center gap-3'>
-              {/* Filter Toggle Button - Only visible on small/medium devices */}
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className='lg:hidden primary_button flex items-center gap-2'
-              >
-                <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z' />
-                </svg>
-                Filters
-              </button>
-
-              {/* View Toggle */}
-              <div className='flex items-center bg-gray-100 rounded-lg p-1'>
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                    viewMode === 'grid' 
-                      ? 'bg-white text-primary_color shadow-sm' 
-                      : 'text-gray-600 hover:text-primary_color'
-                  }`}
-                >
-                  <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                    viewMode === 'list' 
-                      ? 'bg-white text-primary_color shadow-sm' 
-                      : 'text-gray-600 hover:text-primary_color'
-                  }`}
-                >
-                  <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 6h16M4 10h16M4 14h16M4 18h16' />
-                  </svg>
-                </button>
-              </div>
-              
+            {(user?.user_type === 'agent' || userHasPermission(user, 'developments.create')) && (
               <Link href={`/developer/${params.slug}/developments/addNewDevelopment`}>
                 <button className='primary_button'>
                   Add Development
                 </button>
               </Link>
-            </div>
+            )}
           </div>
 
-          {/* Results Summary */}
-          <div className='flex items-center justify-between text-sm px-4 py-2 rounded-lg '>
-            <span>
+          {/* View Toggle and Results Summary */}
+          <div className='flex items-center justify-between flex-wrap gap-4'>
+            <span className='text-sm text-primary_color'>
               Showing {filteredDevelopments.length} of {developments.length} developments
             </span>
+            {/* View Toggle */}
+            <div className='flex items-center gap-2'>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`bg-primary_color text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${
+                  viewMode === 'grid' 
+                    ? 'opacity-100' 
+                    : 'opacity-50 hover:opacity-75'
+                }`}
+              >
+                <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' />
+                </svg>
+                Grid
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`bg-primary_color text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${
+                  viewMode === 'list' 
+                    ? 'opacity-100' 
+                    : 'opacity-50 hover:opacity-75'
+                }`}
+              >
+                <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 6h16M4 10h16M4 14h16M4 18h16' />
+                </svg>
+                List
+              </button>
+            </div>
           </div>
 
           {/* Developments List */}
@@ -460,7 +480,17 @@ const page = () => {
                 </div>
               </div>
             ) : (
-              <div className={`${viewMode === 'grid' ? 'flex flex-col gap-6' : 'space-y-4'}`}>
+              <div 
+                className={viewMode === 'grid' 
+                  ? 'grid gap-6' 
+                  : 'flex flex-col'
+                }
+                style={viewMode === 'grid' ? {
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))'
+                } : {
+                  gap: '1em'
+                }}
+              >
                 {filteredDevelopments.map((development) => (
                   <DevelopmentCard 
                     key={development.id}
@@ -476,9 +506,10 @@ const page = () => {
           </div>
         </div>
 
-        {/* Filters Sidebar - Hidden on small/medium, visible on large+ */}
-        <div className='hidden lg:block w-80 flex-shrink-0 sticky top-20 self-start'>
-          <div className='border-l border-white/50 p-4 max-h-[calc(100vh-5rem)] overflow-y-auto'>
+        {/* Filters Sidebar - Desktop only, Show/hide based on showFilters state */}
+        {showFilters && (
+          <div className='hidden lg:block w-80 flex-shrink-0'>
+            <div className='bg-white/50 border-l border-white/50 p-4 max-h-[calc(100vh-8rem)] overflow-y-auto rounded-lg sticky' style={{ top: '6rem' }}>
             <div className='flex items-center justify-between mb-4'>
               <h2 className='text-lg font-semibold'>Filters</h2>
               {(searchQuery || selectedLocation || selectedPurpose || selectedType || selectedCategory || selectedSubType) && (
@@ -502,7 +533,7 @@ const page = () => {
                   placeholder='Search developments...'
                   className='w-full pl-10'
                 />
-                <svg className='absolute left-3 top-2.5 h-4 w-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <svg className='absolute left-3 top-2.5 h-4 w-4 text-primary_color' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
                   <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' />
                 </svg>
               </div>
@@ -522,7 +553,7 @@ const page = () => {
                   placeholder='Search location...'
                   className='w-full pl-10'
                 />
-                <svg className='absolute left-3 top-2.5 h-4 w-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <svg className='absolute left-3 top-2.5 h-4 w-4 text-primary_color' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
                   <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z' />
                   <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 11a3 3 0 11-6 0 3 3 0 016 0z' />
                 </svg>
@@ -621,14 +652,15 @@ const page = () => {
                 />
               </div>
             </div>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Mobile/Tablet Filters Overlay */}
         {showFilters && (
-          <div className='fixed inset-0 bg-white/70 z-50 lg:hidden overflow-y-auto'>
+          <div className='lg:hidden fixed inset-0 bg-black/70 z-50 overflow-y-auto'>
             <div className='w-full mt-20 p-4'>
-              <div className='bg-white rounded-lg shadow-lg p-4 max-w-2xl mx-auto'>
+              <div className='bg-white rounded-lg shadow-lg p-4 max-w-md mx-auto'>
                 <div className='flex items-center justify-between mb-4'>
                   <h2 className='text-lg font-semibold'>Filters</h2>
                   <button
@@ -661,7 +693,7 @@ const page = () => {
                       placeholder='Search developments...'
                       className='w-full pl-10'
                     />
-                    <svg className='absolute left-3 top-2.5 h-4 w-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                    <svg className='absolute left-3 top-2.5 h-4 w-4 text-primary_color' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
                       <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' />
                     </svg>
                   </div>
@@ -681,7 +713,7 @@ const page = () => {
                       placeholder='Search location...'
                       className='w-full pl-10'
                     />
-                    <svg className='absolute left-3 top-2.5 h-4 w-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                    <svg className='absolute left-3 top-2.5 h-4 w-4 text-primary_color' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
                       <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z' />
                       <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 11a3 3 0 11-6 0 3 3 0 016 0z' />
                     </svg>

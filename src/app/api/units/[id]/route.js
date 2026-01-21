@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { verifyToken } from '@/lib/jwt'
+import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
+import { getDeveloperId } from '@/lib/developerIdHelper'
 
 export async function GET(request, { params }) {
   try {
     const { id } = params
 
     const { data, error } = await supabase
-      .from('units')
+      .from('listings')
       .select(`
         *,
         developments (
@@ -18,6 +19,7 @@ export async function GET(request, { params }) {
         )
       `)
       .eq('id', id)
+      .eq('listing_type', 'unit')
       .single()
 
     if (error) {
@@ -162,9 +164,10 @@ export async function PUT(request, { params }) {
     }
 
     const { data, error } = await supabase
-      .from('units')
+      .from('listings')
       .update(updateData)
       .eq('id', id)
+      .eq('listing_type', 'unit')
       .select()
       .single()
 
@@ -236,9 +239,10 @@ export async function DELETE(request, { params }) {
     }
 
     const { error } = await supabase
-      .from('units')
+      .from('listings')
       .delete()
       .eq('id', id)
+      .eq('listing_type', 'unit')
 
     if (error) {
       console.error('Error deleting unit:', error)

@@ -56,8 +56,10 @@ const DevelopmentStats = ({ developmentId, development }) => {
         // Determine the development ID to use (for single development)
         const devId = developmentId || development?.id
 
-        // Get developer_id from user profile
-        const devIdFromUser = user?.profile?.developer_id
+        // Get developer_id from user profile - for team members, use organization_id
+        const devIdFromUser = user?.user_type === 'team_member' 
+          ? user?.profile?.organization_id 
+          : user?.profile?.developer_id
 
         let url = ''
         if (devId) {

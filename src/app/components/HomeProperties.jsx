@@ -66,9 +66,9 @@ const HomeProperties = () => {
       {/* Header */}
       <div className="mb-6">
         <div className="flex  items-start justify-start w-full">
-          <h1 className="font md:text-[2em] max-w-4xl w-full text-left text-primary_color">
-            Discover our main properties
-          </h1>
+          <h2 className="font text-[1.5em] md:text-[2em] max-w-4xl w-full text-left text-primary_color">
+          Discover our carefully selected properties, each offering comfort, quality, and a place you’ll be proud to call home.
+          </h2>
           {/* <p className="text-sm text-gray-500">
             Discover our main properties and find your dream home
           </p> */}

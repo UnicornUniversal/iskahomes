@@ -95,10 +95,11 @@ export async function POST(request) {
     }
 
     // Calculate lead score based on action type
+    // Scoring: Appointment=40, Phone=30, WhatsApp=25, Direct Messaging=20, Email=10
     const leadScoreMap = {
-      'lead_phone': 10,
-      'lead_message': message_type === 'email' ? 10 : (message_type === 'whatsapp' ? 15 : 20),
-      'lead_appointment': 25
+      'lead_phone': 30,
+      'lead_message': message_type === 'email' ? 10 : (message_type === 'whatsapp' ? 25 : 20),
+      'lead_appointment': 40
     }
     const leadScore = leadScoreMap[actionType] || 10
 

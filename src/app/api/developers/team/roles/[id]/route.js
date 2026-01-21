@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { verifyToken } from '@/lib/jwt'
+import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 
 // GET - Fetch a specific role
 export async function GET(request, { params }) {
@@ -8,28 +8,16 @@ export async function GET(request, { params }) {
     const resolvedParams = params instanceof Promise ? await params : params
     const { id } = resolvedParams
 
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authorization header missing' }, { status: 401 })
-    }
-
-    const token = authHeader.split(' ')[1]
-    const decoded = verifyToken(token)
+    // Authenticate request (handles both developers and team members)
+    const { userInfo, error: authError, status } = await authenticateRequest(request)
     
-    if (!decoded || decoded.user_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid token or user type' }, { status: 401 })
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status })
     }
 
-    // Get developer info
-    const { data: developer } = await supabaseAdmin
-      .from('developers')
-      .select('id')
-      .eq('developer_id', decoded.user_id)
-      .single()
-
-    if (!developer) {
-      return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
+    // Must be developer organization
+    if (userInfo.organization_type !== 'developer') {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
     }
 
     // Fetch the role
@@ -38,7 +26,7 @@ export async function GET(request, { params }) {
       .select('*')
       .eq('id', id)
       .eq('organization_type', 'developer')
-      .eq('organization_id', developer.id)
+      .eq('organization_id', userInfo.organization_id)
       .single()
 
     if (error || !role) {
@@ -65,28 +53,16 @@ export async function PUT(request, { params }) {
     const resolvedParams = params instanceof Promise ? await params : params
     const { id } = resolvedParams
 
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authorization header missing' }, { status: 401 })
-    }
-
-    const token = authHeader.split(' ')[1]
-    const decoded = verifyToken(token)
+    // Authenticate request (handles both developers and team members)
+    const { userInfo, error: authError, status } = await authenticateRequest(request)
     
-    if (!decoded || decoded.user_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid token or user type' }, { status: 401 })
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status })
     }
 
-    // Get developer info
-    const { data: developer } = await supabaseAdmin
-      .from('developers')
-      .select('id')
-      .eq('developer_id', decoded.user_id)
-      .single()
-
-    if (!developer) {
-      return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
+    // Must be developer organization
+    if (userInfo.organization_type !== 'developer') {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
     }
 
     // Check if role exists and belongs to this developer
@@ -95,39 +71,30 @@ export async function PUT(request, { params }) {
       .select('*')
       .eq('id', id)
       .eq('organization_type', 'developer')
-      .eq('organization_id', developer.id)
+      .eq('organization_id', userInfo.organization_id)
       .single()
 
     if (!existingRole) {
       return NextResponse.json({ error: 'Role not found' }, { status: 404 })
     }
 
-    // Prevent editing system roles (Owner)
-    if (existingRole.is_system_role && existingRole.name === 'Owner') {
-      return NextResponse.json({ error: 'Cannot modify Owner role' }, { status: 403 })
+    // Prevent editing system roles (Super Admin)
+    if (existingRole.is_system_role && existingRole.name === 'Super Admin') {
+      return NextResponse.json({ error: 'Cannot modify Super Admin role' }, { status: 403 })
     }
 
-    // Check permissions
-    const { data: teamMember } = await supabaseAdmin
-      .from('organization_team_members')
-      .select('role_id, permissions')
-      .eq('organization_type', 'developer')
-      .eq('organization_id', developer.id)
-      .eq('user_id', decoded.user_id)
-      .eq('status', 'active')
-      .single()
-
-    if (!teamMember) {
-      return NextResponse.json({ error: 'Team member not found' }, { status: 403 })
-    }
-
-    const { data: userRole } = await supabaseAdmin
+    // Check permissions - use userInfo which already has role_id
+    const { data: currentUserRole } = await supabaseAdmin
       .from('organization_roles')
       .select('name')
-      .eq('id', teamMember.role_id)
+      .eq('id', userInfo.role_id)
       .single()
 
-    if (userRole?.name !== 'Owner' && userRole?.name !== 'Admin') {
+    if (!currentUserRole) {
+      return NextResponse.json({ error: 'User role not found' }, { status: 403 })
+    }
+
+    if (currentUserRole?.name !== 'Super Admin' && currentUserRole?.name !== 'Admin') {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
@@ -147,7 +114,7 @@ export async function PUT(request, { params }) {
         .from('organization_roles')
         .select('id')
         .eq('organization_type', 'developer')
-        .eq('organization_id', developer.id)
+        .eq('organization_id', userInfo.organization_id)
         .eq('name', name)
         .single()
 
@@ -193,28 +160,16 @@ export async function DELETE(request, { params }) {
     const resolvedParams = params instanceof Promise ? await params : params
     const { id } = resolvedParams
 
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authorization header missing' }, { status: 401 })
-    }
-
-    const token = authHeader.split(' ')[1]
-    const decoded = verifyToken(token)
+    // Authenticate request (handles both developers and team members)
+    const { userInfo, error: authError, status } = await authenticateRequest(request)
     
-    if (!decoded || decoded.user_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid token or user type' }, { status: 401 })
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status })
     }
 
-    // Get developer info
-    const { data: developer } = await supabaseAdmin
-      .from('developers')
-      .select('id')
-      .eq('developer_id', decoded.user_id)
-      .single()
-
-    if (!developer) {
-      return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
+    // Must be developer organization
+    if (userInfo.organization_type !== 'developer') {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
     }
 
     // Check if role exists
@@ -223,39 +178,29 @@ export async function DELETE(request, { params }) {
       .select('*')
       .eq('id', id)
       .eq('organization_type', 'developer')
-      .eq('organization_id', developer.id)
+      .eq('organization_id', userInfo.organization_id)
       .single()
 
     if (!existingRole) {
       return NextResponse.json({ error: 'Role not found' }, { status: 404 })
     }
 
-    // Prevent deleting system roles
+    // Prevent deleting system roles, especially Super Admin
+    if (existingRole.is_system_role && existingRole.name === 'Super Admin') {
+      return NextResponse.json({ error: 'Cannot delete Super Admin role' }, { status: 403 })
+    }
     if (existingRole.is_system_role) {
       return NextResponse.json({ error: 'Cannot delete system roles' }, { status: 403 })
     }
 
-    // Check permissions (only Owner/Admin)
-    const { data: teamMember } = await supabaseAdmin
-      .from('organization_team_members')
-      .select('role_id')
-      .eq('organization_type', 'developer')
-      .eq('organization_id', developer.id)
-      .eq('user_id', decoded.user_id)
-      .eq('status', 'active')
-      .single()
-
-    if (!teamMember) {
-      return NextResponse.json({ error: 'Team member not found' }, { status: 403 })
-    }
-
-    const { data: userRole } = await supabaseAdmin
+    // Check permissions (only Super Admin/Admin) - use userInfo which already has role_id
+    const { data: currentUserRole } = await supabaseAdmin
       .from('organization_roles')
       .select('name')
-      .eq('id', teamMember.role_id)
+      .eq('id', userInfo.role_id)
       .single()
 
-    if (userRole?.name !== 'Owner' && userRole?.name !== 'Admin') {
+    if (currentUserRole?.name !== 'Super Admin' && currentUserRole?.name !== 'Admin') {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 

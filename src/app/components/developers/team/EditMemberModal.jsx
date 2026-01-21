@@ -43,14 +43,23 @@ const EditMemberModal = ({ isOpen, onClose, member, onSuccess }) => {
       if (response.ok) {
         const result = await response.json()
         setRoles(result.data || [])
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Failed to load roles')
       }
     } catch (error) {
-      console.error('Error fetching roles:', error)
+      toast.error('Failed to load roles')
     }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    // Prevent editing Super Admin team member
+    if (member.role?.name === 'Super Admin') {
+      toast.error('Super Admin team member cannot be modified')
+      return
+    }
     
     if (!formData.role_id) {
       toast.error('Role is required')
@@ -73,9 +82,9 @@ const EditMemberModal = ({ isOpen, onClose, member, onSuccess }) => {
         throw new Error(error.error || 'Failed to update team member')
       }
 
+      toast.success('Team member updated successfully!')
       onSuccess()
     } catch (error) {
-      console.error('Error updating member:', error)
       toast.error(error.message || 'Failed to update team member')
     } finally {
       setLoading(false)
@@ -84,12 +93,24 @@ const EditMemberModal = ({ isOpen, onClose, member, onSuccess }) => {
 
   if (!isOpen || !member) return null
 
+  // Prevent editing Super Admin - close modal if somehow opened
+  useEffect(() => {
+    if (member.role?.name === 'Super Admin') {
+      toast.error('Super Admin team member cannot be edited')
+      onClose()
+    }
+  }, [member, onClose])
+  
+  if (member.role?.name === 'Super Admin') {
+    return null
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">Edit Team Member</h2>
+          <h2 className="text-2xl font-bold text-primary_color">Edit Team Member</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -123,7 +144,8 @@ const EditMemberModal = ({ isOpen, onClose, member, onSuccess }) => {
                 required
                 value={formData.role_id}
                 onChange={(e) => setFormData(prev => ({ ...prev, role_id: e.target.value }))}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none appearance-none bg-white"
+                disabled={member.role?.name === 'Super Admin'}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none appearance-none bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option value="">Select a role</option>
                 {roles.map((role) => (
@@ -132,6 +154,9 @@ const EditMemberModal = ({ isOpen, onClose, member, onSuccess }) => {
                   </option>
                 ))}
               </select>
+              {member.role?.name === 'Super Admin' && (
+                <p className="mt-1 text-xs text-red-600 font-medium">Super Admin role cannot be changed</p>
+              )}
             </div>
           </div>
 
@@ -146,7 +171,8 @@ const EditMemberModal = ({ isOpen, onClose, member, onSuccess }) => {
                   type="text"
                   value={formData.first_name}
                   onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none"
+                  disabled={member.role?.name === 'Super Admin'}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="John"
                 />
               </div>
@@ -162,7 +188,8 @@ const EditMemberModal = ({ isOpen, onClose, member, onSuccess }) => {
                   type="text"
                   value={formData.last_name}
                   onChange={(e) => setFormData(prev => ({ ...prev, last_name: e.target.value }))}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none"
+                  disabled={member.role?.name === 'Super Admin'}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="Doe"
                 />
               </div>
@@ -179,7 +206,8 @@ const EditMemberModal = ({ isOpen, onClose, member, onSuccess }) => {
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none"
+                disabled={member.role?.name === 'Super Admin'}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                 placeholder="+1234567890"
               />
             </div>
@@ -192,13 +220,17 @@ const EditMemberModal = ({ isOpen, onClose, member, onSuccess }) => {
             <select
               value={formData.status}
               onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none"
+              disabled={member.role?.name === 'Super Admin'}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
               <option value="pending">Pending</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
               <option value="suspended">Suspended</option>
             </select>
+            {member.role?.name === 'Super Admin' && (
+              <p className="mt-1 text-xs text-red-600 font-medium">Super Admin status cannot be changed</p>
+            )}
           </div>
 
           {/* Actions */}
@@ -212,7 +244,7 @@ const EditMemberModal = ({ isOpen, onClose, member, onSuccess }) => {
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || member.role?.name === 'Super Admin'}
               className="px-6 py-2 bg-primary_color text-white rounded-lg hover:bg-primary_color/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Updating...' : 'Update Member'}

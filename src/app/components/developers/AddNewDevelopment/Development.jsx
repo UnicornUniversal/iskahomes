@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
+import { userHasPermission } from '@/lib/permissionHelpers'
 import { uploadFileToStorage, uploadMultipleFilesToStorage } from '@/lib/fileUpload'
 import DevelopmentDescription from './DevelopmentDescription'
 import DevelopmentCategories from './DevelopmentCategories'
@@ -11,12 +12,16 @@ import DevelopmentLocations from './DevelopmentLocations'
 import DevelopmentAmenities from './DevelopmentAmenities'
 import DevelopmentMedia from './DevelopmentMedia'
 import DevelopmentFiles from './DevelopmentFiles'
+import DeleteDevelopmentModal from '../DeleteDevelopmentModal'
 
 const Development = ({ isAddMode, developmentId }) => {
   const { user } = useAuth()
   const [developmentData, setDevelopmentData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [developmentStats, setDevelopmentStats] = useState({ listingsCount: 0, totalUnits: 0 });
   
   // Debug user state
   useEffect(() => {
@@ -27,7 +32,7 @@ const Development = ({ isAddMode, developmentId }) => {
         user_type: user.user_type,
         profile: user.profile ? {
           id: user.profile.id,
-          developer_id: user.profile.developer_id,
+          developer_id: user?.user_type === 'team_member' ? user?.profile?.organization_id : user.profile.developer_id,
           name: user.profile.name
         } : null
       } : null
@@ -192,16 +197,43 @@ const Development = ({ isAddMode, developmentId }) => {
     }
   };
 
-  const handleDeleteDevelopment = async () => {
-    if (!confirm('Are you sure you want to delete this development? This action cannot be undone.')) {
-      return;
-    }
+  // Fetch development stats for delete modal
+  useEffect(() => {
+    if (showDeleteModal && developmentId && !isAddMode) {
+      const fetchStats = async () => {
+        try {
+          const token = localStorage.getItem('developer_token');
+          const response = await fetch(`/api/developments/${developmentId}/stats`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
 
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.data) {
+              setDevelopmentStats({
+                listingsCount: result.data.listingsCount || 0,
+                totalUnits: result.data.totalUnits || 0
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching development stats:', error);
+        }
+      };
+
+      fetchStats();
+    }
+  }, [showDeleteModal, developmentId, isAddMode]);
+
+  const handleDeleteDevelopment = async () => {
     if (!user) {
       toast.error('Please log in to delete developments');
       return;
     }
 
+    setDeleteLoading(true);
     try {
       const token = localStorage.getItem('developer_token');
       const response = await fetch(`/api/developments/${developmentId}`, {
@@ -212,18 +244,33 @@ const Development = ({ isAddMode, developmentId }) => {
       });
 
       if (response.ok) {
-        toast.success('Development deleted successfully!');
+        const result = await response.json();
+        toast.success(result.message || 'Development deleted successfully!', {
+          position: "top-center",
+          autoClose: 2000,
+        });
+        
+        setShowDeleteModal(false);
+        
         // Redirect to developments list
         setTimeout(() => {
           window.location.href = `/developer/${user.profile?.slug || user.profile.id}/developments`;
-        }, 2000);
+        }, 1500);
       } else {
         const error = await response.json();
-        toast.error(error.message || 'Failed to delete development');
+        toast.error(error.message || 'Failed to delete development', {
+          position: "top-center",
+          autoClose: 3000,
+        });
+        setDeleteLoading(false);
       }
     } catch (error) {
       console.error('Error deleting development:', error);
-      toast.error('Error deleting development');
+      toast.error('Error deleting development', {
+        position: "top-center",
+        autoClose: 3000,
+      });
+      setDeleteLoading(false);
     }
   };
 
@@ -288,8 +335,11 @@ const Development = ({ isAddMode, developmentId }) => {
       return;
     }
 
-    if (!user.profile || !user.profile.developer_id) {
-      console.log('User profile or profile.developer_id not found', { user });
+    // Use developer_id from profile (already set in AuthContext for team members)
+    const developerId = user?.profile?.developer_id
+    
+    if (!user.profile || !developerId) {
+      console.log('User profile or developer ID not found', { user });
       toast.error('Developer profile not found. Please contact support.');
       return;
     }
@@ -323,6 +373,7 @@ const Development = ({ isAddMode, developmentId }) => {
             bannerData = bannerUpload.data;
           } else {
             toast.error('Failed to upload banner image');
+            setLoading(false);
             return;
           }
         } else if (media.banner && typeof media.banner === 'object' && media.banner.url) {
@@ -341,6 +392,7 @@ const Development = ({ isAddMode, developmentId }) => {
             videoData = videoUpload.data;
           } else {
             toast.error('Failed to upload video file');
+            setLoading(false);
             return;
           }
         } else if (media.video && typeof media.video === 'object' && media.video.url) {
@@ -366,6 +418,7 @@ const Development = ({ isAddMode, developmentId }) => {
             mediaFilesData = [...mediaFilesData, ...mediaUpload.data];
           } else {
             toast.error('Failed to upload some media files');
+            setLoading(false);
             return;
           }
         }
@@ -388,13 +441,14 @@ const Development = ({ isAddMode, developmentId }) => {
             additionalFilesData = [...additionalFilesData, ...filesUpload.data];
           } else {
             toast.error('Failed to upload some additional files');
+            setLoading(false);
             return;
           }
         }
       }
       
       const developmentData = {
-        developer_id: user.profile.developer_id,
+        developer_id: developerId,
         ...otherFormData,
         // Flatten location fields
         country: location?.country || '',
@@ -457,10 +511,10 @@ const Development = ({ isAddMode, developmentId }) => {
         toast.success(
           isAddMode 
             ? 'Development created successfully! Redirecting...' 
-            : 'Development updated successfully! Redirecting...',
+            : 'Development updated successfully!',
           {
             position: "top-center",
-            autoClose: 2000,
+            autoClose: 3000,
             hideProgressBar: false,
             closeOnClick: true,
             pauseOnHover: true,
@@ -468,10 +522,18 @@ const Development = ({ isAddMode, developmentId }) => {
           }
         );
         
-        // Redirect to developments list
-        setTimeout(() => {
-          window.location.href = `/developer/${user.profile?.slug || user.profile.id}/developments`;
-        }, 2000);
+        if (isAddMode) {
+          // Redirect to developments list when creating
+          setTimeout(() => {
+            window.location.href = `/developer/${user.profile?.slug || user.profile.id}/developments`;
+          }, 2000);
+        } else {
+          // Reload the page when updating to show the updated data
+          setLoading(false);
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        }
       } else {
         const error = await response.json();
         console.error('Error response:', error);
@@ -529,9 +591,9 @@ const Development = ({ isAddMode, developmentId }) => {
         <h1 className=''>
           {isAddMode ? 'Add New Development' : 'Edit Development'}
         </h1>
-        {!isAddMode && (
+        {!isAddMode && (user?.user_type === 'agent' || userHasPermission(user, 'developments.delete')) && (
           <button
-            onClick={handleDeleteDevelopment}
+            onClick={() => setShowDeleteModal(true)}
             className='tertiary_button'
           >
             Delete Development
@@ -629,18 +691,46 @@ const Development = ({ isAddMode, developmentId }) => {
       </form>
 
       {/* Sticky Submit Button */}
-      <div className='fixed bottom-0 left-0 right-0 border-t border-gray-200 p-4 z-50 shadow-lg'>
-        <div className='max-w-7xl mx-auto flex justify-center items-center'>
-          <button
-            type='button'
-            onClick={handleSubmit}
-            disabled={loading}
-            className='primary_button backdrop-blur-md'
-          >
-            {loading ? 'Processing...' : (isAddMode ? 'Create Development' : 'Update Development')}
-          </button>
+      {((user?.user_type === 'agent') || 
+        (isAddMode && userHasPermission(user, 'developments.create')) || 
+        (!isAddMode && userHasPermission(user, 'developments.edit'))) && (
+        <div className='fixed bottom-0 left-0 right-0 p-4 z-30 pointer-events-none'>
+          <div className='max-w-7xl mx-auto flex justify-center items-center'>
+            <button
+              type='button'
+              onClick={handleSubmit}
+              disabled={loading}
+              className='primary_button pointer-events-auto flex items-center justify-center gap-2'
+            >
+              {loading ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{isAddMode ? 'Creating Development...' : 'Updating Development...'}</span>
+                </>
+              ) : (
+                <span>{isAddMode ? 'Create Development' : 'Update Development'}</span>
+              )}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Delete Development Modal */}
+      <DeleteDevelopmentModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          if (!deleteLoading) {
+            setShowDeleteModal(false);
+          }
+        }}
+        onConfirm={handleDeleteDevelopment}
+        development={developmentData}
+        listingsCount={developmentStats.listingsCount}
+        totalUnits={developmentStats.totalUnits}
+        isLoading={deleteLoading}
+      />
 
       {/* Toast Container */}
       <ToastContainer

@@ -16,11 +16,12 @@ const SignInPage = () => {
   
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
-    user_type: '' // Add user type selection
+    password: ''
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [multipleOrganizations, setMultipleOrganizations] = useState(null)
+  const [selectedOrganization, setSelectedOrganization] = useState(null)
 
   // Check for success message from signup redirect
   useEffect(() => {
@@ -39,9 +40,11 @@ const SignInPage = () => {
     }
   }, [searchParams, router])
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (but only after token is confirmed saved)
   useEffect(() => {
-    if (!loading && isAuthenticated && user) {
+    // Wait a bit to ensure token is saved after login
+    const checkAuth = setTimeout(() => {
+      if (!loading && isAuthenticated && user) {
       const userType = user.user_type
       let redirectUrl = '/'
       
@@ -61,6 +64,16 @@ const SignInPage = () => {
         case 'property_seeker':
           redirectUrl = `/propertySeeker/${user.id}/dashboard`
           break
+        case 'team_member':
+          // Team members redirect based on organization_type
+          if (user.profile?.organization_type === 'developer') {
+            redirectUrl = `/developer/${user.profile?.organization_slug}/dashboard`
+          } else if (user.profile?.organization_type === 'agency') {
+            redirectUrl = `/agency/${user.profile?.organization_slug}/dashboard`
+          } else {
+            redirectUrl = '/'
+          }
+          break
         case 'admin':
           redirectUrl = '/admin/dashboard'
           break
@@ -68,8 +81,11 @@ const SignInPage = () => {
           redirectUrl = '/'
       }
       
-      router.push(redirectUrl)
-    }
+        router.push(redirectUrl)
+      }
+    }, 500) // Small delay to ensure token is saved
+    
+    return () => clearTimeout(checkAuth)
   }, [isAuthenticated, user, loading, router])
 
 
@@ -83,8 +99,8 @@ const SignInPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    if (!formData.email || !formData.password || !formData.user_type) {
-      toast.error('Please fill in all fields including user type', {
+    if (!formData.email || !formData.password) {
+      toast.error('Please fill in all fields', {
         position: "top-right",
         autoClose: 3000,
         hideProgressBar: false,
@@ -98,12 +114,19 @@ const SignInPage = () => {
     setIsLoading(true)
     
     try {
-      const result = await login(formData.email, formData.password, formData.user_type)
+      const result = await login(formData.email, formData.password, selectedOrganization?.id)
+      
+      // Handle multiple organizations
+      if (result.multipleOrganizations && result.organizations) {
+        setMultipleOrganizations(result.organizations)
+        setIsLoading(false)
+        return
+      }
 
       if (result.success) {
         // Success - show success message
         const userType = result.user.user_type
-        const userName = result.user.profile?.name || userType
+        const userName = result.user.profile?.name || result.user.profile?.first_name || result.user.profile?.organization_name || userType
         
         toast.success(`Welcome back, ${userName}!`, {
           position: "top-center",
@@ -133,6 +156,16 @@ const SignInPage = () => {
           case 'property_seeker':
             redirectUrl = `/propertySeeker/${result.user.id}/dashboard`
             break
+          case 'team_member':
+            // Team members redirect based on organization_type
+            if (result.user.profile?.organization_type === 'developer') {
+              redirectUrl = `/developer/${result.user.profile?.organization_slug}/dashboard`
+            } else if (result.user.profile?.organization_type === 'agency') {
+              redirectUrl = `/agency/${result.user.profile?.organization_slug}/dashboard`
+            } else {
+              redirectUrl = '/'
+            }
+            break
           case 'admin':
             redirectUrl = '/admin/dashboard'
             break
@@ -140,10 +173,26 @@ const SignInPage = () => {
             redirectUrl = '/'
         }
         
-        // Redirect after a short delay
+        // CRITICAL: Wait a bit longer to ensure token is fully saved and state is updated
+        // Also verify token exists before redirecting
         setTimeout(() => {
-          router.push(redirectUrl)
-        }, 2000)
+          // Double-check token is saved before redirect
+          const hasToken = localStorage.getItem('developer_token') || localStorage.getItem('agency_token') || localStorage.getItem('agent_token') || localStorage.getItem('property_seeker_token');
+          console.log('🔐 SIGNIN PAGE: Pre-redirect token check:', hasToken ? 'FOUND' : 'NOT FOUND');
+          
+          if (!hasToken) {
+            console.error('🔐 SIGNIN PAGE: Token not found before redirect! Retrying...');
+            toast.error('Authentication error. Please try again.', {
+              position: "top-center",
+              autoClose: 3000,
+            });
+            setIsLoading(false);
+            return;
+          }
+          
+          console.log('🔐 SIGNIN PAGE: Redirecting to:', redirectUrl);
+          router.push(redirectUrl);
+        }, 1000) // Reduced delay but with verification
         
       } else {
         // Error - show error message
@@ -211,26 +260,6 @@ const SignInPage = () => {
 
           {/* Form */}
           <form onSubmit={handleSubmit}  className="space-y-6">
-            {/* User Type Field */}
-            <div className="space-y-2">
-              <label htmlFor="user_type" className="block text-sm font-medium text-gray-700">
-                Account Type:
-              </label>
-              <select
-                id="user_type"
-                value={formData.user_type}
-                onChange={(e) => handleInputChange('user_type', e.target.value)}
-                className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 bg-white"
-                required
-              >
-                <option value="">Select account type</option>
-                <option value="developer">Developer</option>
-                <option value="agent">Agent</option>
-                <option value="agency">Agency</option>
-                <option value="property_seeker">Property Seeker</option>
-              </select>
-            </div>
-
             {/* Email Field */}
             <div className="space-y-2">
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -358,6 +387,108 @@ const SignInPage = () => {
        
         </div>
       </div>
+      
+      {/* Organization Selector Modal */}
+      {multipleOrganizations && multipleOrganizations.length > 0 && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-primary_color mb-4">Select Organization</h3>
+            <p className="text-gray-600 mb-4">You belong to multiple organizations. Please select one to continue:</p>
+            <div className="space-y-2 mb-6">
+              {multipleOrganizations.map((org) => (
+                <button
+                  key={org.id}
+                  onClick={() => setSelectedOrganization(org)}
+                  className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                    selectedOrganization?.id === org.id
+                      ? 'border-primary_color bg-primary_color/10'
+                      : 'border-gray-200 hover:border-primary_color/50'
+                  }`}
+                >
+                  <div className="font-semibold text-gray-900">{org.organization_name || 'Organization'}</div>
+                  <div className="text-sm text-gray-600 capitalize">{org.organization_type}</div>
+                  <div className="text-sm text-gray-500">Role: {org.role_name}</div>
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setMultipleOrganizations(null)
+                  setSelectedOrganization(null)
+                  setIsLoading(false)
+                }}
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!selectedOrganization) {
+                    toast.error('Please select an organization', {
+                      position: "top-center",
+                      autoClose: 3000,
+                    })
+                    return
+                  }
+                  setIsLoading(true)
+                  try {
+                    const result = await login(formData.email, formData.password, selectedOrganization.id || selectedOrganization.team_member_id)
+                    if (result.success) {
+                      const userType = result.user.user_type
+                      const userName = result.user.profile?.name || result.user.profile?.first_name || result.user.profile?.organization_name || userType
+                      
+                      toast.success(`Welcome back, ${userName}!`, {
+                        position: "top-center",
+                        autoClose: 2000,
+                      })
+                      
+                      let redirectUrl = '/'
+                      if (userType === 'team_member') {
+                        if (result.user.profile?.organization_type === 'developer') {
+                          redirectUrl = `/developer/${result.user.profile?.organization_slug}/dashboard`
+                        } else if (result.user.profile?.organization_type === 'agency') {
+                          redirectUrl = `/agency/${result.user.profile?.organization_slug}/dashboard`
+                        }
+                      } else {
+                        switch (userType) {
+                          case 'developer':
+                            redirectUrl = `/developer/${result.user.profile?.slug || result.user.id}/dashboard`
+                            break
+                          case 'agent':
+                            redirectUrl = `/agents/${result.user.profile?.slug || result.user.id}/dashboard`
+                            break
+                          case 'agency':
+                            redirectUrl = `/agency/${result.user.profile?.slug || result.user.id}/dashboard`
+                            break
+                          case 'property_seeker':
+                            redirectUrl = `/propertySeeker/${result.user.id}/dashboard`
+                            break
+                        }
+                      }
+                      
+                      setTimeout(() => {
+                        router.push(redirectUrl)
+                      }, 2000)
+                    }
+                  } catch (error) {
+                    console.error('Sign in error:', error)
+                    toast.error('An error occurred. Please try again.', {
+                      position: "top-center",
+                      autoClose: 4000,
+                    })
+                    setIsLoading(false)
+                  }
+                }}
+                disabled={!selectedOrganization || isLoading}
+                className="flex-1 px-6 py-2 bg-primary_color text-white rounded-lg hover:bg-primary_color/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Signing In...' : 'Continue'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Toast Container */}
       <ToastContainer

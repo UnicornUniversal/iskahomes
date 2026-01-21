@@ -157,7 +157,7 @@ async function aggregateEvents(events, chunkSize = 5000, errorTracker = null) {
 }
 
 // Calculate lead_score from lead_actions array
-// Scoring: Appointment=40, Phone=30, Direct Messaging=20, WhatsApp=15, Email=10
+// Scoring: Appointment=40, Phone=30, WhatsApp=25, Direct Messaging=20, Email=10
 function calculateLeadScore(leadActions) {
   if (!Array.isArray(leadActions) || leadActions.length === 0) {
     return 0
@@ -180,7 +180,7 @@ function calculateLeadScore(leadActions) {
       if (messageType === 'email') {
         score += 10
       } else if (messageType === 'whatsapp') {
-        score += 15
+        score += 25 // WhatsApp is more valuable than direct messaging (direct communication channel)
       } else {
         // Default to direct messaging
         score += 20
@@ -1674,8 +1674,10 @@ export async function POST(request) {
     
     // Accumulate data across all hours for final updates
     const allListingIdsSet = new Set() // For updating listings table
-    const allUserIdsSet = new Set() // For updating developers/agents table
+    const allUserIdsSet = new Set() // For updating developers/agents/agencies table
     const allDeveloperTotals = {} // Accumulate developer totals across all hours
+    const allAgentTotals = {} // Accumulate agent totals across all hours
+    const allAgencyTotals = {} // Accumulate agency totals across all hours
     
     // CRITICAL: Fetch leads data BEFORE the hour loop (used inside the loop)
     // Get leads data for ALL hours of the date (not just current hour)
@@ -2644,12 +2646,12 @@ export async function POST(request) {
           ? Number((((currentConversion - prevConversion) / prevConversion) * 100).toFixed(2))
           : (currentConversion > 0 ? 100 : 0)
 
-        // Store hourly totals for updating developers table (will be added to cumulative totals)
+        // Store hourly totals for updating developers/agents table (will be added to cumulative totals)
         // These are CURRENT HOUR values only, not cumulative
-        if (user_type === 'developer') {
+        let cumulativeTotalListingViews = 0
+        if (user_type === 'developer' || user_type === 'agent') {
           // Calculate cumulative total_listing_views from ALL historical listing_analytics data
           // FALLBACK: If database is empty, use PostHog events directly (first run scenario)
-          let cumulativeTotalListingViews = 0
           
           // Method 1: Sum from listing_analytics (preferred - already aggregated in database)
           if (userListings && userListings.length > 0) {
@@ -2666,9 +2668,13 @@ export async function POST(request) {
             // Log comparison for debugging (database vs PostHog)
             const posthogCount = cumulativeListingViewsFromPostHog[userId]
             if (Math.abs(cumulativeTotalListingViews - posthogCount) > 10) {
-              errorTracker.addWarning('DEVELOPERS', `Discrepancy for developer ${userId}`, { userId, db: cumulativeTotalListingViews, posthog: posthogCount })
+              const category = user_type === 'developer' ? 'DEVELOPERS' : 'AGENTS'
+              errorTracker.addWarning(category, `Discrepancy for ${user_type} ${userId}`, { userId, db: cumulativeTotalListingViews, posthog: posthogCount })
             }
           }
+        }
+        
+        if (user_type === 'developer') {
           
           // Accumulate developer totals across all hours
           if (!allDeveloperTotals[userId]) {
@@ -2697,6 +2703,62 @@ export async function POST(request) {
           allDeveloperTotals[userId].views_change = viewsChange
           allDeveloperTotals[userId].leads_change = leadsChange
           allDeveloperTotals[userId].impressions_change = impressionsChange
+        } else if (user_type === 'agent') {
+          // Accumulate agent totals across all hours (similar to developers)
+          if (!allAgentTotals[userId]) {
+            allAgentTotals[userId] = {
+              hourly_views: 0,
+              hourly_listing_views: 0,
+              cumulative_listing_views: cumulativeTotalListingViews,
+              hourly_profile_views: 0,
+              hourly_leads: 0,
+              hourly_impressions: 0,
+              profile_to_lead_rate: profile_to_lead_rate,
+              views_change: viewsChange,
+              leads_change: leadsChange,
+              impressions_change: impressionsChange
+            }
+          }
+          // Sum hourly values across all hours
+          allAgentTotals[userId].hourly_views += total_views
+          allAgentTotals[userId].hourly_listing_views += total_listing_views
+          allAgentTotals[userId].hourly_profile_views += (user.profile_views || 0)
+          allAgentTotals[userId].hourly_leads += total_leads
+          allAgentTotals[userId].hourly_impressions += total_impressions_received
+          // Update cumulative and latest values
+          allAgentTotals[userId].cumulative_listing_views = cumulativeTotalListingViews
+          allAgentTotals[userId].profile_to_lead_rate = profile_to_lead_rate
+          allAgentTotals[userId].views_change = viewsChange
+          allAgentTotals[userId].leads_change = leadsChange
+          allAgentTotals[userId].impressions_change = impressionsChange
+        } else if (user_type === 'agency') {
+          // Accumulate agency totals across all hours
+          if (!allAgencyTotals[userId]) {
+            allAgencyTotals[userId] = {
+              hourly_views: 0,
+              hourly_listing_views: 0,
+              cumulative_listing_views: cumulativeTotalListingViews,
+              hourly_profile_views: 0,
+              hourly_leads: 0,
+              hourly_impressions: 0,
+              profile_to_lead_rate: profile_to_lead_rate,
+              views_change: viewsChange,
+              leads_change: leadsChange,
+              impressions_change: impressionsChange
+            }
+          }
+          // Sum hourly values across all hours
+          allAgencyTotals[userId].hourly_views += total_views
+          allAgencyTotals[userId].hourly_listing_views += total_listing_views
+          allAgencyTotals[userId].hourly_profile_views += (user.profile_views || 0)
+          allAgencyTotals[userId].hourly_leads += total_leads
+          allAgencyTotals[userId].hourly_impressions += total_impressions_received
+          // Update cumulative and latest values
+          allAgencyTotals[userId].cumulative_listing_views = cumulativeTotalListingViews
+          allAgencyTotals[userId].profile_to_lead_rate = profile_to_lead_rate
+          allAgencyTotals[userId].views_change = viewsChange
+          allAgencyTotals[userId].leads_change = leadsChange
+          allAgencyTotals[userId].impressions_change = impressionsChange
         }
 
       userRows.push({
@@ -3004,7 +3066,9 @@ export async function POST(request) {
       users: { inserted: 0, errors: [] },
       developments: { inserted: 0, errors: [] },
       leads: { inserted: 0, errors: [] },
-      developers: { updated: 0, errors: 0, details: [] } // Track developers table updates
+      developers: { updated: 0, errors: 0, details: [] }, // Track developers table updates
+      agents: { updated: 0, errors: 0, details: [] }, // Track agents table updates
+      agencies: { updated: 0, errors: 0, details: [] } // Track agencies table updates
     }
 
     // Insert listing analytics (time series - always insert new records)
@@ -4843,6 +4907,724 @@ export async function POST(request) {
       errorTracker.addError('DEVELOPERS', 'Exception updating developers', { error: err.message, stack: err.stack })
     }
 
+    // 12b. Update agents table with cumulative totals
+    // Similar to developers, but for agents
+    let agentUpdatesData = {}
+    try {
+      // Get unique agent IDs from events (lister_ids with user_type = 'agent')
+      const agentIdsToUpdate = new Set()
+      if (allUserIdsSet.size > 0) {
+        const { data: agentsData } = await supabaseAdmin
+          .from('agents')
+          .select('agent_id, agency_id')
+          .in('agent_id', Array.from(allUserIdsSet))
+        
+        if (agentsData) {
+          for (const agent of agentsData) {
+            agentIdsToUpdate.add(agent.agent_id)
+          }
+        }
+      }
+
+      if (agentIdsToUpdate.size === 0) {
+        insertResults.agents = {
+          updated: 0,
+          errors: 0,
+          details: [],
+          message: 'No agents found in events to update'
+        }
+      } else {
+        const agentIdsArray = Array.from(agentIdsToUpdate)
+        
+        // Get current cumulative values from agents table
+        const { data: currentAgents, error: fetchError } = await supabaseAdmin
+          .from('agents')
+          .select('agent_id, total_views, total_listing_views, total_profile_views, total_leads, total_impressions, conversion_rate')
+          .in('agent_id', agentIdsArray)
+
+        if (fetchError) {
+          errorTracker.addError('AGENTS', 'Error fetching current agent data', { error: fetchError.message, code: fetchError.code })
+        }
+
+        // Calculate cumulative totals from user_analytics table (atomic recalculation)
+        const agentIdsForCumulative = Object.keys(allAgentTotals)
+        let cumulativeUserAnalytics = {}
+        
+        if (agentIdsForCumulative.length > 0) {
+          try {
+            const { data: cumulativeData, error: cumulativeError } = await supabaseAdmin
+              .from('user_analytics')
+              .select('user_id, total_views, total_listing_views, profile_views, total_leads, total_impressions_received, impression_social_media_received, impression_website_visit_received, impression_share_received, impression_saved_listing_received')
+              .in('user_id', agentIdsForCumulative)
+              .eq('user_type', 'agent')
+            
+            if (cumulativeError) {
+              errorTracker.addError('AGENTS', 'Error fetching cumulative user analytics', { error: cumulativeError.message })
+            } else if (cumulativeData && cumulativeData.length > 0) {
+              for (const row of cumulativeData) {
+                const userId = row.user_id
+                if (!cumulativeUserAnalytics[userId]) {
+                  cumulativeUserAnalytics[userId] = {
+                    total_views: 0,
+                    total_listing_views: 0,
+                    profile_views: 0,
+                    total_leads: 0,
+                    total_impressions: 0,
+                    impressions_breakdown: {
+                      social_media: 0,
+                      website_visit: 0,
+                      share: 0,
+                      saved_listing: 0
+                    }
+                  }
+                }
+                cumulativeUserAnalytics[userId].total_views += Number(row.total_views) || 0
+                cumulativeUserAnalytics[userId].total_listing_views += Number(row.total_listing_views) || 0
+                cumulativeUserAnalytics[userId].profile_views += Number(row.profile_views) || 0
+                cumulativeUserAnalytics[userId].total_leads += Number(row.total_leads) || 0
+                cumulativeUserAnalytics[userId].total_impressions += Number(row.total_impressions_received) || 0
+                cumulativeUserAnalytics[userId].impressions_breakdown.social_media += Number(row.impression_social_media_received) || 0
+                cumulativeUserAnalytics[userId].impressions_breakdown.website_visit += Number(row.impression_website_visit_received) || 0
+                cumulativeUserAnalytics[userId].impressions_breakdown.share += Number(row.impression_share_received) || 0
+                cumulativeUserAnalytics[userId].impressions_breakdown.saved_listing += Number(row.impression_saved_listing_received) || 0
+              }
+              logSuccess(`Calculated cumulative totals from user_analytics for ${Object.keys(cumulativeUserAnalytics).length} agents`)
+            }
+          } catch (err) {
+            errorTracker.addError('AGENTS', 'Exception calculating cumulative user analytics', { error: err.message, stack: err.stack })
+          }
+        }
+
+        // Fetch unique_leads and anonymous_leads from leads table for agents (similar to developers)
+        const agentLeadsMap = {}
+        const agentAggregateLeadsMap = {}
+        
+        if (agentIdsForCumulative.length > 0) {
+          try {
+            // Profile-specific leads
+            const { data: agentLeadsData, error: agentLeadsError } = await supabaseAdmin
+              .from('leads')
+              .select('lister_id, seeker_id, is_anonymous')
+              .in('lister_id', agentIdsForCumulative)
+              .eq('lister_type', 'agent')
+              .eq('context_type', 'profile')
+            
+            if (!agentLeadsError && agentLeadsData) {
+              for (const lead of agentLeadsData) {
+                if (!agentLeadsMap[lead.lister_id]) {
+                  agentLeadsMap[lead.lister_id] = {
+                    unique_seekers: new Set(),
+                    anonymous_seekers: new Set()
+                  }
+                }
+                if (lead.is_anonymous) {
+                  agentLeadsMap[lead.lister_id].anonymous_seekers.add(lead.seeker_id)
+                } else {
+                  agentLeadsMap[lead.lister_id].unique_seekers.add(lead.seeker_id)
+                }
+              }
+            }
+            
+            // Aggregate leads (all contexts)
+            const { data: agentListings } = await supabaseAdmin
+              .from('listings')
+              .select('id, user_id')
+              .in('user_id', agentIdsForCumulative)
+              .eq('account_type', 'agent')
+            
+            const listingIds = agentListings ? agentListings.map(l => l.id) : []
+            const listingToAgentMap = {}
+            if (agentListings) {
+              for (const listing of agentListings) {
+                listingToAgentMap[listing.id] = listing.user_id
+              }
+            }
+            
+            // Fetch all relevant leads for agents
+            let allAgentLeadsData = []
+            
+            // Profile leads
+            if (agentIdsForCumulative.length > 0) {
+              const { data: profileLeads } = await supabaseAdmin
+                .from('leads')
+                .select('lister_id, lister_type, listing_id, seeker_id, is_anonymous, context_type')
+                .in('lister_id', agentIdsForCumulative)
+                .eq('lister_type', 'agent')
+                .eq('context_type', 'profile')
+              
+              if (profileLeads) allAgentLeadsData.push(...profileLeads)
+            }
+            
+            // Listing leads
+            if (listingIds.length > 0) {
+              const { data: listingLeads } = await supabaseAdmin
+                .from('leads')
+                .select('lister_id, lister_type, listing_id, seeker_id, is_anonymous, context_type')
+                .in('listing_id', listingIds)
+                .eq('context_type', 'listing')
+              
+              if (listingLeads) allAgentLeadsData.push(...listingLeads)
+            }
+            
+            // Process aggregate leads
+            if (allAgentLeadsData.length > 0) {
+              const agentIdsSet = new Set(agentIdsForCumulative)
+              
+              for (const lead of allAgentLeadsData) {
+                const relevantAgentIds = new Set()
+                
+                if (lead.lister_id && lead.lister_type === 'agent' && lead.context_type === 'profile') {
+                  if (agentIdsSet.has(lead.lister_id)) {
+                    relevantAgentIds.add(lead.lister_id)
+                  }
+                }
+                
+                if (lead.context_type === 'listing') {
+                  if (lead.listing_id) {
+                    const ownerAgentId = listingToAgentMap[lead.listing_id]
+                    if (ownerAgentId && agentIdsSet.has(ownerAgentId)) {
+                      relevantAgentIds.add(ownerAgentId)
+                    }
+                  } else if (lead.lister_id && lead.lister_type === 'agent') {
+                    if (agentIdsSet.has(lead.lister_id)) {
+                      relevantAgentIds.add(lead.lister_id)
+                    }
+                  }
+                }
+                
+                for (const agentId of relevantAgentIds) {
+                  if (!agentAggregateLeadsMap[agentId]) {
+                    agentAggregateLeadsMap[agentId] = {
+                      unique_seekers: new Set(),
+                      anonymous_seekers: new Set()
+                    }
+                  }
+                  if (lead.is_anonymous) {
+                    agentAggregateLeadsMap[agentId].anonymous_seekers.add(lead.seeker_id)
+                  } else {
+                    agentAggregateLeadsMap[agentId].unique_seekers.add(lead.seeker_id)
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            errorTracker.addWarning('AGENTS', 'Exception fetching agent leads', { error: err.message })
+          }
+        }
+
+        // Calculate leads breakdown using SQL aggregation (similar to developers)
+        let leadsBreakdownMap = {}
+        try {
+          const { data: leadsBreakdownData, error: breakdownError } = await supabaseAdmin
+            .rpc('get_developer_leads_breakdown', { developer_ids: agentIdsArray })
+
+          if (breakdownError) {
+            errorTracker.addError('AGENTS', 'Error calling get_developer_leads_breakdown for agents', { error: breakdownError.message })
+            for (const agentId of agentIdsArray) {
+              leadsBreakdownMap[agentId] = {
+                phone: { total: 0, percentage: 0 },
+                whatsapp: { total: 0, percentage: 0 },
+                direct_message: { total: 0, percentage: 0 },
+                email: { total: 0, percentage: 0 },
+                appointment: { total: 0, percentage: 0 },
+                website: { total: 0, percentage: 0 },
+                total_leads: 0
+              }
+            }
+          } else if (leadsBreakdownData && leadsBreakdownData.length > 0) {
+            for (const row of leadsBreakdownData) {
+              const whatsappTotal = Number(row.whatsapp_leads) || 0
+              const directMessageTotal = Number(row.direct_message_leads) || 0
+              const messageTotal = whatsappTotal + directMessageTotal
+              const totalLeads = Number(row.total_leads) || 0
+              
+              leadsBreakdownMap[row.user_id] = {
+                phone: { total: Number(row.phone_leads) || 0, percentage: Number(row.phone_percentage) || 0 },
+                messaging: {
+                  total: messageTotal,
+                  percentage: totalLeads > 0 ? Number(((messageTotal / totalLeads) * 100).toFixed(2)) : 0,
+                  direct_message: { total: directMessageTotal, percentage: Number(row.direct_message_percentage) || 0 },
+                  whatsapp: { total: whatsappTotal, percentage: Number(row.whatsapp_percentage) || 0 }
+                },
+                whatsapp: { total: whatsappTotal, percentage: Number(row.whatsapp_percentage) || 0 },
+                direct_message: { total: directMessageTotal, percentage: Number(row.direct_message_percentage) || 0 },
+                email: { total: Number(row.email_leads) || 0, percentage: Number(row.email_percentage) || 0 },
+                appointment: { total: Number(row.appointment_leads) || 0, percentage: Number(row.appointment_percentage) || 0 },
+                website: { total: Number(row.website_leads) || 0, percentage: Number(row.website_percentage) || 0 },
+                total_leads: totalLeads
+              }
+            }
+          }
+        } catch (err) {
+          errorTracker.addError('AGENTS', 'Exception calling get_developer_leads_breakdown', { error: err.message })
+        }
+
+        // Prepare all updates
+        const agentUpdatePromises = []
+        for (const agentId in allAgentTotals) {
+          const hourly = allAgentTotals[agentId]
+          
+          const cumulative = cumulativeUserAnalytics[agentId] || {
+            total_views: 0,
+            total_listing_views: 0,
+            profile_views: 0,
+            total_leads: 0,
+            total_impressions: 0,
+            impressions_breakdown: {
+              social_media: 0,
+              website_visit: 0,
+              share: 0,
+              saved_listing: 0
+            }
+          }
+          
+          const agentLeads = agentLeadsMap[agentId]
+          const uniqueLeads = agentLeads ? agentLeads.unique_seekers.size : 0
+          const anonymousLeads = agentLeads ? agentLeads.anonymous_seekers.size : 0
+          
+          const agentAggregateLeads = agentAggregateLeadsMap[agentId]
+          const totalUniqueLeads = agentAggregateLeads ? agentAggregateLeads.unique_seekers.size : 0
+          const totalAnonymousLeads = agentAggregateLeads ? agentAggregateLeads.anonymous_seekers.size : 0
+          
+          const newTotalViews = cumulative.total_views
+          const newTotalListingViews = cumulative.total_listing_views
+          const newTotalProfileViews = cumulative.profile_views
+          const newTotalLeads = cumulative.total_leads
+          const newTotalImpressions = cumulative.total_impressions
+          
+          const conversion_rate = newTotalViews > 0 
+            ? Number(((newTotalLeads / newTotalViews) * 100).toFixed(2))
+            : 0
+          
+          agentUpdatesData[agentId] = {
+            total_views: newTotalViews,
+            total_listing_views: newTotalListingViews,
+            total_profile_views: newTotalProfileViews,
+            total_leads: newTotalLeads,
+            total_impressions: newTotalImpressions,
+            conversion_rate: conversion_rate,
+            views_change: hourly.views_change || 0,
+            leads_change: hourly.leads_change || 0,
+            impressions_change: hourly.impressions_change || 0
+          }
+          
+          const totalImpressions = cumulative.total_impressions || 0
+          const impressionsBreakdown = {
+            social_media: {
+              total: cumulative.impressions_breakdown.social_media || 0,
+              percentage: totalImpressions > 0 ? Number(((cumulative.impressions_breakdown.social_media || 0) / totalImpressions) * 100).toFixed(2) : 0
+            },
+            website_visit: {
+              total: cumulative.impressions_breakdown.website_visit || 0,
+              percentage: totalImpressions > 0 ? Number(((cumulative.impressions_breakdown.website_visit || 0) / totalImpressions) * 100).toFixed(2) : 0
+            },
+            share: {
+              total: cumulative.impressions_breakdown.share || 0,
+              percentage: totalImpressions > 0 ? Number(((cumulative.impressions_breakdown.share || 0) / totalImpressions) * 100).toFixed(2) : 0
+            },
+            saved_listing: {
+              total: cumulative.impressions_breakdown.saved_listing || 0,
+              percentage: totalImpressions > 0 ? Number(((cumulative.impressions_breakdown.saved_listing || 0) / totalImpressions) * 100).toFixed(2) : 0
+            }
+          }
+
+          const leadsBreakdown = leadsBreakdownMap[agentId] || {
+            phone: { total: 0, percentage: 0 },
+            messaging: { total: 0, percentage: 0, direct_message: { total: 0, percentage: 0 }, whatsapp: { total: 0, percentage: 0 } },
+            whatsapp: { total: 0, percentage: 0 },
+            direct_message: { total: 0, percentage: 0 },
+            email: { total: 0, percentage: 0 },
+            appointment: { total: 0, percentage: 0 },
+            website: { total: 0, percentage: 0 },
+            total_leads: 0
+          }
+          
+          agentUpdatePromises.push(
+            supabaseAdmin
+              .from('agents')
+              .update({
+                total_views: newTotalViews,
+                total_listing_views: newTotalListingViews,
+                total_profile_views: newTotalProfileViews,
+                total_leads: newTotalLeads,
+                total_impressions: newTotalImpressions,
+                conversion_rate: conversion_rate,
+                views_change: hourly.views_change || 0,
+                leads_change: hourly.leads_change || 0,
+                impressions_change: hourly.impressions_change || 0,
+                leads_breakdown: leadsBreakdown,
+                impressions_breakdown: impressionsBreakdown
+              })
+              .eq('agent_id', agentId)
+              .then(({ error }) => {
+                if (error) {
+                  errorTracker.addError('AGENTS', `Error updating agent ${agentId}`, {
+                    agent_id: agentId,
+                    error: error.message,
+                    code: error.code
+                  })
+                } else {
+                  logSuccess(`Updated agent ${agentId.substring(0, 8)}...`)
+                }
+                return { agent_id: agentId, error, totals: agentUpdatesData[agentId] }
+              })
+              .catch(error => {
+                errorTracker.addError('AGENTS', `Exception updating agent ${agentId}`, {
+                  agent_id: agentId,
+                  error: error.message
+                })
+                return { agent_id: agentId, error, totals: agentUpdatesData[agentId] }
+              })
+          )
+        }
+        
+        const updateResults = await Promise.all(agentUpdatePromises)
+        const successCount = updateResults.filter(r => !r.error).length
+        const errorCount = updateResults.filter(r => r.error).length
+        
+        if (errorCount > 0) {
+          errorTracker.addError('AGENTS', `Errors updating ${errorCount} agents`, {
+            totalErrors: errorCount,
+            successCount
+          })
+        }
+        logSuccess(`Updated ${successCount} agents`)
+        
+        insertResults.agents = {
+          updated: successCount,
+          errors: errorCount,
+          details: updateResults
+        }
+      }
+    } catch (err) {
+      errorTracker.addError('AGENTS', 'Exception updating agents', { error: err.message, stack: err.stack })
+    }
+
+    // 12c. Update agencies table with cumulative totals
+    // Agencies aggregates = agency's own metrics + sum of all their agents' metrics
+    let agencyUpdatesData = {}
+    try {
+      // Get unique agency IDs from events
+      const agencyIdsToUpdate = new Set()
+      if (allUserIdsSet.size > 0) {
+        const { data: agenciesData } = await supabaseAdmin
+          .from('agencies')
+          .select('agency_id')
+          .in('agency_id', Array.from(allUserIdsSet))
+        
+        if (agenciesData) {
+          for (const agency of agenciesData) {
+            agencyIdsToUpdate.add(agency.agency_id)
+          }
+        }
+      }
+
+      if (agencyIdsToUpdate.size === 0) {
+        insertResults.agencies = {
+          updated: 0,
+          errors: 0,
+          details: [],
+          message: 'No agencies found in events to update'
+        }
+      } else {
+        const agencyIdsArray = Array.from(agencyIdsToUpdate)
+        
+        // Get all agents for these agencies
+        const { data: allAgentsForAgencies } = await supabaseAdmin
+          .from('agents')
+          .select('agent_id, agency_id')
+          .in('agency_id', agencyIdsArray)
+        
+        // Group agents by agency_id
+        const agentsByAgency = {}
+        if (allAgentsForAgencies) {
+          for (const agent of allAgentsForAgencies) {
+            if (!agentsByAgency[agent.agency_id]) {
+              agentsByAgency[agent.agency_id] = []
+            }
+            agentsByAgency[agent.agency_id].push(agent.agent_id)
+          }
+        }
+
+        // Calculate agency's own metrics from user_analytics
+        const agencyIdsForCumulative = Object.keys(allAgencyTotals)
+        let cumulativeAgencyAnalytics = {}
+        
+        if (agencyIdsForCumulative.length > 0) {
+          try {
+            const { data: cumulativeData, error: cumulativeError } = await supabaseAdmin
+              .from('user_analytics')
+              .select('user_id, total_views, total_listing_views, profile_views, total_leads, total_impressions_received, impression_social_media_received, impression_website_visit_received, impression_share_received, impression_saved_listing_received')
+              .in('user_id', agencyIdsForCumulative)
+              .eq('user_type', 'agency')
+            
+            if (cumulativeError) {
+              errorTracker.addError('AGENCIES', 'Error fetching cumulative user analytics', { error: cumulativeError.message })
+            } else if (cumulativeData && cumulativeData.length > 0) {
+              for (const row of cumulativeData) {
+                const userId = row.user_id
+                if (!cumulativeAgencyAnalytics[userId]) {
+                  cumulativeAgencyAnalytics[userId] = {
+                    total_views: 0,
+                    total_listing_views: 0,
+                    profile_views: 0,
+                    total_leads: 0,
+                    total_impressions: 0,
+                    impressions_breakdown: {
+                      social_media: 0,
+                      website_visit: 0,
+                      share: 0,
+                      saved_listing: 0
+                    }
+                  }
+                }
+                cumulativeAgencyAnalytics[userId].total_views += Number(row.total_views) || 0
+                cumulativeAgencyAnalytics[userId].total_listing_views += Number(row.total_listing_views) || 0
+                cumulativeAgencyAnalytics[userId].profile_views += Number(row.profile_views) || 0
+                cumulativeAgencyAnalytics[userId].total_leads += Number(row.total_leads) || 0
+                cumulativeAgencyAnalytics[userId].total_impressions += Number(row.total_impressions_received) || 0
+                cumulativeAgencyAnalytics[userId].impressions_breakdown.social_media += Number(row.impression_social_media_received) || 0
+                cumulativeAgencyAnalytics[userId].impressions_breakdown.website_visit += Number(row.impression_website_visit_received) || 0
+                cumulativeAgencyAnalytics[userId].impressions_breakdown.share += Number(row.impression_share_received) || 0
+                cumulativeAgencyAnalytics[userId].impressions_breakdown.saved_listing += Number(row.impression_saved_listing_received) || 0
+              }
+            }
+          } catch (err) {
+            errorTracker.addError('AGENCIES', 'Exception calculating cumulative user analytics', { error: err.message })
+          }
+        }
+
+        // Sum all agents' metrics for each agency
+        const agentsMetricsByAgency = {}
+        for (const agencyId of agencyIdsArray) {
+          const agentIds = agentsByAgency[agencyId] || []
+          if (agentIds.length > 0) {
+            // Get cumulative totals from agents table
+            const { data: agentsData } = await supabaseAdmin
+              .from('agents')
+              .select('total_leads, total_appointments, total_impressions, total_saved, total_revenue, total_sales, total_listing_views, total_profile_views, total_views')
+              .in('agent_id', agentIds)
+            
+            if (agentsData) {
+              agentsMetricsByAgency[agencyId] = {
+                agents_total_leads: agentsData.reduce((sum, a) => sum + (Number(a.total_leads) || 0), 0),
+                agents_total_appointments: agentsData.reduce((sum, a) => sum + (Number(a.total_appointments) || 0), 0),
+                agents_total_impressions: agentsData.reduce((sum, a) => sum + (Number(a.total_impressions) || 0), 0),
+                agents_total_saved: agentsData.reduce((sum, a) => sum + (Number(a.total_saved) || 0), 0),
+                agents_total_revenue: agentsData.reduce((sum, a) => sum + (Number(a.total_revenue) || 0), 0),
+                agents_total_sales: agentsData.reduce((sum, a) => sum + (Number(a.total_sales) || 0), 0),
+                agents_total_listing_views: agentsData.reduce((sum, a) => sum + (Number(a.total_listing_views) || 0), 0),
+                agents_total_profile_views: agentsData.reduce((sum, a) => sum + (Number(a.total_profile_views) || 0), 0),
+                agents_total_views: agentsData.reduce((sum, a) => sum + (Number(a.total_views) || 0), 0)
+              }
+            }
+          }
+        }
+
+        // Fetch agency's own profile leads
+        const agencyLeadsMap = {}
+        if (agencyIdsForCumulative.length > 0) {
+          try {
+            const { data: agencyLeadsData } = await supabaseAdmin
+              .from('leads')
+              .select('lister_id, seeker_id, is_anonymous')
+              .in('lister_id', agencyIdsForCumulative)
+              .eq('lister_type', 'agency')
+              .eq('context_type', 'profile')
+            
+            if (agencyLeadsData) {
+              for (const lead of agencyLeadsData) {
+                if (!agencyLeadsMap[lead.lister_id]) {
+                  agencyLeadsMap[lead.lister_id] = {
+                    unique_seekers: new Set(),
+                    anonymous_seekers: new Set()
+                  }
+                }
+                if (lead.is_anonymous) {
+                  agencyLeadsMap[lead.lister_id].anonymous_seekers.add(lead.seeker_id)
+                } else {
+                  agencyLeadsMap[lead.lister_id].unique_seekers.add(lead.seeker_id)
+                }
+              }
+            }
+          } catch (err) {
+            errorTracker.addWarning('AGENCIES', 'Exception fetching agency leads', { error: err.message })
+          }
+        }
+
+        // Prepare all updates
+        const agencyUpdatePromises = []
+        for (const agencyId of agencyIdsArray) {
+          const hourly = allAgencyTotals[agencyId] || {}
+          const agencyOwn = cumulativeAgencyAnalytics[agencyId] || {
+            total_views: 0,
+            total_listing_views: 0,
+            profile_views: 0,
+            total_leads: 0,
+            total_impressions: 0,
+            impressions_breakdown: { social_media: 0, website_visit: 0, share: 0, saved_listing: 0 }
+          }
+          
+          const agentsMetrics = agentsMetricsByAgency[agencyId] || {
+            agents_total_leads: 0,
+            agents_total_appointments: 0,
+            agents_total_impressions: 0,
+            agents_total_saved: 0,
+            agents_total_revenue: 0,
+            agents_total_sales: 0,
+            agents_total_listing_views: 0,
+            agents_total_profile_views: 0,
+            agents_total_views: 0
+          }
+          
+          // Agency's own metrics (from profile)
+          const agencyProfileLeads = agencyLeadsMap[agencyId]
+          const agencyProfileLeadsCount = agencyProfileLeads ? agencyProfileLeads.unique_seekers.size + agencyProfileLeads.anonymous_seekers.size : 0
+          
+          // Combined totals = agency's own + agents' totals
+          const totalViews = agencyOwn.total_views + agentsMetrics.agents_total_views
+          const totalListingViews = agencyOwn.total_listing_views + agentsMetrics.agents_total_listing_views
+          const totalProfileViews = agencyOwn.profile_views + agentsMetrics.agents_total_profile_views
+          const totalLeads = agencyOwn.total_leads + agentsMetrics.agents_total_leads
+          const totalImpressions = agencyOwn.total_impressions + agentsMetrics.agents_total_impressions
+          const totalAppointments = (agencyOwn.total_leads || 0) + agentsMetrics.agents_total_appointments // Approximate from leads
+          const totalSaved = agentsMetrics.agents_total_saved // Agency doesn't have saved, only agents
+          const totalRevenue = agentsMetrics.agents_total_revenue
+          const totalSales = agentsMetrics.agents_total_sales
+          
+          const conversion_rate = totalViews > 0 
+            ? Number(((totalLeads / totalViews) * 100).toFixed(2))
+            : 0
+          
+          const leads_to_sales_rate = totalLeads > 0
+            ? Number(((totalSales / totalLeads) * 100).toFixed(2))
+            : 0
+          
+          agencyUpdatesData[agencyId] = {
+            total_views: totalViews,
+            total_listings_views: totalListingViews,
+            total_profile_views: totalProfileViews,
+            total_leads: totalLeads,
+            total_impressions: totalImpressions,
+            total_appointments: totalAppointments,
+            total_saved: totalSaved,
+            total_revenue: totalRevenue,
+            total_sales: totalSales,
+            conversion_rate: conversion_rate,
+            leads_to_sales_rate: leads_to_sales_rate,
+            views_change: hourly.views_change || 0,
+            leads_change: hourly.leads_change || 0,
+            impressions_change: hourly.impressions_change || 0,
+            revenue_change: 0, // Calculate if needed
+            agency_profile_leads: agencyProfileLeadsCount,
+            agency_appointments: agencyOwn.total_leads || 0, // Approximate
+            agency_impressions: agencyOwn.total_impressions,
+            agency_saved: 0, // Agency doesn't have saved
+            agents_total_leads: agentsMetrics.agents_total_leads,
+            agents_total_appointments: agentsMetrics.agents_total_appointments,
+            agents_total_impressions: agentsMetrics.agents_total_impressions,
+            agents_total_saved: agentsMetrics.agents_total_saved,
+            agents_total_revenue: agentsMetrics.agents_total_revenue,
+            agents_total_sales: agentsMetrics.agents_total_sales
+          }
+          
+          // Calculate impressions breakdown (combine agency + agents)
+          const totalImpressionsForBreakdown = totalImpressions || 0
+          const impressionsBreakdown = {
+            social_media: {
+              total: agencyOwn.impressions_breakdown.social_media || 0, // Agency's own
+              percentage: totalImpressionsForBreakdown > 0 ? Number(((agencyOwn.impressions_breakdown.social_media || 0) / totalImpressionsForBreakdown) * 100).toFixed(2) : 0
+            },
+            website_visit: {
+              total: agencyOwn.impressions_breakdown.website_visit || 0,
+              percentage: totalImpressionsForBreakdown > 0 ? Number(((agencyOwn.impressions_breakdown.website_visit || 0) / totalImpressionsForBreakdown) * 100).toFixed(2) : 0
+            },
+            share: {
+              total: agencyOwn.impressions_breakdown.share || 0,
+              percentage: totalImpressionsForBreakdown > 0 ? Number(((agencyOwn.impressions_breakdown.share || 0) / totalImpressionsForBreakdown) * 100).toFixed(2) : 0
+            },
+            saved_listing: {
+              total: agencyOwn.impressions_breakdown.saved_listing || 0,
+              percentage: totalImpressionsForBreakdown > 0 ? Number(((agencyOwn.impressions_breakdown.saved_listing || 0) / totalImpressionsForBreakdown) * 100).toFixed(2) : 0
+            }
+          }
+          
+          agencyUpdatePromises.push(
+            supabaseAdmin
+              .from('agencies')
+              .update({
+                total_views: totalViews,
+                total_listings_views: totalListingViews,
+                total_profile_views: totalProfileViews,
+                total_leads: totalLeads,
+                total_impressions: totalImpressions,
+                total_appointments: totalAppointments,
+                total_saved: totalSaved,
+                total_revenue: totalRevenue,
+                total_sales: totalSales,
+                conversion_rate: conversion_rate,
+                leads_to_sales_rate: leads_to_sales_rate,
+                views_change: hourly.views_change || 0,
+                leads_change: hourly.leads_change || 0,
+                impressions_change: hourly.impressions_change || 0,
+                revenue_change: 0,
+                agency_profile_leads: agencyProfileLeadsCount,
+                agency_appointments: agencyOwn.total_leads || 0,
+                agency_impressions: agencyOwn.total_impressions,
+                agency_saved: 0,
+                agents_total_leads: agentsMetrics.agents_total_leads,
+                agents_total_appointments: agentsMetrics.agents_total_appointments,
+                agents_total_impressions: agentsMetrics.agents_total_impressions,
+                agents_total_saved: agentsMetrics.agents_total_saved,
+                agents_total_revenue: agentsMetrics.agents_total_revenue,
+                agents_total_sales: agentsMetrics.agents_total_sales,
+                impressions_breakdown: impressionsBreakdown
+              })
+              .eq('agency_id', agencyId)
+              .then(({ error }) => {
+                if (error) {
+                  errorTracker.addError('AGENCIES', `Error updating agency ${agencyId}`, {
+                    agency_id: agencyId,
+                    error: error.message,
+                    code: error.code
+                  })
+                } else {
+                  logSuccess(`Updated agency ${agencyId.substring(0, 8)}...`)
+                }
+                return { agency_id: agencyId, error, totals: agencyUpdatesData[agencyId] }
+              })
+              .catch(error => {
+                errorTracker.addError('AGENCIES', `Exception updating agency ${agencyId}`, {
+                  agency_id: agencyId,
+                  error: error.message
+                })
+                return { agency_id: agencyId, error, totals: agencyUpdatesData[agencyId] }
+              })
+          )
+        }
+        
+        const updateResults = await Promise.all(agencyUpdatePromises)
+        const successCount = updateResults.filter(r => !r.error).length
+        const errorCount = updateResults.filter(r => r.error).length
+        
+        if (errorCount > 0) {
+          errorTracker.addError('AGENCIES', `Errors updating ${errorCount} agencies`, {
+            totalErrors: errorCount,
+            successCount
+          })
+        }
+        logSuccess(`Updated ${successCount} agencies`)
+        
+        insertResults.agencies = {
+          updated: successCount,
+          errors: errorCount,
+          details: updateResults
+        }
+      }
+    } catch (err) {
+      errorTracker.addError('AGENCIES', 'Exception updating agencies', { error: err.message, stack: err.stack })
+    }
+
     // 13. Update admin_analytics table with platform-wide aggregations
     // Updating admin_analytics
     let adminAnalyticsData = null // Declare outside try block
@@ -5500,6 +6282,8 @@ export async function POST(request) {
         leads: serializeLeadRows,
         listing_updates: listingUpdatesData,
         developer_updates: developerUpdatesData,
+        agent_updates: agentUpdatesData,
+        agency_updates: agencyUpdatesData,
         admin_analytics: adminAnalyticsData || null
       },
       // Include all errors and warnings for tracking

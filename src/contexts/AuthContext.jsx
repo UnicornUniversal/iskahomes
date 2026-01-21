@@ -225,7 +225,96 @@ export const AuthProvider = ({ children }) => {
         // Verify developer token
         const decoded = verifyToken(developerTokenValue);
         
-        if (decoded && decoded.developer_id) {
+        console.log('🔐 AUTH CONTEXT: Decoded token:', {
+          hasDecoded: !!decoded,
+          user_type: decoded?.user_type,
+          hasDeveloperId: !!decoded?.developer_id,
+          hasTeamMemberId: !!decoded?.team_member_id,
+          organization_type: decoded?.organization_type
+        });
+        
+        // Check if this is a team member token first (BEFORE checking developer_id)
+        if (decoded && decoded.user_type === 'team_member' && decoded.team_member_id) {
+          console.log('🔐 AUTH CONTEXT: Loading team member from developer_token');
+          setDeveloperToken(developerTokenValue);
+          
+          // Load team member from organization_team_members
+          const { data: teamMember, error: teamError } = await supabase
+            .from('organization_team_members')
+            .select(`
+              *,
+              role:organization_roles(id, name, description, is_system_role)
+            `)
+            .eq('id', decoded.team_member_id)
+            .eq('status', 'active')
+            .maybeSingle();
+          
+          if (teamError) {
+            console.error('🔐 AUTH CONTEXT: Error loading team member:', teamError);
+            // Don't clear token on database error, might be temporary
+            setLoading(false);
+            return;
+          }
+          
+          if (!teamMember) {
+            console.error('🔐 AUTH CONTEXT: Team member not found in database');
+            localStorage.removeItem('developer_token');
+            setDeveloperToken('');
+            setUser(null);
+            if (typeof window !== 'undefined') {
+              handleAuthFailure('/home/signin');
+            }
+            return;
+          }
+          
+          // Get organization details and developer_id
+          let organizationSlug = null;
+          let organizationName = null;
+          let developerId = null;
+          
+          if (teamMember.organization_type === 'developer') {
+            const { data: devOrg } = await supabase
+              .from('developers')
+              .select('slug, name, developer_id')
+              .eq('id', teamMember.organization_id)
+              .single();
+            organizationSlug = devOrg?.slug;
+            organizationName = devOrg?.name;
+            developerId = devOrg?.developer_id; // Add developer_id for easy access
+          } else if (teamMember.organization_type === 'agency') {
+            const { data: agencyOrg } = await supabase
+              .from('agencies')
+              .select('slug, name, agency_id')
+              .eq('agency_id', teamMember.organization_id)
+              .single();
+            organizationSlug = agencyOrg?.slug;
+            organizationName = agencyOrg?.name;
+          }
+          
+          const userData = {
+            id: decoded.user_id,
+            email: teamMember.email,
+            user_type: 'team_member',
+            profile: {
+              id: teamMember.id,
+              team_member_id: teamMember.id,
+              organization_type: teamMember.organization_type,
+              organization_id: teamMember.organization_id,
+              organization_slug: organizationSlug,
+              organization_name: organizationName,
+              developer_id: developerId, // Add developer_id so components can use it directly
+              role_id: teamMember.role_id,
+              role_name: teamMember.role?.name,
+              permissions: teamMember.permissions,
+              email: teamMember.email,
+              first_name: teamMember.first_name,
+              last_name: teamMember.last_name
+            }
+          };
+          setUser(userData);
+          console.log('🔐 AUTH CONTEXT: Team member loaded successfully from developer_token');
+          return;
+        } else if (decoded && decoded.developer_id) {
           setDeveloperToken(developerTokenValue);
           
           const developerId = decoded.developer_id;
@@ -248,8 +337,34 @@ export const AuthProvider = ({ children }) => {
             }
             return;
           } else if (userData) {
+            // CRITICAL: Check if developer is in organization_team_members (for permissions)
+            // Even owners need to be in organization_team_members to have permissions loaded
+            const { data: teamMember, error: teamError } = await supabase
+              .from('organization_team_members')
+              .select(`
+                *,
+                role:organization_roles(id, name, description, is_system_role)
+              `)
+              .eq('organization_type', 'developer')
+              .eq('organization_id', userData.id)
+              .eq('user_id', developerId)
+              .eq('status', 'active')
+              .maybeSingle()
+            
             // Enrich stats with category names
             const enrichedProfile = await enrichDeveloperStats(userData);
+            
+            // Add permissions from organization_team_members if found
+            if (teamMember && teamMember.permissions) {
+              enrichedProfile.permissions = teamMember.permissions
+              enrichedProfile.role_id = teamMember.role_id
+              enrichedProfile.role_name = teamMember.role?.name
+              enrichedProfile.team_member_id = teamMember.id
+            } else {
+              // Legacy user or not set up - set all permissions to true (Super Admin)
+              console.warn('Developer not found in organization_team_members, using full permissions')
+              enrichedProfile.permissions = null // null means all permissions (Super Admin)
+            }
             
             // Fetch subscription data
             const subscription = await fetchUserSubscription(developerId, 'developer');
@@ -258,7 +373,7 @@ export const AuthProvider = ({ children }) => {
               id: userData.developer_id,
               email: userData.email,
               user_type: 'developer',
-              profile: enrichedProfile, // Store enriched developer profile
+              profile: enrichedProfile, // Store enriched developer profile with permissions
               subscription: subscription || null // Add subscription data
             });
           } else {
@@ -293,7 +408,95 @@ export const AuthProvider = ({ children }) => {
         // Verify agency token
         const decoded = verifyToken(agencyTokenValue);
         
-        if (decoded && decoded.agency_id) {
+        console.log('🔐 AUTH CONTEXT: Decoded agency token:', {
+          hasDecoded: !!decoded,
+          user_type: decoded?.user_type,
+          hasAgencyId: !!decoded?.agency_id,
+          hasTeamMemberId: !!decoded?.team_member_id,
+          organization_type: decoded?.organization_type
+        });
+        
+        // Check if this is a team member token first
+        if (decoded && decoded.user_type === 'team_member' && decoded.team_member_id) {
+          console.log('🔐 AUTH CONTEXT: Loading team member from agency token');
+          setAgencyToken(agencyTokenValue);
+          
+          // Load team member from organization_team_members
+          const { data: teamMember, error: teamError } = await supabase
+            .from('organization_team_members')
+            .select(`
+              *,
+              role:organization_roles(id, name, description, is_system_role)
+            `)
+            .eq('id', decoded.team_member_id)
+            .eq('status', 'active')
+            .maybeSingle();
+          
+          if (teamError) {
+            console.error('🔐 AUTH CONTEXT: Error loading team member:', teamError);
+            // Don't clear token on database error, might be temporary
+            setLoading(false);
+            return;
+          }
+          
+          if (!teamMember) {
+            console.error('🔐 AUTH CONTEXT: Team member not found in database');
+            localStorage.removeItem('agency_token');
+            setAgencyToken('');
+            setUser(null);
+            if (typeof window !== 'undefined') {
+              handleAuthFailure('/home/signin');
+            }
+            return;
+          }
+          
+          // Get organization details and developer_id
+          let organizationSlug = null;
+          let organizationName = null;
+          let developerId = null;
+          
+          if (teamMember.organization_type === 'developer') {
+            const { data: devOrg } = await supabase
+              .from('developers')
+              .select('slug, name, developer_id')
+              .eq('id', teamMember.organization_id)
+              .single();
+            organizationSlug = devOrg?.slug;
+            organizationName = devOrg?.name;
+            developerId = devOrg?.developer_id; // Add developer_id for easy access
+          } else if (teamMember.organization_type === 'agency') {
+            const { data: agencyOrg } = await supabase
+              .from('agencies')
+              .select('slug, name, agency_id')
+              .eq('agency_id', teamMember.organization_id)
+              .single();
+            organizationSlug = agencyOrg?.slug;
+            organizationName = agencyOrg?.name;
+          }
+          
+          setUser({
+            id: decoded.user_id,
+            email: teamMember.email,
+            user_type: 'team_member',
+            profile: {
+              id: teamMember.id,
+              team_member_id: teamMember.id,
+              organization_type: teamMember.organization_type,
+              organization_id: teamMember.organization_id,
+              organization_slug: organizationSlug,
+              organization_name: organizationName,
+              developer_id: developerId, // Add developer_id so components can use it directly
+              role_id: teamMember.role_id,
+              role_name: teamMember.role?.name,
+              permissions: teamMember.permissions,
+              email: teamMember.email,
+              first_name: teamMember.first_name,
+              last_name: teamMember.last_name
+            }
+          });
+          console.log('🔐 AUTH CONTEXT: Team member loaded successfully from agency_token');
+          return;
+        } else if (decoded && decoded.agency_id) {
           setAgencyToken(agencyTokenValue);
           
           const agencyId = decoded.agency_id;
@@ -316,6 +519,32 @@ export const AuthProvider = ({ children }) => {
             }
             return;
           } else if (userData) {
+            // CRITICAL: Check if agency is in organization_team_members (for permissions)
+            // Even owners need to be in organization_team_members to have permissions loaded
+            const { data: teamMember, error: teamError } = await supabase
+              .from('organization_team_members')
+              .select(`
+                *,
+                role:organization_roles(id, name, description, is_system_role)
+              `)
+              .eq('organization_type', 'agency')
+              .eq('organization_id', userData.id)
+              .eq('user_id', agencyId)
+              .eq('status', 'active')
+              .maybeSingle()
+            
+            // Add permissions from organization_team_members if found
+            if (teamMember && teamMember.permissions) {
+              userData.permissions = teamMember.permissions
+              userData.role_id = teamMember.role_id
+              userData.role_name = teamMember.role?.name
+              userData.team_member_id = teamMember.id
+            } else {
+              // Legacy user or not set up - set all permissions to true (Super Admin)
+              console.warn('Agency not found in organization_team_members, using full permissions')
+              userData.permissions = null // null means all permissions (Super Admin)
+            }
+            
             // Fetch subscription data
             const subscription = await fetchUserSubscription(agencyId, 'agency');
             
@@ -559,25 +788,62 @@ export const AuthProvider = ({ children }) => {
 
   // Load user from token on mount
   useEffect(() => {
+    console.log('🔐 AUTH CONTEXT: useEffect triggered, checking for tokens...');
     
     // Check if there's a token in localStorage first
-    const token = localStorage.getItem('developer_token');
+    const devToken = localStorage.getItem('developer_token');
+    const agencyToken = localStorage.getItem('agency_token');
+    const agentToken = localStorage.getItem('agent_token');
+    const seekerToken = localStorage.getItem('property_seeker_token');
+    
+    console.log('🔐 AUTH CONTEXT: Tokens found:', {
+      developer: !!devToken,
+      agency: !!agencyToken,
+      agent: !!agentToken,
+      seeker: !!seekerToken
+    });
     
     loadUser();
   }, []);
 
-  const login = async (email, password, userType = null) => {
+  const login = async (email, password, organizationId = null) => {
     try {
       const response = await fetch('/api/auth/signin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password, user_type: userType }),
+        body: JSON.stringify({ email, password, organization_id: organizationId }),
       });
 
       if (response.ok) {
         const data = await response.json();
+        
+        // Handle multiple organizations case
+        if (data.multipleOrganizations && data.organizations) {
+          return { 
+            success: true, 
+            multipleOrganizations: true, 
+            organizations: data.organizations,
+            message: data.message 
+          };
+        }
+        
+        console.log('🔐 AUTH CONTEXT: Login response:', {
+          hasUser: !!data.user,
+          hasToken: !!data.token,
+          userType: data.user?.user_type,
+          tokenLength: data.token?.length,
+          tokenPreview: data.token ? data.token.substring(0, 20) + '...' : 'null'
+        });
+        
+        if (!data.token) {
+          console.error('🔐 AUTH CONTEXT: No token in response!');
+          return { 
+            success: false, 
+            error: 'No authentication token received. Please try again.' 
+          };
+        }
         
         if (data.user && data.token) {
           // Clear any old tokens first
@@ -592,7 +858,72 @@ export const AuthProvider = ({ children }) => {
           clearAnonymousId();
           
           // Handle different user types
-          if (data.user.user_type === 'developer') {
+          if (data.user.user_type === 'team_member') {
+            // Team members use the same token as their organization
+            const orgType = data.user.profile?.organization_type
+            console.log('🔐 AUTH CONTEXT: Team member login, orgType:', orgType);
+            
+            // CRITICAL: Save token FIRST, synchronously, before anything else
+            if (orgType === 'developer') {
+              console.log('🔐 AUTH CONTEXT: Saving developer_token for team member');
+              localStorage.setItem('developer_token', data.token);
+              // CRITICAL: Set state immediately and synchronously
+              setDeveloperToken(data.token);
+              // Verify it was saved
+              const savedToken = localStorage.getItem('developer_token');
+              console.log('🔐 AUTH CONTEXT: Token saved verification:', savedToken ? 'YES' : 'NO', savedToken?.substring(0, 20));
+            } else if (orgType === 'agency') {
+              console.log('🔐 AUTH CONTEXT: Saving agency_token for team member');
+              localStorage.setItem('agency_token', data.token);
+              // CRITICAL: Set state immediately and synchronously
+              setAgencyToken(data.token);
+              // Verify it was saved
+              const savedToken = localStorage.getItem('agency_token');
+              console.log('🔐 AUTH CONTEXT: Token saved verification:', savedToken ? 'YES' : 'NO', savedToken?.substring(0, 20));
+            } else {
+              console.error('🔐 AUTH CONTEXT: Unknown organization type for team member:', orgType);
+              return { success: false, error: 'Unknown organization type' };
+            }
+            
+            // Team members don't have subscriptions (organization has it)
+            // Enrich profile with developer_id if it's a developer organization
+            let enrichedUser = { ...data.user };
+            if (enrichedUser.profile?.organization_type === 'developer' && !enrichedUser.profile?.developer_id) {
+              const { data: devOrg } = await supabase
+                .from('developers')
+                .select('developer_id')
+                .eq('id', enrichedUser.profile.organization_id)
+                .single();
+              if (devOrg?.developer_id) {
+                enrichedUser.profile.developer_id = devOrg.developer_id;
+              }
+            }
+            
+            console.log('🔐 AUTH CONTEXT: Setting user data:', enrichedUser);
+            // CRITICAL: Set user state immediately
+            setUser(enrichedUser);
+            
+            // Force a small delay to ensure state updates propagate
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Track login with PostHog
+            posthog.identify(data.user.id, {
+              email: data.user.email,
+              user_type: 'team_member',
+              organization_type: data.user.profile?.organization_type,
+              organization_id: data.user.profile?.organization_id,
+              role_name: data.user.profile?.role_name
+            });
+            
+            posthog.capture('user_logged_in', {
+              user_type: 'team_member',
+              organization_type: data.user.profile?.organization_type,
+              login_method: 'email'
+            });
+            
+            console.log('🔐 AUTH CONTEXT: Team member login successful, token persisted');
+            return { success: true, user: data.user };
+          } else if (data.user.user_type === 'developer') {
             // Store developer token
             localStorage.setItem('developer_token', data.token);
             setDeveloperToken(data.token);

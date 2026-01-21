@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { userHasPermission } from '@/lib/permissionHelpers'
 import { toast } from 'react-toastify'
 import { FiMail, FiPhone, FiUser, FiEdit, FiTrash2, FiClock, FiCheckCircle, FiXCircle } from 'react-icons/fi'
 import EditMemberModal from './EditMemberModal'
@@ -42,6 +43,13 @@ const TeamMembersList = ({ onRefresh }) => {
   }
 
   const handleRemove = async (memberId) => {
+    // Prevent removing Super Admin team member
+    const memberToRemove = members.find(m => m.id === memberId)
+    if (memberToRemove?.role?.name === 'Super Admin') {
+      toast.error('Super Admin team member cannot be removed')
+      return
+    }
+
     if (!confirm('Are you sure you want to remove this team member?')) {
       return
     }
@@ -63,7 +71,6 @@ const TeamMembersList = ({ onRefresh }) => {
       fetchMembers()
       if (onRefresh) onRefresh()
     } catch (error) {
-      console.error('Error removing member:', error)
       toast.error(error.message || 'Failed to remove team member')
     }
   }
@@ -97,19 +104,19 @@ const TeamMembersList = ({ onRefresh }) => {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className="secondary_bg rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Member</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Role</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Joined</th>
-              <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-primary_color uppercase tracking-wider">Member</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-primary_color uppercase tracking-wider">Role</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-primary_color uppercase tracking-wider">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-primary_color uppercase tracking-wider">Joined</th>
+              <th className="px-6 py-3 text-right text-xs font-semibold text-primary_color uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="secondary_bg divide-y divide-gray-200">
             {members.length === 0 ? (
               <tr>
                 <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
@@ -163,17 +170,19 @@ const TeamMembersList = ({ onRefresh }) => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => {
-                          setSelectedMember(member)
-                          setShowEditModal(true)
-                        }}
-                        className="text-primary_color hover:text-primary_color/80 transition-colors"
-                        title="Edit"
-                      >
-                        <FiEdit className="w-5 h-5" />
-                      </button>
-                      {member.status !== 'deleted' && (
+                      {!(member.role?.name === 'Super Admin') && (user?.user_type === 'agent' || userHasPermission(user, 'team.edit')) && (
+                        <button
+                          onClick={() => {
+                            setSelectedMember(member)
+                            setShowEditModal(true)
+                          }}
+                          className="text-primary_color hover:text-primary_color/80 transition-colors"
+                          title="Edit"
+                        >
+                          <FiEdit className="w-5 h-5" />
+                        </button>
+                      )}
+                      {member.status !== 'deleted' && !(member.role?.name === 'Super Admin') && (user?.user_type === 'agent' || userHasPermission(user, 'team.remove')) && (
                         <button
                           onClick={() => handleRemove(member.id)}
                           className="text-red-600 hover:text-red-800 transition-colors"
@@ -192,7 +201,7 @@ const TeamMembersList = ({ onRefresh }) => {
       </div>
 
       {/* Edit Modal */}
-      {showEditModal && selectedMember && (
+      {showEditModal && selectedMember && !(selectedMember.role?.name === 'Super Admin') && (
         <EditMemberModal
           isOpen={showEditModal}
           onClose={() => {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { verifyToken } from '@/lib/jwt'
+import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 
 // GET - Fetch a specific team member
 export async function GET(request, { params }) {
@@ -8,28 +8,16 @@ export async function GET(request, { params }) {
     const resolvedParams = params instanceof Promise ? await params : params
     const { id } = resolvedParams
 
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authorization header missing' }, { status: 401 })
-    }
-
-    const token = authHeader.split(' ')[1]
-    const decoded = verifyToken(token)
+    // Authenticate request (handles both developers and team members)
+    const { userInfo, error: authError, status } = await authenticateRequest(request)
     
-    if (!decoded || decoded.user_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid token or user type' }, { status: 401 })
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status })
     }
 
-    // Get developer info
-    const { data: developer } = await supabaseAdmin
-      .from('developers')
-      .select('id')
-      .eq('developer_id', decoded.user_id)
-      .single()
-
-    if (!developer) {
-      return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
+    // Must be developer organization
+    if (userInfo.organization_type !== 'developer') {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
     }
 
     // Fetch the team member with role info
@@ -41,7 +29,7 @@ export async function GET(request, { params }) {
       `)
       .eq('id', id)
       .eq('organization_type', 'developer')
-      .eq('organization_id', developer.id)
+      .eq('organization_id', userInfo.organization_id)
       .single()
 
     if (error || !member) {
@@ -71,28 +59,16 @@ export async function PUT(request, { params }) {
     const resolvedParams = params instanceof Promise ? await params : params
     const { id } = resolvedParams
 
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authorization header missing' }, { status: 401 })
-    }
-
-    const token = authHeader.split(' ')[1]
-    const decoded = verifyToken(token)
+    // Authenticate request (handles both developers and team members)
+    const { userInfo, error: authError, status } = await authenticateRequest(request)
     
-    if (!decoded || decoded.user_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid token or user type' }, { status: 401 })
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status })
     }
 
-    // Get developer info
-    const { data: developer } = await supabaseAdmin
-      .from('developers')
-      .select('id')
-      .eq('developer_id', decoded.user_id)
-      .single()
-
-    if (!developer) {
-      return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
+    // Must be developer organization
+    if (userInfo.organization_type !== 'developer') {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
     }
 
     // Check if team member exists
@@ -101,41 +77,32 @@ export async function PUT(request, { params }) {
       .select('*')
       .eq('id', id)
       .eq('organization_type', 'developer')
-      .eq('organization_id', developer.id)
+      .eq('organization_id', userInfo.organization_id)
       .single()
 
     if (!existingMember) {
       return NextResponse.json({ error: 'Team member not found' }, { status: 404 })
     }
 
-    // Check permissions
-    const { data: currentUser } = await supabaseAdmin
-      .from('organization_team_members')
-      .select('role_id, permissions')
-      .eq('organization_type', 'developer')
-      .eq('organization_id', developer.id)
-      .eq('user_id', decoded.user_id)
-      .eq('status', 'active')
-      .single()
-
-    if (!currentUser) {
-      return NextResponse.json({ error: 'Team member not found' }, { status: 403 })
-    }
-
+    // Check permissions - use userInfo which already has role_id and permissions
     const { data: userRole } = await supabaseAdmin
       .from('organization_roles')
       .select('name')
-      .eq('id', currentUser.role_id)
+      .eq('id', userInfo.role_id)
       .single()
 
-    const permissions = currentUser.permissions || {}
-    const canEdit = permissions.team?.edit || userRole?.name === 'Owner' || userRole?.name === 'Admin'
+    if (!userRole) {
+      return NextResponse.json({ error: 'User role not found' }, { status: 403 })
+    }
+
+    const permissions = userInfo.permissions || {}
+    const canEdit = permissions.team?.edit || userRole.name === 'Super Admin' || userRole.name === 'Admin'
 
     if (!canEdit) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    // Prevent editing Owner role (unless current user is Owner)
+    // Prevent editing Super Admin role (unless current user is Super Admin)
     if (existingMember.role_id) {
       const { data: memberRole } = await supabaseAdmin
         .from('organization_roles')
@@ -143,13 +110,39 @@ export async function PUT(request, { params }) {
         .eq('id', existingMember.role_id)
         .single()
 
-      if (memberRole?.name === 'Owner' && userRole?.name !== 'Owner') {
-        return NextResponse.json({ error: 'Cannot modify Owner team member' }, { status: 403 })
+      if (memberRole?.name === 'Super Admin' && userRole?.name !== 'Super Admin') {
+        return NextResponse.json({ error: 'Cannot modify Super Admin team member' }, { status: 403 })
       }
     }
 
     const body = await request.json()
     const { role_id, permissions: customPermissions, status, first_name, last_name, phone } = body
+
+    // Prevent changing role of Super Admin member
+    if (existingMember.role_id && role_id && role_id !== existingMember.role_id) {
+      const { data: currentMemberRole } = await supabaseAdmin
+        .from('organization_roles')
+        .select('name')
+        .eq('id', existingMember.role_id)
+        .single()
+
+      if (currentMemberRole?.name === 'Super Admin') {
+        return NextResponse.json({ error: 'Cannot change role of Super Admin team member' }, { status: 403 })
+      }
+    }
+
+    // Prevent changing status of Super Admin member
+    if (status !== undefined && status !== existingMember.status) {
+      const { data: currentMemberRole } = await supabaseAdmin
+        .from('organization_roles')
+        .select('name')
+        .eq('id', existingMember.role_id)
+        .single()
+
+      if (currentMemberRole?.name === 'Super Admin' && status !== 'active') {
+        return NextResponse.json({ error: 'Cannot change status of Super Admin team member' }, { status: 403 })
+      }
+    }
 
     // Build update object
     const updateData = {}
@@ -166,7 +159,7 @@ export async function PUT(request, { params }) {
         .select('id, permissions')
         .eq('id', role_id)
         .eq('organization_type', 'developer')
-        .eq('organization_id', developer.id)
+        .eq('organization_id', userInfo.organization_id)
         .single()
 
       if (!newRole) {
@@ -228,28 +221,16 @@ export async function DELETE(request, { params }) {
     const resolvedParams = params instanceof Promise ? await params : params
     const { id } = resolvedParams
 
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authorization header missing' }, { status: 401 })
-    }
-
-    const token = authHeader.split(' ')[1]
-    const decoded = verifyToken(token)
+    // Authenticate request (handles both developers and team members)
+    const { userInfo, error: authError, status } = await authenticateRequest(request)
     
-    if (!decoded || decoded.user_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid token or user type' }, { status: 401 })
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status })
     }
 
-    // Get developer info
-    const { data: developer } = await supabaseAdmin
-      .from('developers')
-      .select('id')
-      .eq('developer_id', decoded.user_id)
-      .single()
-
-    if (!developer) {
-      return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
+    // Must be developer organization
+    if (userInfo.organization_type !== 'developer') {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
     }
 
     // Check if team member exists
@@ -258,7 +239,7 @@ export async function DELETE(request, { params }) {
       .select('role_id, user_id')
       .eq('id', id)
       .eq('organization_type', 'developer')
-      .eq('organization_id', developer.id)
+      .eq('organization_id', userInfo.organization_id)
       .single()
 
     if (!existingMember) {
@@ -266,28 +247,15 @@ export async function DELETE(request, { params }) {
     }
 
     // Prevent removing yourself
-    if (existingMember.user_id === decoded.user_id) {
+    if (existingMember.user_id === userInfo.user_id) {
       return NextResponse.json({ error: 'Cannot remove yourself' }, { status: 400 })
     }
 
-    // Check permissions
-    const { data: currentUser } = await supabaseAdmin
-      .from('organization_team_members')
-      .select('role_id')
-      .eq('organization_type', 'developer')
-      .eq('organization_id', developer.id)
-      .eq('user_id', decoded.user_id)
-      .eq('status', 'active')
-      .single()
-
-    if (!currentUser) {
-      return NextResponse.json({ error: 'Team member not found' }, { status: 403 })
-    }
-
+    // Check permissions - use userInfo which already has role_id
     const { data: userRole } = await supabaseAdmin
       .from('organization_roles')
       .select('name')
-      .eq('id', currentUser.role_id)
+      .eq('id', userInfo.role_id)
       .single()
 
     // Check if trying to remove Owner
@@ -297,11 +265,11 @@ export async function DELETE(request, { params }) {
       .eq('id', existingMember.role_id)
       .single()
 
-    if (memberRole?.name === 'Owner') {
-      return NextResponse.json({ error: 'Cannot remove Owner' }, { status: 403 })
+    if (memberRole?.name === 'Super Admin') {
+      return NextResponse.json({ error: 'Cannot remove Super Admin' }, { status: 403 })
     }
 
-    if (userRole?.name !== 'Owner' && userRole?.name !== 'Admin') {
+    if (userRole?.name !== 'Super Admin' && userRole?.name !== 'Admin') {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 

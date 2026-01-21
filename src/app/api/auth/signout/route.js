@@ -60,49 +60,66 @@ export async function POST(request) {
     // Additional cleanup based on user type (if we have user info)
     if (userInfo) {
       try {
-        // Update last_logout_at timestamp in user profile
-        const tableName = userInfo.user_type === 'developer' ? 'developers' : 
-                         userInfo.user_type === 'property_seeker' ? 'property_seekers' : 
-                         userInfo.user_type === 'agent' ? 'agents' : null;
-        
-        if (tableName) {
-          // Update last_active_at (which exists in property_seekers) and updated_at
-          // For developers, we'll try to update last_logout_at if it exists, otherwise just updated_at
-          const updateData = {
-            updated_at: new Date().toISOString()
-          };
+        // Handle team members separately
+        if (userInfo.user_type === 'team_member') {
+          const { error: teamUpdateError } = await supabase
+            .from('organization_team_members')
+            .update({ 
+              last_logout_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', userInfo.id || userInfo.team_member_id);
           
-          // Add last_active_at for property_seekers, or last_logout_at for developers
-          if (userInfo.user_type === 'property_seeker') {
-            updateData.last_active_at = new Date().toISOString();
+          if (teamUpdateError) {
+            console.warn('🚪 SIGNOUT API: Failed to update team member logout timestamp:', teamUpdateError.message);
           } else {
-            // For developers and agents, try to update last_logout_at
-            updateData.last_logout_at = new Date().toISOString();
+            console.log('🚪 SIGNOUT API: Updated team member logout timestamp');
+          }
+        } else {
+          // Update last_logout_at timestamp in user profile
+          let tableName = null;
+          let idField = null;
+          let idValue = null;
+          
+          if (userInfo.user_type === 'developer') {
+            tableName = 'developers';
+            idField = 'developer_id';
+            idValue = userInfo.id || userInfo.developer_id;
+          } else if (userInfo.user_type === 'agency') {
+            tableName = 'agencies';
+            idField = 'agency_id';
+            idValue = userInfo.id || userInfo.agency_id;
+          } else if (userInfo.user_type === 'agent') {
+            tableName = 'agents';
+            idField = 'agent_id';
+            idValue = userInfo.id || userInfo.agent_id;
+          } else if (userInfo.user_type === 'property_seeker') {
+            tableName = 'property_seekers';
+            idField = 'user_id';
+            idValue = userInfo.user_id;
           }
           
-          const { error: updateError } = await supabase
-            .from(tableName)
-            .update(updateData)
-            .eq('user_id', userInfo.user_id);
-          
-          if (updateError) {
-            console.warn(`🚪 SIGNOUT API: Failed to update ${tableName} logout timestamp:`, updateError.message);
+          if (tableName && idValue) {
+            const updateData = {
+              last_logout_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
             
-            // If last_logout_at field doesn't exist, try updating just updated_at
-            if (updateError.message.includes('last_logout_at')) {
-              const { error: fallbackError } = await supabase
-                .from(tableName)
-                .update({ updated_at: new Date().toISOString() })
-                .eq('user_id', userInfo.user_id);
-              
-              if (fallbackError) {
-                console.warn(`🚪 SIGNOUT API: Fallback update also failed:`, fallbackError.message);
-              } else {
-                console.log(`🚪 SIGNOUT API: Updated ${tableName} with fallback (updated_at only)`);
-              }
+            // For property_seekers, also update last_active_at
+            if (userInfo.user_type === 'property_seeker') {
+              updateData.last_active_at = new Date().toISOString();
             }
-          } else {
-            console.log(`🚪 SIGNOUT API: Updated ${tableName} logout timestamp`);
+            
+            const { error: updateError } = await supabase
+              .from(tableName)
+              .update(updateData)
+              .eq(idField, idValue);
+            
+            if (updateError) {
+              console.warn(`🚪 SIGNOUT API: Failed to update ${tableName} logout timestamp:`, updateError.message);
+            } else {
+              console.log(`🚪 SIGNOUT API: Updated ${tableName} logout timestamp`);
+            }
           }
         }
         

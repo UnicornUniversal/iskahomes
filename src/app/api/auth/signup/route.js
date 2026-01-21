@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 // import { createClient } from '@supabase/supabase-js' // Commented out - using SendGrid instead of Supabase auth
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendVerificationEmail } from '@/lib/sendgrid' // Using SendGrid for email verification
+import { getDefaultRoles } from '@/lib/rolesAndPermissions'
 import crypto from 'crypto'
 
 export async function POST(request) {
@@ -320,6 +321,66 @@ export async function POST(request) {
             console.error('❌ Developer profile creation error:', devError)
           } else {
             console.log('✅ Developer profile created successfully')
+            
+            // CRITICAL: Create Owner role and add developer to organization_team_members as Super Admin
+            try {
+              // Get Owner role permissions (all true)
+              const defaultRoles = getDefaultRoles('developer')
+              const ownerPermissions = defaultRoles.owner.permissions
+              
+              // Create Super Admin role for this developer
+              const { data: ownerRole, error: roleError } = await supabaseAdmin
+                .from('organization_roles')
+                .insert({
+                  organization_type: 'developer',
+                  organization_id: devData.id,
+                  name: 'Super Admin',
+                  description: 'Full access to all features and settings. Cannot be removed or modified.',
+                  is_system_role: true,
+                  is_default: false,
+                  permissions: ownerPermissions,
+                  created_by: newUser.id
+                })
+                .select()
+                .single()
+              
+              if (roleError) {
+                console.error('❌ Error creating Super Admin role:', roleError)
+              } else {
+                console.log('✅ Super Admin role created successfully')
+                
+                // Add developer to organization_team_members as Super Admin
+                const { data: teamMember, error: teamError } = await supabaseAdmin
+                  .from('organization_team_members')
+                  .insert({
+                    organization_type: 'developer',
+                    organization_id: devData.id,
+                    user_id: newUser.id,
+                    email: email,
+                    role_id: ownerRole.id,
+                    permissions: ownerPermissions, // All permissions set to true
+                    status: 'active',
+                    first_name: userData.fullName?.split(' ')[0] || null,
+                    last_name: userData.fullName?.split(' ').slice(1).join(' ') || null,
+                    phone: userData.phone || null,
+                    // No invitation fields since this is the owner signing up
+                    invitation_token: null,
+                    expires_at: null,
+                    accepted_at: new Date().toISOString()
+                  })
+                  .select()
+                  .single()
+                
+                if (teamError) {
+                  console.error('❌ Error adding developer to organization_team_members:', teamError)
+                } else {
+                  console.log('✅ Developer added to organization_team_members as Owner (Super Admin)')
+                }
+              }
+            } catch (setupError) {
+              console.error('❌ Error setting up Owner role and team member:', setupError)
+              // Don't fail signup if role setup fails - can be fixed later
+            }
           }
           break
 

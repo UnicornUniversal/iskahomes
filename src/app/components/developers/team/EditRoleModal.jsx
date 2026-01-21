@@ -30,6 +30,12 @@ const EditRoleModal = ({ isOpen, onClose, role, onSuccess, organizationType = 'd
   const handleSubmit = async (e) => {
     e.preventDefault()
     
+    // Prevent editing Super Admin role
+    if (role.is_system_role && role.name === 'Super Admin') {
+      toast.error('Super Admin role cannot be modified')
+      return
+    }
+    
     if (!formData.name) {
       toast.error('Role name is required')
       return
@@ -46,15 +52,22 @@ const EditRoleModal = ({ isOpen, onClose, role, onSuccess, organizationType = 'd
         body: JSON.stringify(formData)
       })
 
+      const result = await response.json()
+
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to update role')
+        // Check for duplicate role name
+        if (result.error && (result.error.toLowerCase().includes('already exists') || result.error.toLowerCase().includes('already'))) {
+          toast.error('A role with this name already exists. Please choose a different name.')
+        } else {
+          toast.error(result.error || 'Failed to update role')
+        }
+        return
       }
 
+      toast.success('Role updated successfully!')
       onSuccess()
     } catch (error) {
-      console.error('Error updating role:', error)
-      toast.error(error.message || 'Failed to update role')
+      toast.error(error.message || 'Failed to update role. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -62,12 +75,24 @@ const EditRoleModal = ({ isOpen, onClose, role, onSuccess, organizationType = 'd
 
   if (!isOpen || !role) return null
 
+  // Prevent editing Super Admin - close modal if somehow opened
+  useEffect(() => {
+    if (role.is_system_role && role.name === 'Super Admin') {
+      toast.error('Super Admin role cannot be edited')
+      onClose()
+    }
+  }, [role, onClose])
+  
+  if (role.is_system_role && role.name === 'Super Admin') {
+    return null
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-20">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[85vh] overflow-y-auto mt-8">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">Edit Role</h2>
+          <h2 className="text-2xl font-bold text-primary_color">Edit Role</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -89,12 +114,15 @@ const EditRoleModal = ({ isOpen, onClose, role, onSuccess, organizationType = 'd
                 required
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                disabled={role.is_system_role && role.name === 'Owner'}
+                disabled={role.is_system_role && role.name === 'Super Admin'}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                 placeholder="e.g., Manager, Editor, Viewer"
               />
             </div>
-            {role.is_system_role && (
+            {role.is_system_role && role.name === 'Super Admin' && (
+              <p className="mt-1 text-xs text-red-600 font-medium">Super Admin role cannot be modified or deleted</p>
+            )}
+            {role.is_system_role && role.name !== 'Super Admin' && (
               <p className="mt-1 text-xs text-gray-500">System roles cannot be renamed</p>
             )}
           </div>
@@ -107,7 +135,8 @@ const EditRoleModal = ({ isOpen, onClose, role, onSuccess, organizationType = 'd
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none resize-none"
+              disabled={role.is_system_role && role.name === 'Super Admin'}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary_color focus:border-primary_color outline-none resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
               placeholder="Describe what this role can do..."
             />
           </div>
@@ -116,11 +145,19 @@ const EditRoleModal = ({ isOpen, onClose, role, onSuccess, organizationType = 'd
             <label className="block text-sm font-medium text-gray-700 mb-4">
               Permissions <span className="text-red-500">*</span>
             </label>
-            <PermissionsEditor
-              permissions={formData.permissions}
-              onChange={(permissions) => setFormData(prev => ({ ...prev, permissions }))}
-              organizationType={organizationType}
-            />
+            {role.is_system_role && role.name === 'Super Admin' ? (
+              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <p className="text-sm text-gray-600">
+                  Super Admin role has all permissions enabled and cannot be modified.
+                </p>
+              </div>
+            ) : (
+              <PermissionsEditor
+                permissions={formData.permissions}
+                onChange={(permissions) => setFormData(prev => ({ ...prev, permissions }))}
+                organizationType={organizationType}
+              />
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -129,7 +166,8 @@ const EditRoleModal = ({ isOpen, onClose, role, onSuccess, organizationType = 'd
               id="is_default"
               checked={formData.is_default}
               onChange={(e) => setFormData(prev => ({ ...prev, is_default: e.target.checked }))}
-              className="w-4 h-4 text-primary_color border-gray-300 rounded focus:ring-primary_color"
+              disabled={role.is_system_role && role.name === 'Super Admin'}
+              className="w-4 h-4 text-primary_color border-gray-300 rounded focus:ring-primary_color disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <label htmlFor="is_default" className="text-sm text-gray-700">
               Set as default role for new team members
@@ -147,7 +185,7 @@ const EditRoleModal = ({ isOpen, onClose, role, onSuccess, organizationType = 'd
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (role.is_system_role && role.name === 'Super Admin')}
               className="px-6 py-2 bg-primary_color text-white rounded-lg hover:bg-primary_color/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Updating...' : 'Update Role'}

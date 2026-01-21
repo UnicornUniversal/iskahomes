@@ -32,6 +32,7 @@ import countryToCurrency from 'country-to-currency'
 import DeveloperNav from '@/app/components/developers/DeveloperNav'
 import { CustomSelect } from '@/app/components/ui/custom-select'
 import { useAuth } from '@/contexts/AuthContext'
+import { userHasPermission } from '@/lib/permissionHelpers'
 import { toast } from 'react-toastify'
 
 // Google Map Component for Location Modal
@@ -1028,7 +1029,10 @@ const ProfilePage = () => {
           <div className="flex space-x-1">
             {[
               { id: 'profile', label: 'Profile Information', icon: FiUser },
-              { id: 'password', label: 'Change Password', icon: FiLock }
+              // Only show Change Password tab for Super Admin (permissions === null or role_name === 'Super Admin')
+              ...((user?.user_type === 'agent') || (user?.profile?.permissions === null) || (user?.profile?.role_name === 'Super Admin') 
+                ? [{ id: 'password', label: 'Change Password', icon: FiLock }] 
+                : [])
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1904,19 +1908,21 @@ const ProfilePage = () => {
             </div>
             <hr className="border-white/50 mt-6" />
 
-            {/* Save Button at the End */}
-            <div className="sticky bottom-6 mt-10 px-6 py-4 z-10">
-              <div className="flex items-center justify-center">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="primary_button flex items-center gap-2 disabled:opacity-50"
-                >
-                  <FiSave className="w-4 h-4" />
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
+            {/* Save Button at the End - Only show if user has edit permission */}
+            {(user?.user_type === 'agent' || userHasPermission(user, 'profile.edit')) && (
+              <div className="sticky bottom-6 mt-10 px-6 py-4 z-10">
+                <div className="flex items-center justify-center">
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="primary_button flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <FiSave className="w-4 h-4" />
+                    {saving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Location Modal */}
             {showLocationModal && (

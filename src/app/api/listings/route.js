@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
-import { verifyToken } from '@/lib/jwt'
+import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
+import { getDeveloperId } from '@/lib/developerIdHelper'
 import { processCurrencyConversions } from '@/lib/currencyConversion'
 import { updateAdminAnalytics } from '@/lib/adminAnalytics'
 
@@ -836,28 +837,38 @@ export async function POST(request) {
       )
     }
 
-    const token = authHeader.split(' ')[1]
-    
-    // Verify the token and get user info
-    const decoded = verifyToken(token)
-    if (!decoded || !decoded.user_id) {
-      // Auth failure - return response that will trigger client-side logout
-      return NextResponse.json(
-        { 
-          error: 'Invalid or expired token',
-          auth_failed: true // Flag to trigger logout on client
-        },
-        { status: 401 }
-      )
-    }
-
-    const userId = decoded.user_id
-    console.log('✅ User authenticated:', { userId, user_id: decoded.user_id })
-
-    // Parse form data
+    // Parse form data first to check listing_type
     console.log('📋 Parsing form data...')
     const formData = await request.formData()
     console.log('✅ Form data parsed')
+
+    // Authenticate request (handles both developers and team members)
+    const { userInfo, error: authError, status } = await authenticateRequest(request)
+    
+    if (authError) {
+      return NextResponse.json({ 
+        error: authError,
+        auth_failed: true 
+      }, { status })
+    }
+
+    // Must be developer organization for units
+    const listingType = formData.get('listing_type')
+    if (listingType === 'unit' && userInfo.organization_type !== 'developer') {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
+    }
+
+    // Get the actual developer's user_id
+    const userId = await getDeveloperId(userInfo)
+    
+    if (!userId) {
+      return NextResponse.json({ 
+        error: 'Developer ID not found',
+        auth_failed: true 
+      }, { status: 404 })
+    }
+    
+    console.log('✅ User authenticated:', { userId, user_type: userInfo.user_type })
 
     // Check if user has an incomplete draft to resume
     const resumeListingId = formData.get('resume_listing_id')

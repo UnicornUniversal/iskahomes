@@ -126,7 +126,7 @@ const DevelopmentsBySale = React.memo(({ developerId, currency: propCurrency }) 
               <tr key={development.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <Link 
-                    href={development.slug ? `/allDevelopments/${development.slug}` : '#'}
+                    href={development.slug ? `/home/allDevelopments/${development.slug}` : '#'}
                     className="flex items-center space-x-3"
                   >
                     <div className="w-12 h-12 rounded overflow-hidden border border-gray-200 flex-shrink-0">

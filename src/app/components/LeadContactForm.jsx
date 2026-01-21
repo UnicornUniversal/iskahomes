@@ -411,7 +411,7 @@ const LeadContactForm = ({
           <div className="flex-1 min-w-0">
             {contactInfo.developerSlug && getAccountType() === 'developer' ? (
               <Link 
-                href={`/allDevelopers/${contactInfo.developerSlug}`}
+                href={`/home/allDevelopers/${contactInfo.developerSlug}`}
                 className="block text-lg font-bold text-primary_color hover:text-primary_color/80 transition-colors mb-1"
               >
                 {contactInfo.name}

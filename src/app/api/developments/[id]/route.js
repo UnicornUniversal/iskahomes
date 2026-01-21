@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
-import { verifyToken } from '@/lib/jwt'
+import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 
 // Helper function to update developer's total_developments count
 async function updateDeveloperTotalDevelopments(developerIdFromRequest) {
@@ -63,14 +63,35 @@ export async function GET(request, { params }) {
       )
     }
 
-    const token = authHeader.substring(7)
-    const decoded = verifyToken(token)
+    // Authenticate request (handles both developers and team members)
+    const { userInfo, error: authError, status } = await authenticateRequest(request)
     
-    if (!decoded) {
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 401 }
-      )
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status })
+    }
+
+    // Must be developer organization
+    if (userInfo.organization_type !== 'developer') {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
+    }
+
+    // Get the actual developer's user_id from organization
+    let actualDeveloperId = null
+    
+    if (userInfo.user_type === 'team_member') {
+      const { data: developer } = await supabaseAdmin
+        .from('developers')
+        .select('developer_id')
+        .eq('id', userInfo.organization_id)
+        .single()
+      
+      if (!developer?.developer_id) {
+        return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
+      }
+      
+      actualDeveloperId = developer.developer_id
+    } else {
+      actualDeveloperId = userInfo.user_id
     }
 
     // Fetch the development
@@ -89,14 +110,20 @@ export async function GET(request, { params }) {
     }
 
     // Check if the developer owns this development
-    if (development.developer_id !== decoded.developer_id) {
+    if (development.developer_id !== actualDeveloperId) {
       return NextResponse.json(
         { error: 'Unauthorized access to development' },
         { status: 403 }
       )
     }
 
-    return NextResponse.json({ data: development })
+    // Ensure total_units is always present (default to 0 if null/undefined)
+    const developmentWithUnits = {
+      ...development,
+      total_units: development.total_units !== null && development.total_units !== undefined ? development.total_units : 0
+    }
+
+    return NextResponse.json({ data: developmentWithUnits })
 
   } catch (error) {
     console.error('Get development error:', error)
@@ -250,14 +277,35 @@ export async function PUT(request, { params }) {
       )
     }
 
-    const token = authHeader.substring(7)
-    const decoded = verifyToken(token)
+    // Authenticate request (handles both developers and team members)
+    const { userInfo, error: authError, status: authStatus } = await authenticateRequest(request)
     
-    if (!decoded) {
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 401 }
-      )
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status: authStatus })
+    }
+
+    // Must be developer organization
+    if (userInfo.organization_type !== 'developer') {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
+    }
+
+    // Get the actual developer's user_id from organization
+    let actualDeveloperId = null
+    
+    if (userInfo.user_type === 'team_member') {
+      const { data: developer } = await supabaseAdmin
+        .from('developers')
+        .select('developer_id')
+        .eq('id', userInfo.organization_id)
+        .single()
+      
+      if (!developer?.developer_id) {
+        return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
+      }
+      
+      actualDeveloperId = developer.developer_id
+    } else {
+      actualDeveloperId = userInfo.user_id
     }
 
     // First check if the development exists and belongs to the developer
@@ -274,7 +322,7 @@ export async function PUT(request, { params }) {
       )
     }
 
-    if (existingDevelopment.developer_id !== decoded.developer_id) {
+    if (existingDevelopment.developer_id !== actualDeveloperId) {
       return NextResponse.json(
         { error: 'Unauthorized access to development' },
         { status: 403 }
@@ -359,7 +407,7 @@ export async function PUT(request, { params }) {
                 // Create sales_listings entry
                 const salesEntry = await createSalesListingEntry(
                   listing.id,
-                  decoded.developer_id,
+                  actualDeveloperId,
                   listing,
                   saleType
                 )
@@ -374,7 +422,7 @@ export async function PUT(request, { params }) {
           }
 
           // Recalculate developer totals from sales_listings table
-          await recalculateDeveloperTotals(decoded.developer_id)
+          await recalculateDeveloperTotals(actualDeveloperId)
 
           console.log('✅ Development marked as Sold Out:', {
             development_id: id,
@@ -426,20 +474,42 @@ export async function DELETE(request, { params }) {
       )
     }
 
-    const token = authHeader.substring(7)
-    const decoded = verifyToken(token)
+    // Authenticate request (handles both developers and team members)
+    const { userInfo, error: authError, status: authStatus } = await authenticateRequest(request)
     
-    if (!decoded) {
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 401 }
-      )
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status: authStatus })
+    }
+
+    // Must be developer organization
+    if (userInfo.organization_type !== 'developer') {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
+    }
+
+    // Get the actual developer's user_id from organization
+    let actualDeveloperId = null
+    
+    if (userInfo.user_type === 'team_member') {
+      const { data: developer } = await supabaseAdmin
+        .from('developers')
+        .select('developer_id')
+        .eq('id', userInfo.organization_id)
+        .single()
+      
+      if (!developer?.developer_id) {
+        return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
+      }
+      
+      actualDeveloperId = developer.developer_id
+    } else {
+      actualDeveloperId = userInfo.user_id
     }
 
     // First check if the development exists and belongs to the developer
-    const { data: existingDevelopment, error: fetchError } = await supabase
+    // Get full development data to access metrics
+    const { data: existingDevelopment, error: fetchError } = await supabaseAdmin
       .from('developments')
-      .select('developer_id')
+      .select('developer_id, total_units, estimated_revenue, total_revenue, development_status')
       .eq('id', id)
       .single()
 
@@ -450,36 +520,118 @@ export async function DELETE(request, { params }) {
       )
     }
 
-    if (existingDevelopment.developer_id !== decoded.developer_id) {
+    if (existingDevelopment.developer_id !== actualDeveloperId) {
       return NextResponse.json(
         { error: 'Unauthorized access to development' },
         { status: 403 }
       )
     }
 
-    // Store developer_id before deletion for updating total_developments
-    const developerIdToUpdate = existingDevelopment.developer_id
+    // Check if already deleted
+    if (existingDevelopment.development_status === 'deleted') {
+      return NextResponse.json(
+        { error: 'Development is already deleted' },
+        { status: 400 }
+      )
+    }
 
-    // Delete the development
-    const { error } = await supabase
+    // Store developer_id and metrics before soft deletion
+    const developerIdToUpdate = existingDevelopment.developer_id
+    const totalUnits = existingDevelopment.total_units || 0
+    const estimatedRevenue = existingDevelopment.estimated_revenue || 0
+    const totalRevenue = existingDevelopment.total_revenue || 0
+
+    // Soft delete: Set development_status to 'deleted'
+    const { error: updateError } = await supabaseAdmin
       .from('developments')
-      .delete()
+      .update({ 
+        development_status: 'deleted',
+        updated_at: new Date().toISOString()
+      })
       .eq('id', id)
 
-    if (error) {
-      console.error('Error deleting development:', error)
+    if (updateError) {
+      console.error('Error soft deleting development:', updateError)
       return NextResponse.json(
         { error: 'Failed to delete development' },
         { status: 500 }
       )
     }
 
-    // Update developer's total_developments count
-    await updateDeveloperTotalDevelopments(developerIdToUpdate)
+    // Get developer record to update metrics
+    const { data: developer, error: devError } = await supabaseAdmin
+      .from('developers')
+      .select('id, total_developments, total_units, estimated_revenue, total_revenue')
+      .eq('developer_id', developerIdToUpdate)
+      .single()
+
+    if (devError || !developer) {
+      console.error('Error fetching developer for metrics update:', devError)
+      // Still return success since development was soft deleted
+      return NextResponse.json({ 
+        success: true,
+        message: 'Development deleted successfully',
+        warning: 'Developer metrics update failed'
+      })
+    }
+
+    // Count active developments (not deleted)
+    const { count: activeDevelopmentsCount, error: countError } = await supabaseAdmin
+      .from('developments')
+      .select('*', { count: 'exact', head: true })
+      .eq('developer_id', developerIdToUpdate)
+      .neq('development_status', 'deleted')
+
+    if (countError) {
+      console.error('Error counting active developments:', countError)
+    }
+
+    // Calculate new developer metrics
+    const newTotalDevelopments = (activeDevelopmentsCount || 0)
+    const newTotalUnits = Math.max(0, (developer.total_units || 0) - totalUnits)
+    const newEstimatedRevenue = Math.max(0, (developer.estimated_revenue || 0) - estimatedRevenue)
+    const newTotalRevenue = Math.max(0, (developer.total_revenue || 0) - totalRevenue)
+
+    // Update developer metrics
+    const { error: metricsUpdateError } = await supabaseAdmin
+      .from('developers')
+      .update({
+        total_developments: newTotalDevelopments,
+        total_units: newTotalUnits,
+        estimated_revenue: newEstimatedRevenue,
+        total_revenue: newTotalRevenue,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', developer.id)
+
+    if (metricsUpdateError) {
+      console.error('Error updating developer metrics:', metricsUpdateError)
+      // Still return success since development was soft deleted
+      return NextResponse.json({ 
+        success: true,
+        message: 'Development deleted successfully',
+        warning: 'Developer metrics update failed'
+      })
+    }
+
+    console.log('✅ Development soft deleted and metrics updated:', {
+      development_id: id,
+      developer_id: developerIdToUpdate,
+      total_developments: newTotalDevelopments,
+      total_units: newTotalUnits,
+      estimated_revenue: newEstimatedRevenue,
+      total_revenue: newTotalRevenue
+    })
 
     return NextResponse.json({ 
       success: true,
-      message: 'Development deleted successfully' 
+      message: 'Development deleted successfully',
+      data: {
+        total_developments: newTotalDevelopments,
+        total_units: newTotalUnits,
+        estimated_revenue: newEstimatedRevenue,
+        total_revenue: newTotalRevenue
+      }
     })
 
   } catch (error) {

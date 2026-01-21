@@ -13,25 +13,33 @@ export default function DeveloperLayout({ children }) {
   const router = useRouter()
   const { user, loading, isAuthenticated, developerToken } = useAuth()
   
-  // Check if we're adding a new unit
-  const isAddingNewUnit = pathname?.includes('/units/addNewUnit')
-  
   // Protect route - check authentication
   useEffect(() => {
     if (!loading) {
-      // Check if user is authenticated and is a developer
+      // Check if user is authenticated and has developer token
       const hasDeveloperToken = localStorage.getItem('developer_token')
       
-      if (!hasDeveloperToken || !isAuthenticated || user?.user_type !== 'developer') {
-        console.log('Developer route protection: No valid developer token, redirecting to signin')
-        handleAuthFailure('/home/signin')
-        return
-      }
+      // Allow developers OR team members with developer organization
+      const isDeveloper = user?.user_type === 'developer'
+      const isTeamMemberWithDeveloperOrg = user?.user_type === 'team_member' && user?.profile?.organization_type === 'developer'
+      const hasValidUser = isDeveloper || isTeamMemberWithDeveloperOrg
       
-      // Verify token is valid
-      if (!developerToken && !hasDeveloperToken) {
-        console.log('Developer route protection: Token missing, redirecting to signin')
-        handleAuthFailure('/home/signin')
+      // Check authentication: either state says authenticated OR we have token in localStorage
+      const isAuth = isAuthenticated || (hasDeveloperToken && user)
+      
+      if (!hasDeveloperToken || !isAuth || !hasValidUser) {
+        console.log('Developer route protection: No valid access, redirecting to signin', {
+          hasToken: !!hasDeveloperToken,
+          isAuthenticated,
+          isAuth,
+          userType: user?.user_type,
+          orgType: user?.profile?.organization_type,
+          hasUser: !!user
+        })
+        // Only redirect if we're sure - don't redirect if still loading
+        if (!loading) {
+          handleAuthFailure('/home/signin')
+        }
         return
       }
     }
@@ -47,13 +55,16 @@ export default function DeveloperLayout({ children }) {
   }
   
   // Don't render protected content if not authenticated
-  if (!isAuthenticated || user?.user_type !== 'developer') {
+  const isDeveloper = user?.user_type === 'developer'
+  const isTeamMemberWithDeveloperOrg = user?.user_type === 'team_member' && user?.profile?.organization_type === 'developer'
+  
+  if (!isAuthenticated || (!isDeveloper && !isTeamMemberWithDeveloperOrg)) {
     return null // Will redirect via handleAuthFailure
   }
   
   return (
     <>
-      {!isAddingNewUnit && <DeveloperTopNav />}
+      <DeveloperTopNav />
 
     
     <div className='flex gap-[1em] md:px-[1em] overflow-hidden template_body_bg'>

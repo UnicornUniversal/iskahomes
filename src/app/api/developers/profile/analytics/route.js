@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { verifyToken } from '@/lib/jwt'
+import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 
 function parseJSON(value, fallback = null) {
   if (!value) return fallback
@@ -140,11 +140,16 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Authorization header missing' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
-    const decoded = verifyToken(token)
+    // Authenticate request (handles both developers and team members)
+    const { userInfo, error: authError, status } = await authenticateRequest(request)
+    
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status })
+    }
 
-    if (!decoded || decoded.user_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid token or user type' }, { status: 401 })
+    // Must be developer organization
+    if (userInfo.organization_type !== 'developer') {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -171,10 +176,21 @@ export async function GET(request) {
     const diffTime = Math.abs(endDateObj - startDateObj)
     const rangeDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
 
-    const developerId = decoded.user_id
+    // Get developer_id from organization - for team members, get the actual developer's user_id
+    const { data: developer, error: developerError } = await supabaseAdmin
+      .from('developers')
+      .select('developer_id, id')
+      .eq('id', userInfo.organization_id)
+      .single()
+
+    if (developerError || !developer) {
+      return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
+    }
+
+    const developerId = developer.developer_id // Use the actual developer's user_id
 
     const [
-      { data: developer, error: developerError },
+      { data: developerFull, error: developerFullError },
       { data: analyticsRows, error: analyticsError },
       { data: developerListings, error: listingsError }
     ] = await Promise.all([
@@ -187,7 +203,7 @@ export async function GET(request) {
           leads_breakdown,
           impressions_breakdown
         `)
-        .eq('developer_id', developerId)
+        .eq('id', userInfo.organization_id)
         .single(),
       supabaseAdmin
         .from('user_analytics')
@@ -206,10 +222,10 @@ export async function GET(request) {
         .eq('account_type', 'developer')
     ])
 
-    if (developerError) {
-      console.error('Error fetching developer stats:', developerError)
+    if (developerFullError || !developerFull) {
+      console.error('Error fetching developer stats:', developerFullError)
       return NextResponse.json(
-        { error: 'Failed to fetch developer stats', details: developerError.message },
+        { error: 'Failed to fetch developer stats', details: developerFullError?.message || 'Developer not found' },
         { status: 500 }
       )
     }
@@ -289,14 +305,14 @@ export async function GET(request) {
       success: true,
       data: {
         developer: {
-          name: developer?.name || null,
-          slug: developer?.slug || null,
+          name: developerFull?.name || null,
+          slug: developerFull?.slug || null,
           total_profile_views: totals.profile_views,
           total_impressions: totals.total_impressions,
           total_saved: savedPropertiesCount,
           total_appointments: appointmentsCount,
-          leads_breakdown: parseJSON(developer?.leads_breakdown, {}),
-          impressions_breakdown: parseJSON(developer?.impressions_breakdown, {})
+          leads_breakdown: parseJSON(developerFull?.leads_breakdown, {}),
+          impressions_breakdown: parseJSON(developerFull?.impressions_breakdown, {})
         },
         summary: {
           range_days: rangeDays,
@@ -314,13 +330,13 @@ export async function GET(request) {
           appointments_booked: appointmentsCount,
           properties_saved: savedPropertiesCount,
           // Use unique_leads + anonymous_leads instead of total_leads (which counts actions, not individuals)
-          total_leads: (developer?.total_unique_leads || 0) + (developer?.total_anonymous_leads || 0) || 
-                       (developer?.unique_leads || 0) + (developer?.anonymous_leads || 0) || 
-                       (developer?.total_leads || 0),
+          total_leads: (developerFull?.total_unique_leads || 0) + (developerFull?.total_anonymous_leads || 0) || 
+                       (developerFull?.unique_leads || 0) + (developerFull?.anonymous_leads || 0) || 
+                       (developerFull?.total_leads || 0),
           conversion_rate: totals.profile_views > 0 
-            ? ((((developer?.total_unique_leads || 0) + (developer?.total_anonymous_leads || 0) || 
-                 (developer?.unique_leads || 0) + (developer?.anonymous_leads || 0) || 
-                 (developer?.total_leads || 0)) / totals.profile_views) * 100).toFixed(2)
+            ? ((((developerFull?.total_unique_leads || 0) + (developerFull?.total_anonymous_leads || 0) || 
+                 (developerFull?.unique_leads || 0) + (developerFull?.anonymous_leads || 0) || 
+                 (developerFull?.total_leads || 0)) / totals.profile_views) * 100).toFixed(2)
             : 0
         },
         time_series: {

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'react-toastify'
+import { userCanAccessRoute, userHasPermission } from '@/lib/permissionHelpers'
 import { 
     FiHome, 
     FiCalendar, 
@@ -25,6 +26,7 @@ import {
     FiChevronUp,
     FiShield
 } from 'react-icons/fi'
+import Link from 'next/link'
 
 const DeveloperNav = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -53,111 +55,113 @@ const DeveloperNav = () => {
     
     // Get the developer slug from user profile or use user ID as fallback
     // Only use this after client-side hydration to prevent mismatches
-    const developerSlug = isClient ? (user?.profile?.slug || user?.id || 'developer') : 'developer'
+    // For team members, use organization_slug; for developers, use slug
+    const developerSlug = isClient ? (
+      user?.profile?.organization_slug || 
+      user?.profile?.slug || 
+      user?.id || 
+      'developer'
+    ) : 'developer'
 
-    const navItems = [
+    // Helper function to check if user can access route (only for developers/agencies, not agents)
+    const canAccess = (routeCategory) => {
+        // Agents don't have permissions system
+        if (user?.user_type === 'agent') return true
+        // For developers and team members, check permissions
+        if (user?.user_type === 'developer' || user?.user_type === 'team_member' || user?.user_type === 'agency') {
+            return userCanAccessRoute(user, routeCategory)
+        }
+        return true
+    }
+
+    // Build nav items with permission checks
+    const allNavItems = [
         {
             label: 'Dashboard',
             href: `/developer/${developerSlug}/dashboard`,
-            icon: FiHome
+            icon: FiHome,
+            permission: 'dashboard'
         },
         {
             label: 'Messages',
             href: `/developer/${developerSlug}/messages`,
-            icon: FiMessageSquare
-        },
-        {
-            label: 'Developments',
-            href: `/developer/${developerSlug}/developments`,
-            icon: FiMapPin
-        },
-        {
-            label: 'Units',
-            href: `/developer/${developerSlug}/units`,
-            icon: FiGrid
-        },
-        {
-            label: 'Appointments',
-            href: `/developer/${developerSlug}/appointments`,
-            icon: FiCalendar
+            icon: FiMessageSquare,
+            permission: 'messages'
         },
         {
             label: 'Leads',
             href: `/developer/${developerSlug}/leads`,
-            icon: FiUsers
+            icon: FiUsers,
+            permission: 'leads'
+        },
+        {
+            label: 'Developments',
+            href: `/developer/${developerSlug}/developments`,
+            icon: FiMapPin,
+            permission: 'developments'
+        },
+        {
+            label: 'Units',
+            href: `/developer/${developerSlug}/units`,
+            icon: FiGrid,
+            permission: 'units'
+        },
+        {
+            label: 'Appointments',
+            href: `/developer/${developerSlug}/appointments`,
+            icon: FiCalendar,
+            permission: 'appointments'
         },
         {
             label: 'Team',
             href: `/developer/${developerSlug}/team`,
-            icon: FiShield
+            icon: FiShield,
+            permission: 'team'
+        },
+        {
+            label: 'Sales',
+            href: `/developer/${developerSlug}/sales`,
+            icon: FiTrendingUp,
+            permission: 'sales'
         },
         {
             label: 'Analytics',
             href: `/developer/${developerSlug}/analytics`,
             icon: FiBarChart2,
             hasSubmenu: true,
+            permission: 'analytics',
             submenu: [
-                // {
-                //     label: 'Overview',
-                //     href: `/developer/${developerSlug}/analytics`,
-                //     icon: FiTrendingUp
-                // },
                 {
                     label: 'Properties',
                     href: `/developer/${developerSlug}/analytics/properties`,
-                    icon: FiMapPin
+                    icon: FiMapPin,
+                    permission: 'analytics.view_properties'
                 },
                 {
                     label: 'Leads',
                     href: `/developer/${developerSlug}/analytics/leads`,
-                    icon: FiMessageSquare
-                },
-                {
-                    label: 'Sales',
-                    href: `/developer/${developerSlug}/analytics/sales`,
-                    icon: FiUser
+                    icon: FiMessageSquare,
+                    permission: 'analytics.view_leads'
                 },
                 {
                     label: 'Profile & Brand',
                     href: `/developer/${developerSlug}/analytics/profile`,
-                    icon: FiUser
+                    icon: FiUser,
+                    permission: 'analytics.view_profile_brand'
                 },
-                // {
-                //     label: 'Appointments',
-                //     href: `/developer/${developerSlug}/analytics/appointments`,
-                //     icon: FiCalendar
-                // },
-                // {
-                //     label: 'Messages',
-                //     href: `/developer/${developerSlug}/analytics/messages`,
-                //     icon: FiMessageSquare
-                // },
-                // {
-                //     label: 'Market Intelligence',
-                //     href: `/developer/${developerSlug}/analytics/market`,
-                //     icon: FiTrendingUp
-                // }
             ]
         },
-        // {
-        //     label: 'Agents',
-        //     href: `/developer/${developerSlug}/agents`,
-        //     icon: FiUsers
-        // },
-        // {
-        //     label: 'Favorites',
-        //     href: `/developer/${developerSlug}/favorites`,
-        //     icon: FiHeart
-        // },
         {
             label: 'Profile',
             href: `/developer/${developerSlug}/profile`,
-            icon: FiUser
+            icon: FiUser,
+            permission: 'profile'
         },
         {
             label: 'Subscriptions',
             href: `/developer/${developerSlug}/subscriptions`,
-            icon: FiCreditCard
+            icon: FiCreditCard,
+            permission: 'subscriptions'
         },
         {
             label: 'Logout',
@@ -167,6 +171,38 @@ const DeveloperNav = () => {
         },
     ]
 
+    // Filter nav items based on permissions (only for developers/agencies/team members)
+    const navItems = allNavItems.filter(item => {
+        // Always show logout
+        if (item.isLogout) return true
+        
+        // For agents, show all items (no permission system)
+        if (user?.user_type === 'agent') return true
+        
+        // For developers, agencies, and team members, check permissions
+        if (user?.user_type === 'developer' || user?.user_type === 'team_member' || user?.user_type === 'agency') {
+            // Check main route permission
+            if (!canAccess(item.permission)) return false
+            
+            // Filter submenu items if it's analytics
+            if (item.hasSubmenu && item.submenu) {
+                item.submenu = item.submenu.filter(subItem => {
+                    if (subItem.permission) {
+                        return userHasPermission(user, subItem.permission)
+                    }
+                    return true
+                })
+                // Only show analytics if it has at least one submenu item
+                return item.submenu.length > 0
+            }
+            
+            return true
+        }
+        
+        // Default: show item
+        return true
+    })
+
     const toggleMobileMenu = () => {
         setIsMobileMenuOpen(!isMobileMenuOpen)
         // On mobile, when opening menu, set collapsed to false
@@ -175,8 +211,17 @@ const DeveloperNav = () => {
         }
     }
 
-    const toggleCollapse = () => {
-        setIsCollapsed(!isCollapsed)
+    // Handle hover for expand/collapse on desktop
+    const handleMouseEnter = () => {
+        if (!isMobile) {
+            setIsCollapsed(false)
+        }
+    }
+
+    const handleMouseLeave = () => {
+        if (!isMobile) {
+            setIsCollapsed(true)
+        }
     }
 
     const toggleAnalytics = () => {
@@ -315,39 +360,43 @@ const DeveloperNav = () => {
 
                     {/* Navigation Menu - Only render on large devices or when mobile menu is open */}
                     {(isMobileMenuOpen || !isMobile) && (
-                        <nav className={`fixed rounded-sm border-primary_color bg-white/95 lg:bg-gradient-to-b lg:from-white lg:to-gray-50 flex flex-col h-auto lg:max-h-[calc(100vh-7rem)] py-4 pb-8 px-[1em] shadow-lg border border-gray-100 z-[50] transition-all duration-300 ease-in-out top-16 lg:top-28 left-2 overflow-x-hidden overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${
-                            isMobileMenuOpen 
-                                ? 'translate-x-0' 
-                                : '-translate-x-full lg:translate-x-0'
-                        } ${
-                            isCollapsed ? 'w-[85vw] min-w-[80px] max-w-[80px] lg:w-[80px] lg:min-w-[80px]' : 'w-[85vw] min-w-[300px] max-w-[300px] lg:w-[300px] lg:min-w-[300px]'
-                        }`}>
+                        <nav 
+                            onMouseEnter={handleMouseEnter}
+                            onMouseLeave={handleMouseLeave}
+                            className={`fixed rounded-sm border-primary_color bg-white/95 lg:bg-gradient-to-b lg:from-white lg:to-gray-50 flex flex-col h-screen lg:h-auto lg:max-h-[calc(100vh-7rem)] py-4 pb-8 px-[1em] shadow-lg border border-gray-100 z-[60] transition-all duration-300 ease-in-out top-0 lg:top-28 left-0 lg:left-2 overflow-hidden lg:overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${
+                                isMobileMenuOpen 
+                                    ? 'translate-x-0' 
+                                    : '-translate-x-full lg:translate-x-0'
+                            } ${
+                                isCollapsed ? 'w-[80vw] min-w-[80px] max-w-[80px] lg:w-[80px] lg:min-w-[80px]' : 'w-[80vw] min-w-[300px] max-w-[300px] lg:w-[300px] lg:min-w-[300px]'
+                            }`}>
+                {/* ISKA Logo - Only visible on small devices, bigger and left-aligned */}
+                <div className="mb-4 lg:hidden flex items-center justify-start pt-4">
+                    <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
+                        <img src="/iska-dark.png" alt="ISKA Logo" className='w-[100px]' />
+                    </Link>
+                </div>
+
+                {/* Cancel Button - Upper right on mobile */}
+                <button
+                    onClick={toggleMobileMenu}
+                    className="lg:hidden absolute top-4 right-4 flex items-center justify-center w-8 h-8 bg-primary_color/10 hover:bg-primary_color/20 text-primary_color rounded-lg transition-all duration-300"
+                    aria-label="Close navigation"
+                >
+                    <FiX className="w-4 h-4" />
+                </button>
+
                 <div className="mb-4 flex items-center justify-between">
                     {!isCollapsed && (
                         <div>
                             <h5 className="mb-2">Developer </h5>
                             <h3 className="mb-2">Dashboard</h3>
                             <div className="w-12 h-1 bg-primary_color rounded-full"></div>
-                    
-                    
                         </div>
                     )}
-                    
-                    {/* Collapse Toggle Button - Only visible on large devices */}
-                    <button
-                        onClick={toggleCollapse}
-                        className="hidden lg:flex items-center justify-center w-8 h-8 bg-primary_color/10 hover:bg-primary_color/20 text-primary_color rounded-lg transition-all duration-300"
-                        aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"}
-                    >
-                        {isCollapsed ? (
-                            <FiChevronRight className="w-4 h-4" />
-                        ) : (
-                            <FiChevronLeft className="w-4 h-4" />
-                        )}
-                    </button>
                 </div>
                 
-                <div className="space-y-2 w-full flex-1 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <div className="space-y-2 w-full flex-1 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] min-h-0">
                     {navItems.map((item, index) => {
                         const IconComponent = item.icon
                         // Check if current pathname matches this nav item

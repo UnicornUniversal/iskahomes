@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FiChevronDown, FiSearch, FiX, FiUser, FiLogOut } from 'react-icons/fi'
 import { handleAuthFailure } from '@/lib/authFailureHandler'
+import { supabase } from '@/lib/supabase'
 
 const DeveloperTopNav = ({ onSearch }) => {
   const { user, logout } = useAuth()
@@ -17,23 +18,113 @@ const DeveloperTopNav = ({ onSearch }) => {
   const [isSearching, setIsSearching] = useState(false)
   const [showResults, setShowResults] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [developerData, setDeveloperData] = useState(null)
+  const [developerSubscription, setDeveloperSubscription] = useState(null)
   const searchRef = useRef(null)
   const resultsRef = useRef(null)
 
-  const profileImage = useMemo(() => {
-    const image =
-      user?.profile?.profile_image &&
-      (typeof user.profile.profile_image === 'string'
-        ? user.profile.profile_image
-        : user.profile.profile_image.url)
-    return image || '/avatar.jpg'
-  }, [user])
+  // For team members, show team member info; for developers, show developer info
+  const isTeamMember = user?.user_type === 'team_member'
+  
+  // Fetch developer data for team members
+  useEffect(() => {
+    const fetchDeveloperData = async () => {
+      if (isTeamMember && user?.profile?.organization_id && user?.profile?.organization_type === 'developer') {
+        try {
+          // Fetch developer profile
+          const { data: developer, error: devError } = await supabase
+            .from('developers')
+            .select('id, name, profile_image, slug, developer_id')
+            .eq('id', user.profile.organization_id)
+            .single()
 
-  const developerName = user?.profile?.name || user?.profile?.company_name || 'Developer'
+          if (!devError && developer) {
+            setDeveloperData(developer)
+            
+            // Fetch developer subscription
+            const { data: subscription, error: subError } = await supabase
+              .from('subscriptions')
+              .select(`
+                *,
+                subscriptions_package:package_id (
+                  id,
+                  name,
+                  description,
+                  features,
+                  local_currency_price,
+                  international_currency_price,
+                  duration,
+                  span,
+                  display_text,
+                  ideal_duration,
+                  user_type,
+                  is_active
+                )
+              `)
+              .eq('user_id', developer.developer_id)
+              .eq('user_type', 'developer')
+              .in('status', ['pending', 'active', 'grace_period'])
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+
+            if (!subError && subscription) {
+              setDeveloperSubscription(subscription)
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching developer data:', error)
+        }
+      }
+    }
+
+    fetchDeveloperData()
+  }, [isTeamMember, user?.profile?.organization_id, user?.profile?.organization_type])
+
+  // Get developer profile image - use developer's image for both developers and team members
+  const profileImage = useMemo(() => {
+    if (isTeamMember && developerData?.profile_image) {
+      // For team members, use developer's profile image
+      try {
+        if (typeof developerData.profile_image === 'string') {
+          const parsed = JSON.parse(developerData.profile_image)
+          return parsed?.url || parsed || '/avatar.jpg'
+        } else if (typeof developerData.profile_image === 'object') {
+          return developerData.profile_image?.url || developerData.profile_image || '/avatar.jpg'
+        }
+        return developerData.profile_image || '/avatar.jpg'
+      } catch (e) {
+        if (typeof developerData.profile_image === 'string' && developerData.profile_image.startsWith('http')) {
+          return developerData.profile_image
+        }
+        return '/avatar.jpg'
+      }
+    } else if (!isTeamMember && user?.profile?.profile_image) {
+      // For developers, use their own profile image
+      const image = typeof user.profile.profile_image === 'string'
+        ? user.profile.profile_image
+        : user.profile.profile_image.url
+      return image || '/avatar.jpg'
+    }
+    return '/avatar.jpg'
+  }, [user, isTeamMember, developerData])
+
+  const teamMemberName = isTeamMember 
+    ? `${user?.profile?.first_name || ''} ${user?.profile?.last_name || ''}`.trim() || 'Team Member'
+    : null
+  const teamMemberRole = isTeamMember ? user?.profile?.role_name || 'Team Member' : null
+  const developerName = isTeamMember 
+    ? (developerData?.name || user?.profile?.organization_name || 'Developer')
+    : (user?.profile?.name || user?.profile?.company_name || 'Developer')
+  
   const accountStatus = user?.profile?.account_status || 'active'
   const email = user?.profile?.email || user?.email || 'N/A'
-  const developerSlug = user?.profile?.slug || user?.id || 'developer'
-  const subscription = user?.subscription
+  const developerSlug = isTeamMember 
+    ? (developerData?.slug || user?.profile?.organization_slug || 'developer')
+    : (user?.profile?.organization_slug || user?.profile?.slug || user?.id || 'developer')
+  
+  // Use developer subscription for team members, or user subscription for developers
+  const subscription = isTeamMember ? developerSubscription : user?.subscription
   const packageName = subscription?.subscriptions_package?.name || 'No Package'
   
   // Format next billing date
@@ -252,21 +343,21 @@ const DeveloperTopNav = ({ onSearch }) => {
   }
 
   return (
-    <div className="fixed top-0   w-full  left-1/2 -translate-x-1/2    overflow-y z-100 backdrop-blur-mdw-full shadow-sm bg-white/20 backdrop-blur-sm">
+    <div className="fixed top-0 w-full left-1/2 -translate-x-1/2 overflow-y z-50 backdrop-blur-md shadow-sm bg-white/20 backdrop-blur-sm">
       <div className="">
-        <div className="mx-auto flex  items-center justify-between px-4 py-4 text-primary_color">
-          {/* Logo / Branding */}
-          <div className="flex items-center gap-3">
-    <Link href="/">
-    <img src="/iska-dark.png" alt="logo" className='w-[60px]'></img>
-     </Link>
+        <div className="mx-auto flex items-center justify-between px-4 py-4 text-primary_color relative">
+          {/* Logo / Branding - Hidden on small devices */}
+          <div className="hidden md:flex items-center gap-3 flex-shrink-0">
+            <Link href="/">
+              <img src="/iska-dark.png" alt="logo" className='w-[60px]'></img>
+            </Link>
             <div>
             
             </div>
           </div>
 
-          {/* Search */}
-          <div className="hidden w-full max-w-md md:block relative" ref={searchRef}>
+          {/* Search - Centered */}
+          <div className="hidden md:block absolute left-1/2 -translate-x-1/2 w-full max-w-md" ref={searchRef}>
             <form
               onSubmit={handleSubmit}
               className="flex items-center"
@@ -330,7 +421,8 @@ const DeveloperTopNav = ({ onSearch }) => {
                         {searchResults.developments.map((development) => (
                           <Link
                             key={development.id}
-                            href={`/developer/${user?.profile?.slug}/developments/${development.slug}`}
+                            href={`/developer/${user?.profile?.organization_slug || user?.profile?.slug}/developments/${development.slug}`}
+                            prefetch={false}
                             onClick={() => {
                               setShowResults(false)
                               setQuery('')
@@ -376,7 +468,8 @@ const DeveloperTopNav = ({ onSearch }) => {
                         {searchResults.listings.map((listing) => (
                           <Link
                             key={listing.id}
-                            href={`/developer/${user?.profile?.slug}/units/${listing.slug}`}
+                            href={`/developer/${user?.profile?.organization_slug || user?.profile?.slug}/units/${listing.slug}`}
+                            prefetch={false}
                             onClick={() => {
                               setShowResults(false)
                               setQuery('')
@@ -425,12 +518,25 @@ const DeveloperTopNav = ({ onSearch }) => {
             )}
           </div>
 
-          {/* Profile */}
-          <div className="relative">
+          {/* Profile - Moved to right */}
+          <div className="relative ml-auto flex-shrink-0 z-10">
             <button
               onClick={() => setOpen((prev) => !prev)}
               className="flex items-center gap-3 rounded-md border border-white/50 bg-white/40 px-3 py-1.5 transition hover:bg-white/20"
             >
+              <div className="hidden text-left text-sm md:block">
+                {isTeamMember ? (
+                  <>
+                    <p className="leading-tight text-sm text-primary_color">{teamMemberName}</p>
+                    <p className='text-[0.8em] italic text-primary_color'>{teamMemberRole}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="leading-tight text-sm text-primary_color">{developerName}</p>
+                    <p className='text-[0.8em] italic text-primary_color'>Developer</p>
+                  </>
+                )}
+              </div>
               <div className="relative h-10 w-10 overflow-hidden rounded-full md:rounded-md border border-white/20">
                 <Image
                   src={profileImage}
@@ -441,12 +547,6 @@ const DeveloperTopNav = ({ onSearch }) => {
                   unoptimized
                 />
               </div>
-              <div className="hidden text-left text-sm md:block">
-                
-                <p className=" leading-tight text-sm">{developerName}</p>
-                <p className='text-[0.8em] italic'>Developer </p>
-                {/* <p className="text-xs uppercase tracking-wide text-white/70">{accountStatus}</p> */}
-              </div>
               <FiChevronDown className={`transition ${open ? 'rotate-180' : ''}`} />
             </button>
 
@@ -454,29 +554,45 @@ const DeveloperTopNav = ({ onSearch }) => {
               <div className="absolute right-0 mt-3 w-64 rounded-2xl border border-gray-100 bg-white p-4 text-gray-800 shadow-lg z-50">
                 {/* User Name */}
                 <div className="mb-3">
-                  <p className="text-sm font-">{developerName}</p>
-                  <p className="text-xs text-gray-600 capitalize">
-                    {user?.user_type || 'Developer'}, {accountStatus}
-                  </p>
+                  {isTeamMember ? (
+                    <>
+                      <p className="text-sm text-primary_color">Member of</p>
+                      <p className="text-sm font-semibold text-primary_color">{developerName}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-semibold text-primary_color">{developerName}</p>
+                      <p className="text-sm text-primary_color capitalize">
+                        Developer, {accountStatus}
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 {/* Separator */}
                 <div className="border-t border-gray-200 my-3"></div>
 
                 {/* Next Billing Date and Package */}
-                <div className="mb-3 flex flex-col gap-2">
-          <span>
-          <p className="text-xs font-bold ">Package:</p>
-          <p className="text-sm ">{packageName}</p>
-          </span>
-                
-                <span>
-                <p className="text-xs font-bold ">Next Billing Date:</p>
-                  <p className="text-sm ">{nextBillingDate}</p>
-                 
-                </span>
-               
-                </div>
+                {subscription && (
+                  <div className="mb-3 flex flex-col gap-2">
+                    <span>
+                      <p className="text-sm font-bold text-primary_color">Package:</p>
+                      <p className="text-sm text-primary_color">{packageName}</p>
+                    </span>
+                    
+                    <span>
+                      <p className="text-sm font-bold text-primary_color">Next Billing Date:</p>
+                      <p className="text-sm text-primary_color">{nextBillingDate}</p>
+                    </span>
+                    
+                    {subscription?.status && (
+                      <span>
+                        <p className="text-sm font-bold text-primary_color">Status:</p>
+                        <p className="text-sm text-primary_color capitalize">{subscription.status}</p>
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Separator */}
                 <div className="border-t border-gray-200 my-3"></div>
@@ -484,11 +600,12 @@ const DeveloperTopNav = ({ onSearch }) => {
                 {/* Profile Link */}
                 <Link
                   href={`/developer/${developerSlug}/profile`}
+                  prefetch={false}
                   onClick={() => setOpen(false)}
                   className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors mb-2"
                 >
-                  <FiUser className="w-4 h-4" />
-                  <span className="text-sm">Profile</span>
+                  <FiUser className="w-4 h-4 text-primary_color" />
+                  <span className="text-sm text-primary_color">Profile</span>
                 </Link>
 
                 {/* Logout */}

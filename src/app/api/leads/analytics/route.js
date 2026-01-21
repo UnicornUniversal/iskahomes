@@ -41,12 +41,14 @@ export async function GET(request) {
     }
 
     // Build date filter
+    // IMPORTANT: Exclude anonymous/unknown seekers - only get leads with user IDs (non-anonymous)
     let dateFilter = supabaseAdmin
       .from('leads')
       .select('*')
       .eq('lister_id', finalListerId)
       .eq('lister_type', listerType)
-      .not('seeker_id', 'is', null)
+      .not('seeker_id', 'is', null) // Only leads with seeker_id
+      .or('is_anonymous.is.null,is_anonymous.eq.false') // Exclude anonymous leads (only get non-anonymous leads)
 
     if (dateFrom) {
       dateFilter = dateFilter.gte('first_action_date', dateFrom)

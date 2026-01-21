@@ -1,14 +1,18 @@
+'use client'
 import React from 'react'
-import DeveloperNav from '@/app/components/developers/DeveloperNav'
+import { useAuth } from '@/contexts/AuthContext'
 import Appointments from '@/app/components/developers/Appointments'
-import CalendarAppointments from '@/app/components/shared/CalendarAppointments'
-const page = () => {
-  return (
-    <div className='w-full  '>
-       
 
-      
-      <Appointments />
+const page = () => {
+  const { user } = useAuth()
+  
+  // Use developer_id from profile (already set in AuthContext for team members)
+  const accountId = user?.profile?.developer_id || user?.id
+  const accountType = 'developer'
+
+  return (
+    <div className='w-full'>
+      <Appointments accountId={accountId} accountType={accountType} />
     </div>
   )
 }

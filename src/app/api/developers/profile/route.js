@@ -1,28 +1,27 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { verifyToken } from '@/lib/jwt'
+import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 
 // GET - Fetch developer profile
 export async function GET(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authorization header missing' }, { status: 401 })
-    }
-
-    const token = authHeader.split(' ')[1]
-    const decoded = verifyToken(token)
+    // Authenticate request (handles both developers and team members)
+    const { userInfo, error: authError, status } = await authenticateRequest(request)
     
-    if (!decoded || decoded.user_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid token or user type' }, { status: 401 })
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status })
     }
 
-    // Get developer profile
+    // Must be developer organization (owner or team member)
+    if (userInfo.organization_type !== 'developer') {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
+    }
+
+    // Get developer profile using organization_id
     const { data: developer, error } = await supabaseAdmin
       .from('developers')
       .select('*')
-      .eq('developer_id', decoded.user_id)
+      .eq('id', userInfo.organization_id)
       .single()
 
     if (error) {
@@ -59,17 +58,16 @@ export async function GET(request) {
 // PUT - Update developer profile
 export async function PUT(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authorization header missing' }, { status: 401 })
+    // Authenticate request (handles both developers and team members)
+    const { userInfo, error: authError, status } = await authenticateRequest(request)
+    
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status })
     }
 
-    const token = authHeader.split(' ')[1]
-    const decoded = verifyToken(token)
-    
-    if (!decoded || decoded.user_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid token or user type' }, { status: 401 })
+    // Must be developer organization (owner or team member)
+    if (userInfo.organization_type !== 'developer') {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
     }
 
     // Check if request is multipart/form-data (file uploads)
@@ -80,7 +78,7 @@ export async function PUT(request) {
     const { data: existingDeveloper } = await supabaseAdmin
       .from('developers')
       .select('company_gallery')
-      .eq('developer_id', decoded.user_id)
+      .eq('id', userInfo.organization_id)
       .single()
 
     const existingGallery = existingDeveloper?.company_gallery || []
@@ -251,7 +249,7 @@ export async function PUT(request) {
               // Extract just the path part if it's a full path
               const pathToDelete = img.path.startsWith('profile/gallery/') || img.path.startsWith('company-gallery/') 
                 ? img.path 
-                : `profile/gallery/${decoded.user_id}/${img.path.split('/').pop()}`
+                : `profile/gallery/${userInfo.organization_id}/${img.path.split('/').pop()}`
               
               const { error: deleteError } = await supabaseAdmin.storage
                 .from('iskaHomes')
@@ -301,7 +299,7 @@ export async function PUT(request) {
               const fileExtension = file.name.split('.').pop() || 'jpg'
               // Use only timestamp and random string, not original filename to avoid special characters
               const fileName = `gallery-${timestamp}-${randomString}.${fileExtension}`
-              const filePath = `profile/gallery/${decoded.user_id}/${fileName}`
+              const filePath = `profile/gallery/${userInfo.organization_id}/${fileName}`
 
               // Convert file to buffer (required for Supabase storage)
               const fileBuffer = await file.arrayBuffer()
@@ -390,7 +388,7 @@ export async function PUT(request) {
               // Extract just the path part if it's a full path
               const pathToDelete = img.path.startsWith('profile/gallery/') || img.path.startsWith('company-gallery/') 
                 ? img.path 
-                : `profile/gallery/${decoded.user_id}/${img.path.split('/').pop()}`
+                : `profile/gallery/${userInfo.organization_id}/${img.path.split('/').pop()}`
               
               const { error: deleteError } = await supabaseAdmin.storage
                 .from('iskaHomes')
@@ -542,7 +540,7 @@ export async function PUT(request) {
     const { data: updatedDeveloper, error: updateError } = await supabaseAdmin
       .from('developers')
       .update(updateData)
-      .eq('developer_id', decoded.user_id)
+      .eq('id', userInfo.organization_id)
       .select()
       .single()
 

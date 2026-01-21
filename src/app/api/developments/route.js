@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
-import { verifyToken } from '@/lib/jwt'
+import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 import { cache } from 'react'
 import { invalidateDevelopmentsCache } from '@/lib/cacheInvalidation'
 
@@ -19,12 +19,13 @@ async function updateDeveloperTotalDevelopments(developerIdFromRequest) {
       return
     }
 
-    // Count developments where developer_id matches the developer_id from request
+    // Count active developments (not deleted) where developer_id matches
     // Note: developments.developer_id stores developers.developer_id (not developers.id)
     const { count: totalDevelopmentsCount, error: countError } = await supabaseAdmin
       .from('developments')
       .select('*', { count: 'exact', head: true })
       .eq('developer_id', developerIdFromRequest)
+      .neq('development_status', 'deleted')
 
     if (countError) {
       console.error('Error counting developments:', countError)
@@ -56,6 +57,7 @@ const getCachedDevelopments = cache(async (developerId) => {
     .from('developments')
     .select('*')
     .eq('developer_id', developerId)
+    .neq('development_status', 'deleted')
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -96,21 +98,49 @@ export async function GET(request) {
       )
     }
 
-    const token = authHeader.substring(7)
-    const decoded = verifyToken(token)
+    // Authenticate request (handles both developers and team members)
+    const { userInfo, error: authError, status } = await authenticateRequest(request)
     
-    if (!decoded || decoded.developer_id !== developerId) {
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 401 }
-      )
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status })
+    }
+
+    // Must be developer organization
+    if (userInfo.organization_type !== 'developer') {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
+    }
+
+    // Get the actual developer's user_id from organization
+    // For team members, get developer_id from developers table; for developers, use their user_id
+    let actualDeveloperId = developerId
+    
+    if (userInfo.user_type === 'team_member') {
+      const { data: developer } = await supabaseAdmin
+        .from('developers')
+        .select('developer_id')
+        .eq('id', userInfo.organization_id)
+        .single()
+      
+      if (!developer?.developer_id) {
+        return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
+      }
+      
+      actualDeveloperId = developer.developer_id
+    } else {
+      // For developers, developerId should match their user_id
+      if (developerId !== userInfo.user_id) {
+        return NextResponse.json({ error: 'Invalid developer ID' }, { status: 403 })
+      }
+      actualDeveloperId = developerId
     }
 
     // Build query with filters
+    // Exclude deleted developments (only show active ones)
     let query = supabase
       .from('developments')
       .select('*')
-      .eq('developer_id', developerId)
+      .eq('developer_id', actualDeveloperId)
+      .neq('development_status', 'deleted')
 
     // Apply search filter
     if (search) {
@@ -148,8 +178,12 @@ export async function GET(request) {
       )
     }
 
+    // Ensure total_units is always present (default to 0 if null/undefined)
     // Filter by category IDs (stored as JSON arrays)
-    let filtered = developments || []
+    let filtered = (developments || []).map(dev => ({
+      ...dev,
+      total_units: dev.total_units !== null && dev.total_units !== undefined ? dev.total_units : 0
+    }))
     
     if (purpose) {
       filtered = filtered.filter(dev => {
@@ -238,35 +272,40 @@ export async function POST(request) {
       )
     }
 
-    const token = authHeader.substring(7)
-    const decoded = verifyToken(token)
+    // Authenticate request (handles both developers and team members)
+    const { userInfo, error: authError, status } = await authenticateRequest(request)
     
-    console.log('Token verification debug:', {
-      developer_id_from_request: developer_id,
-      decoded_token: decoded ? {
-        id: decoded.id,
-        user_id: decoded.user_id,
-        developer_id: decoded.developer_id,
-        email: decoded.email,
-        user_type: decoded.user_type
-      } : null,
-      comparison: decoded ? {
-        'decoded.developer_id': decoded.developer_id,
-        'developer_id_from_request': developer_id,
-        'types_match': typeof decoded.developer_id === typeof developer_id,
-        'values_match': decoded.developer_id === developer_id
-      } : null
-    });
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status })
+    }
+
+    // Must be developer organization
+    if (userInfo.organization_type !== 'developer') {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
+    }
+
+    // Get the actual developer's user_id from organization
+    // For team members, get developer_id from developers table; for developers, use their user_id
+    let actualDeveloperId = developer_id
     
-    if (!decoded || decoded.developer_id !== developer_id) {
-      console.log('Token verification failed:', {
-        decoded_exists: !!decoded,
-        developer_id_match: decoded ? decoded.developer_id === developer_id : false
-      });
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 401 }
-      )
+    if (userInfo.user_type === 'team_member') {
+      const { data: developer } = await supabaseAdmin
+        .from('developers')
+        .select('developer_id')
+        .eq('id', userInfo.organization_id)
+        .single()
+      
+      if (!developer?.developer_id) {
+        return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
+      }
+      
+      actualDeveloperId = developer.developer_id
+    } else {
+      // For developers, developer_id should match their user_id
+      if (developer_id !== userInfo.user_id) {
+        return NextResponse.json({ error: 'Invalid developer ID' }, { status: 403 })
+      }
+      actualDeveloperId = developer_id
     }
 
     // Debug: Log the data being sent
@@ -276,7 +315,7 @@ export async function POST(request) {
     const { data: development, error } = await supabase
       .from('developments')
       .insert([{
-        developer_id,
+        developer_id: actualDeveloperId,
         ...developmentData
       }])
       .select()
@@ -291,10 +330,10 @@ export async function POST(request) {
     }
 
     // Invalidate cache after successful creation
-    invalidateDevelopmentsCache(developer_id)
+    invalidateDevelopmentsCache(actualDeveloperId)
 
     // Update developer's total_developments count
-    await updateDeveloperTotalDevelopments(developer_id)
+    await updateDeveloperTotalDevelopments(actualDeveloperId)
 
     return NextResponse.json({ 
       success: true, 
