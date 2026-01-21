@@ -29,7 +29,7 @@ export async function GET(request) {
     const page = parseInt(searchParams.get('page')) || 1
     const limit = parseInt(searchParams.get('limit')) || 12
     const search = searchParams.get('search') || ''
-    const status = searchParams.get('status') || ''
+    const listingStatus = searchParams.get('status') || ''
     const offset = (page - 1) * limit
 
     // Build query for units belonging to this developer
@@ -45,8 +45,8 @@ export async function GET(request) {
       query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`)
     }
 
-    if (status) {
-      query = query.eq('listing_status', status)
+    if (listingStatus) {
+      query = query.eq('listing_status', listingStatus)
     }
 
     // Apply pagination
@@ -73,8 +73,8 @@ export async function GET(request) {
     if (search) {
       countQuery = countQuery.or(`title.ilike.%${search}%,description.ilike.%${search}%`)
     }
-    if (status) {
-      countQuery = countQuery.eq('listing_status', status)
+    if (listingStatus) {
+      countQuery = countQuery.eq('listing_status', listingStatus)
     }
 
     const { count: totalCount } = await countQuery

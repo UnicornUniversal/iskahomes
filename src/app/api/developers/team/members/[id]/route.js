@@ -116,7 +116,7 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json()
-    const { role_id, permissions: customPermissions, status, first_name, last_name, phone } = body
+    const { role_id, permissions: customPermissions, status: memberStatus, first_name, last_name, phone } = body
 
     // Prevent changing role of Super Admin member
     if (existingMember.role_id && role_id && role_id !== existingMember.role_id) {
@@ -132,14 +132,14 @@ export async function PUT(request, { params }) {
     }
 
     // Prevent changing status of Super Admin member
-    if (status !== undefined && status !== existingMember.status) {
+    if (memberStatus !== undefined && memberStatus !== existingMember.status) {
       const { data: currentMemberRole } = await supabaseAdmin
         .from('organization_roles')
         .select('name')
         .eq('id', existingMember.role_id)
         .single()
 
-      if (currentMemberRole?.name === 'Super Admin' && status !== 'active') {
+      if (currentMemberRole?.name === 'Super Admin' && memberStatus !== 'active') {
         return NextResponse.json({ error: 'Cannot change status of Super Admin team member' }, { status: 403 })
       }
     }
@@ -149,7 +149,7 @@ export async function PUT(request, { params }) {
     if (first_name !== undefined) updateData.first_name = first_name
     if (last_name !== undefined) updateData.last_name = last_name
     if (phone !== undefined) updateData.phone = phone
-    if (status !== undefined) updateData.status = status
+    if (memberStatus !== undefined) updateData.status = memberStatus
 
     // Handle role change
     if (role_id && role_id !== existingMember.role_id) {
