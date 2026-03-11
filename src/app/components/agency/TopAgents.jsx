@@ -133,7 +133,7 @@ const TopAgents = ({ limit = 7, agencyId = null }) => {
         {agents.map((agent, index) => (
           <Link
             key={agent.id}
-            href={`/agency/${user?.profile?.slug || ''}/agents/${agent.slug || agent.id}/profile`}
+            href={`/agency/${user?.profile?.slug || user?.profile?.organization_slug || ''}/agents/${agent.slug || agent.id}/profile`}
             className="block p-4 hover:bg-gray-50 transition-colors"
           >
             <div className="flex items-center justify-between">

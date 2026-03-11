@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function GET(request, { params }) {
   try {
@@ -78,6 +79,17 @@ export async function GET(request, { params }) {
     if (listingsError) {
       console.error('Error counting listings:', listingsError)
     }
+
+    captureAuditEvent('development_stats_viewed', {
+      user_id: actualDeveloperId,
+      user_type: 'developer',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/developments/[id]/stats',
+      metadata: {
+        development_id: id
+      }
+    }, actualDeveloperId)
 
     return NextResponse.json({
       success: true,

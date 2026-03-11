@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function POST(request) {
   try {
@@ -91,6 +92,14 @@ export async function POST(request) {
         { status: 400 }
       )
     }
+
+    captureAuditEvent('auth_password_changed', {
+      user_id: decoded.user_id ?? decoded.id,
+      user_type: decoded.user_type,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/auth/change-password',
+    }, decoded.user_id ?? decoded.id)
 
     return NextResponse.json({
       success: true,

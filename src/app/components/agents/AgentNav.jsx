@@ -182,6 +182,22 @@ const AgentNav = ({ active }) => {
                     ? 'translate-x-0' 
                     : '-translate-x-full lg:translate-x-0'
             }`}>
+                {/* Logo - first element, links to homepage */}
+                <div className="mb-6">
+                    <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
+                        <img src="/iska-dark.png" alt="ISKA Homes" className="max-w-[120px] w-24" />
+                    </Link>
+                </div>
+
+                {/* Close button - small/medium devices only */}
+                <button
+                    onClick={toggleMobileMenu}
+                    className="lg:hidden absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                    aria-label="Close navigation"
+                >
+                    <FiX className="w-5 h-5" />
+                </button>
+
                 <div className="mb-8">
                     <h5 className="mb-2">Agent</h5>
                     <h3 className="mb-2">Dashboard</h3>

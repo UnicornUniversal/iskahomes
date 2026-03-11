@@ -1,9 +1,8 @@
 "use client"
 import React, { useState, useEffect } from 'react'
-import { toast, ToastContainer } from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
+import { toast } from 'react-toastify'
 import { useAuth } from '@/contexts/AuthContext'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAnalytics } from '@/hooks/useAnalytics'
 import { FaMapMarkerAlt, FaPhone, FaEnvelope, FaCheckCircle, FaVideo, FaUserFriends } from 'react-icons/fa'
@@ -21,10 +20,12 @@ import CustomDropdown from '@/app/components/propertyManagement/modules/CustomDr
  * @param {string} profileId - Profile ID (for profile context)
  * @param {string} propertyTitle - Title of the property/listing
  * @param {string} propertyType - Type of property
- * @param {object} developer - Developer object
+ * @param {object} developer - Developer object (for developer listings)
+ * @param {object} agent - Agent object (for agent listings)
+ * @param {object} agency - Agency object (for agency listings or agent's parent)
  * @param {object} listing - Listing object
  * @param {object} development - Development object
- * @param {object} profile - Profile object (developer/agent/agency)
+ * @param {object} profile - Profile object (developer/agent/agency - for profile context)
  */
 const LeadContactForm = ({ 
   contextType: providedContextType,
@@ -34,13 +35,18 @@ const LeadContactForm = ({
   propertyTitle, 
   propertyType, 
   developer, 
+  agent,
+  agency,
   listing,
   development,
   profile
 }) => {
   const { user, propertySeekerToken } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const analytics = useAnalytics()
+  // Read share_medium from URL for lead attribution (lead_source) - set when link was shared via WhatsApp, copy, etc.
+  const leadSourceFromUrl = searchParams?.get('share_medium') || null
   const [activeTab, setActiveTab] = useState('appointment')
   const [mode, setMode] = useState('in-person')
   const [loading, setLoading] = useState(false)
@@ -75,57 +81,121 @@ const LeadContactForm = ({
   const getAccountType = () => {
     if (listing) return listing.account_type || (propertyType === 'unit' || propertyType === 'developer' ? 'developer' : 'agent')
     if (development) return 'developer'
-    if (profile) return profile.account_type || 'developer'
+    if (profile) return profile.account_type || (profile.agent_id ? 'agent' : profile.agency_id ? 'agency' : 'developer')
+    if (agent) return 'agent'
+    if (agency) return 'agency'
     return 'developer'
   }
   
   const getAccountId = () => {
-    if (listing) return listing.user_id || developer?.developer_id || 'unknown'
+    if (listing) return listing.user_id || developer?.developer_id || agent?.agent_id || agency?.agency_id || 'unknown'
     if (development) return development.developer_id || developer?.developer_id || 'unknown'
     if (profile) return profile.developer_id || profile.agent_id || profile.agency_id || 'unknown'
-    return developer?.developer_id || 'unknown'
+    return developer?.developer_id || agent?.agent_id || agency?.agency_id || 'unknown'
+  }
+
+  // Resolve owner: developer, agent, or agency (for listing context use listing.account_type)
+  const getOwner = () => {
+    if (profile) return profile
+    const acct = getAccountType()
+    if (acct === 'agent') return agent || agency || null
+    if (acct === 'agency') return agency || agent || null
+    return developer || null
+  }
+
+  // Parse image field (can be JSON string with .url)
+  const parseImageUrl = (img) => {
+    if (!img) return null
+    if (typeof img === 'string') {
+      try {
+        const parsed = JSON.parse(img)
+        return parsed?.url || null
+      } catch { return null }
+    }
+    return img?.url || null
+  }
+
+  // Get WhatsApp from social_media (string or object)
+  const getWhatsAppFromSocial = (social) => {
+    if (!social) return null
+    try {
+      const sm = typeof social === 'string' ? JSON.parse(social) : social
+      return sm?.whatsapp || null
+    } catch { return null }
   }
   
   const getContactInfo = () => {
-    const name = developer?.name || profile?.name || listing?.title || 'Property Owner'
-    const profileImage = developer?.profile_image?.url || profile?.profile_image?.url || null
-    const location = developer?.town && developer?.city ? `${developer.town}, ${developer.city}` : 
-                     developer?.address || listing?.full_address || development?.location || 'Location n/a'
+    const owner = getOwner()
+    const name = owner?.name || developer?.name || agent?.name || agency?.name || profile?.name || listing?.title || 'Property Owner'
     
-    // Determine account type
+    // Profile image: parse JSON if string (developer, agent, agency all can have this)
+    const profileImage = parseImageUrl(owner?.profile_image || developer?.profile_image || agent?.profile_image || agency?.profile_image || profile?.profile_image)
+    
+    let location = (owner?.town && owner?.city) ? `${owner.town}, ${owner.city}` : 
+                   owner?.address || (owner?.city && owner?.country ? `${owner.city}, ${owner.country}` : null) ||
+                   developer?.address || listing?.full_address || development?.location || null
+    if (!location && agency && (agency?.city || agency?.address || agency?.country)) {
+      location = [agency.city, agency.country].filter(Boolean).join(', ') || agency.address
+    }
+    if (!location) location = 'Location n/a'
+    
     const accountType = getAccountType()
     const accountTypeLabel = accountType === 'developer' ? 'Developer' : 
                             accountType === 'agent' ? 'Agent' : 
                             accountType === 'agency' ? 'Agency' : ''
     
-    // Get developer slug for profile link
-    const developerSlug = developer?.slug || profile?.slug || null
+    // Profile link: slug + base path
+    const slug = owner?.slug || developer?.slug || agent?.slug || agency?.slug || profile?.slug
+    const profileHref = accountType === 'developer' ? `/home/allDevelopers/${slug}` :
+                       accountType === 'agent' ? `/home/allAgents/${slug}` :
+                       accountType === 'agency' ? `/home/allAgencies/${slug}` : null
     
-    // Get WhatsApp from social_media if available
-    let whatsappNumber = listing?.whatsapp || developer?.whatsapp || profile?.whatsapp
-    if (!whatsappNumber && developer?.social_media) {
-      try {
-        const socialMedia = typeof developer.social_media === 'string' 
-          ? JSON.parse(developer.social_media) 
-          : developer.social_media
-        whatsappNumber = socialMedia?.whatsapp || null
-      } catch (e) {
-        // If parsing fails, ignore
-      }
-    }
+    let whatsappNumber = listing?.whatsapp || getWhatsAppFromSocial(owner?.social_media) || getWhatsAppFromSocial(developer?.social_media) || getWhatsAppFromSocial(agent?.social_media) || getWhatsAppFromSocial(agency?.social_media) || profile?.whatsapp
+    
+    const phone = owner?.phone || developer?.phone || agent?.phone || agency?.phone || listing?.phone || profile?.phone
+    const email = owner?.email || developer?.email || agent?.email || agency?.email || profile?.email
+    
+    const verified = owner?.verified ?? developer?.verified ?? false
     
     return { 
       name, 
       profileImage, 
       location, 
-      phone: developer?.phone || listing?.phone || profile?.phone, 
+      phone, 
       whatsapp: whatsappNumber, 
-      email: developer?.email || profile?.email,
+      email,
       accountType: accountTypeLabel,
-      developerSlug
+      profileHref,
+      slug,
+      verified
     }
   }
   const contactInfo = getContactInfo()
+
+  // Build analytics context so lister_id/lister_type are correct for agents, agencies, developers
+  const getAnalyticsContext = (extra = {}) => ({
+    contextType: contextType,
+    context_type: contextType,
+    listingId: contextType === 'listing' ? (propertyId || listing?.id) : null,
+    listing_id: contextType === 'listing' ? (propertyId || listing?.id) : null,
+    developmentId: contextType === 'development' ? (developmentId || development?.id) : null,
+    development_id: contextType === 'development' ? (developmentId || development?.id) : null,
+    profileId: contextType === 'profile' ? (profileId || profile?.id || developer?.developer_id) : null,
+    profile_id: contextType === 'profile' ? (profileId || profile?.id || developer?.developer_id) : null,
+    // Lead attribution: share_medium from URL (whatsapp, copy_link, facebook, etc.) - defaults to 'website' if direct visit
+    lead_source: leadSourceFromUrl || 'website',
+    // CRITICAL: Pass listing so useAnalytics getListerContext extracts user_id + account_type for agents
+    ...(listing && { listing }),
+    // For profile context: pass lister_id/lister_type so agent/agency leads are attributed correctly
+    ...(profile && {
+      lister_id: getAccountId(),
+      lister_type: getAccountType(),
+      agent_id: profile.agent_id,
+      agency_id: profile.agency_id
+    }),
+    developerId: developer?.developer_id,
+    ...extra
+  })
 
   // Handlers
   const handleAppointmentInputChange = (e) => setAppointmentData(prev => ({ ...prev, [e.target.name]: e.target.value }))
@@ -138,30 +208,11 @@ const LeadContactForm = ({
     if (!contactInfo.phone) return
     
     try {
-      // Copy phone number FIRST
       await navigator.clipboard.writeText(contactInfo.phone)
-      
-      // Show toast immediately
-      toast.success("Phone number copied!", {
-        position: "bottom-center",
-        autoClose: 3000,
-      })
-      
-      // Track phone interaction (non-blocking)
-      analytics.trackPhoneInteraction('click', {
-        contextType: contextType,
-        listingId: contextType === 'listing' ? (propertyId || listing?.id) : null,
-        developmentId: contextType === 'development' ? (developmentId || development?.id) : null,
-        profileId: contextType === 'profile' ? (profileId || profile?.id || developer?.developer_id) : null,
-        developerId: developer?.developer_id,
-        phoneNumber: contactInfo.phone
-      }).catch(err => console.error('Analytics error:', err))
+      toast.success("Phone number copied!", { autoClose: 3000 })
+      analytics.trackPhoneInteraction('click', getAnalyticsContext({ phoneNumber: contactInfo.phone })).catch(() => {})
     } catch (error) {
-      console.error('Failed to copy phone number:', error)
-      toast.error("Failed to copy phone number", {
-        position: "bottom-center",
-        autoClose: 3000,
-      })
+      toast.error("Failed to copy phone number", { autoClose: 3000 })
     }
   }
   
@@ -174,35 +225,12 @@ const LeadContactForm = ({
     const whatsappLink = `https://wa.me/${contactInfo.whatsapp}`
     
     try {
-      // Copy WhatsApp link FIRST
       await navigator.clipboard.writeText(whatsappLink)
-      
-      // Show toast immediately
-      toast.success("WhatsApp link copied!", {
-        position: "bottom-center",
-        autoClose: 2000,
-      })
-      
-      // Track message click (non-blocking)
-      analytics.trackMessageClick({
-        contextType: contextType,
-        listingId: contextType === 'listing' ? (propertyId || listing?.id) : null,
-        developmentId: contextType === 'development' ? (developmentId || development?.id) : null,
-        profileId: contextType === 'profile' ? (profileId || profile?.id || developer?.developer_id) : null,
-        developerId: developer?.developer_id,
-        messageType: 'whatsapp'
-      }).catch(err => console.error('Analytics error:', err))
-      
-      // Open WhatsApp after toast is visible (delay to show toast first)
-      setTimeout(() => {
-        window.open(whatsappLink, '_blank')
-      }, 500)
+      toast.success("WhatsApp link copied!", { autoClose: 2000 })
+      analytics.trackMessageClick(getAnalyticsContext({ messageType: 'whatsapp' })).catch(() => {})
+      setTimeout(() => window.open(whatsappLink, '_blank'), 300)
     } catch (error) {
-      console.error('Failed to copy WhatsApp link:', error)
-      toast.error("Failed to copy WhatsApp link", {
-        position: "bottom-center",
-        autoClose: 3000,
-      })
+      toast.error("Failed to copy WhatsApp link", { autoClose: 3000 })
     }
   }
   
@@ -213,35 +241,17 @@ const LeadContactForm = ({
     if (!contactInfo.email) return
     
     try {
-      // Copy email FIRST
       await navigator.clipboard.writeText(contactInfo.email)
       
       // Show toast immediately
-      toast.success("Email address copied!", {
-        position: "bottom-center",
-        autoClose: 2000,
-      })
+      toast.success("Email address copied!", { autoClose: 2000 })
       
       // Track email click (non-blocking)
-      analytics.trackMessageClick({
-        contextType: contextType,
-        listingId: contextType === 'listing' ? (propertyId || listing?.id) : null,
-        developmentId: contextType === 'development' ? (developmentId || development?.id) : null,
-        profileId: contextType === 'profile' ? (profileId || profile?.id || developer?.developer_id) : null,
-        developerId: developer?.developer_id,
-        messageType: 'email'
-      }).catch(err => console.error('Analytics error:', err))
+      analytics.trackMessageClick(getAnalyticsContext({ messageType: 'email' })).catch(() => {})
       
-      // Open email client after toast is visible (delay to show toast first)
-      setTimeout(() => {
-        window.location.href = `mailto:${contactInfo.email}`
-      }, 500)
+      setTimeout(() => { window.location.href = `mailto:${contactInfo.email}` }, 300)
     } catch (error) {
-      console.error('Failed to copy email:', error)
-      toast.error("Failed to copy email address", {
-        position: "bottom-center",
-        autoClose: 3000,
-      })
+      toast.error("Failed to copy email address", { autoClose: 3000 })
     }
   }
   
@@ -250,65 +260,83 @@ const LeadContactForm = ({
     
     // Check if user is logged in
     if (!user) {
-      toast.error("Please log in to book an appointment", {
-        position: "bottom-center",
-        autoClose: 3000,
-      })
+      toast.error("Please log in to book an appointment")
       router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'))
       return
     }
     
     // Check if user is a property seeker
     if (user.user_type !== 'property_seeker') {
-      toast.error("Only property seekers can book appointments", {
-        position: "bottom-center",
-        autoClose: 3000,
-      })
+      toast.error("Only property seekers can book appointments")
       return
     }
     
     // Validate required fields
     if (!appointmentData.date || !appointmentData.time || !appointmentData.name || !appointmentData.email) {
-      toast.error("Please fill in all required fields", {
-        position: "bottom-center",
-        autoClose: 3000,
-      })
+      toast.error("Please fill in all required fields")
       return
     }
     
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(appointmentData.email)) {
-      toast.error("Please enter a valid email address", {
-        position: "bottom-center",
-        autoClose: 3000,
-      })
+      toast.error("Please enter a valid email address")
       return
     }
     
     setLoading(true)
     
-    try {
-      // Track appointment click with context
-      await analytics.trackAppointmentClick({
-        contextType: contextType,
-        listingId: contextType === 'listing' ? (propertyId || listing?.id) : null,
-        developmentId: contextType === 'development' ? (developmentId || development?.id) : null,
-        profileId: contextType === 'profile' ? (profileId || profile?.id || developer?.developer_id) : null,
-        developerId: developer?.developer_id,
-        appointmentType: mode === 'video' ? 'virtual' : 'viewing'
-      })
-      
-      // TODO: Implement actual appointment submission logic
-      setTimeout(() => {
+    const listingId = contextType === 'listing' ? (propertyId || listing?.id) : null
+    const accountType = getAccountType()
+    const accountId = getAccountId()
+    const token = propertySeekerToken || (typeof window !== 'undefined' ? localStorage.getItem('property_seeker_token') : null)
+    
+    // Listing context: create actual appointment via API
+    if (listingId && accountId && accountId !== 'unknown' && token && ['developer', 'agent', 'agency'].includes(accountType)) {
+      const toastId = toast.loading("Booking appointment...", { autoClose: false })
+      try {
+        const appointmentType = mode === 'video' ? 'virtual' : 'in-person'
+        const res = await fetch('/api/appointments', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            account_type: accountType,
+            account_id: accountId,
+            listing_id: listingId,
+            seeker_id: user.id,
+            appointment_date: appointmentData.date,
+            appointment_time: appointmentData.time,
+            client_name: appointmentData.name,
+            client_email: appointmentData.email,
+            client_phone: appointmentData.phone || null,
+            notes: appointmentData.message || null,
+            appointment_type: appointmentType,
+          }),
+        })
+        
+        const data = await res.json().catch(() => ({}))
+        
+        if (!res.ok) {
+          throw new Error(data.error || data.details || 'Failed to book appointment')
+        }
+        
         setLoading(false)
-        toast.success("Appointment request sent!")
-      }, 1500)
-    } catch (error) {
-      console.error('Error submitting appointment:', error)
-      setLoading(false)
-      toast.error("Failed to send appointment request")
+        toast.update(toastId, { type: 'success', render: "Appointment request sent!", autoClose: 3000, isLoading: false })
+        analytics.trackAppointmentClick(getAnalyticsContext({ appointmentType: mode === 'video' ? 'virtual' : 'viewing' })).catch(() => {})
+      } catch (error) {
+        setLoading(false)
+        toast.update(toastId, { type: 'error', render: error.message || "Failed to send appointment request", autoClose: 4000, isLoading: false })
+      }
+      return
     }
+    
+    // Profile/development context: show toast immediately, track lead in background
+    setLoading(false)
+    toast.success("Appointment request sent!")
+    analytics.trackAppointmentClick(getAnalyticsContext({ appointmentType: mode === 'video' ? 'virtual' : 'viewing' })).catch(err => console.error('Analytics error:', err))
   }
   
   const handleMessageSubmit = async (e) => {
@@ -316,65 +344,82 @@ const LeadContactForm = ({
     
     // Check if user is logged in
     if (!user) {
-      toast.error("Please log in to send a message", {
-        position: "bottom-center",
-        autoClose: 3000,
-      })
+      toast.error("Please log in to send a message")
       router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'))
       return
     }
     
     // Check if user is a property seeker
     if (user.user_type !== 'property_seeker') {
-      toast.error("Only property seekers can send messages", {
-        position: "bottom-center",
-        autoClose: 3000,
-      })
+      toast.error("Only property seekers can send messages")
       return
     }
     
     // Validate message is not empty
     if (!messageData.message || messageData.message.trim().length === 0) {
-      toast.error("Please enter a message", {
-        position: "bottom-center",
-        autoClose: 3000,
-      })
+      toast.error("Please enter a message")
       return
     }
     
     // Validate minimum message length
     if (messageData.message.trim().length < 10) {
-      toast.error("Message must be at least 10 characters long", {
-        position: "bottom-center",
-        autoClose: 3000,
-      })
+      toast.error("Message must be at least 10 characters long")
+      return
+    }
+    
+    const token = propertySeekerToken || (typeof window !== 'undefined' ? localStorage.getItem('property_seeker_token') : null)
+    if (!token) {
+      toast.error("Session expired. Please log in again.")
+      router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'))
+      return
+    }
+    
+    const otherUserId = getAccountId()
+    const otherUserType = getAccountType()
+    if (!otherUserId || otherUserId === 'unknown') {
+      toast.error("Unable to send message: recipient not found")
       return
     }
     
     setSendingMessage(true)
+    const toastId = toast.loading("Sending message...", { autoClose: false })
     
     try {
-      // Track message click with context
-      await analytics.trackMessageClick({
-        contextType: contextType,
-        listingId: contextType === 'listing' ? (propertyId || listing?.id) : null,
-        developmentId: contextType === 'development' ? (developmentId || development?.id) : null,
-        profileId: contextType === 'profile' ? (profileId || profile?.id || developer?.developer_id) : null,
-        developerId: developer?.developer_id,
-        messageType: 'direct_message'
+      const listingId = contextType === 'listing' ? (propertyId || listing?.id) : null
+      const devId = contextType === 'development' ? (developmentId || development?.id) : null
+      const subject = propertyTitle ? `Inquiry about ${propertyTitle}` : 'General inquiry'
+      
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          otherUserId,
+          otherUserType,
+          firstMessage: messageData.message.trim(),
+          listingId,
+          developmentId: devId,
+          subject,
+          conversationType: 'general_inquiry',
+        }),
       })
       
-      // TODO: Implement actual message submission logic
-      setTimeout(() => {
-        setSendingMessage(false)
-        toast.success("Message sent!")
-        // Clear message after successful send
-        setMessageData({ message: '' })
-      }, 1500)
-    } catch (error) {
-      console.error('Error sending message:', error)
+      const data = await res.json().catch(() => ({}))
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send message')
+      }
+      
       setSendingMessage(false)
-      toast.error("Failed to send message")
+      toast.update(toastId, { type: 'success', render: "Message sent!", autoClose: 2000, isLoading: false })
+      setMessageData({ message: '' })
+      
+      analytics.trackMessageClick(getAnalyticsContext({ messageType: 'direct_message' })).catch(() => {})
+    } catch (error) {
+      setSendingMessage(false)
+      toast.update(toastId, { type: 'error', render: error.message || "Failed to send message", autoClose: 4000, isLoading: false })
     }
   }
 
@@ -400,7 +445,7 @@ const LeadContactForm = ({
                 </span>
               </div>
             )}
-            {developer?.verified && (
+            {contactInfo.verified && (
               <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center shadow-sm">
                 <FaCheckCircle className="w-2.5 h-2.5 text-white" />
               </div>
@@ -408,19 +453,23 @@ const LeadContactForm = ({
           </div>
 
           {/* Name & Location */}
-          <div className="flex-1 min-w-0">
-            {contactInfo.developerSlug && getAccountType() === 'developer' ? (
-              <Link 
-                href={`/home/allDevelopers/${contactInfo.developerSlug}`}
-                className="block text-lg font-bold text-primary_color hover:text-primary_color/80 transition-colors mb-1"
-              >
-                {contactInfo.name}
-              </Link>
-            ) : (
-              <h3 className="text-lg font-bold text-primary_color mb-1">
-                {contactInfo.name}
-              </h3>
-            )}
+          <div className=" min-w-0">
+            <div className="">
+              {contactInfo.profileHref && contactInfo.slug ? (
+                <Link 
+                  href={contactInfo.profileHref}
+                  className="text-lg font-bold  text-primary_color hover:text-primary_color/80 transition-colors"
+                >
+                  {contactInfo.name}
+                </Link>
+              ) : (
+                <span className="text-lg font-bold text-primary_color">{contactInfo.name}</span>
+              )}
+          
+            </div>
+            {contactInfo.accountType && (
+                <span className="text-xs font-medium text-primary_color/60 ml-1.5">{contactInfo.accountType}</span>
+              )}
             <p className="text-xs text-primary_color/70 flex items-center gap-1.5">
               <FaMapMarkerAlt className="w-3 h-3 flex-shrink-0" />
               <span className="truncate">{contactInfo.location}</span>
@@ -628,21 +677,6 @@ const LeadContactForm = ({
         </button>
       </div>
       
-      {/* Toast Container - Bottom Center */}
-      <ToastContainer
-        position="bottom-center"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={true}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-        style={{ zIndex: 9999 }}
-        toastClassName="custom-toast"
-      />
     </div>
   )
 }

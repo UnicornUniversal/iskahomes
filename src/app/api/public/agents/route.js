@@ -23,7 +23,6 @@ export async function GET(request) {
         email,
         phone,
         profile_image,
-        cover_image,
         bio,
         slug,
         account_status,

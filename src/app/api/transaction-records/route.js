@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // Helper function to upload files to Supabase Storage
 async function uploadFile(file, folder, subfolder) {
@@ -133,6 +134,27 @@ export async function GET(request) {
         { status: 500 }
       )
     }
+
+    captureAuditEvent('transaction_record_listed', {
+      user_id: decoded.user_id || decoded.agent_id || decoded.agency_id || 'unknown',
+      user_type: decoded.user_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/transaction-records',
+      metadata: {
+        listing_id: listingId,
+        agent_id: agentId,
+        agency_id: agencyId,
+        transaction_type: transactionType,
+        status,
+        payment_status: paymentStatus,
+        search,
+        limit,
+        offset,
+        result_count: data?.length || 0,
+        total_count: count || 0
+      }
+    }, decoded.user_id || decoded.agent_id || decoded.agency_id || 'unknown')
 
     return NextResponse.json({
       success: true,
@@ -357,6 +379,20 @@ export async function POST(request) {
         { status: 500 }
       )
     }
+
+    captureAuditEvent('transaction_record_created', {
+      user_id: decoded.user_id || decoded.agent_id || decoded.agency_id || 'unknown',
+      user_type: decoded.user_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/transaction-records',
+      metadata: {
+        transaction_record_id: newTransaction?.id,
+        listing_id: transactionData.listing_id || null,
+        agency_id: transactionData.agency_id || null,
+        transaction_type: transactionData.transaction_type || null
+      }
+    }, decoded.user_id || decoded.agent_id || decoded.agency_id || 'unknown')
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function POST(request) {
   try {
@@ -60,9 +61,9 @@ export async function POST(request) {
     }
 
     // Validate account_type
-    if (!['agent', 'developer'].includes(account_type)) {
+    if (!['agent', 'developer', 'agency'].includes(account_type)) {
       return NextResponse.json(
-        { error: 'Invalid account_type. Must be "agent" or "developer"' },
+        { error: 'Invalid account_type. Must be "agent", "developer", or "agency"' },
         { status: 400 }
       )
     }
@@ -146,35 +147,75 @@ export async function POST(request) {
 
       if (updateListingError) {
         console.error('Error updating listing appointments count:', updateListingError)
-        // Don't fail the request, just log the error
-      } else {
-        // If listing belongs to a developer, also update developers table
-        if (listing.account_type === 'developer' && listing.user_id) {
-          const { data: developer, error: devError } = await supabase
-            .from('developers')
-            .select('developer_id, total_appointments')
-            .eq('developer_id', listing.user_id)
-            .single()
+      }
+    }
 
-          if (!devError && developer) {
-            const newDevAppointmentsCount = (developer.total_appointments || 0) + 1
-            const { error: updateDevError } = await supabase
-              .from('developers')
-              .update({ 
-                total_appointments: newDevAppointmentsCount
-              })
-              .eq('developer_id', listing.user_id)
+    // Update total_appointments for developer/agent/agency using request account_type and account_id
+    const tableName = account_type === 'developer' ? 'developers' : account_type === 'agency' ? 'agencies' : 'agents'
+    const idField = account_type === 'developer' ? 'developer_id' : account_type === 'agency' ? 'agency_id' : 'agent_id'
 
-            if (updateDevError) {
-              console.error('Error updating developer appointments count:', updateDevError)
-              // Don't fail the request, just log the error
-            }
-          }
+    const { data: listerRow, error: listerFetchError } = await supabase
+      .from(tableName)
+      .select(`${idField}, total_appointments${account_type === 'agent' ? ', agency_id' : ''}`)
+      .eq(idField, account_id)
+      .single()
+
+    if (!listerFetchError && listerRow) {
+      const newCount = (listerRow.total_appointments || 0) + 1
+      const { error: updateListerError } = await supabase
+        .from(tableName)
+        .update({ total_appointments: newCount })
+        .eq(idField, account_id)
+
+      if (updateListerError) {
+        console.error(`Error updating ${tableName} appointments count:`, updateListerError)
+      }
+
+      // When agent has agency_id: also increment agency's agents_total_appointments
+      if (account_type === 'agent' && listerRow.agency_id) {
+        const { data: agencyRow, error: agencyFetchErr } = await supabase
+          .from('agencies')
+          .select('agents_total_appointments')
+          .eq('agency_id', listerRow.agency_id)
+          .single()
+        if (!agencyFetchErr && agencyRow) {
+          await supabase
+            .from('agencies')
+            .update({ agents_total_appointments: (agencyRow.agents_total_appointments || 0) + 1 })
+            .eq('agency_id', listerRow.agency_id)
+        }
+      }
+
+      // When agency direct: increment agency_appointments
+      if (account_type === 'agency') {
+        const { data: agencyRow, error: agencyFetchErr } = await supabase
+          .from('agencies')
+          .select('agency_appointments')
+          .eq('agency_id', account_id)
+          .single()
+        if (!agencyFetchErr && agencyRow) {
+          await supabase
+            .from('agencies')
+            .update({ agency_appointments: (agencyRow.agency_appointments || 0) + 1 })
+            .eq('agency_id', account_id)
         }
       }
     }
 
     console.log('Appointment created successfully:', appointment.id)
+
+    captureAuditEvent('appointment_created', {
+      user_id: decoded.id,
+      user_type: decoded.user_type || 'property_seeker',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/appointments',
+      metadata: {
+        appointment_id: appointment.id,
+        listing_id,
+        account_type
+      }
+    }, decoded.id)
 
     return NextResponse.json({
       success: true,
@@ -287,6 +328,24 @@ export async function GET(request) {
       )
     }
 
+    const auditUserId = decoded?.id || seeker_id || account_id || 'unknown'
+    captureAuditEvent('appointment_listed', {
+      user_id: auditUserId,
+      user_type: decoded?.user_type || account_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/appointments',
+      metadata: {
+        account_type,
+        account_id,
+        listing_id,
+        status,
+        page,
+        limit,
+        result_count: appointments?.length || 0
+      }
+    }, auditUserId)
+
     return NextResponse.json({
       success: true,
       data: appointments || [],
@@ -352,6 +411,18 @@ export async function PUT(request) {
         { status: 500 }
       )
     }
+
+    captureAuditEvent('appointment_updated', {
+      user_id: appointment?.seeker_id || appointment?.account_id || 'unknown',
+      user_type: 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/appointments',
+      metadata: {
+        appointment_id: id,
+        status: updateData.status || null
+      }
+    }, appointment?.seeker_id || appointment?.account_id || 'unknown')
 
     return NextResponse.json({
       success: true,

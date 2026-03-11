@@ -9,6 +9,8 @@ import PropertiesByType from '@/app/components/developers/DataStats/PropertiesBy
 import PropertiesByStatus from '@/app/components/developers/DataStats/PropertiesByStatus'
 import LatestAppointments from '@/app/components/developers/LatestAppointments'
 import PropertiesBySubType from '@/app/components/developers/DataStats/PropertiesBySubType'
+import LatestEngagements from '@/app/components/developers/DataStats/LatestEngagements'
+import LatestServiceCharge from '@/app/components/developers/DataStats/LatestServiceCharge'
 import { useAuth } from '@/contexts/AuthContext'
 import { Building2, Eye, BarChart3, Home, DollarSign } from 'lucide-react'
 import LatestLeads from '@/app/components/developers/DataStats/LatestLeads'
@@ -177,6 +179,11 @@ const page = () => {
             <RecentSales />
           </div>
           <LatestLeads />  
+
+          <div className='grid grid-cols-1 lg:grid-cols-2 gap-4'>
+            <LatestEngagements />
+            <LatestServiceCharge />
+          </div>
 
         <div className='w-full flex justify-between gap-4 flex-col md:grid lg:grid-cols-3 gap-4'>
        

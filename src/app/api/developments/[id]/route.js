@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // Helper function to update developer's total_developments count
 async function updateDeveloperTotalDevelopments(developerIdFromRequest) {
@@ -122,6 +123,15 @@ export async function GET(request, { params }) {
       ...development,
       total_units: development.total_units !== null && development.total_units !== undefined ? development.total_units : 0
     }
+
+    captureAuditEvent('development_viewed', {
+      user_id: userInfo.user_id,
+      user_type: userInfo.user_type || userInfo.organization_type || 'developer',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/developments/[id]',
+      metadata: { development_id: id }
+    }, userInfo.user_id)
 
     return NextResponse.json({ data: developmentWithUnits })
 
@@ -430,6 +440,20 @@ export async function PUT(request, { params }) {
             salesCreated
           })
 
+          captureAuditEvent('development_updated', {
+            user_id: userInfo.user_id,
+            user_type: userInfo.user_type || userInfo.organization_type || 'developer',
+            timestamp: new Date().toISOString(),
+            success: true,
+            api_route: '/api/developments/[id]',
+            metadata: {
+              development_id: id,
+              status: development?.status || null,
+              listings_updated: listingsUpdated,
+              sales_created: salesCreated
+            }
+          }, userInfo.user_id)
+
           return NextResponse.json({ 
             success: true, 
             data: development,
@@ -443,6 +467,18 @@ export async function PUT(request, { params }) {
         // Don't fail the request, just log the error
       }
     }
+
+    captureAuditEvent('development_updated', {
+      user_id: userInfo.user_id,
+      user_type: userInfo.user_type || userInfo.organization_type || 'developer',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/developments/[id]',
+      metadata: {
+        development_id: id,
+        status: development?.status || null
+      }
+    }, userInfo.user_id)
 
     return NextResponse.json({ 
       success: true, 
@@ -568,6 +604,18 @@ export async function DELETE(request, { params }) {
     if (devError || !developer) {
       console.error('Error fetching developer for metrics update:', devError)
       // Still return success since development was soft deleted
+      captureAuditEvent('development_deleted', {
+        user_id: userInfo.user_id,
+        user_type: userInfo.user_type || userInfo.organization_type || 'developer',
+        timestamp: new Date().toISOString(),
+        success: true,
+        api_route: '/api/developments/[id]',
+        metadata: {
+          development_id: id,
+          warning: 'developer_metrics_update_failed'
+        }
+      }, userInfo.user_id)
+
       return NextResponse.json({ 
         success: true,
         message: 'Development deleted successfully',
@@ -607,6 +655,18 @@ export async function DELETE(request, { params }) {
     if (metricsUpdateError) {
       console.error('Error updating developer metrics:', metricsUpdateError)
       // Still return success since development was soft deleted
+      captureAuditEvent('development_deleted', {
+        user_id: userInfo.user_id,
+        user_type: userInfo.user_type || userInfo.organization_type || 'developer',
+        timestamp: new Date().toISOString(),
+        success: true,
+        api_route: '/api/developments/[id]',
+        metadata: {
+          development_id: id,
+          warning: 'developer_metrics_update_failed'
+        }
+      }, userInfo.user_id)
+
       return NextResponse.json({ 
         success: true,
         message: 'Development deleted successfully',
@@ -622,6 +682,15 @@ export async function DELETE(request, { params }) {
       estimated_revenue: newEstimatedRevenue,
       total_revenue: newTotalRevenue
     })
+
+    captureAuditEvent('development_deleted', {
+      user_id: userInfo.user_id,
+      user_type: userInfo.user_type || userInfo.organization_type || 'developer',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/developments/[id]',
+      metadata: { development_id: id }
+    }, userInfo.user_id)
 
     return NextResponse.json({ 
       success: true,

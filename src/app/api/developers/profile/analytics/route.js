@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 function parseJSON(value, fallback = null) {
   if (!value) return fallback
@@ -355,6 +356,31 @@ export async function GET(request) {
           : null
       }
     }
+
+    captureAuditEvent('analytics_viewed', {
+      user_id: developerId,
+      user_type: 'developer',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/developers/profile/analytics',
+      metadata: {
+        range: range || null,
+        date_from: startDate,
+        date_to: endDate
+      }
+    }, developerId)
+    captureAuditEvent('developer_analytics_viewed', {
+      user_id: developerId,
+      user_type: 'developer',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/developers/profile/analytics',
+      metadata: {
+        range: range || null,
+        date_from: startDate,
+        date_to: endDate
+      }
+    }, developerId)
 
     return NextResponse.json(responseData)
   } catch (error) {

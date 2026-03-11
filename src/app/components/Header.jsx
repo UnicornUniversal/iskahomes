@@ -1,9 +1,7 @@
 "use client"
 import React, { useState, useEffect } from 'react'
-import DataCard from '../components/Data/DataCard'
-import SimplePropertyCard from '../components/Data/SimplePropertyCard'
 import { Swiper, SwiperSlide } from 'swiper/react';
-import { Autoplay, Pagination, EffectCoverflow } from 'swiper/modules';
+import { Autoplay, Pagination } from 'swiper/modules';
 import HeaderSearch from './HeaderSearch';
 import Link from 'next/link';
 import 'swiper/css';
@@ -15,6 +13,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Bed, Bath, Square } from 'lucide-react';
 import { getSpecificationDataByTypeId, getFieldDataByKey } from '@/app/components/Data/StaticData';
+import { Playfair_Display } from 'next/font/google';
 
 const dummyImage = "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?q=80&w=735&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
 
@@ -41,6 +40,11 @@ const titleVariants = {
   hidden: { opacity: 0, scale: 0.8 },
   visible: { opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 120, damping: 8, duration: 0.7 } },
 };
+
+const playfairDisplay = Playfair_Display({
+  subsets: ['latin'],
+  weight: ['400', '600', '700']
+})
 
 const Header = () => {
   const [headerProperties, setHeaderProperties] = useState([])
@@ -276,79 +280,83 @@ const Header = () => {
   }, [])
 
   return (
-    <div 
-    
-    
-    className='flex flex-col md:flex-row gap-4 items-center justify-center px-[2em]   h-[80vh] w-full '>
+    <section className='w-full  px-4 py-8 sm:px-6 lg:px-10 lg:py-14'>
+      <div className='mx-auto flex w-full max-w-[1400px] flex-col items-start justify-between gap-8 lg:flex-row lg:items-center'>
         {/* left side */}
         <motion.div
-          className='flex flex-col items-start gap-4 w-full md:w-1/2 '
+          className='w-full lg:w-[52%] flex flex-col items-start gap-5'
           variants={containerVariants}
           initial="hidden"
           animate="visible"
         >
-          <motion.div variants={itemVariants}>
-            <h5 className='text-sm'>Welcome to</h5>
-          </motion.div>
           <motion.h1
-            className='text-primary_color md:text-[5em] font-bold'
+            className={`${playfairDisplay.className} text-primary_color text-[2.4rem] leading-[1.18] sm:text-[3rem] md:text-[3.6rem] lg:text-[4.8rem]`}
             variants={titleVariants}
           >
-            ISKA Homes
+            <motion.h1
+                className={`${playfairDisplay.className} text-primary_color text-[2.4rem] leading-[1.18] sm:text-[3rem] md:text-[3.6rem] lg:text-[5rem]`}
+                variants={titleVariants}
+            >Your Realty Quest</motion.h1>
+            <motion.h1 
+              variants={titleVariants}
+            className={`${playfairDisplay.className} text-primary_color text-[2.4rem] ml-[1em] leading-[1.18] sm:text-[3rem] md:text-[3.6rem] lg:text-[5.5rem]`}
+            >Concludes Here</motion.h1>
+          
+           
           </motion.h1>
-          <motion.div variants={itemVariants}>
-            <h4 className=''>Your Dream Property Awaits You</h4>
+
+          <motion.div variants={itemVariants} className='-mt-2 w-full max-w-[560px]'>
+            <svg
+              viewBox="0 0 620 62"
+              className="h-8 w-full text-primary_color/85"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M10 34C140 18 268 12 432 14C500 15 560 17 610 20"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+              />
+              <path
+                d="M96 43C206 50 310 50 408 41"
+                stroke="currentColor"
+                strokeOpacity="0.5"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
           </motion.div>
-          {/* <p className='text-sm text-gray-500 leading-relaxed max-w-2xl'>
-            Iska Homes is your trusted partner in finding the perfect property. We connect property seekers with verified developers and experienced agents across Ghana and beyond. 
-            <br className="hidden sm:block" />
-            Explore thousands of verified listings, from cozy apartments to grand developments, all in one place. 
-            <br className="hidden sm:block" />
-            Whether you're buying, renting, or investing, we make your property journey seamless and successful.
-          </p> */}
-          <motion.div variants={itemVariants} className='w-full'>
+
+          <motion.div variants={itemVariants} className='w-full max-w-[680px]'>
             <HeaderSearch />
           </motion.div>
-          {/* 
-          <motion.div variants={itemVariants} className='grid grid-cols-3 gap-4 w-full'>
-            <DataCard title="Total Properties" data="1000" />
-            <DataCard title="Total Agents" data="60+" />
-            <DataCard title="Happy Customers   " data="60K+" />
-          </motion.div> */}
 
-
-       <div className='flex items-center gap-4'>
-       <motion.div variants={itemVariants}>
-            <Link href="/home/signup">
-            <button className="secondary_button">Get Started </button>
-            </Link>
-          </motion.div>
-       <motion.div variants={itemVariants}>
-            <Link href="/home/exploreProperties">
-            <button className="secondary_button">Explore Properties</button>
-            </Link>
-          </motion.div>
-       
-       </div>
-
+          <div className='flex flex-wrap items-center gap-3 sm:gap-4'>
+            <motion.div variants={itemVariants}>
+              <Link href="/home/signup">
+                <button className="secondary_button">Get Started</button>
+              </Link>
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <Link href="/home/exploreProperties">
+                <button className="secondary_button">Explore Properties</button>
+              </Link>
+            </motion.div>
+          </div>
         </motion.div>
 
         {/* right side - Swiper carousel */}
-        <div className="w-full md:w-1/2 h-[500px] md:h-[500px] relative">
+        <div className="w-full lg:w-[44%]  relative">
           {loading ? (
             <motion.div
               initial={{ scale: 0.7, opacity: 0 }}
               animate={{ scale: 0.7, opacity: 1 }}
               exit={{ scale: 1, opacity: 0 }}
               transition={{ duration: 0.5 }}
-              className="h-[450px] sm:h-[550px] md:h-[650px] lg:h-[700px] w-full relative rounded-t-full overflow-hidden shadow-lg border-t-4"
-              style={{
-                borderTopColor: 'var(--color-primary_color)',
-              }}
+              className="h-[260px] sm:h-[300px] md:h-[340px] w-full max-w-[360px] mx-auto relative overflow-hidden shadow-lg rounded-t-[200px]"
+           
             >
-              {/* Background with blur and primary color overlay */}
-              <div className="absolute inset-0 bg-primary_color/50 backdrop-blur-sm z-0" />
-              
               {/* Cross-fading images */}
               <div className="relative h-full w-full">
                 {loadingImages.map((image, idx) => (
@@ -380,28 +388,21 @@ const Header = () => {
               initial={{ scale: 0.7, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
-              className="h-full w-full"
+              className="w-full max-w-[360px] mx-auto pb-16"
             >
               <Swiper
-                modules={[Autoplay, Pagination, EffectCoverflow]}
+                modules={[Autoplay, Pagination]}
                 autoplay={{ delay: 3000, disableOnInteraction: false }}
                 loop={true}
                 spaceBetween={0}
                 slidesPerView={1}
-                effect="coverflow"
-                coverflowEffect={{
-                  rotate: 30,
-                  stretch: 0,
-                  depth: 100,
-                  modifier: 1,
-                  slideShadows: true,
-                }}
                 pagination={{ clickable: true }}
-                className="h-full w-full rounded-xl overflow-hidden shadow-lg"
+                className="header-featured-swiper h-full w-full"
               >
                 {headerProperties.map((property, idx) => (
                   <SwiperSlide key={property.id || idx} className='relative h-full w-full'>
-                    <div className='relative h-full w-full'>
+                    <div className='relative h-full w-full flex flex-col'>
+                      <div className='relative h-[350px] sm:h-[500px] md:h-[400px] w-full overflow-hidden rounded-t-[200px] shadow-lg'>
                       <Image 
                         src={property.property_images[0]} 
                         alt={property.propertyName} 
@@ -409,16 +410,29 @@ const Header = () => {
                         className='object-cover'
                         priority={idx === 0}
                       />
-                      <div className="absolute bottom-8 left-8  min-w-[320px] max-w-[90vw] flex flex-col gap-3 z-10">
-                        <SimplePropertyCard
-                          propertyType={property.propertyType}
-                          propertyName={property.propertyName}
-                          propertyPrice={property.propertyPrice}
-                          propertyLocation={property.propertyLocation}
-                          propertyBedrooms={property.propertyBedrooms}
-                          Availability={property.Availability}
-                          specifications={property.specifications}
-                        />
+                      </div>
+                      <div className='pt-3 text-primary_color'>
+                       <span className='flex items-center justify-between flex-wrap gap-2'>
+                       <h6 className='text-sm font-medium bg-primary_color text-white px-2 py-1 rounded-md  tracking-wide'>{property.propertyType}</h6>
+                        <p className='text-base font-semibold mt-1'>{property.propertyPrice}</p>
+                       
+                       </span>
+                        <h3 className='text-[1.2rem] leading-tight font-semibold mt-1'>{property.propertyName}</h3>
+  
+                        <p className='text-sm mt-1'>{property.propertyLocation}</p>
+                        {property.specifications?.length > 0 && (
+                          <div className='mt-2 flex flex-wrap gap-x-4 gap-y-2 text-base'>
+                            {property.specifications.map((spec, specIndex) => (
+                              <span
+                                key={`${property.id || idx}-spec-${specIndex}`}
+                                className='text-primary_color inline-flex items-center gap-1.5'
+                              >
+                                {spec.icon ? <spec.icon className="h-4 w-4" /> : null}
+                                <span>{spec.label}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </SwiperSlide>
@@ -431,8 +445,20 @@ const Header = () => {
             </div>
           )}
         </div>
-      
-    </div>
+      </div>
+      <style jsx global>{`
+        .header-featured-swiper .swiper-pagination {
+          bottom: -46px !important;
+        }
+        .header-featured-swiper .swiper-pagination-bullet {
+          background: var(--color-primary_color);
+          opacity: 0.35;
+        }
+        .header-featured-swiper .swiper-pagination-bullet-active {
+          opacity: 1;
+        }
+      `}</style>
+    </section>
   )
 }
 

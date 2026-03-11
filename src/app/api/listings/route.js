@@ -4,6 +4,7 @@ import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 import { getDeveloperId } from '@/lib/developerIdHelper'
 import { processCurrencyConversions } from '@/lib/currencyConversion'
 import { updateAdminAnalytics } from '@/lib/adminAnalytics'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // Verify import immediately
 console.log('📦 Import check - updateAdminAnalytics type:', typeof updateAdminAnalytics)
@@ -653,6 +654,19 @@ export async function GET(request) {
     }
 
     const { count: totalCount } = await countQuery
+
+    captureAuditEvent('listing_listed', {
+      user_id: 'public',
+      user_type: 'public',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/listings',
+      metadata: {
+        page,
+        limit,
+        result_count: listings?.length || 0
+      }
+    }, 'public')
 
     return NextResponse.json({ 
       success: true,
@@ -1684,6 +1698,31 @@ export async function POST(request) {
     }
 
     console.log('🎉 Returning success response...')
+    captureAuditEvent('listing_created', {
+      user_id: userId,
+      user_type: userInfo.user_type || userInfo.organization_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/listings',
+      metadata: {
+        listing_id: finalListing.id,
+        account_type: finalListing.account_type,
+        listing_type: finalListing.listing_type
+      }
+    }, userId)
+    if (finalListing?.account_type === 'developer' && finalListing?.listing_type === 'unit') {
+      captureAuditEvent('unit_created', {
+        user_id: userId,
+        user_type: userInfo.user_type || userInfo.organization_type || 'developer',
+        timestamp: new Date().toISOString(),
+        success: true,
+        api_route: '/api/listings',
+        metadata: {
+          listing_id: finalListing.id
+        }
+      }, userId)
+    }
+
     return NextResponse.json({ 
       success: true,
       data: finalListing,

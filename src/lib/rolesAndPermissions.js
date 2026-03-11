@@ -49,6 +49,13 @@ const developerPermissions = {
     delete: 'leads.delete',      // Delete leads
     export: 'leads.export'       // Export leads data
   },
+  clients: {
+    view: 'clients.view',           // View clients list
+    create: 'clients.create',       // Create new clients
+    edit: 'clients.edit',          // Edit client information
+    delete: 'clients.delete',      // Delete clients
+    export: 'clients.export'       // Export clients data
+  },
   team: {
     view: 'team.view',            // View team members list
     invite: 'team.invite',       // Invite new team members
@@ -96,6 +103,10 @@ const developerPermissions = {
     view: 'favorites.view',       // View favorites
     add: 'favorites.add',        // Add to favorites
     remove: 'favorites.remove'  // Remove from favorites
+  },
+  audit_trail: {
+    view: 'audit_trail.view',    // View audit trail
+    manage: 'audit_trail.manage'  // Manage audit logs
   }
 }
 
@@ -188,6 +199,10 @@ const agencyPermissions = {
     view: 'reviews.view',
     respond: 'reviews.respond',
     delete: 'reviews.delete'
+  },
+  audit_trail: {
+    view: 'audit_trail.view',
+    manage: 'audit_trail.manage'
   }
 }
 
@@ -211,7 +226,8 @@ const developerDefaultRoles = {
       profile: { view: true, edit: true, manage_branding: true, manage_settings: true, manage_locations: true },
       subscriptions: { view: true, upgrade: true, downgrade: true, cancel: true, manage: true },
       media: { upload: true, delete: true, manage: true },
-      favorites: { view: true, add: true, remove: true }
+      favorites: { view: true, add: true, remove: true },
+      audit_trail: { view: true, manage: true }
     }
   },
   admin: {
@@ -232,7 +248,8 @@ const developerDefaultRoles = {
       profile: { view: true, edit: true, manage_branding: true, manage_settings: true, manage_locations: true },
       subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: true, delete: true, manage: true },
-      favorites: { view: true, add: true, remove: true }
+      favorites: { view: true, add: true, remove: true },
+      audit_trail: { view: true, manage: true }
     }
   },
   manager: {
@@ -253,7 +270,8 @@ const developerDefaultRoles = {
       profile: { view: true, edit: true, manage_branding: false, manage_settings: false, manage_locations: false },
       subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: true, delete: true, manage: true },
-      favorites: { view: true, add: true, remove: true }
+      favorites: { view: true, add: true, remove: true },
+      audit_trail: { view: true, manage: true }
     }
   },
   editor: {
@@ -274,7 +292,8 @@ const developerDefaultRoles = {
       profile: { view: true, edit: true, manage_branding: false, manage_settings: false, manage_locations: false },
       subscriptions: { view: false, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: true, delete: true, manage: false },
-      favorites: { view: true, add: true, remove: true }
+      favorites: { view: true, add: true, remove: true },
+      audit_trail: { view: true, manage: false }
     }
   },
   viewer: {
@@ -295,7 +314,8 @@ const developerDefaultRoles = {
       profile: { view: true, edit: false, manage_branding: false, manage_settings: false, manage_locations: false },
       subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: false, delete: false, manage: false },
-      favorites: { view: true, add: false, remove: false }
+      favorites: { view: true, add: false, remove: false },
+      audit_trail: { view: true, manage: false }
     }
   }
 }
@@ -320,7 +340,8 @@ const agencyDefaultRoles = {
       profile: { view: true, edit: true, manage_branding: true, manage_settings: true, manage_locations: true },
       subscriptions: { view: true, upgrade: true, downgrade: true, cancel: true, manage: true },
       media: { upload: true, delete: true, manage: true },
-      reviews: { view: true, respond: true, delete: true }
+      reviews: { view: true, respond: true, delete: true },
+      audit_trail: { view: true, manage: true }
     }
   },
   admin: {
@@ -341,7 +362,8 @@ const agencyDefaultRoles = {
       profile: { view: true, edit: true, manage_branding: true, manage_settings: true, manage_locations: true },
       subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: true, delete: true, manage: true },
-      reviews: { view: true, respond: true, delete: true }
+      reviews: { view: true, respond: true, delete: true },
+      audit_trail: { view: true, manage: true }
     }
   },
   agentManager: {
@@ -362,7 +384,8 @@ const agencyDefaultRoles = {
       profile: { view: true, edit: true, manage_branding: false, manage_settings: false, manage_locations: false },
       subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: true, delete: true, manage: true },
-      reviews: { view: true, respond: true, delete: false }
+      reviews: { view: true, respond: true, delete: false },
+      audit_trail: { view: true, manage: true }
     }
   },
   editor: {
@@ -383,7 +406,8 @@ const agencyDefaultRoles = {
       profile: { view: true, edit: true, manage_branding: false, manage_settings: false, manage_locations: false },
       subscriptions: { view: false, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: true, delete: true, manage: false },
-      reviews: { view: true, respond: false, delete: false }
+      reviews: { view: true, respond: false, delete: false },
+      audit_trail: { view: true, manage: false }
     }
   },
   viewer: {
@@ -404,7 +428,8 @@ const agencyDefaultRoles = {
       profile: { view: true, edit: false, manage_branding: false, manage_settings: false, manage_locations: false },
       subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: false, delete: false, manage: false },
-      reviews: { view: true, respond: false, delete: false }
+      reviews: { view: true, respond: false, delete: false },
+      audit_trail: { view: true, manage: false }
     }
   }
 }

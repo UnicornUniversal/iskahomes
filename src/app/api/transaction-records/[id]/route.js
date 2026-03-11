@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // Helper function to upload files to Supabase Storage
 async function uploadFile(file, folder, subfolder) {
@@ -132,6 +133,15 @@ export async function GET(request, { params }) {
     } else {
       return NextResponse.json({ error: 'Unauthorized user type' }, { status: 403 })
     }
+
+    captureAuditEvent('transaction_record_viewed', {
+      user_id: decoded.user_id || decoded.agent_id || decoded.agency_id || 'unknown',
+      user_type: decoded.user_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/transaction-records/[id]',
+      metadata: { transaction_record_id: resolvedId }
+    }, decoded.user_id || decoded.agent_id || decoded.agency_id || 'unknown')
 
     return NextResponse.json({
       success: true,
@@ -390,6 +400,19 @@ export async function PUT(request, { params }) {
       )
     }
 
+    captureAuditEvent('transaction_record_updated', {
+      user_id: decoded.user_id || decoded.agent_id || decoded.agency_id || 'unknown',
+      user_type: decoded.user_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/transaction-records/[id]',
+      metadata: {
+        transaction_record_id: resolvedId,
+        status: updatedTransaction?.status || null,
+        payment_status: updatedTransaction?.payment_status || null
+      }
+    }, decoded.user_id || decoded.agent_id || decoded.agency_id || 'unknown')
+
     return NextResponse.json({
       success: true,
       message: 'Transaction record updated successfully',
@@ -500,6 +523,15 @@ export async function DELETE(request, { params }) {
         { status: 500 }
       )
     }
+
+    captureAuditEvent('transaction_record_deleted', {
+      user_id: decoded.user_id || decoded.agent_id || decoded.agency_id || 'unknown',
+      user_type: decoded.user_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/transaction-records/[id]',
+      metadata: { transaction_record_id: resolvedId }
+    }, decoded.user_id || decoded.agent_id || decoded.agency_id || 'unknown')
 
     return NextResponse.json({
       success: true,

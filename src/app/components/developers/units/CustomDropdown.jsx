@@ -58,7 +58,7 @@ const CustomDropdown = ({ options, value, onChange, placeholder = 'Select an opt
           {options.map((option, idx) => (
             <li
               key={option.value || idx}
-              className={`px-4 py-2 cursor-pointer text-gray-900 ${value === option.value ? 'bg-primary_color' : highlighted === idx ? 'bg-gray-100' : ''}`}
+              className={`px-4 py-2 cursor-pointer ${value === option.value ? 'bg-primary_color text-white' : highlighted === idx ? 'bg-gray-100 text-gray-900' : 'text-gray-900'}`}
               onClick={() => handleSelect(option)}
               onMouseEnter={() => setHighlighted(idx)}
               role="option"

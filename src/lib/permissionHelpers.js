@@ -158,7 +158,7 @@ export const extractRouteCategory = (pathname) => {
   
   if (parts.length === 0) return null
   
-  // Map common routes to categories
+  // Map common routes to categories (check all path parts for agency/developer routes)
   const routeMap = {
     'dashboard': 'dashboard',
     'units': 'units',
@@ -167,18 +167,22 @@ export const extractRouteCategory = (pathname) => {
     'appointments': 'appointments',
     'leads': 'leads',
     'team': 'team',
+    'roles': 'team',
     'analytics': 'analytics',
     'profile': 'profile',
     'subscriptions': 'subscriptions',
     'messages': 'messages',
     'media': 'media',
     'sales': 'sales',
+    'audit-trail': 'audit_trail',
+    'audit': 'audit_trail',
     'favorites': 'favorites',
     'agents': 'agents',
     'reviews': 'reviews'
   }
-  
-  return routeMap[parts[0]] || null
+
+  const routePart = parts.find(p => routeMap[p])
+  return routePart ? routeMap[routePart] : null
 }
 
 export default {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // GET - Fetch user's billing information
 export async function GET(request) {
@@ -52,6 +53,17 @@ export async function GET(request) {
         details: error.message 
       }, { status: 500 })
     }
+
+    captureAuditEvent('billing_viewed', {
+      user_id: userId,
+      user_type: dbUserType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/billing-information',
+      metadata: {
+        result_count: billingInfo?.length || 0
+      }
+    }, userId)
 
     return NextResponse.json({ 
       success: true,
@@ -160,6 +172,18 @@ export async function POST(request) {
       }, { status: 500 })
     }
 
+    captureAuditEvent('billing_created', {
+      user_id: userId,
+      user_type: dbUserType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/billing-information',
+      metadata: {
+        billing_information_id: billingInfo.id,
+        payment_method: preferred_payment_method
+      }
+    }, userId)
+
     return NextResponse.json({ 
       success: true,
       data: billingInfo,
@@ -259,6 +283,18 @@ export async function PUT(request) {
         details: error.message 
       }, { status: 500 })
     }
+
+    captureAuditEvent('billing_updated', {
+      user_id: userId,
+      user_type: dbUserType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/billing-information',
+      metadata: {
+        billing_information_id: id,
+        updated_fields: Object.keys(updates || {})
+      }
+    }, userId)
 
     return NextResponse.json({ 
       success: true,

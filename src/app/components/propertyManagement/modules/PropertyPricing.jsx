@@ -121,6 +121,7 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
 
   const [pricingData, setPricingData] = useState({
     price: '',
+    service_charge: '',
     currency: defaultCurrency,
     time: 1, // Duration length (number) - default to 1
     duration: 'monthly', // Duration type (monthly, yearly)
@@ -864,6 +865,25 @@ const PropertyPricing = ({ formData, updateFormData, mode, purposeData, companyL
           </div>
         </div>
       )}
+
+      {/* Service Charge (if applicable) */}
+      <div className="mt-4 sm:mt-6">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Service Charge (if applicable)
+        </label>
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          value={pricingData.service_charge ?? ''}
+          onChange={(e) => { const v = e.target.value; handlePricingChange('service_charge', v === '' ? '' : (parseFloat(v) || 0)) }}
+          placeholder="e.g. 500"
+          className="w-full max-w-xs !text-sm"
+        />
+        <p className="text-sm text-gray-500 mt-1">
+          Monthly or periodic service charge for this unit ({pricingData.currency || defaultCurrency})
+        </p>
+      </div>
       
       {/* Commission Rate Display for Agents (Rent/Lease) */}
       {isAgent && commissionRate && pricingData.price_type !== 'sale' && (

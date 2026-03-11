@@ -24,8 +24,9 @@ export async function GET(request) {
       )
     }
 
-    // Fetch developer data to get leads_breakdown, conversion_rate, total_appointments
-    let developerData = null
+    // Fetch lister metadata (for developers: leads_breakdown, conversion_rate, total_appointments)
+    // For agents/agencies: use lister_id directly
+    let listerMetadata = null
     let finalListerId = listerId
 
     if (listerType === 'developer') {
@@ -39,7 +40,7 @@ export async function GET(request) {
           .single()
 
         if (!devError && developer) {
-          developerData = developer
+          listerMetadata = developer
           finalListerId = developer.developer_id
           console.log('📊 Developer data fetched:', {
             conversion_rate: developer.conversion_rate,
@@ -59,7 +60,7 @@ export async function GET(request) {
           .single()
 
         if (!devError && developer) {
-          developerData = developer
+          listerMetadata = developer
           console.log('📊 Developer data fetched:', {
             conversion_rate: developer.conversion_rate,
             conversion_rate_type: typeof developer.conversion_rate,
@@ -70,6 +71,11 @@ export async function GET(request) {
           console.error('❌ Error fetching developer by ID:', devError)
         }
       }
+    } else {
+      // For agents and agencies, use lister_id directly
+      // They can pass their agent_id or agency_id as lister_id
+      finalListerId = listerId
+      console.log(`📊 Using ${listerType} lister_id directly:`, finalListerId)
     }
 
     // Calculate date range based on period or custom date range
@@ -129,23 +135,24 @@ export async function GET(request) {
       }
     }
 
-    // Fetch leads for this lister
-    // IMPORTANT: Exclude anonymous/unknown seekers - only get leads with user IDs (non-anonymous)
+    // Fetch leads for this lister (works for developers, agents, and agencies)
+    // Include all leads with seeker_id (both anonymous and non-anonymous if they have seeker_id)
+    // Date filtering will be done on action dates, not lead record dates
     let query = supabase
       .from('leads')
       .select('id, seeker_id, lead_actions, first_action_date, last_action_date, total_actions')
       .eq('lister_id', finalListerId)
       .eq('lister_type', listerType)
       .not('seeker_id', 'is', null) // Only leads with seeker_id
-      .or('is_anonymous.is.null,is_anonymous.eq.false') // Exclude anonymous leads (only get non-anonymous leads)
-      .gte('first_action_date', startDate.toISOString().split('T')[0])
-      .lte('last_action_date', endDate.toISOString().split('T')[0])
 
+    // If listingId is provided, filter by that specific listing
+    // If not provided, show ALL leads (aggregate across all listings + profile-level leads)
+    // This works for all lister types: developers, agents, and agencies
     if (listingId) {
       query = query.eq('listing_id', listingId)
-    } else {
-      query = query.not('listing_id', 'is', null)
     }
+    // When listingId is not provided, we don't filter by listing_id at all
+    // This allows both listing-level leads (listing_id != null) and profile-level leads (listing_id = null)
 
     const { data: leads, error: leadsError } = await query
 
@@ -344,21 +351,22 @@ export async function GET(request) {
     let websiteLeads = websiteActions.length
     let conversionRate = 0
 
-    // Use developer data if available (more accurate aggregated data)
-    if (developerData) {
-      // Parse leads_breakdown JSON
+    // Use lister metadata if available (for developers: more accurate aggregated data)
+    // For agents/agencies: use calculated totals from leads
+    if (listerMetadata) {
+      // Parse leads_breakdown JSON (only for developers)
       let leadsBreakdown = null
-      if (developerData.leads_breakdown) {
+      if (listerMetadata.leads_breakdown) {
         try {
-          leadsBreakdown = typeof developerData.leads_breakdown === 'string' 
-            ? JSON.parse(developerData.leads_breakdown)
-            : developerData.leads_breakdown
+          leadsBreakdown = typeof listerMetadata.leads_breakdown === 'string' 
+            ? JSON.parse(listerMetadata.leads_breakdown)
+            : listerMetadata.leads_breakdown
         } catch (e) {
           console.error('Error parsing leads_breakdown:', e)
         }
       }
 
-      // Use breakdown data if available (more accurate)
+      // Use breakdown data if available (more accurate - developers only)
       if (leadsBreakdown) {
         totalLeads = leadsBreakdown.total_leads ?? totalLeads
         phoneLeads =
@@ -384,42 +392,42 @@ export async function GET(request) {
         appointmentLeads =
           leadsBreakdown.appointment?.total ??
           leadsBreakdown.appointment_leads?.total ??
-          developerData.total_appointments ??
+          listerMetadata.total_appointments ??
           appointmentLeads
         websiteLeads =
           leadsBreakdown.website?.total ??
           leadsBreakdown.website_leads?.total ??
           websiteLeads
       } else {
-        // Fallback to developer totals
-        totalLeads = developerData.total_leads || totalLeads
-        appointmentLeads = developerData.total_appointments || appointmentLeads
+        // Fallback to developer totals (developers only)
+        totalLeads = listerMetadata.total_leads || totalLeads
+        appointmentLeads = listerMetadata.total_appointments || appointmentLeads
       }
 
-      // Use conversion_rate from developer data
+      // Use conversion_rate from developer data (developers only)
       console.log('🔍 Parsing conversion_rate:', {
-        raw: developerData.conversion_rate,
-        type: typeof developerData.conversion_rate,
-        isNull: developerData.conversion_rate === null,
-        isUndefined: developerData.conversion_rate === undefined,
-        isEmpty: developerData.conversion_rate === ''
+        raw: listerMetadata.conversion_rate,
+        type: typeof listerMetadata.conversion_rate,
+        isNull: listerMetadata.conversion_rate === null,
+        isUndefined: listerMetadata.conversion_rate === undefined,
+        isEmpty: listerMetadata.conversion_rate === ''
       })
       
-      if (developerData.conversion_rate !== null && developerData.conversion_rate !== undefined && developerData.conversion_rate !== '') {
+      if (listerMetadata.conversion_rate !== null && listerMetadata.conversion_rate !== undefined && listerMetadata.conversion_rate !== '') {
         // Handle both string and number types
-        if (typeof developerData.conversion_rate === 'string') {
-          const parsed = parseFloat(developerData.conversion_rate)
+        if (typeof listerMetadata.conversion_rate === 'string') {
+          const parsed = parseFloat(listerMetadata.conversion_rate)
           conversionRate = isNaN(parsed) ? 0 : parsed
           console.log('✅ Parsed string conversion_rate:', parsed)
-        } else if (typeof developerData.conversion_rate === 'number') {
-          conversionRate = developerData.conversion_rate
+        } else if (typeof listerMetadata.conversion_rate === 'number') {
+          conversionRate = listerMetadata.conversion_rate
           console.log('✅ Using number conversion_rate:', conversionRate)
         }
       }
       
-      // If still 0, try to calculate from total_views and total_leads
-      if (conversionRate === 0 && developerData.total_views && developerData.total_views > 0 && developerData.total_leads) {
-        conversionRate = (developerData.total_leads / developerData.total_views) * 100
+      // If still 0, try to calculate from total_views and total_leads (developers only)
+      if (conversionRate === 0 && listerMetadata.total_views && listerMetadata.total_views > 0 && listerMetadata.total_leads) {
+        conversionRate = (listerMetadata.total_leads / listerMetadata.total_views) * 100
         console.log('📈 Calculated conversion_rate from views/leads:', conversionRate)
       }
       

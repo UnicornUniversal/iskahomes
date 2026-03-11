@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 import { sendAgentInvitationEmail } from '@/lib/sendgrid'
+import { captureAuditEvent } from '@/lib/auditLogger'
 import crypto from 'crypto'
 
 // POST - Send agent invitation
@@ -16,8 +17,24 @@ export async function POST(request) {
     const token = authHeader.split(' ')[1]
     const decoded = verifyToken(token)
     
-    if (!decoded || decoded.user_type !== 'agency') {
+    const isAgencyOwner = decoded?.user_type === 'agency'
+    const isAgencyTeamMember = decoded?.user_type === 'team_member' && decoded?.organization_type === 'agency'
+    if (!decoded || (!isAgencyOwner && !isAgencyTeamMember)) {
       return NextResponse.json({ error: 'Invalid token or user type' }, { status: 401 })
+    }
+
+    // Resolve agency_id: owner has agency_id; team members have organization_id (= agencies.id)
+    let agencyId = decoded.agency_id
+    if (!agencyId && isAgencyTeamMember && decoded.organization_id) {
+      const { data: agency } = await supabaseAdmin
+        .from('agencies')
+        .select('agency_id')
+        .eq('id', decoded.organization_id)
+        .single()
+      agencyId = agency?.agency_id
+    }
+    if (!agencyId) {
+      return NextResponse.json({ error: 'Agency not found' }, { status: 401 })
     }
 
     const body = await request.json()
@@ -45,7 +62,7 @@ export async function POST(request) {
       .from('agents')
       .select('id, invitation_status')
       .eq('email', email)
-      .eq('agency_id', decoded.user_id)
+      .eq('agency_id', agencyId)
       .maybeSingle()
 
     if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
@@ -68,7 +85,7 @@ export async function POST(request) {
     const { data: agency, error: agencyError } = await supabaseAdmin
       .from('agencies')
       .select('name, agency_id, company_locations')
-      .eq('agency_id', decoded.user_id)
+      .eq('agency_id', agencyId)
       .single()
 
     if (agencyError || !agency) {
@@ -124,7 +141,7 @@ export async function POST(request) {
 
     // Prepare agent data
     const agentData = {
-      agency_id: decoded.user_id,
+      agency_id: agencyId,
       name: name.trim(),
       email: email.toLowerCase().trim(),
       phone: phone?.trim() || null,
@@ -190,9 +207,33 @@ export async function POST(request) {
         table_name: 'agencies',
         column_name: 'total_agents',
         id_column: 'agency_id',
-        id_value: decoded.user_id,
+        id_value: agencyId,
         increment: 0 // Don't increment, just refresh
       })
+
+      const auditId = decoded.agency_id || decoded.user_id
+      captureAuditEvent('agent_invitation_sent', {
+        user_id: auditId,
+        user_type: decoded.user_type,
+        timestamp: new Date().toISOString(),
+        success: true,
+        api_route: '/api/agencies/agents/invite',
+        agency_id: agencyId,
+        agent_id: updatedAgent.id,
+        invitee_email: email,
+      }, auditId)
+      captureAuditEvent('agency_agent_invitation_sent', {
+        user_id: auditId,
+        user_type: decoded.user_type,
+        timestamp: new Date().toISOString(),
+        success: true,
+        api_route: '/api/agencies/agents/invite',
+        metadata: {
+          agency_id: agencyId,
+          agent_id: updatedAgent.id,
+          invitee_email: email
+        }
+      }, auditId)
 
       return NextResponse.json({
         success: true,
@@ -230,7 +271,7 @@ export async function POST(request) {
     const { data: agencyUpdate } = await supabaseAdmin
       .from('agencies')
       .select('total_agents')
-      .eq('agency_id', decoded.user_id)
+      .eq('agency_id', agencyId)
       .single()
 
     const newTotalAgents = (agencyUpdate?.total_agents || 0) + 1
@@ -238,7 +279,31 @@ export async function POST(request) {
     await supabaseAdmin
       .from('agencies')
       .update({ total_agents: newTotalAgents })
-      .eq('agency_id', decoded.user_id)
+      .eq('agency_id', agencyId)
+
+    const auditId = decoded.agency_id || decoded.user_id
+    captureAuditEvent('agent_invitation_sent', {
+      user_id: auditId,
+      user_type: decoded.user_type,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/agencies/agents/invite',
+      agency_id: agencyId,
+      agent_id: newAgent.id,
+      invitee_email: email,
+    }, auditId)
+    captureAuditEvent('agency_agent_invitation_sent', {
+      user_id: auditId,
+      user_type: decoded.user_type,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/agencies/agents/invite',
+      metadata: {
+        agency_id: agencyId,
+        agent_id: newAgent.id,
+        invitee_email: email
+      }
+    }, auditId)
 
     return NextResponse.json({
       success: true,

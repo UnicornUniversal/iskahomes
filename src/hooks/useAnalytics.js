@@ -73,6 +73,15 @@ export function useAnalytics() {
   const getSeekerContext = useCallback((additionalContext = {}) => {
     const isPropertySeeker = user?.user_type === 'property_seeker'
     
+    // Get lead_source from URL (share_medium param) - e.g. ?share_medium=whatsapp
+    let leadSource = additionalContext.lead_source || additionalContext.leadSource
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location?.search || '')
+      const shareMedium = params.get('share_medium') || params.get('utm_source')
+      if (shareMedium) leadSource = shareMedium
+    }
+    if (!leadSource) leadSource = 'website'
+    
     // Normalize property names - handle both camelCase and snake_case
     const listingId = additionalContext.listingId || additionalContext.listing_id
     const profileId = additionalContext.profileId || additionalContext.profile_id
@@ -124,6 +133,8 @@ export function useAnalytics() {
       viewed_from: viewedFrom,
       listingType: listingType,
       listing_type: listingType,
+      lead_source: leadSource,
+      leadSource: leadSource,
       // User-specific properties - ALWAYS provide seeker_id (never null)
       seekerId: finalSeekerId,
       seeker_id: finalSeekerId, // Also set snake_case version
@@ -337,7 +348,9 @@ export function useAnalytics() {
             action: phoneAction,
             phone_number: seekerContext.phoneNumber,
             is_logged_in: seekerContext.is_logged_in,
-            timestamp: nowIso()
+            timestamp: nowIso(),
+            lead_source: seekerContext.lead_source || 'website',
+            lead_origin: 'platform'
           })
         })
       } catch (error) {
@@ -386,7 +399,9 @@ export function useAnalytics() {
             seeker_id: seekerContext.seekerId,
             message_type: seekerContext.messageType || 'direct_message',
             is_logged_in: seekerContext.is_logged_in,
-            timestamp: nowIso()
+            timestamp: nowIso(),
+            lead_source: seekerContext.lead_source || 'website',
+            lead_origin: 'platform'
           })
         })
       } catch (error) {
@@ -435,7 +450,9 @@ export function useAnalytics() {
             seeker_id: seekerContext.seekerId,
             appointment_type: seekerContext.appointmentType || 'viewing',
             is_logged_in: seekerContext.is_logged_in,
-            timestamp: nowIso()
+            timestamp: nowIso(),
+            lead_source: seekerContext.lead_source || 'website',
+            lead_origin: 'platform'
           })
         })
       } catch (error) {

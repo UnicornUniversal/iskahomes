@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
+import { captureAuditEvent } from '@/lib/auditLogger'
 import { cache } from 'react'
 import { invalidateDevelopmentsCache } from '@/lib/cacheInvalidation'
 
@@ -239,6 +240,21 @@ export async function GET(request) {
       })
     }
 
+    const auditId = userInfo.developer_id || userInfo.user_id
+    captureAuditEvent('development_listed', {
+      user_id: auditId,
+      user_type: userInfo.user_type || userInfo.organization_type || 'developer',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/developments',
+      metadata: {
+        result_count: filtered.length,
+        search,
+        location_type: locationType,
+        location_value: locationValue
+      }
+    }, auditId)
+
     return NextResponse.json({ data: filtered })
 
   } catch (error) {
@@ -334,6 +350,17 @@ export async function POST(request) {
 
     // Update developer's total_developments count
     await updateDeveloperTotalDevelopments(actualDeveloperId)
+
+    const auditId = userInfo.developer_id || userInfo.user_id
+    captureAuditEvent('development_created', {
+      user_id: auditId,
+      user_type: userInfo.user_type,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/developments',
+      development_id: development?.id,
+      developer_id: actualDeveloperId,
+    }, auditId)
 
     return NextResponse.json({ 
       success: true, 

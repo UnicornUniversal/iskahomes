@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { captureAuditEvent } from '@/lib/auditLogger'
 import crypto from 'crypto'
 
 /**
@@ -24,7 +25,9 @@ export async function POST(request) {
       appointment_type, // For appointment: 'viewing', 'consultation', etc.
       phone_number,
       is_logged_in = false,
-      timestamp
+      timestamp,
+      lead_source, // Share medium: whatsapp, copy_link, website, etc.
+      lead_origin // Where from: platform, their_website, etc. (default: platform for automated)
     } = body
 
     // Validation
@@ -211,6 +214,9 @@ export async function POST(request) {
         seeker_id: finalSeekerId,
         context_type: context_type,
         is_anonymous: is_anonymous, // Set is_anonymous based on is_logged_in
+        lead_type: 'automated',
+        lead_source: lead_source || 'website',
+        lead_origin: lead_origin || 'platform',
         lead_actions: [actionObj],
         total_actions: 1,
         lead_score: leadScore,
@@ -313,18 +319,19 @@ export async function POST(request) {
       }
     }
 
-    // Update developers/agents table totals immediately
+    // Update developers/agents/agencies table totals immediately
     // HYBRID APPROACH: Update both profile-specific AND aggregate fields
     // Only increment unique_leads or anonymous_leads if this is a NEW lead (not updating existing)
     if (!existingLead) {
       try {
-        // Get current totals from developers/agents table
-        const tableName = lister_type === 'developer' ? 'developers' : 'agents'
-        const idField = lister_type === 'developer' ? 'developer_id' : 'agent_id'
+        // Get current totals from developers/agents/agencies table
+        const tableName = lister_type === 'developer' ? 'developers' : lister_type === 'agency' ? 'agencies' : 'agents'
+        const idField = lister_type === 'developer' ? 'developer_id' : lister_type === 'agency' ? 'agency_id' : 'agent_id'
 
+        const selectFields = `total_leads, total_appointments, unique_leads, anonymous_leads, total_unique_leads, total_anonymous_leads, leads_breakdown${lister_type === 'agent' ? ', agency_id' : ''}${lister_type === 'agency' ? ', agency_profile_leads, agency_appointments' : ''}`
         const { data: listerData, error: fetchError } = await supabaseAdmin
           .from(tableName)
-          .select(`total_leads, unique_leads, anonymous_leads, total_unique_leads, total_anonymous_leads, leads_breakdown`)
+          .select(selectFields)
           .eq(idField, lister_id)
           .single()
 
@@ -359,6 +366,11 @@ export async function POST(request) {
                 total: ((breakdown.direct_message?.total || 0) + 1),
                 percentage: 0
               }
+            } else if (message_type === 'email') {
+              breakdown.email = {
+                total: ((breakdown.email?.total || 0) + 1),
+                percentage: 0
+              }
             }
           } else if (lead_type === 'appointment') {
             breakdown.appointment = {
@@ -373,6 +385,21 @@ export async function POST(request) {
             total_leads: currentTotalLeads,
             leads_breakdown: breakdown,
             updated_at: actionTimestamp
+          }
+
+          // When lead is appointment: increment total_appointments (appointments count as leads)
+          if (lead_type === 'appointment') {
+            updateData.total_appointments = (listerData.total_appointments || 0) + 1
+          }
+
+          // Agency direct: when lister is agency, update agency_profile_leads and agency_appointments
+          if (lister_type === 'agency') {
+            if (context_type === 'profile') {
+              updateData.agency_profile_leads = (listerData.agency_profile_leads || 0) + 1
+            }
+            if (lead_type === 'appointment') {
+              updateData.agency_appointments = (listerData.agency_appointments || 0) + 1
+            }
           }
 
           // HYBRID APPROACH: Update profile-specific fields (only for profile leads)
@@ -406,6 +433,77 @@ export async function POST(request) {
           if (updateError) {
             console.error(`Error updating ${tableName} totals:`, updateError)
             // Don't fail the request, just log the error
+          }
+
+          // When agent gets a lead: also update parent agency's totals and leads_breakdown in real-time
+          if (lister_type === 'agent' && listerData.agency_id) {
+            try {
+              const { data: agencyData, error: agencyFetchError } = await supabaseAdmin
+                .from('agencies')
+                .select('total_leads, total_appointments, agents_total_leads, agents_total_appointments, leads_breakdown')
+                .eq('agency_id', listerData.agency_id)
+                .single()
+
+              if (!agencyFetchError && agencyData) {
+                const newAgencyTotalLeads = (agencyData.total_leads || 0) + 1
+                const newAgentsTotalLeads = (agencyData.agents_total_leads || 0) + 1
+                const newAgentsTotalAppointments = lead_type === 'appointment'
+                  ? (agencyData.agents_total_appointments || 0) + 1
+                  : (agencyData.agents_total_appointments || 0)
+
+                const agencyBreakdown = agencyData.leads_breakdown || {}
+                const agencyBreakdownCopy = { ...agencyBreakdown }
+
+                if (lead_type === 'phone') {
+                  agencyBreakdownCopy.phone = {
+                    total: ((agencyBreakdownCopy.phone?.total || 0) + 1),
+                    percentage: 0
+                  }
+                  agencyBreakdownCopy.phone_leads = agencyBreakdownCopy.phone
+                } else if (lead_type === 'message') {
+                  const agencyMsgTotal = (agencyBreakdownCopy.message_leads?.total || 0) + 1
+                  agencyBreakdownCopy.message_leads = { total: agencyMsgTotal, percentage: 0 }
+                  if (message_type === 'whatsapp') {
+                    agencyBreakdownCopy.whatsapp = {
+                      total: ((agencyBreakdownCopy.whatsapp?.total || 0) + 1),
+                      percentage: 0
+                    }
+                  } else if (message_type === 'direct_message') {
+                    agencyBreakdownCopy.direct_message = {
+                      total: ((agencyBreakdownCopy.direct_message?.total || 0) + 1),
+                      percentage: 0
+                    }
+                  } else if (message_type === 'email') {
+                    agencyBreakdownCopy.email = {
+                      total: ((agencyBreakdownCopy.email?.total || 0) + 1),
+                      percentage: 0
+                    }
+                  }
+                } else if (lead_type === 'appointment') {
+                  agencyBreakdownCopy.appointment = {
+                    total: ((agencyBreakdownCopy.appointment?.total || 0) + 1),
+                    percentage: 0
+                  }
+                  agencyBreakdownCopy.appointment_leads = agencyBreakdownCopy.appointment
+                }
+
+                await supabaseAdmin
+                  .from('agencies')
+                  .update({
+                    total_leads: newAgencyTotalLeads,
+                    agents_total_leads: newAgentsTotalLeads,
+                    ...(lead_type === 'appointment' && {
+                      total_appointments: (agencyData.total_appointments || 0) + 1,
+                      agents_total_appointments: newAgentsTotalAppointments
+                    }),
+                    leads_breakdown: agencyBreakdownCopy,
+                    updated_at: actionTimestamp
+                  })
+                  .eq('agency_id', listerData.agency_id)
+              }
+            } catch (agencyErr) {
+              console.error('Error updating agency totals from agent lead:', agencyErr)
+            }
           }
         }
       } catch (err) {
@@ -484,75 +582,32 @@ export async function POST(request) {
       }
     }
 
-    // Update developments table totals if this is a development lead
-    // Only increment unique_leads or anonymous_leads if this is a NEW lead (not updating existing)
-    if (context_type === 'development' && development_id && !existingLead) {
-      try {
-        const { data: development, error: developmentError } = await supabaseAdmin
-          .from('developments')
-          .select('id, developer_id, total_leads, unique_leads, anonymous_leads')
-          .eq('id', development_id)
-          .single()
-
-        if (!developmentError && development) {
-          const newTotalLeads = (development.total_leads || 0) + 1
-          const updateData = { total_leads: newTotalLeads }
-          
-          // Increment unique_leads or anonymous_leads based on is_anonymous
-          if (is_anonymous) {
-            updateData.anonymous_leads = (development.anonymous_leads || 0) + 1
-          } else {
-            updateData.unique_leads = (development.unique_leads || 0) + 1
-          }
-          
-          const { error: updateDevelopmentError } = await supabaseAdmin
-            .from('developments')
-            .update(updateData)
-            .eq('id', development_id)
-
-          if (updateDevelopmentError) {
-            console.error('Error updating development leads:', updateDevelopmentError)
-            // Don't fail the request, just log the error
-          }
-
-          // HYBRID APPROACH: Also update the developer's aggregate fields (total_unique_leads/total_anonymous_leads)
-          // if this development is owned by a developer
-          if (development.developer_id) {
-            try {
-              const { data: developerData, error: developerFetchError } = await supabaseAdmin
-                .from('developers')
-                .select('total_unique_leads, total_anonymous_leads')
-                .eq('developer_id', development.developer_id)
-                .single()
-
-              if (!developerFetchError && developerData) {
-                const developerUpdateData = {}
-                // Increment aggregate fields (cron job will deduplicate if needed)
-                if (is_anonymous) {
-                  developerUpdateData.total_anonymous_leads = (developerData.total_anonymous_leads || 0) + 1
-                } else {
-                  developerUpdateData.total_unique_leads = (developerData.total_unique_leads || 0) + 1
-                }
-
-                const { error: developerUpdateError } = await supabaseAdmin
-                  .from('developers')
-                  .update(developerUpdateData)
-                  .eq('developer_id', development.developer_id)
-
-                if (developerUpdateError) {
-                  console.error('Error updating developer aggregate leads from development:', developerUpdateError)
-                }
-              }
-            } catch (err) {
-              console.error('Exception updating developer aggregate leads from development:', err)
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Exception updating development leads:', err)
-        // Don't fail the request, just log the error
-      }
+    // Resolve developer_id for audit filtering (development leads)
+    let developerIdForAudit = lister_type === 'developer' ? lister_id : null
+    if (context_type === 'development' && development_id && !developerIdForAudit) {
+      const { data: dev } = await supabaseAdmin
+        .from('developments')
+        .select('developer_id')
+        .eq('id', development_id)
+        .single()
+      developerIdForAudit = dev?.developer_id
     }
+
+    captureAuditEvent('lead_created', {
+      user_id: finalSeekerId,
+      user_type: is_anonymous ? 'anonymous' : 'property_seeker',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/leads/create',
+      lead_type,
+      context_type,
+      listing_id: listing_id || null,
+      development_id: development_id || null,
+      lister_id,
+      lister_type,
+      developer_id: developerIdForAudit,
+      metadata: { is_new: !existingLead },
+    }, finalSeekerId)
 
     return NextResponse.json({
       success: true,

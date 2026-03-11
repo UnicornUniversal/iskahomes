@@ -248,6 +248,8 @@ const PropertyDetailPage = () => {
     is_verified,
     is_premium,
     developers,
+    agent,
+    agency,
     relatedListings,
     propertySubtypes,
     listing_types,
@@ -670,11 +672,11 @@ const PropertyDetailPage = () => {
           <div id="intro" className="scroll-mt-24 space-y-4">
             <div className="flex items-start justify-between flex-col md:flex-row">
               <div className="flex-1">
-                <h1 className="text-4xl md:text-[4em] mb-3">{title}</h1>
+                <h1 className="text-2xl md:text-[4em] mb-3">{title}</h1>
                 
                 {/* Price and Status */}
                 <div className="flex items-center gap-4 mb-3">
-                  <h4 className="text-3xl ">
+                  <h4 className="md:text-3xl ">
                     {formatPrice()}
                   </h4>
                   {price_type && (
@@ -1115,6 +1117,8 @@ const PropertyDetailPage = () => {
                     propertyTitle={title}
                     propertyType={listing_type}
                     developer={developers}
+                    agent={agent}
+                    agency={agency}
                     listing={listing}
                   />
                 </div>
@@ -1130,6 +1134,8 @@ const PropertyDetailPage = () => {
               propertyTitle={title}
               propertyType={listing_type}
               developer={developers}
+              agent={agent}
+              agency={agency}
               listing={listing}
             />
           </div>
@@ -1309,6 +1315,8 @@ const PropertyDetailPage = () => {
                 propertyTitle={title}
                 propertyType={listing_type}
                 developer={developers}
+                agent={agent}
+                agency={agency}
                 listing={listing}
               />
             </div>

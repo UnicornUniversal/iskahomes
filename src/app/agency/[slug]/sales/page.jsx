@@ -76,7 +76,7 @@ export default function AgencySalesPage() {
 
       {/* Sales Time Series */}
       <div className="w-full">
-        <SalesTrendChart listerId={accountId} currency={currency} />
+        <SalesTrendChart listerId={accountId} currency={currency} accountType="agency" />
       </div>
     </>
   )

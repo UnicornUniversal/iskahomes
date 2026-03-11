@@ -375,10 +375,10 @@ const AgentProfile = () => {
                     <div className="sticky top-24 space-y-8">
                         <LeadContactForm 
                             contextType="profile"
-                            profileId={agent.id}
+                            profileId={agent.agent_id}
                             profile={agent}
                             agent={agent}
-                            developer={null}
+                            agency={agency}
                             propertyTitle={`Consultation with ${agent.name}`}
                         />
                     </div>

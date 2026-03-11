@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { createClient } from '@supabase/supabase-js'
+import { captureAuditEvent } from '@/lib/auditLogger'
 import crypto from 'crypto'
 
 // GET - Verify invitation token and get agent details
@@ -326,6 +327,27 @@ export async function POST(request) {
       .from('agencies')
       .update({ active_agents: newActiveAgents })
       .eq('agency_id', agent.agency_id)
+
+    captureAuditEvent('agent_invitation_accepted', {
+      user_id: userId,
+      user_type: 'agent',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/agencies/agents/invite/accept',
+      agency_id: agent.agency_id,
+      agent_id: userId,
+    }, userId)
+    captureAuditEvent('agency_agent_invitation_accepted', {
+      user_id: userId,
+      user_type: 'agent',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/agencies/agents/invite/accept',
+      metadata: {
+        agency_id: agent.agency_id,
+        agent_id: userId
+      }
+    }, userId)
 
     // Check final email confirmation status
     let emailConfirmationRequired = false

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function GET(request) {
   try {
@@ -69,6 +70,14 @@ export async function GET(request) {
     // Update the profile status
     const userType = targetUser.user_metadata?.user_type
     await updateProfileStatus(targetUser.id, userType)
+
+    captureAuditEvent('auth_email_verified', {
+      user_id: targetUser.id,
+      user_type: userType || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/auth/verify-email-supabase',
+    }, targetUser.id)
 
     // Mark that we've updated the profile
     await supabaseAdmin.auth.admin.updateUserById(
@@ -140,12 +149,15 @@ async function updateProfileStatus(userId, userType, skipIfAlreadyVerified = fal
     invitation_status: 'sent'
   }
 
-  // Use account_status for developers, status for others
-  if (tableName === 'developers') {
+  // Developers and agencies stay 'pending' until admin approves
+  // Agents and property seekers are approved by default - set active on verification
+  if (tableName === 'agents') {
     updateData.account_status = 'active'
-  } else {
+    updateData.agent_status = 'active'
+  } else if (tableName === 'property_seekers') {
     updateData.status = 'active'
   }
+  // developers and agencies: keep account_status as 'pending', admin must approve
 
   const { error: profileUpdateError } = await supabaseAdmin
     .from(tableName)

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 /**
  * Search API Route
@@ -113,6 +114,35 @@ export async function GET(request) {
       } catch (developmentsErr) {
         console.error('Error in developments search:', developmentsErr)
       }
+    }
+
+    const auditUserId = decoded.user_id || decoded.agent_id || decoded.agency_id || decoded.developer_id || userId
+    captureAuditEvent('search_performed', {
+      user_id: auditUserId,
+      user_type: userType || decoded.user_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/search',
+      metadata: {
+        query: searchQuery,
+        limit,
+        listing_result_count: results.listings?.length || 0,
+        development_result_count: results.developments?.length || 0
+      }
+    }, auditUserId)
+
+    if (userType === 'developer') {
+      captureAuditEvent('development_searched', {
+        user_id: auditUserId,
+        user_type: userType || decoded.user_type || 'developer',
+        timestamp: new Date().toISOString(),
+        success: true,
+        api_route: '/api/search',
+        metadata: {
+          query: searchQuery,
+          development_result_count: results.developments?.length || 0
+        }
+      }, auditUserId)
     }
 
     return NextResponse.json({

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest, requirePermission } from '@/lib/apiPermissionMiddleware'
 import { sendTeamMemberInvitationEmail } from '@/lib/sendgrid'
+import { captureAuditEvent } from '@/lib/auditLogger'
 import crypto from 'crypto'
 
 // GET - Fetch all team members for a developer organization
@@ -42,6 +43,32 @@ export async function GET(request) {
       const { password_hash, invitation_token, ...sanitized } = member
       return sanitized
     })
+
+    const auditId = userInfo.developer_id || userInfo.agency_id || userInfo.user_id
+    captureAuditEvent('team_listed', {
+      user_id: auditId,
+      user_type: userInfo.user_type,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/developers/team/members',
+      metadata: {
+        organization_type: organizationType,
+        organization_id: organizationId,
+        result_count: sanitizedMembers.length
+      }
+    }, auditId)
+    captureAuditEvent('developer_team_listed', {
+      user_id: auditId,
+      user_type: userInfo.user_type,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/developers/team/members',
+      metadata: {
+        organization_type: organizationType,
+        organization_id: organizationId,
+        result_count: sanitizedMembers.length
+      }
+    }, auditId)
 
     return NextResponse.json({ 
       success: true,
@@ -194,6 +221,19 @@ export async function POST(request) {
 
     // Remove sensitive data from response
     const { password_hash, invitation_token, ...sanitized } = newMember
+
+    const auditId = userInfo.developer_id || userInfo.agency_id || userInfo.user_id
+    captureAuditEvent('team_invitation_sent', {
+      user_id: auditId,
+      user_type: userInfo.user_type,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/developers/team/members',
+      organization_type: organizationType,
+      organization_id: organizationId,
+      invitee_email: email,
+      role_id,
+    }, auditId)
 
     return NextResponse.json({ 
       success: true,

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { signOut } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function POST(request) {
   try {
@@ -134,6 +135,17 @@ export async function POST(request) {
     }
     
     console.log('🚪 SIGNOUT API: Logout completed successfully');
+
+    if (userInfo) {
+      const userId = userInfo.user_id ?? userInfo.id
+      captureAuditEvent('auth_signout', {
+        user_id: userId,
+        user_type: userInfo.user_type,
+        timestamp: new Date().toISOString(),
+        success: true,
+        api_route: '/api/auth/signout',
+      }, userId)
+    }
     
     return NextResponse.json({
       success: true,

@@ -458,6 +458,13 @@ const PropertyView = ({ formData, accountType, developments = [] }) => {
               </div>
             )}
 
+            {(formData.pricing.service_charge || formData.pricing.service_charge === 0) && (
+              <div>
+                <p className="font-medium mb-1">Service charge</p>
+                <p>{(formData.pricing.currency || 'GHS')} {parseFloat(formData.pricing.service_charge || 0).toLocaleString()}</p>
+              </div>
+            )}
+
             {formData.pricing.price_type && (
               <div>
                 <p className="font-medium mb-1">Price Type</p>

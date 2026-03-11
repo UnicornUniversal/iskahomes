@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function POST(request) {
   try {
@@ -147,6 +148,15 @@ export async function POST(request) {
         }
       }
     }
+
+    captureAuditEvent('saved_listing_added', {
+      user_id: propertySeeker.user_id ?? decoded.user_id,
+      user_type: 'property_seeker',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/saved-listings',
+      listing_id: listingId,
+    }, propertySeeker.user_id ?? decoded.user_id)
 
     return NextResponse.json({
       success: true,
@@ -295,6 +305,15 @@ export async function DELETE(request) {
       }
     }
 
+    captureAuditEvent('saved_listing_removed', {
+      user_id: propertySeeker.user_id ?? decoded.user_id,
+      user_type: 'property_seeker',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/saved-listings',
+      listing_id: listingId,
+    }, propertySeeker.user_id ?? decoded.user_id)
+
     return NextResponse.json({
       success: true,
       message: 'Listing removed from saved'
@@ -380,8 +399,9 @@ export async function GET(request) {
           user_type,
           listings (
             id,
+            slug,
+            listing_type,
             title,
-            description,
             price,
             currency,
             price_type,
@@ -393,25 +413,9 @@ export async function GET(request) {
             city,
             town,
             full_address,
-            latitude,
-            longitude,
             specifications,
-            amenities,
             media,
-            available_from,
-            available_until,
-            is_featured,
-            is_verified,
-            is_premium,
-            cancellation_policy,
-            is_negotiable,
-            security_requirements,
-            flexible_terms,
-            acquisition_rules,
-            additional_information,
-            slug,
-            created_at,
-            updated_at
+            created_at
           )
         `)
         .eq('user_id', propertySeeker.id)

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { createClient } from '@supabase/supabase-js'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // POST - Accept invitation and create Supabase Auth account
 export async function POST(request) {
@@ -151,6 +152,16 @@ export async function POST(request) {
 
     // Remove sensitive data
     const { password_hash, invitation_token, ...sanitized } = updatedMember
+
+    captureAuditEvent('team_invitation_accepted', {
+      user_id: userId,
+      user_type: 'team_member',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/developers/team/members/invite/accept',
+      organization_type: teamMember.organization_type,
+      organization_id: teamMember.organization_id,
+    }, userId)
 
     return NextResponse.json({ 
       success: true,

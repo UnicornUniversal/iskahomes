@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { verifyToken } from '@/lib/jwt';
+import { captureAuditEvent } from '@/lib/auditLogger';
 
 // GET all conversations for a user
 export async function GET(request) {
@@ -28,24 +29,32 @@ export async function GET(request) {
     let userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
     let userType = decoded.user_type;
 
-    // For team members, we need to use the developer's ID to fetch conversations
-    // Conversations are stored with the developer's ID, not the team member's ID
-    if (decoded.user_type === 'team_member' && decoded.organization_type === 'developer') {
-      // Get the developer's ID from the organization
-      const { data: developer } = await supabaseAdmin
-        .from('developers')
-        .select('developer_id')
-        .eq('id', decoded.organization_id)
-        .single();
-
-      if (developer?.developer_id) {
-        userId = developer.developer_id;
-        userType = 'developer'; // Use 'developer' type for fetching conversations
-      } else {
-        return NextResponse.json(
-          { error: 'Developer organization not found' },
-          { status: 404 }
-        );
+    // For team members, use the organization's ID (developer_id or agency_id) to fetch conversations
+    if (decoded.user_type === 'team_member') {
+      if (decoded.organization_type === 'developer') {
+        const { data: developer } = await supabaseAdmin
+          .from('developers')
+          .select('developer_id')
+          .eq('id', decoded.organization_id)
+          .single();
+        if (developer?.developer_id) {
+          userId = developer.developer_id;
+          userType = 'developer';
+        } else {
+          return NextResponse.json({ error: 'Developer organization not found' }, { status: 404 });
+        }
+      } else if (decoded.organization_type === 'agency') {
+        const { data: agency } = await supabaseAdmin
+          .from('agencies')
+          .select('agency_id')
+          .eq('id', decoded.organization_id)
+          .single();
+        if (agency?.agency_id) {
+          userId = agency.agency_id;
+          userType = 'agency';
+        } else {
+          return NextResponse.json({ error: 'Agency organization not found' }, { status: 404 });
+        }
       }
     }
 
@@ -204,6 +213,19 @@ export async function GET(request) {
       };
     });
 
+    captureAuditEvent('conversation_listed', {
+      user_id: userId,
+      user_type: userType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/conversations',
+      metadata: {
+        result_count: conversationsWithUserDetails.length,
+        limit,
+        offset
+      }
+    }, userId);
+
     return NextResponse.json({
       success: true,
       conversations: conversationsWithUserDetails,
@@ -257,28 +279,36 @@ export async function POST(request) {
       firstMessage = null
     } = body;
 
-    // For developers, use developer_id. For property_seekers, use id
-    // For team members, use the developer's ID from their organization
-    let userId = decoded.developer_id || decoded.id;
+    // For developers, use developer_id. For agents/agencies, use agent_id/agency_id. For property_seekers, use id
+    let userId = decoded.developer_id || decoded.agent_id || decoded.agency_id || decoded.id;
     let userType = decoded.user_type;
 
-    // For team members, we need to use the developer's ID to create/find conversations
-    if (decoded.user_type === 'team_member' && decoded.organization_type === 'developer') {
-      // Get the developer's ID from the organization
-      const { data: developer } = await supabaseAdmin
-        .from('developers')
-        .select('developer_id')
-        .eq('id', decoded.organization_id)
-        .single();
-
-      if (developer?.developer_id) {
-        userId = developer.developer_id;
-        userType = 'developer'; // Use 'developer' type for conversation operations
-      } else {
-        return NextResponse.json(
-          { error: 'Developer organization not found' },
-          { status: 404 }
-        );
+    // For team members, use the organization's ID (developer_id or agency_id) to create/find conversations
+    if (decoded.user_type === 'team_member') {
+      if (decoded.organization_type === 'developer') {
+        const { data: developer } = await supabaseAdmin
+          .from('developers')
+          .select('developer_id')
+          .eq('id', decoded.organization_id)
+          .single();
+        if (developer?.developer_id) {
+          userId = developer.developer_id;
+          userType = 'developer';
+        } else {
+          return NextResponse.json({ error: 'Developer organization not found' }, { status: 404 });
+        }
+      } else if (decoded.organization_type === 'agency') {
+        const { data: agency } = await supabaseAdmin
+          .from('agencies')
+          .select('agency_id')
+          .eq('id', decoded.organization_id)
+          .single();
+        if (agency?.agency_id) {
+          userId = agency.agency_id;
+          userType = 'agency';
+        } else {
+          return NextResponse.json({ error: 'Agency organization not found' }, { status: 404 });
+        }
       }
     }
 
@@ -375,6 +405,17 @@ export async function POST(request) {
         }
       }
     }
+
+    captureAuditEvent('conversation_created', {
+      user_id: userId,
+      user_type: userType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/conversations',
+      resource_id: conversationId,
+      other_user_id: otherUserId,
+      other_user_type: otherUserType,
+    });
 
     return NextResponse.json({
       success: true,

@@ -734,7 +734,7 @@ export const AuthProvider = ({ children }) => {
         // Check if we're on a protected route
         if (typeof window !== 'undefined') {
           const path = window.location.pathname;
-          const protectedRoutes = ['/developer/', '/agency/', '/agents/', '/admin/', '/propertySeeker/', '/homeowner/', '/homeSeeker/'];
+          const protectedRoutes = ['/developer/', '/agency/', '/agents/', /* '/admin/', */ '/propertySeeker/', '/homeowner/', '/homeSeeker/'];
           const isProtectedRoute = protectedRoutes.some(route => path.startsWith(route));
           const isPublicRoute = path === '/home/signin' || path === '/signup' || path === '/' || path.startsWith('/property/');
           

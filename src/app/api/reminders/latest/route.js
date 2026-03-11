@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // GET /api/reminders/latest - Fetch latest reminders with joins to leads and listings
 export async function GET(request) {
@@ -123,6 +124,17 @@ export async function GET(request) {
         } : null
       }
     })
+
+    captureAuditEvent('reminder_viewed', {
+      user_id: userId,
+      user_type: userType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/reminders/latest',
+      metadata: {
+        result_count: enrichedReminders.length
+      }
+    }, userId)
 
     return NextResponse.json({
       success: true,

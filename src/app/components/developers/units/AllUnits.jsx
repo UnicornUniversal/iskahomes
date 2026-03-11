@@ -38,20 +38,19 @@ import {
   const [checkingRequirements, setCheckingRequirements] = useState(true)
   const [requirementMessage, setRequirementMessage] = useState('')
   
-  // Check if user can create units (only for developers/agencies/team members, not agents)
-  // Also check if requirements are met
+  // Check if user can create units/properties
   const canCreate = useMemo(() => {
-    // Agents should not be able to list properties
+    // Agents: can add properties when agency commission rates are set (requirementsMet)
     if (isAgent) {
-      return false
+      return requirementsMet
     }
     
-    // Check permissions first
+    // Check permissions for developers/agencies/team members
     const hasPermission = (user?.user_type === 'developer' || user?.user_type === 'team_member' || user?.user_type === 'agency') 
       ? userHasPermission(user, 'units.create') 
       : true
     
-    // Then check if requirements are met (for developers/team members)
+    // Developers/team members: also need profile requirements met
     if ((user?.user_type === 'developer' || user?.user_type === 'team_member') && !isAgency) {
       return hasPermission && requirementsMet
     }
@@ -74,6 +73,8 @@ import {
   const [selectedPurpose, setSelectedPurpose] = useState('')
   const [selectedType, setSelectedType] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('')
+  const [selectedAgent, setSelectedAgent] = useState('')
+  const [agents, setAgents] = useState([])
   
   // Filter visibility for mobile/tablet
   const [showFilters, setShowFilters] = useState(false)
@@ -130,6 +131,27 @@ import {
       fetchUnits()
     }
   }, [accountId])
+
+  // Fetch agents when agency - for agent filter
+  useEffect(() => {
+    if (!isAgency || !accountId) return
+    const fetchAgents = async () => {
+      try {
+        const token = localStorage.getItem('agency_token')
+        if (!token) return
+        const res = await fetch('/api/agencies/agents', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (res.ok) {
+          const { data } = await res.json()
+          setAgents(data || [])
+        }
+      } catch (e) {
+        console.error('Error fetching agents:', e)
+      }
+    }
+    fetchAgents()
+  }, [isAgency, accountId])
 
   // Check if user meets requirements to add units/properties
   const checkRequirements = async () => {
@@ -231,20 +253,22 @@ import {
         if (response.ok) {
           const { data } = await response.json()
           
-          // Check if commission_rate exists and has a default value
+          // Check commission_rates (plural): support both array format and legacy { default } format
           let hasCommissionRates = false
-          if (data.commission_rate) {
+          const rawRates = data.commission_rates ?? data.commission_rate
+          if (rawRates) {
             try {
-              const rates = typeof data.commission_rate === 'string' 
-                ? JSON.parse(data.commission_rate) 
-                : data.commission_rate
-              
-              // Check if default rate exists
-              if (rates.default !== undefined && rates.default !== null) {
+              const rates = typeof rawRates === 'string' ? JSON.parse(rawRates) : rawRates
+              // New format: array of rate objects
+              if (Array.isArray(rates) && rates.length > 0) {
+                hasCommissionRates = true
+              }
+              // Legacy format: { default: number }
+              else if (rates && typeof rates === 'object' && rates.default !== undefined && rates.default !== null) {
                 hasCommissionRates = true
               }
             } catch (e) {
-              console.error('Error parsing commission_rate:', e)
+              console.error('Error parsing commission_rates:', e)
             }
           }
 
@@ -336,7 +360,9 @@ import {
       return
     }
     
-    const slug = user?.profile?.organization_slug || user?.profile?.slug
+    const slug = isAgent
+      ? (user?.profile?.slug || user?.profile?.agent_slug)
+      : (user?.profile?.organization_slug || user?.profile?.slug)
     if (!slug) {
       toast.error(`${isAgent ? 'Agent' : 'Developer'} profile not found`)
       return
@@ -478,8 +504,13 @@ import {
       })
     }
 
+    // Filter by agent (agency only) - user_id on listing = agent_id for agent listings
+    if (isAgency && selectedAgent) {
+      filtered = filtered.filter(unit => unit.user_id === selectedAgent)
+    }
+
     setFilteredUnits(filtered)
-  }, [units, searchQuery, selectedLocation, selectedStatus, selectedPurpose, selectedType])
+  }, [units, searchQuery, selectedLocation, selectedStatus, selectedPurpose, selectedType, selectedAgent, isAgency])
 
   // Clear all filters
   const clearFilters = () => {
@@ -489,8 +520,14 @@ import {
     setSelectedPurpose('')
     setSelectedType('')
     setSelectedStatus('')
+    setSelectedAgent('')
     setShowLocationResults(false)
   }
+
+  const agentOptions = useMemo(() => [
+    { value: '', label: 'All Agents' },
+    ...agents.map(a => ({ value: a.agent_id || a.id, label: a.name }))
+  ], [agents])
 
   if (loading) {
     return (
@@ -523,7 +560,7 @@ import {
       <div className="w-full p-6">
         <div className="w-full flex justify-between items-center mb-6">
           <h1 className="">{pageTitle}</h1>
-          {!isAgency && !isAgent && canCreate && (
+          {!isAgency && canCreate && (
             <button 
               onClick={handleAddUnit}
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
@@ -564,8 +601,8 @@ import {
             Showing {filteredUnits.length} of {units.length} {units.length === 1 ? itemLabel.toLowerCase() : itemLabelPlural.toLowerCase()}
           </p>
         </div>
-        {/* Conditionally render Add New Property button - only for developers/team members with permission and requirements met */}
-        {!isAgency && !isAgent && canCreate && (
+        {/* Add New Property/Unit button - for developers, team members, and agents (when requirements met) */}
+        {!isAgency && canCreate && (
           <button 
             onClick={handleAddUnit}
             className="primary_button transition-colors flex items-center gap-2"
@@ -647,7 +684,7 @@ import {
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">{emptyStateTitle}</h3>
             <p className="text-gray-600 mb-6">{emptyStateMessage}</p>
-            {!isAgency && !isAgent && canCreate && (
+            {!isAgency && canCreate && (
               <button 
                 onClick={handleAddUnit}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -721,7 +758,7 @@ import {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Filters</h2>
             <div className="flex items-center gap-2">
-              {(searchQuery || selectedLocation || selectedStatus || selectedPurpose || selectedType) && (
+              {(searchQuery || selectedLocation || selectedStatus || selectedPurpose || selectedType || selectedAgent) && (
                 <button
                   onClick={clearFilters}
                   className="secondary_button text-sm"
@@ -836,6 +873,19 @@ import {
             />
           </div>
 
+          {/* Agent Filter - Agency only */}
+          {isAgency && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">Agent</label>
+              <CustomSelect
+                value={selectedAgent}
+                onChange={(e) => setSelectedAgent(e.target.value)}
+                options={agentOptions}
+                placeholder="All Agents"
+              />
+            </div>
+          )}
+
           {/* Category Filters */}
           <div className="space-y-4">
             <div>
@@ -881,7 +931,7 @@ import {
                   Cancel
                 </button>
               </div>
-              {(searchQuery || selectedLocation || selectedStatus || selectedPurpose || selectedType) && (
+              {(searchQuery || selectedLocation || selectedStatus || selectedPurpose || selectedType || selectedAgent) && (
                 <button
                   onClick={clearFilters}
                   className="secondary_button text-sm mb-4 w-full"
@@ -984,6 +1034,19 @@ import {
                   placeholder="All Statuses"
                 />
               </div>
+
+              {/* Agent Filter - Agency only */}
+              {isAgency && (
+                <div className="mb-6">
+                  <label className="block text-sm font-medium mb-2">Agent</label>
+                  <CustomSelect
+                    value={selectedAgent}
+                    onChange={(e) => setSelectedAgent(e.target.value)}
+                    options={agentOptions}
+                    placeholder="All Agents"
+                  />
+                </div>
+              )}
 
               {/* Category Filters */}
               <div className="space-y-4">

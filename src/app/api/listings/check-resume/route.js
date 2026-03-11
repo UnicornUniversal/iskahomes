@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 /**
  * GET /api/listings/check-resume
@@ -49,11 +50,24 @@ export async function GET(request) {
       )
     }
 
+    const draftCount = incompleteDrafts?.length || 0
+    captureAuditEvent('listing_resume_checked', {
+      user_id: userId,
+      user_type: decoded.user_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/listings/check-resume',
+      metadata: {
+        has_incomplete_drafts: draftCount > 0,
+        draft_count: draftCount
+      }
+    }, userId)
+
     return NextResponse.json({
       success: true,
-      hasIncompleteDrafts: incompleteDrafts && incompleteDrafts.length > 0,
+      hasIncompleteDrafts: incompleteDrafts && draftCount > 0,
       drafts: incompleteDrafts || [],
-      count: incompleteDrafts?.length || 0
+      count: draftCount
     })
 
   } catch (error) {

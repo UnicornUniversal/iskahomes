@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function POST(request) {
   try {
@@ -58,6 +59,14 @@ export async function POST(request) {
         { status: 400 }
       )
     }
+
+    captureAuditEvent('auth_password_reset', {
+      user_id: data?.user?.id ?? 'unknown',
+      user_type: 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/auth/reset-password',
+    }, data?.user?.id)
 
     return NextResponse.json({
       success: true,

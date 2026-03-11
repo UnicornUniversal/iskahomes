@@ -245,9 +245,9 @@ const Chats = ({ onChatSelect, selectedChatId, onConversationDataChange }) => {
   };
 
   return (
-    <div className="w-full h-full default_bg border-r border-primary_color/10 flex flex-col shadow-lg rounded-xl overflow-hidden min-h-0">
+    <div className="w-full h-full  border-r border-primary_color/10 flex flex-col shadow-lg rounded-xl overflow-hidden min-h-0">
       {/* Header */}
-      <div className="p-4 border-b border-primary_color/10 default_bg">
+      <div className="p-4 border-b border-primary_color/10 ">
         <h2 className="text-xl font-bold text-primary_color">Chats</h2>
         <p className="text-sm text-primary_color/60 mt-1">{conversations.length} conversations</p>
       </div>

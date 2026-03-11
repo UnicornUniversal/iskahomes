@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // GET - Fetch property seeker profile
 export async function GET(request) {
@@ -135,6 +136,16 @@ export async function PUT(request) {
         details: updateError.message 
       }, { status: 500 })
     }
+
+    const updatedFields = Object.keys(updateData).filter(k => !['updated_at'].includes(k))
+    captureAuditEvent('seeker_profile_updated', {
+      user_id: decoded.user_id,
+      user_type: 'property_seeker',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/property-seekers/profile',
+      metadata: { updated_fields: updatedFields },
+    }, decoded.user_id)
 
     return NextResponse.json({ 
       success: true,

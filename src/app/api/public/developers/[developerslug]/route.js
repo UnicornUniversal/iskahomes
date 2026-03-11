@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function GET(request, { params }) {
   try {
@@ -73,6 +74,17 @@ export async function GET(request, { params }) {
     }
 
     console.log('✅ Developer found:', developer.name)
+    captureAuditEvent('developer_public_profile_viewed', {
+      user_id: developer.developer_id || 'anonymous',
+      user_type: 'public',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/public/developers/[developerslug]',
+      metadata: {
+        developer_id: developer.developer_id,
+        slug: developerslug
+      }
+    }, developer.developer_id || 'anonymous')
 
     // 2. Fetch developer's developments (PUBLIC - no auth required)
     const { data: developments, error: developmentsError } = await supabase

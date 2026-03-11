@@ -554,9 +554,9 @@ const Conversation = ({ selectedChatId, onBack, conversationData, onConversation
   }
 
   return (
-    <div className="flex flex-col h-full w-full default_bg rounded-xl shadow-lg border border-primary_color/10 min-h-0">
+    <div className="flex flex-col h-full w-full  rounded-xl shadow-lg border border-primary_color/10 min-h-0">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-primary_color/10 default_bg rounded-t-xl flex-shrink-0">
+      <div className="flex items-center justify-between p-4 border-b border-primary_color/10  rounded-t-xl flex-shrink-0">
         <div className="flex items-center min-w-0">
           <Button 
             variant="ghost" 

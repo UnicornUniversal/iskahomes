@@ -18,10 +18,33 @@ export async function GET(request) {
     // Calculate offset
     const offset = (page - 1) * limit
 
-    // Fetch listings with pagination
+    // Fetch listings - display fields only, no analytics
     const { data: listings, error } = await supabase
       .from('listings')
-      .select('*')
+      .select(`
+        id,
+        slug,
+        listing_type,
+        title,
+        description,
+        price,
+        currency,
+        price_type,
+        duration,
+        media,
+        specifications,
+        types,
+        city,
+        state,
+        country,
+        purposes,
+        status,
+        is_featured,
+        is_verified,
+        is_premium,
+        available_from,
+        created_at
+      `)
       .eq('user_id', developerId)
       .eq('listing_status', 'active')
       .eq('listing_condition', 'completed')

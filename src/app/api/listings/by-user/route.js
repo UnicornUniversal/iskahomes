@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function GET(request) {
   try {
@@ -134,6 +135,19 @@ export async function GET(request) {
     }
 
     const { count: totalCount } = await countQuery
+
+    captureAuditEvent('listing_by_user_listed', {
+      user_id: userId,
+      user_type: decoded.user_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/listings/by-user',
+      metadata: {
+        page,
+        limit,
+        result_count: listings?.length || 0
+      }
+    }, userId)
 
     return NextResponse.json({ 
       success: true,

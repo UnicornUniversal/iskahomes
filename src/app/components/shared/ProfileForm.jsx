@@ -24,6 +24,7 @@ import {
   FiFileText,
   FiMap,
   FiChevronDown,
+  FiSettings,
 } from 'react-icons/fi'
 import { FaWhatsapp, FaYoutube, FaTiktok } from 'react-icons/fa'
 import dynamic from 'next/dynamic'
@@ -32,6 +33,7 @@ import countryToCurrency from 'country-to-currency'
 import { CustomSelect } from '@/app/components/ui/custom-select'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'react-toastify'
+import ProfileSettings from '@/app/components/shared/ProfileSettings'
 
 // Google Map Component for Location Modal
 const GoogleMapViewer = React.memo(({ center, zoom, coordinates, onMapClick }) => {
@@ -1100,6 +1102,7 @@ const ProfileForm = ({ accountType = 'developer' }) => {
           <div className="flex space-x-1">
             {[
               { id: 'profile', label: 'Profile Information', icon: FiUser },
+              { id: 'settings', label: 'Settings', icon: FiSettings },
               { id: 'password', label: 'Change Password', icon: FiLock }
             ].map((tab) => (
               <button
@@ -2243,6 +2246,10 @@ const ProfileForm = ({ accountType = 'developer' }) => {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <ProfileSettings token={token} title={`${accountType === 'agency' ? 'Agency' : 'Developer'} Settings`} />
         )}
 
         {/* Change Password Tab */}

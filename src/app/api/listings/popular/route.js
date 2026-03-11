@@ -5,6 +5,7 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('user_id')
+    const accountType = searchParams.get('account_type') || 'developer'
     const limit = parseInt(searchParams.get('limit')) || 7
 
     if (!userId) {
@@ -14,15 +15,22 @@ export async function GET(request) {
       )
     }
 
-    // Fetch popular listings for the user, sorted by total_views
-    const { data: listings, error: listingsError } = await supabase
+    // For agency: fetch by listing_agency_id. For developer/agent: fetch by user_id
+    let query = supabase
       .from('listings')
       .select('id, title, slug, price, currency, media, total_views, city, state, country, town, full_address, listing_status, listing_type')
-      .eq('user_id', userId)
       .eq('listing_status', 'active')
       .eq('listing_condition', 'completed')
       .order('total_views', { ascending: false })
       .limit(limit)
+
+    if (accountType === 'agency') {
+      query = query.eq('listing_agency_id', userId)
+    } else {
+      query = query.eq('user_id', userId)
+    }
+
+    const { data: listings, error: listingsError } = await query
 
     if (listingsError) {
       console.error('Error fetching popular listings:', listingsError)

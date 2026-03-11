@@ -73,6 +73,12 @@ const AdminNav = ({ active }) => {
                     href: '/admin/users/agents',
                     icon: FiUsers,
                     type: 'single'
+                },
+                {
+                    label: 'Agencies',
+                    href: '/admin/users/agencies',
+                    icon: FiHome,
+                    type: 'single'
                 }
             ]
         },
@@ -80,6 +86,12 @@ const AdminNav = ({ active }) => {
             label: 'Properties',
             href: '/admin/properties',
             icon: FiMapPin,
+            type: 'single'
+        },
+        {
+            label: 'Audit Log',
+            href: '/admin/audit',
+            icon: FiList,
             type: 'single'
         },
         {
@@ -359,14 +371,14 @@ const AdminNav = ({ active }) => {
             )}
 
             {/* Navigation Menu */}
-            <nav className={`fixed lg:relative flex flex-col bg-gradient-to-b from-white  to-gray-50 min-h-screen py-8 w-[85vw] max-w-[300px] px-[1em] shadow-lg border-r border-gray-100 z-50 transition-transform duration-300 ease-in-out ${
+            <nav className={`fixed lg:relative flex flex-col secondary_bg min-h-screen py-8 w-[85vw] max-w-[300px] px-[1em] shadow-lg border-r border-primary_color/10 z-50 transition-transform duration-300 ease-in-out ${
                 isMobileMenuOpen 
                     ? 'translate-x-0' 
                     : '-translate-x-full lg:translate-x-0'
             }`}>
                 <div className="mb-8">
-                    <h5 className="mb-2">Admin</h5>
-                    <h3 className="mb-2">Dashboard</h3>
+                    <h5 className="mb-2 text-primary_color/70">Admin</h5>
+                    <h3 className="mb-2 text-primary_color">Dashboard</h3>
                     <div className="w-12 h-1 bg-primary_color rounded-full"></div>
                 </div>
                 

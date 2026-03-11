@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function GET(request) {
   try {
@@ -234,6 +235,19 @@ export async function GET(request) {
       leadsToSales: Math.round(leadsToSales * 100) / 100, // Round to 2 decimal places
       currency: primaryCurrency // Include currency in response
     }
+
+    captureAuditEvent('sales_viewed', {
+      user_id: finalUserId || 'unknown',
+      user_type: 'developer',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/sales/overview',
+      metadata: {
+        slug: slug || null,
+        total_revenue: totalRevenue,
+        total_units_sold: developer?.total_sales || totalUnitsSold
+      }
+    }, finalUserId || 'unknown')
 
     return NextResponse.json({
       success: true,

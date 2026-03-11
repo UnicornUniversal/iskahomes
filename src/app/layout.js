@@ -1,16 +1,24 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Poppins } from "next/font/google";
+import { Poppins, Playfair_Display } from "next/font/google";
 import Layout1 from "./layout/Layout1";
+
 import { AuthProvider } from "@/contexts/AuthContext";
 import { PostHogProvider } from "./providers";
 import DisableNumberInputScroll from "./components/DisableNumberInputScroll";
+import ToastProvider from "./components/ToastProvider";
 
 import Nav from "./components/Nav";
 import Footer from "./components/Footer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const playfair_display = Playfair_Display({
+  weight: ["400", "500", "600", "700", "800", "900"],
+  variable: "--font-playfair-display",
   subsets: ["latin"],
 });
 
@@ -34,11 +42,12 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body
-        className={` ${poppins.variable} antialiased text-primary_color`}
+        className={` ${poppins.variable} ${playfair_display.variable} antialiased text-primary_color`}
       >
         <PostHogProvider>
           <AuthProvider>
             <DisableNumberInputScroll />
+            <ToastProvider />
             {/* <Nav /> */}
             {/* <Layout1> */}
               {children}

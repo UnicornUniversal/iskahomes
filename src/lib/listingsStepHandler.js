@@ -4,6 +4,7 @@ import { verifyToken } from '@/lib/jwt'
 import { processCurrencyConversions } from '@/lib/currencyConversion'
 import { updateAdminAnalytics } from '@/lib/adminAnalytics'
 import { updateAdminListingsAnalytics, updateAdminSalesAnalytics } from '@/lib/adminAnalyticsHelpers'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -1123,6 +1124,17 @@ async function createSalesListingEntry(listingId, userId, listingData, saleType,
       return { error: 'Failed to create sales entry. Please try again.' }
     }
 
+    // If client_id provided, add listing to client's clients_properties
+    if (salesInfo.client_id && listingId) {
+      const { data: client } = await supabaseAdmin.from('clients').select('clients_properties').eq('id', salesInfo.client_id).single()
+      if (client) {
+        const props = Array.isArray(client.clients_properties) ? [...client.clients_properties] : []
+        const exists = props.some(p => (typeof p === 'object' ? p?.id : p) === listingId)
+        if (!exists) props.push({ id: listingId })
+        await supabaseAdmin.from('clients').update({ clients_properties: props }).eq('id', salesInfo.client_id)
+      }
+    }
+
     return { success: true, data }
   } catch (error) {
     console.error('Error in createSalesListingEntry:', error)
@@ -1378,6 +1390,19 @@ export async function handleStepUpdate(request, params, isNewListing) {
             { error: 'Failed to create draft listing', details: createError.message },
             { status: 500 }
           )
+        }
+        if (newDraft?.account_type === 'developer' && newDraft?.listing_type === 'unit') {
+          captureAuditEvent('unit_created', {
+            user_id: userId,
+            user_type: accountType,
+            timestamp: new Date().toISOString(),
+            success: true,
+            api_route: '/api/listings/new/step/[stepName]',
+            metadata: {
+              listing_id: newDraft.id,
+              created_as: 'draft'
+            }
+          }, userId)
         }
         existingListing = newDraft
       }
@@ -2192,6 +2217,19 @@ export async function handleStepUpdate(request, params, isNewListing) {
         }
       }
     }
+
+    captureAuditEvent('listing_step_saved', {
+      user_id: userId,
+      user_type: accountType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/listings/new/step/[stepName]',
+      metadata: {
+        listing_id: listingId,
+        step_name: stepName,
+        is_new_listing: actuallyNewListing
+      }
+    }, userId)
 
     return NextResponse.json({
       success: true,

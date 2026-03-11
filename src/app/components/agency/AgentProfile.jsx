@@ -1,10 +1,11 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { FiUser, FiMail, FiPhone, FiCalendar, FiCheckCircle, FiXCircle, FiFileText, FiMapPin, FiCamera, FiEdit3, FiSave, FiX, FiLock, FiEye, FiEyeOff, FiPlus, FiTrash2, FiAward, FiGlobe as FiGlobeIcon } from 'react-icons/fi'
+import { FiUser, FiMail, FiPhone, FiCalendar, FiCheckCircle, FiXCircle, FiFileText, FiMapPin, FiCamera, FiEdit3, FiSave, FiX, FiLock, FiEye, FiEyeOff, FiPlus, FiTrash2, FiAward, FiGlobe as FiGlobeIcon, FiAlertTriangle } from 'react-icons/fi'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'react-toastify'
 import Image from 'next/image'
+import ProfileSettings from '@/app/components/shared/ProfileSettings'
 
 export default function AgentProfile({ agent, loading, isEditable = false, onUpdate }) {
   const { user, agentToken, agencyToken } = useAuth()
@@ -29,6 +30,7 @@ export default function AgentProfile({ agent, loading, isEditable = false, onUpd
   const [coverImageFile, setCoverImageFile] = useState(null)
   const [profileImagePreview, setProfileImagePreview] = useState(null)
   const [coverImagePreview, setCoverImagePreview] = useState(null)
+  const [showDecommissionModal, setShowDecommissionModal] = useState(false)
 
   // Initialize form data when agent data changes
   useEffect(() => {
@@ -267,10 +269,6 @@ export default function AgentProfile({ agent, loading, isEditable = false, onUpd
   const handleDecommission = async () => {
     if (!agencyToken || !user?.id) return
 
-    if (!confirm('Are you sure you want to decommission this agent? This action cannot be undone.')) {
-      return
-    }
-
     setSaving(true)
     try {
       const response = await fetch(`/api/agencies/agents/${agent.id}`, {
@@ -300,6 +298,7 @@ export default function AgentProfile({ agent, loading, isEditable = false, onUpd
       toast.error('Error decommissioning agent')
     } finally {
       setSaving(false)
+      setShowDecommissionModal(false)
     }
   }
 
@@ -465,7 +464,7 @@ export default function AgentProfile({ agent, loading, isEditable = false, onUpd
                 )}
                 {!isEditable && agencyToken && (
                   <button
-                    onClick={handleDecommission}
+                    onClick={() => setShowDecommissionModal(true)}
                     disabled={saving}
                     className="secondary_button flex items-center gap-2 disabled:opacity-50"
                   >
@@ -771,6 +770,11 @@ export default function AgentProfile({ agent, loading, isEditable = false, onUpd
 
       {/* Change Password - Only for agent viewing */}
       {isEditable && (
+        <ProfileSettings token={agentToken || user?.token} title="Agent Settings" />
+      )}
+
+      {/* Change Password - Only for agent viewing */}
+      {isEditable && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Change Password</h3>
@@ -881,6 +885,63 @@ export default function AgentProfile({ agent, loading, isEditable = false, onUpd
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Decommission Agent Modal */}
+      {showDecommissionModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
+            <div className="p-6 pb-4 border-b border-gray-200">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center justify-center w-12 h-12 bg-amber-100 rounded-full">
+                  <FiAlertTriangle className="w-6 h-6 text-amber-600" />
+                </div>
+                <h3 className="text-xl font-bold text-primary_color">Decommission Agent</h3>
+              </div>
+              {agent && (
+                <p className="text-gray-700 font-medium">{agent.name}</p>
+              )}
+            </div>
+            <div className="p-6">
+              <p className="text-gray-600 mb-4">
+                Are you sure you want to decommission this agent? Please review what will happen:
+              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                <p className="text-sm font-medium text-amber-800 mb-2">What will happen:</p>
+                <ul className="list-disc list-inside space-y-1 text-sm text-amber-800">
+                  <li>The agent will be marked as inactive</li>
+                  <li>They will be hidden from your agency&apos;s public profile and agent listings</li>
+                  <li>Commission eligibility will be turned off</li>
+                  <li>Their listings, leads, and messages will remain in the system</li>
+                  <li>They will still appear in your dashboard as &quot;Inactive&quot;</li>
+                </ul>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => !saving && setShowDecommissionModal(false)}
+                  disabled={saving}
+                  className="flex-1 px-4 py-2.5 text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDecommission}
+                  disabled={saving}
+                  className="flex-1 px-4 py-2.5 text-white bg-amber-600 rounded-lg hover:bg-amber-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+                >
+                  {saving ? (
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    'Approve'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

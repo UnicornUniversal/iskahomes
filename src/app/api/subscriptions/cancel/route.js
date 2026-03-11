@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // POST - Cancel subscription (creates request, moves to free plan)
 export async function POST(request) {
@@ -131,6 +132,18 @@ export async function POST(request) {
           cancellation_reason: cancellation_reason || null
         }
       })
+
+    captureAuditEvent('subscription_cancelled', {
+      user_id: userId,
+      user_type: dbUserType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/subscriptions/cancel',
+      metadata: {
+        subscription_id: currentSubscription.id,
+        request_id: cancelRequest.id
+      }
+    }, userId)
 
     return NextResponse.json({ 
       success: true,

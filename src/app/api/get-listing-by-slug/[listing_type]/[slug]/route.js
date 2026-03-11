@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function GET(request, { params }) {
   try {
@@ -130,6 +131,18 @@ export async function GET(request, { params }) {
     }
 
     console.log('Listing fetched successfully for end user by slug')
+    captureAuditEvent('listing_viewed', {
+      user_id: listing.user_id || 'anonymous',
+      user_type: listing.account_type || 'public',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/get-listing-by-slug/[listing_type]/[slug]',
+      metadata: {
+        listing_id: listing.id,
+        listing_type: listing.listing_type,
+        slug
+      }
+    }, listing.user_id || 'anonymous')
 
     return NextResponse.json({
       success: true,

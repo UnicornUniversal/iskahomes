@@ -7,8 +7,9 @@ import { toast } from 'react-toastify'
 import { FiMail, FiPhone, FiUser, FiEdit, FiTrash2, FiClock, FiCheckCircle, FiXCircle } from 'react-icons/fi'
 import EditMemberModal from './EditMemberModal'
 
-const TeamMembersList = ({ onRefresh }) => {
-  const { user, developerToken } = useAuth()
+const TeamMembersList = ({ onRefresh, organizationType = 'developer' }) => {
+  const { user, developerToken, agencyToken } = useAuth()
+  const token = organizationType === 'agency' ? agencyToken : developerToken
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedMember, setSelectedMember] = useState(null)
@@ -23,7 +24,7 @@ const TeamMembersList = ({ onRefresh }) => {
       setLoading(true)
       const response = await fetch('/api/developers/team/members', {
         headers: {
-          'Authorization': `Bearer ${developerToken}`
+          'Authorization': `Bearer ${token}`
         }
       })
 
@@ -58,7 +59,7 @@ const TeamMembersList = ({ onRefresh }) => {
       const response = await fetch(`/api/developers/team/members/${memberId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${developerToken}`
+          'Authorization': `Bearer ${token}`
         }
       })
 
@@ -216,6 +217,7 @@ const TeamMembersList = ({ onRefresh }) => {
             if (onRefresh) onRefresh()
             toast.success('Team member updated successfully!')
           }}
+          organizationType={organizationType}
         />
       )}
     </div>

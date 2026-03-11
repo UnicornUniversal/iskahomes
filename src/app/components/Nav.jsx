@@ -82,6 +82,7 @@ const handleLogout = () => {
         } md:flex py-[2em] md:py-4 px-4  items-center md:justify-between md:gap-0 md:p-2 md:px-8 md:shadow-lg md:bg-white/90 md:backdrop-blur-lg w-[90%] md:w-full h-screen md:h-auto max-h-screen md:min-h-[30px] overflow-y-auto md:overflow-visible bg-white/90 shadow-xl backdrop-blur-lg`}
       >
         {/* Logo (left) */}
+        <Link href="/">
         <img
           src="/iska-dark.png"
           alt="Company Logo"
@@ -90,7 +91,7 @@ const handleLogout = () => {
           src="/iska-dark.png"
           alt="Company Logo"
           className="block   md:hidden w-[12em] max-w-[150px] mb-8 " />
-
+</Link>
         {/* Nav items (centered on md+) */}
         <div className="flex flex-col md:flex-row gap-2 md:gap-2 h-auto items-start md:items-center justify-start md:justify-center w-full md:w-auto flex-1">
           {nav_options.map((each_value) => {
@@ -156,6 +157,26 @@ const handleLogout = () => {
                 </Link>
               ) : user.user_type === 'agent' ? (
                 <Link href={`/agents/${user.profile?.slug || user.id}/dashboard`} className="w-full md:w-auto">
+                  <div 
+                    onClick={() => set_show_nav(false)}
+                    className="flex items-center gap-3 justify-center text-left md:text-center text-[1.1em] md:text-sm cursor-pointer transition-all duration-500 bg-primary_color text-white px-4 py-3 md:px-6 md:py-2 rounded-lg hover:bg-opacity-90 w-full md:w-auto shadow-md hover:shadow-lg"
+                  >
+                    <FaUser size={22} className="md:hidden" />
+                    <span className="text-xs font-medium">Welcome, {user.profile?.name || user.email}</span>
+                  </div>
+                </Link>
+              ) : user.user_type === 'agency' ? (
+                <Link href={`/agency/${user.profile?.slug || user.id}/dashboard`} className="w-full md:w-auto">
+                  <div 
+                    onClick={() => set_show_nav(false)}
+                    className="flex items-center gap-3 justify-center text-left md:text-center text-[1.1em] md:text-sm cursor-pointer transition-all duration-500 bg-primary_color text-white px-4 py-3 md:px-6 md:py-2 rounded-lg hover:bg-opacity-90 w-full md:w-auto shadow-md hover:shadow-lg"
+                  >
+                    <FaUser size={22} className="md:hidden" />
+                    <span className="text-xs font-medium">Welcome, {user.profile?.name || user.email}</span>
+                  </div>
+                </Link>
+              ) : (user.user_type === 'team_member' && user.profile?.organization_type === 'agency') ? (
+                <Link href={`/agency/${user.profile?.organization_slug || user.profile?.slug || user.id}/dashboard`} className="w-full md:w-auto">
                   <div 
                     onClick={() => set_show_nav(false)}
                     className="flex items-center gap-3 justify-center text-left md:text-center text-[1.1em] md:text-sm cursor-pointer transition-all duration-500 bg-primary_color text-white px-4 py-3 md:px-6 md:py-2 rounded-lg hover:bg-opacity-90 w-full md:w-auto shadow-md hover:shadow-lg"

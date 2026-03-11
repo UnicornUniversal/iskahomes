@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // GET - Fetch all agents for an agency
 export async function GET(request) {
@@ -14,7 +15,21 @@ export async function GET(request) {
     const token = authHeader.split(' ')[1]
     const decoded = verifyToken(token)
     
-    if (!decoded || decoded.user_type !== 'agency') {
+    if (!decoded) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    }
+
+    // Get agency_id: owner has agency_id; team members have organization_id (= agencies.id)
+    let agencyId = decoded.agency_id || decoded.user_id
+    if (!agencyId && decoded.user_type === 'team_member' && decoded.organization_type === 'agency' && decoded.organization_id) {
+      const { data: agency } = await supabaseAdmin
+        .from('agencies')
+        .select('agency_id')
+        .eq('id', decoded.organization_id)
+        .single()
+      agencyId = agency?.agency_id
+    }
+    if (!agencyId) {
       return NextResponse.json({ error: 'Invalid token or user type' }, { status: 401 })
     }
 
@@ -27,7 +42,7 @@ export async function GET(request) {
     let query = supabaseAdmin
       .from('agents')
       .select('*')
-      .eq('agency_id', decoded.user_id)
+      .eq('agency_id', agencyId)
       .order('created_at', { ascending: false })
 
     // Apply status filter
@@ -57,6 +72,7 @@ export async function GET(request) {
     // Format agents data for frontend
     const formattedAgents = (agents || []).map(agent => ({
       id: agent.id,
+      agent_id: agent.agent_id,
       name: agent.name,
       email: agent.email,
       phone: agent.phone,
@@ -77,6 +93,20 @@ export async function GET(request) {
       profile_image: agent.profile_image,
       slug: agent.slug
     }))
+
+    const auditId = decoded.agency_id || decoded.user_id
+    captureAuditEvent('agency_agents_listed', {
+      user_id: auditId,
+      user_type: decoded.user_type || 'agency',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/agencies/agents',
+      metadata: {
+        result_count: formattedAgents.length,
+        status: status || 'all',
+        search
+      }
+    }, auditId)
 
     return NextResponse.json({
       success: true,

@@ -14,7 +14,7 @@ export async function GET(request, { params }) {
       )
     }
 
-    // 1. Fetch agency details by slug
+    // 1. Fetch agency details - display fields only, no analytics
     const { data: agency, error: agencyError } = await supabase
       .from('agencies')
       .select(`
@@ -31,7 +31,6 @@ export async function GET(request, { params }) {
         country,
         description,
         profile_image,
-        cover_image,
         social_media,
         customer_care,
         account_status,
@@ -72,7 +71,6 @@ export async function GET(request, { params }) {
         email,
         phone,
         profile_image,
-        cover_image,
         bio,
         slug,
         account_status,
@@ -99,7 +97,30 @@ export async function GET(request, { params }) {
     // First try to get listings directly by listing_agency_id
     const { data: directListings, error: directListingsError } = await supabase
       .from('listings')
-      .select('*')
+      .select(`
+        id,
+        slug,
+        listing_type,
+        title,
+        description,
+        price,
+        currency,
+        price_type,
+        duration,
+        media,
+        specifications,
+        types,
+        city,
+        state,
+        country,
+        purposes,
+        status,
+        is_featured,
+        is_verified,
+        is_premium,
+        available_from,
+        created_at
+      `)
       .eq('listing_agency_id', agency.agency_id)
       .order('created_at', { ascending: false })
       .limit(50)
@@ -123,7 +144,30 @@ export async function GET(request, { params }) {
         if (agentIds.length > 0) {
           const { data: agentListings, error: agentListingsError } = await supabase
             .from('listings')
-            .select('*')
+            .select(`
+              id,
+              slug,
+              listing_type,
+              title,
+              description,
+              price,
+              currency,
+              price_type,
+              duration,
+              media,
+              specifications,
+              types,
+              city,
+              state,
+              country,
+              purposes,
+              status,
+              is_featured,
+              is_verified,
+              is_premium,
+              available_from,
+              created_at
+            `)
             .in('user_id', agentIds)
             .order('created_at', { ascending: false })
             .limit(50)
@@ -148,15 +192,15 @@ export async function GET(request, { params }) {
       
       if (allAgentIds.length > 0) {
         // Get listings by listing_agency_id
+        const listingFields = `id,slug,listing_type,title,description,price,currency,price_type,duration,media,specifications,types,city,state,country,purposes,status,is_featured,is_verified,is_premium,available_from,created_at`
         const { data: agencyListings } = await supabase
           .from('listings')
-          .select('*')
+          .select(listingFields)
           .eq('listing_agency_id', agency.agency_id)
         
-        // Get listings by agent user_ids
         const { data: agentListings } = await supabase
           .from('listings')
-          .select('*')
+          .select(listingFields)
           .in('user_id', allAgentIds)
         
         // Combine and deduplicate by id
@@ -200,7 +244,6 @@ export async function GET(request, { params }) {
           country: agency.country,
           description: agency.description,
           profile_image: agency.profile_image,
-          cover_image: agency.cover_image,
           social_media: agency.social_media,
           customer_care: agency.customer_care,
           account_status: agency.account_status,

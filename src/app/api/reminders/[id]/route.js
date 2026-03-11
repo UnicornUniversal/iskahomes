@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // PATCH /api/reminders/[id] - Update reminder status or details
 export async function PATCH(request, { params }) {
@@ -61,6 +62,18 @@ export async function PATCH(request, { params }) {
       )
     }
 
+    captureAuditEvent('reminder_updated', {
+      user_id: reminder.user_id || 'unknown',
+      user_type: reminder.user_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/reminders/[id]',
+      metadata: {
+        reminder_id: id,
+        updated_fields: Object.keys(updateData)
+      }
+    }, reminder.user_id || 'unknown')
+
     return NextResponse.json({
       success: true,
       data: reminder
@@ -79,6 +92,12 @@ export async function DELETE(request, { params }) {
   try {
     const { id } = await params
 
+    const { data: existingReminder } = await supabaseAdmin
+      .from('reminders')
+      .select('id, user_id, user_type')
+      .eq('id', id)
+      .maybeSingle()
+
     const { error } = await supabaseAdmin
       .from('reminders')
       .delete()
@@ -91,6 +110,17 @@ export async function DELETE(request, { params }) {
         { status: 500 }
       )
     }
+
+    captureAuditEvent('reminder_deleted', {
+      user_id: existingReminder?.user_id || 'unknown',
+      user_type: existingReminder?.user_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/reminders/[id]',
+      metadata: {
+        reminder_id: id
+      }
+    }, existingReminder?.user_id || 'unknown')
 
     return NextResponse.json({
       success: true,

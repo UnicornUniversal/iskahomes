@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // Helper to check if string is UUID
 function isUUID(value) {
@@ -70,6 +71,16 @@ export async function GET(request, { params }) {
         agent.location_data = location
       }
     }
+
+    const auditId = decoded.agency_id || decoded.user_id
+    captureAuditEvent('agency_agent_viewed', {
+      user_id: auditId,
+      user_type: 'agency',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/agencies/agents/[agentSlug]',
+      metadata: { agent_id: agent.agent_id || agent.id }
+    }, auditId)
 
     return NextResponse.json({
       success: true,
@@ -143,6 +154,38 @@ export async function PUT(request, { params }) {
         { error: 'Failed to update agent' },
         { status: 500 }
       )
+    }
+
+    const auditId = decoded.agency_id || decoded.user_id
+    captureAuditEvent('agent_updated', {
+      user_id: auditId,
+      user_type: 'agency',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/agencies/agents/[agentSlug]',
+      resource_id: updatedAgent?.agent_id || agentSlug,
+      updated_fields: Object.keys(updateData).filter(k => k !== 'updated_at'),
+    }, auditId);
+    captureAuditEvent('agency_agent_updated', {
+      user_id: auditId,
+      user_type: 'agency',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/agencies/agents/[agentSlug]',
+      metadata: {
+        agent_id: updatedAgent?.agent_id || agentSlug,
+        updated_fields: Object.keys(updateData).filter(k => k !== 'updated_at')
+      }
+    }, auditId);
+    if (agent_status === 'inactive') {
+      captureAuditEvent('agency_agent_removed', {
+        user_id: auditId,
+        user_type: 'agency',
+        timestamp: new Date().toISOString(),
+        success: true,
+        api_route: '/api/agencies/agents/[agentSlug]',
+        metadata: { agent_id: updatedAgent?.agent_id || agentSlug, removal_type: 'decommission' }
+      }, auditId);
     }
 
     return NextResponse.json({

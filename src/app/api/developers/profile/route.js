@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // GET - Fetch developer profile
 export async function GET(request) {
@@ -40,6 +41,15 @@ export async function GET(request) {
     } else {
       developer.locations = []
     }
+
+    const auditId = userInfo.developer_id || userInfo.user_id
+    captureAuditEvent('developer_profile_viewed', {
+      user_id: auditId,
+      user_type: userInfo.user_type || 'developer',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/developers/profile'
+    }, auditId)
 
     return NextResponse.json({ 
       success: true,
@@ -551,6 +561,18 @@ export async function PUT(request) {
         details: updateError.message 
       }, { status: 500 })
     }
+
+    const updatedFields = Object.keys(updateData).filter(k => !['updated_at'].includes(k))
+    const auditId = userInfo.developer_id || userInfo.user_id
+    captureAuditEvent('developer_profile_updated', {
+      user_id: auditId,
+      user_type: userInfo.user_type,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/developers/profile',
+      developer_id: userInfo.developer_id,
+      metadata: { updated_fields: updatedFields },
+    }, auditId)
 
     // Map company_locations to locations for frontend compatibility in response
     if (updatedDeveloper.company_locations) {

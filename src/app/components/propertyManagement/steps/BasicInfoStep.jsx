@@ -33,7 +33,8 @@ const BasicInfoStep = ({ formData, updateFormData, mode, accountType, developmen
       <PropertyDescription 
         formData={formData}
         updateFormData={updateFormData}
-        mode={mode} 
+        isEditMode={mode === 'edit'}
+        accountType={accountType}
       />
     </div>
   )

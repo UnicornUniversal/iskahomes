@@ -26,7 +26,7 @@ ChartJS.register(
   Filler
 )
 
-const SalesTrendChart = React.memo(({ listerId, currency: propCurrency = 'USD' }) => {
+const SalesTrendChart = React.memo(({ listerId, currency: propCurrency = 'USD', accountType = 'developer' }) => {
   // Initialize with current month as default
   const getDefaultDateRange = () => {
     const today = new Date()
@@ -55,10 +55,15 @@ const SalesTrendChart = React.memo(({ listerId, currency: propCurrency = 'USD' }
     try {
       setLoading(true)
       const params = new URLSearchParams({
-        slug: listerId,
         date_from: dateRange.startDate,
         date_to: dateRange.endDate
       })
+      if (accountType === 'agency') {
+        params.append('user_id', listerId)
+        params.append('account_type', 'agency')
+      } else {
+        params.append('slug', listerId)
+      }
       const response = await fetch(`/api/sales/time-series?${params.toString()}`)
       const result = await response.json()
       
@@ -73,7 +78,7 @@ const SalesTrendChart = React.memo(({ listerId, currency: propCurrency = 'USD' }
     } finally {
       setLoading(false)
     }
-  }, [listerId, dateRange.startDate, dateRange.endDate])
+  }, [listerId, dateRange.startDate, dateRange.endDate, accountType])
 
   useEffect(() => {
     fetchData()
@@ -86,10 +91,15 @@ const SalesTrendChart = React.memo(({ listerId, currency: propCurrency = 'USD' }
     try {
       setExporting(true)
       const params = new URLSearchParams({
-        slug: listerId,
         date_from: dateRange.startDate,
         date_to: dateRange.endDate
       })
+      if (accountType === 'agency') {
+        params.append('user_id', listerId)
+        params.append('account_type', 'agency')
+      } else {
+        params.append('slug', listerId)
+      }
       const response = await fetch(`/api/sales/time-series?${params.toString()}`)
       const result = await response.json()
       

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 import { getDeveloperId } from '@/lib/developerIdHelper'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function GET(request) {
   try {
@@ -78,6 +79,22 @@ export async function GET(request) {
     }
 
     const { count: totalCount } = await countQuery
+
+    captureAuditEvent('unit_listed', {
+      user_id: userInfo.user_id,
+      user_type: userInfo.user_type || userInfo.organization_type || 'developer',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/units',
+      metadata: {
+        page,
+        limit,
+        search,
+        listing_status: listingStatus,
+        result_count: units?.length || 0,
+        total_count: totalCount || 0
+      }
+    }, userInfo.user_id)
 
     return NextResponse.json({ 
       success: true,

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // GET - Fetch invoices/billing history for user
 export async function GET(request) {
@@ -60,6 +61,17 @@ export async function GET(request) {
         details: error.message 
       }, { status: 500 })
     }
+
+    captureAuditEvent('invoice_listed', {
+      user_id: userId,
+      user_type: dbUserType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/subscriptions/invoices',
+      metadata: {
+        result_count: invoices?.length || 0
+      }
+    }, userId)
 
     return NextResponse.json({ 
       success: true,

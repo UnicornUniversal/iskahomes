@@ -14,7 +14,9 @@ import {
     FiMessageSquare, 
     FiUser, 
     FiCreditCard, 
+    FiDollarSign,
     FiGrid,
+    FiBriefcase,
     FiLogOut,
     FiMenu,
     FiX,
@@ -24,7 +26,8 @@ import {
     FiChevronRight,
     FiChevronLeft,
     FiChevronUp,
-    FiShield
+    FiShield,
+    FiActivity
 } from 'react-icons/fi'
 import Link from 'next/link'
 
@@ -95,6 +98,18 @@ const DeveloperNav = () => {
             permission: 'leads'
         },
         {
+            label: 'Clients',
+            href: `/developer/${developerSlug}/clientManagement`,
+            icon: FiBriefcase,
+            permission: 'clients'
+        },
+        {
+            label: 'Service Charges',
+            href: `/developer/${developerSlug}/serviceCharge`,
+            icon: FiDollarSign,
+            permission: 'clients'
+        },
+        {
             label: 'Developments',
             href: `/developer/${developerSlug}/developments`,
             icon: FiMapPin,
@@ -123,6 +138,12 @@ const DeveloperNav = () => {
             href: `/developer/${developerSlug}/sales`,
             icon: FiTrendingUp,
             permission: 'sales'
+        },
+        {
+            label: 'Audit Trail',
+            href: `/developer/${developerSlug}/audit-trail`,
+            icon: FiActivity,
+            permission: 'audit_trail'
         },
         {
             label: 'Analytics',
@@ -370,10 +391,10 @@ const DeveloperNav = () => {
                             } ${
                                 isCollapsed ? 'w-[80vw] min-w-[80px] max-w-[80px] lg:w-[80px] lg:min-w-[80px]' : 'w-[80vw] min-w-[300px] max-w-[300px] lg:w-[300px] lg:min-w-[300px]'
                             }`}>
-                {/* ISKA Logo - Only visible on small devices, bigger and left-aligned */}
-                <div className="mb-4 lg:hidden flex items-center justify-start pt-4">
+                {/* ISKA Logo - first element, links to homepage (hidden when collapsed on desktop) */}
+                <div className={`mb-4 flex items-center justify-start pt-4 ${isCollapsed ? 'lg:hidden' : ''}`}>
                     <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
-                        <img src="/iska-dark.png" alt="ISKA Logo" className='w-[100px]' />
+                        <img src="/iska-dark.png" alt="ISKA Homes" className="w-[100px] max-w-[120px]" />
                     </Link>
                 </div>
 

@@ -295,7 +295,8 @@ export async function POST(request) {
             phone: userData.phone || '',
             website: userData.companyWebsite || '',
             license_number: userData.registrationNumber || '',
-            account_status: 'active',
+            account_status: 'pending',
+            admin_status: 'pending',
             slug: slug,
             profile_completion_percentage: 0,
             total_units: 0,
@@ -393,6 +394,9 @@ export async function POST(request) {
             agency_name: userData.agencyName || '',
             license_id: userData.licenseId || '',
             status: 'active',
+            account_status: 'active',
+            agent_status: 'active',
+            admin_status: 'approved',
             // New invitation and signup status fields
             invitation_status: 'sent',
             signup_status: 'invited',
@@ -421,6 +425,7 @@ export async function POST(request) {
             email: email,
             phone: userData.phone || '',
             status: 'active',
+            admin_status: 'approved',
             // New invitation and signup status fields
             invitation_status: 'sent',
             signup_status: 'invited',
@@ -458,7 +463,8 @@ export async function POST(request) {
             phone: userData.phone || '',
             website: userData.companyWebsite || '',
             license_number: userData.registrationNumber || '',
-            account_status: 'active',
+            account_status: 'pending',
+            admin_status: 'pending',
             slug: agencySlug,
             profile_completion_percentage: 0,
             total_agents: 0,
@@ -496,6 +502,59 @@ export async function POST(request) {
             console.error('❌ Agency profile creation error:', agencyError)
           } else {
             console.log('✅ Agency profile created successfully')
+
+            // Create Super Admin role and add agency to organization_team_members
+            try {
+              const defaultRoles = getDefaultRoles('agency')
+              const ownerPermissions = defaultRoles.owner.permissions
+
+              const { data: ownerRole, error: roleError } = await supabaseAdmin
+                .from('organization_roles')
+                .insert({
+                  organization_type: 'agency',
+                  organization_id: agencyData.id,
+                  name: 'Super Admin',
+                  description: 'Full access to all agency features and settings. Cannot be removed or modified.',
+                  is_system_role: true,
+                  is_default: false,
+                  permissions: ownerPermissions,
+                  created_by: newUser.id
+                })
+                .select()
+                .single()
+
+              if (roleError) {
+                console.error('❌ Error creating agency Super Admin role:', roleError)
+              } else {
+                const { data: teamMember, error: teamError } = await supabaseAdmin
+                  .from('organization_team_members')
+                  .insert({
+                    organization_type: 'agency',
+                    organization_id: agencyData.id,
+                    user_id: newUser.id,
+                    email: email,
+                    role_id: ownerRole.id,
+                    permissions: ownerPermissions,
+                    status: 'active',
+                    first_name: userData.fullName?.split(' ')[0] || null,
+                    last_name: userData.fullName?.split(' ').slice(1).join(' ') || null,
+                    phone: userData.phone || null,
+                    invitation_token: null,
+                    expires_at: null,
+                    accepted_at: new Date().toISOString()
+                  })
+                  .select()
+                  .single()
+
+                if (teamError) {
+                  console.error('❌ Error adding agency to organization_team_members:', teamError)
+                } else {
+                  console.log('✅ Agency added to organization_team_members as Super Admin')
+                }
+              }
+            } catch (setupError) {
+              console.error('❌ Error setting up agency Owner role and team member:', setupError)
+            }
           }
           break
       }

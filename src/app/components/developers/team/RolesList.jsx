@@ -7,8 +7,9 @@ import { toast } from 'react-toastify'
 import { FiShield, FiEdit, FiTrash2, FiUsers, FiLock } from 'react-icons/fi'
 import EditRoleModal from './EditRoleModal'
 
-const RolesList = ({ onRefresh }) => {
-  const { user, developerToken } = useAuth()
+const RolesList = ({ onRefresh, organizationType = 'developer' }) => {
+  const { user, developerToken, agencyToken } = useAuth()
+  const token = organizationType === 'agency' ? agencyToken : developerToken
   const [roles, setRoles] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedRole, setSelectedRole] = useState(null)
@@ -23,7 +24,7 @@ const RolesList = ({ onRefresh }) => {
       setLoading(true)
       const response = await fetch('/api/developers/team/roles', {
         headers: {
-          'Authorization': `Bearer ${developerToken}`
+          'Authorization': `Bearer ${token}`
         }
       })
 
@@ -55,7 +56,7 @@ const RolesList = ({ onRefresh }) => {
       const response = await fetch(`/api/developers/team/roles/${roleId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${developerToken}`
+          'Authorization': `Bearer ${token}`
         }
       })
 
@@ -171,7 +172,7 @@ const RolesList = ({ onRefresh }) => {
             if (onRefresh) onRefresh()
             toast.success('Role updated successfully!')
           }}
-          organizationType="developer"
+          organizationType={organizationType}
         />
       )}
     </>

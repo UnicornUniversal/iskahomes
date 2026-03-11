@@ -5,8 +5,9 @@ import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'react-toastify'
 import { FiX, FiShield, FiUser, FiPhone } from 'react-icons/fi'
 
-const EditMemberModal = ({ isOpen, onClose, member, onSuccess }) => {
-  const { developerToken } = useAuth()
+const EditMemberModal = ({ isOpen, onClose, member, onSuccess, organizationType = 'developer' }) => {
+  const { developerToken, agencyToken } = useAuth()
+  const token = organizationType === 'agency' ? agencyToken : developerToken
   const [loading, setLoading] = useState(false)
   const [roles, setRoles] = useState([])
   const [formData, setFormData] = useState({
@@ -36,7 +37,7 @@ const EditMemberModal = ({ isOpen, onClose, member, onSuccess }) => {
     try {
       const response = await fetch('/api/developers/team/roles', {
         headers: {
-          'Authorization': `Bearer ${developerToken}`
+          'Authorization': `Bearer ${token}`
         }
       })
 
@@ -72,7 +73,7 @@ const EditMemberModal = ({ isOpen, onClose, member, onSuccess }) => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${developerToken}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(formData)
       })

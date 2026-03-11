@@ -5,7 +5,7 @@ import { CustomSelect } from '../../ui/custom-select'
 import { cn } from '@/lib/utils'
 import SalesInformationModal from '../../ui/SalesInformationModal'
 
-const PropertyDescription = ({ formData, updateFormData, isEditMode }) => {
+const PropertyDescription = ({ formData, updateFormData, isEditMode, accountType = 'developer' }) => {
   const [showSalesModal, setShowSalesModal] = useState(false)
   const [pendingStatus, setPendingStatus] = useState(null)
   const [previousStatus, setPreviousStatus] = useState(formData.status || '')
@@ -154,6 +154,7 @@ const PropertyDescription = ({ formData, updateFormData, isEditMode }) => {
         onConfirm={handleSalesModalConfirm}
         saleType={pendingStatus?.toLowerCase() === 'rented out' ? 'rented' : 'sold'}
         isLoading={false}
+        useClientSelector={accountType === 'developer'}
       />
     </div>
   )

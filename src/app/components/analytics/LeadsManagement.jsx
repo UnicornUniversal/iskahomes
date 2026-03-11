@@ -9,6 +9,7 @@ import { toast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import Reminders from './Reminders'
 import CustomDropdown from '@/app/components/propertyManagement/modules/CustomDropdown'
+import AddLeadModal from './AddLeadModal'
 
 // Helper function to get lead category from score
 function getLeadCategory(score) {
@@ -53,6 +54,9 @@ function formatActionName(action) {
   const actionType = action?.action_type || ''
   const metadata = action?.action_metadata || {}
 
+  if (actionType === 'lead_manual') {
+    return 'Manual Entry'
+  }
   if (actionType === 'lead_appointment') {
     const appointmentType = metadata?.appointment_type || 'viewing'
     const formattedType = appointmentType.replace('_', ' ').split(' ').map(word => 
@@ -91,6 +95,8 @@ function getActionIcon(action) {
     return Calendar
   } else if (actionType === 'lead_phone') {
     return Phone
+  } else if (actionType === 'lead_manual') {
+    return FiUser
   } else if (actionType === 'lead_message') {
     const messageType = String(metadata.message_type || metadata.messageType || 'direct_message').toLowerCase()
     
@@ -107,13 +113,14 @@ function getActionIcon(action) {
 }
 
 export default function LeadsManagement({ listerId, listerType = 'developer', listingId = null, pageSize = 20 }) {
-  const { user, developerToken, propertySeekerToken } = useAuth()
+  const { user, developerToken, agencyToken, propertySeekerToken } = useAuth()
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [developerProfile, setDeveloperProfile] = useState(null)
   const [statusFilter, setStatusFilter] = useState('')
   const [actionFilter, setActionFilter] = useState('')
+  const [leadTypeFilter, setLeadTypeFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [search, setSearch] = useState('')
@@ -132,8 +139,46 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
   const [saving, setSaving] = useState(false)
   const [messageBoxLead, setMessageBoxLead] = useState(null) // Lead for which message box is open
   const [remindersRefreshKey, setRemindersRefreshKey] = useState(0)
+  const [showAddLeadModal, setShowAddLeadModal] = useState(false)
+  const [assignableUsers, setAssignableUsers] = useState([])
+  const [loadingAssignableUsers, setLoadingAssignableUsers] = useState(false)
 
   const offset = useMemo(() => page * pageSize, [page, pageSize])
+  const authToken = listerType === 'agency' || listerType === 'agent' ? agencyToken : developerToken
+  const currentUserId = user?.id || user?.profile?.user_id || null
+  const isSuperAdmin = user?.profile?.permissions === null || /super\s*admin/i.test(String(user?.profile?.role_name || ''))
+  const assignableManagerOptions = useMemo(() => {
+    return (assignableUsers || []).filter((userOption) => {
+      const optionRole = String(userOption?.role || '')
+      const isOwnerRole = /owner|super\s*admin/i.test(optionRole)
+      const isListerOwner = userOption?.user_id && listerId && userOption.user_id === listerId
+      return !isOwnerRole && !isListerOwner
+    })
+  }, [assignableUsers, listerId])
+
+  useEffect(() => {
+    async function loadAssignableUsers() {
+      if (!authToken) return
+      setLoadingAssignableUsers(true)
+      try {
+        const response = await fetch('/api/audit/users', {
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        })
+        const result = await response.json()
+        if (response.ok && result.success) {
+          setAssignableUsers(result.users || [])
+        }
+      } catch (err) {
+        console.error('Error loading assignable users:', err)
+      } finally {
+        setLoadingAssignableUsers(false)
+      }
+    }
+
+    loadAssignableUsers()
+  }, [authToken])
 
   // Fetch developer profile for team members to get leads data
   useEffect(() => {
@@ -186,6 +231,9 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
       if (statusFilter) {
         params.append('status', statusFilter)
       }
+      if (leadTypeFilter) {
+        params.append('lead_type', leadTypeFilter)
+      }
       
       if (actionFilter) {
         params.append('action_type', actionFilter)
@@ -203,7 +251,13 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         params.append('search', search)
       }
 
-      const response = await fetch(`/api/leads?${params.toString()}`)
+      if (!isSuperAdmin && currentUserId) {
+        params.append('assigned_user', currentUserId)
+      }
+
+      const response = await fetch(`/api/leads?${params.toString()}`, {
+        headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+      })
       const result = await response.json()
 
       console.log('🔍 Leads API response:', {
@@ -243,7 +297,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
   useEffect(() => {
     loadLeads()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listerId, listerType, listingId, statusFilter, actionFilter, dateFrom, dateTo, search, page, pageSize])
+  }, [listerId, listerType, listingId, statusFilter, actionFilter, leadTypeFilter, dateFrom, dateTo, search, page, pageSize, isSuperAdmin, currentUserId, authToken])
 
   function updateLeadStatusLocally(leadId, newStatus) {
     // Update locally (will be saved when user clicks "Save Changes")
@@ -254,6 +308,19 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
           ...prev, 
           status: newStatus,
           _previousStatus: prev.status // Store previous status for comparison
+        }
+      }
+      return prev
+    })
+    setHasChanges(true)
+  }
+
+  function updateLeadAssignmentLocally(leadId, assignedUserId) {
+    setSelectedLead(prev => {
+      if (prev && prev.id === leadId) {
+        return {
+          ...prev,
+          assigned_user: assignedUserId || null
         }
       }
       return prev
@@ -490,9 +557,13 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
       // Include user_id and user_type when saving reminders
       const response = await fetch(`/api/leads/${selectedLead.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+        },
         body: JSON.stringify({
           status: selectedLead.status,
+          assigned_user: selectedLead.assigned_user || null,
           notes: notesToSave,
           reminders: remindersToSave,
           user_id: user?.id || null,
@@ -544,6 +615,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
             ...prev,
             notes: result.data.notes || prev.notes || [],
             status: result.data.status || prev.status,
+            assigned_user: result.data.assigned_user || null,
             status_tracker: result.data.status_tracker || prev.status_tracker || [],
             _previousStatus: undefined // Clear stored previous status
           }))
@@ -691,19 +763,13 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
     const appointmentLeads = profileData.total_appointments ?? leadsBreakdown?.appointment?.total ?? leadsBreakdown?.appointment_leads?.total ?? 0
     const websiteLeads = leadsBreakdown?.website?.total ?? leadsBreakdown?.website_leads?.total ?? 0
 
-    // IGNORE ANONYMOUS/UNKNOWN SEEKERS: Only count leads with user IDs (non-anonymous)
-    // Anonymous seekers are only for aggregation purposes, not for lead management
-    // Use aggregate total_unique_leads (excludes anonymous) for developer-level display
-    // This shows unique logged-in individuals across ALL contexts (profile + listings + developments)
-    const totalUniqueLeads = profileData.total_unique_leads || 0 // Aggregate across all contexts (non-anonymous only)
-    
-    // Fallback to profile-specific if aggregate not available
-    const profileUniqueLeads = profileData.unique_leads || 0 // Profile-specific only (non-anonymous)
-    
-    // Use aggregate if available, otherwise fallback to profile-specific, then to total_leads
-    // Note: We're excluding anonymous leads from the total
+    // SOURCE OF TRUTH: Use actual leads count from API (total) - this matches the leads list
+    // Profile total_leads/total_unique_leads can be stale (cron-updated) and cause mismatch
+    const totalUniqueLeads = profileData.total_unique_leads || 0
+    const profileUniqueLeads = profileData.unique_leads || 0
     const totalLeadsFallback = profileUniqueLeads > 0 ? profileUniqueLeads : (leadsBreakdown?.total_leads || profileData.total_leads || 0)
-    const finalTotalLeads = totalUniqueLeads > 0 ? totalUniqueLeads : totalLeadsFallback
+    // Prefer API count when available; fallback to profile only before fetch completes
+    const finalTotalLeads = total > 0 ? total : (totalUniqueLeads > 0 ? totalUniqueLeads : totalLeadsFallback)
     
     return {
       total_leads: finalTotalLeads, // Aggregate across all contexts (NON-ANONYMOUS ONLY)
@@ -769,11 +835,32 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {!listingId && (
+            <button
+              onClick={() => setShowAddLeadModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary_color text-white rounded-lg hover:bg-primary_color/90 transition-colors text-sm font-medium"
+            >
+              <FiPlus className="w-4 h-4" />
+              Add Lead
+            </button>
+          )}
           <div className="text-sm text-secondary_color-500">
             Total: <span className="font-medium text-secondary_color-900">{total}</span>
           </div>
         </div>
       </div>
+
+      <AddLeadModal
+        isOpen={showAddLeadModal}
+        onClose={() => setShowAddLeadModal(false)}
+        onSubmit={() => {
+          loadLeads()
+          setShowAddLeadModal(false)
+        }}
+        listerId={listerId}
+        listerType={listerType}
+        token={listerType === 'agency' || listerType === 'agent' ? agencyToken : developerToken}
+      />
 
       {/* Filters */}
       <div className="space-y-4">
@@ -808,6 +895,19 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
             />
           </div>
           <div>
+            <label className="block text-sm font-medium text-secondary_color-700 mb-1">Lead Type</label>
+            <CustomDropdown
+              options={[
+                { value: '', label: 'All Types' },
+                { value: 'automated', label: 'From site' },
+                { value: 'manual', label: 'Manual' }
+              ]}
+              value={leadTypeFilter}
+              onChange={(value) => { setPage(0); setLeadTypeFilter(value) }}
+              placeholder="All Types"
+            />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-secondary_color-700 mb-1">Action Type</label>
             <CustomDropdown
               options={[
@@ -815,6 +915,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                 { value: 'lead_phone', label: 'Phone' },
                 { value: 'lead_message', label: 'Message' },
                 { value: 'lead_appointment', label: 'Appointment' },
+                { value: 'lead_manual', label: 'Manual' },
                 { value: 'lead_email', label: 'Email' }
               ]}
               value={actionFilter}
@@ -847,6 +948,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                 setPage(0)
                 setStatusFilter('')
                 setActionFilter('')
+                setLeadTypeFilter('')
                 setDateFrom('')
                 setDateTo('')
                 setSearch('')
@@ -902,6 +1004,19 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                     />
                   </div>
                   <div>
+                    <label className="block text-sm font-medium text-secondary_color-700 mb-1">Lead Type</label>
+                    <CustomDropdown
+                      options={[
+                        { value: '', label: 'All Types' },
+                        { value: 'automated', label: 'From site' },
+                        { value: 'manual', label: 'Manual' }
+                      ]}
+                      value={leadTypeFilter}
+                      onChange={(value) => { setPage(0); setLeadTypeFilter(value) }}
+                      placeholder="All Types"
+                    />
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-secondary_color-700 mb-1">Action Type</label>
                     <CustomDropdown
                       options={[
@@ -909,6 +1024,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                         { value: 'lead_phone', label: 'Phone' },
                         { value: 'lead_message', label: 'Message' },
                         { value: 'lead_appointment', label: 'Appointment' },
+                        { value: 'lead_manual', label: 'Manual' },
                         { value: 'lead_email', label: 'Email' }
                       ]}
                       value={actionFilter}
@@ -941,6 +1057,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                         setPage(0)
                         setStatusFilter('')
                         setActionFilter('')
+                        setLeadTypeFilter('')
                         setDateFrom('')
                         setDateTo('')
                         setSearch('')
@@ -1021,24 +1138,27 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                   onClick={() => setSelectedLead(lead)}
                 >
                   <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                    <button
-                      className="text-blue-600 hover:text-blue-900 transition-colors relative"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        // Generate default message with listing link
-                        const listingLink = lead.listing_id && lead.listing_slug && lead.listing_type
-                          ? `${window.location.origin}/property/${lead.listing_type}/${lead.listing_slug}/${lead.listing_id}`
-                          : null
-                        const defaultMessage = listingLink
-                          ? `Hi! I noticed your interest in ${lead.listing_title || 'this property'}. Here's the link: ${listingLink}`
-                          : `Hi! I noticed your interest in ${lead.listing_title || 'this property'}. How can I help you?`
-                        setChatMessage(defaultMessage)
-                        setMessageBoxLead(lead)
-                      }}
-                      title="Message"
-                    >
-                      <FiMessageCircle className="box_holder border-1 border-primary_color w-8 h-8" />
-                    </button>
+                    {lead.seeker_id ? (
+                      <button
+                        className="text-blue-600 hover:text-blue-900 transition-colors relative"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const listingLink = lead.listing_id && lead.listing_slug && lead.listing_type
+                            ? `${window.location.origin}/property/${lead.listing_type}/${lead.listing_slug}/${lead.listing_id}`
+                            : null
+                          const defaultMessage = listingLink
+                            ? `Hi! I noticed your interest in ${lead.listing_title || 'this property'}. Here's the link: ${listingLink}`
+                            : `Hi! I noticed your interest in ${lead.listing_title || 'this property'}. How can I help you?`
+                          setChatMessage(defaultMessage)
+                          setMessageBoxLead(lead)
+                        }}
+                        title="Message"
+                      >
+                        <FiMessageCircle className="box_holder border-1 border-primary_color w-8 h-8" />
+                      </button>
+                    ) : (
+                      <span className="text-gray-300" title="Manual lead - no in-app messaging">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -1163,7 +1283,10 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                             const previousStatus = lead.status || 'new'
                             const response = await fetch(`/api/leads/${lead.id}`, {
                               method: 'PATCH',
-                              headers: { 'Content-Type': 'application/json' },
+                              headers: {
+                                'Content-Type': 'application/json',
+                                ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+                              },
                               body: JSON.stringify({ status: newStatus })
                             })
                             if (response.ok) {
@@ -1306,6 +1429,27 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                         <FiCalendar className="w-5 h-5 text-secondary_color-500" />
                         <span className="text-sm text-secondary_color-700">{selectedLead.first_action_date}</span>
                       </div>
+
+                      {/* Leads Manager */}
+                      <div className="w-full">
+                        <span className="text-sm text-secondary_color-500 block mb-1.5">Leads Manager</span>
+                        <select
+                          value={selectedLead.assigned_user || ''}
+                          onChange={(e) => updateLeadAssignmentLocally(selectedLead.id, e.target.value)}
+                          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-secondary_color-500 focus:border-secondary_color-500"
+                        >
+                          <option value="">Unassigned</option>
+                          {assignableManagerOptions.map((userOption) => (
+                            <option key={userOption.user_id} value={userOption.user_id}>
+                              {userOption.name} {userOption.role ? `(${userOption.role})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        {loadingAssignableUsers && (
+                          <p className="text-xs text-secondary_color-500 mt-1">Loading users...</p>
+                        )}
+                      </div>
+
                       <div className=" w-full">
                         <span className="text-sm text-secondary_color-500">Status:</span>
                         <div className="max-w-[300px]">

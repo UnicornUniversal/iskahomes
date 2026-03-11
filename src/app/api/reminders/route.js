@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // GET /api/reminders - Fetch reminders for a grouped lead or user
 export async function GET(request) {
@@ -152,11 +153,41 @@ export async function GET(request) {
         return { ...reminder, listing }
       })
 
+      const auditUserId = userId || 'unknown'
+      captureAuditEvent('reminder_listed', {
+        user_id: auditUserId,
+        user_type: userType || 'unknown',
+        timestamp: new Date().toISOString(),
+        success: true,
+        api_route: '/api/reminders',
+        metadata: {
+          grouped_lead_key: groupedLeadKey,
+          lead_id: leadId,
+          limit: limit ? parseInt(limit) : null,
+          result_count: enrichedReminders.length
+        }
+      }, auditUserId)
+
       return NextResponse.json({
         success: true,
         data: enrichedReminders
       })
     }
+
+    const auditUserId = userId || 'unknown'
+    captureAuditEvent('reminder_listed', {
+      user_id: auditUserId,
+      user_type: userType || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/reminders',
+      metadata: {
+        grouped_lead_key: groupedLeadKey,
+        lead_id: leadId,
+        limit: limit ? parseInt(limit) : null,
+        result_count: remindersWithStatus.length
+      }
+    }, auditUserId)
 
     return NextResponse.json({
       success: true,
@@ -225,6 +256,20 @@ export async function POST(request) {
         { status: 500 }
       )
     }
+
+    const auditUserId = user_id || lead?.seeker_id || 'unknown'
+    captureAuditEvent('reminder_created', {
+      user_id: auditUserId,
+      user_type: user_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/reminders',
+      metadata: {
+        reminder_id: reminder.id,
+        lead_id,
+        grouped_lead_key: grouped_lead_key
+      }
+    }, auditUserId)
 
     return NextResponse.json({
       success: true,

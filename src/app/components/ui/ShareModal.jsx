@@ -23,7 +23,7 @@ import {
   Instagram
 } from 'lucide-react'
 import { toast } from 'react-toastify'
-import { generateShareData, getSocialShareData } from '@/lib/shareUtils'
+import { generateShareData, getSocialShareData, SHARE_MEDIUMS } from '@/lib/shareUtils'
 import { useAnalytics } from '@/hooks/useAnalytics'
 
 const ShareModal = ({ isOpen, onClose, property, propertyType = 'listing' }) => {
@@ -32,7 +32,8 @@ const ShareModal = ({ isOpen, onClose, property, propertyType = 'listing' }) => 
   
   if (!isOpen || !property) return null
 
-  const shareData = generateShareData(property)
+  // Copy link URL includes share_medium for lead attribution when recipient visits
+  const shareData = generateShareData(property, undefined, SHARE_MEDIUMS.COPY_LINK)
   const socialData = getSocialShareData(property)
 
   const handleCopyLink = async () => {

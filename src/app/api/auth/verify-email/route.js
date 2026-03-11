@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendWelcomeEmail } from '@/lib/sendgrid'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function POST(request) {
   try {
@@ -98,12 +99,15 @@ export async function POST(request) {
         invitation_token: null // Clear the token after verification
       }
       
-      // Use account_status for developers and agencies, status for others
-      if (tableName === 'developers' || tableName === 'agencies') {
+      // Developers and agencies stay 'pending' until admin approves - do NOT set account_status here
+      // Agents and property seekers are approved by default - set active on verification
+      if (tableName === 'agents') {
         updateData.account_status = 'active'
-      } else {
+        updateData.agent_status = 'active'
+      } else if (tableName === 'property_seekers') {
         updateData.status = 'active'
       }
+      // developers and agencies: keep account_status as 'pending', admin must approve
       
       // Use developer_id for developers, agency_id for agencies, user_id for others
       let idField = 'user_id'
@@ -123,6 +127,14 @@ export async function POST(request) {
         // Don't fail the verification if profile update fails
       }
     }
+
+    captureAuditEvent('auth_email_verified', {
+      user_id: user.id,
+      user_type: userType || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/auth/verify-email',
+    }, user.id)
 
     // Send welcome email
     try {

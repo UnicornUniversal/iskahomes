@@ -1,6 +1,78 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
+
+// GET - Fetch a single subscription request
+export async function GET(request, { params }) {
+  try {
+    const resolvedParams = params instanceof Promise ? await params : params
+    const { id } = resolvedParams
+    if (!id) {
+      return NextResponse.json({ error: 'Request ID is required' }, { status: 400 })
+    }
+
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Authorization header missing' }, { status: 401 })
+    }
+
+    const token = authHeader.split(' ')[1]
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    }
+
+    const userType = decoded.user_type
+    const userId = decoded.developer_id || decoded.agent_id || decoded.user_id
+    const dbUserType = userType === 'developer' ? 'developer'
+      : userType === 'agent' ? 'agent'
+      : userType === 'agency' ? 'agency'
+      : null
+
+    if (!dbUserType || !userId) {
+      return NextResponse.json({ error: 'Invalid user information' }, { status: 401 })
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('subscriptions_request')
+      .select(`
+        *,
+        subscriptions_package:package_id (
+          id,
+          name,
+          local_currency_price,
+          international_currency_price,
+          ideal_duration
+        )
+      `)
+      .eq('id', id)
+      .eq('user_id', userId)
+      .eq('user_type', dbUserType)
+      .single()
+
+    if (error || !data) {
+      return NextResponse.json({ error: 'Request not found' }, { status: 404 })
+    }
+
+    captureAuditEvent('subscription_request_viewed', {
+      user_id: userId,
+      user_type: dbUserType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/subscriptions-requests/[id]',
+      metadata: { subscription_request_id: id }
+    }, userId)
+
+    return NextResponse.json({ success: true, data })
+  } catch (error) {
+    console.error('API error:', error)
+    return NextResponse.json({
+      error: 'Internal server error',
+      details: error.message
+    }, { status: 500 })
+  }
+}
 
 // DELETE - Cancel a subscription request (only if pending)
 export async function DELETE(request, { params }) {
@@ -79,6 +151,18 @@ export async function DELETE(request, { params }) {
         details: deleteError.message 
       }, { status: 500 })
     }
+
+    captureAuditEvent('subscription_request_updated', {
+      user_id: userId,
+      user_type: dbUserType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/subscriptions-requests/[id]',
+      metadata: {
+        subscription_request_id: id,
+        new_status: 'cancelled'
+      }
+    }, userId)
 
     return NextResponse.json({ 
       success: true,

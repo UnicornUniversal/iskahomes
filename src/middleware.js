@@ -19,6 +19,6 @@ export const config = {
     '/agents/:path*',
     '/homeowner/:path*',
     '/homeSeeker/:path*',
-    '/admin/:path*'
+    // '/admin/:path*' // Commented out - free access for now
   ]
 }

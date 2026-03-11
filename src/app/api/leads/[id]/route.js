@@ -1,11 +1,67 @@
 import { NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
+import { captureAuditEvent } from '@/lib/auditLogger'
+import { verifyToken } from '@/lib/jwt'
+import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
+
+export async function GET(request, { params }) {
+  try {
+    const { id } = await params
+    if (!id) {
+      return NextResponse.json({ error: 'Lead ID is required' }, { status: 400 })
+    }
+
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Authorization token required' }, { status: 401 })
+    }
+
+    const token = authHeader.substring(7)
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
+    }
+
+    const { data: lead, error } = await supabaseAdmin
+      .from('leads')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error || !lead) {
+      return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    }
+
+    const auditUserId = decoded.user_id || decoded.developer_id || decoded.agency_id || decoded.agent_id || lead?.lister_id || lead?.seeker_id || 'unknown'
+    captureAuditEvent('lead_viewed', {
+      user_id: auditUserId,
+      user_type: decoded.user_type || lead?.lister_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/leads/[id]',
+      metadata: { lead_id: id, listing_id: lead?.listing_id || null }
+    }, auditUserId)
+
+    return NextResponse.json({ success: true, data: lead })
+  } catch (error) {
+    console.error('Get lead error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error', details: error.message },
+      { status: 500 }
+    )
+  }
+}
 
 export async function PATCH(request, { params }) {
   try {
+    const { userInfo, error: authError, status } = await authenticateRequest(request)
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status: status || 401 })
+    }
+
     const { id } = await params
     const body = await request.json()
-    const { status, notes, reminders } = body
+    const { status: leadStatus, notes, reminders, assigned_user } = body
 
     if (!id) {
       return NextResponse.json(
@@ -17,7 +73,7 @@ export async function PATCH(request, { params }) {
     // First, fetch the lead record to get seeker_id, listing_id, and context_type
     const { data: leadRecord, error: fetchError } = await supabaseAdmin
       .from('leads')
-      .select('seeker_id, listing_id, status, status_tracker, context_type')
+      .select('seeker_id, listing_id, lister_id, status, status_tracker, context_type, assigned_user')
       .eq('id', id)
       .single()
 
@@ -35,8 +91,8 @@ export async function PATCH(request, { params }) {
     updateData.updated_at = now
 
     // Handle status update
-    if (status !== undefined && status !== leadRecord.status) {
-      updateData.status = status
+    if (leadStatus !== undefined && leadStatus !== leadRecord.status) {
+      updateData.status = leadStatus
       
       // Update status_tracker: append new status if it's different
       const currentTracker = Array.isArray(leadRecord.status_tracker) 
@@ -44,12 +100,12 @@ export async function PATCH(request, { params }) {
         : (leadRecord.status_tracker ? [leadRecord.status_tracker] : [])
       
       // Only add if it's a new status (not already in tracker)
-      if (!currentTracker.includes(status)) {
-        updateData.status_tracker = [...currentTracker, status]
+      if (!currentTracker.includes(leadStatus)) {
+        updateData.status_tracker = [...currentTracker, leadStatus]
       } else {
         updateData.status_tracker = currentTracker
       }
-    } else if (status !== undefined) {
+    } else if (leadStatus !== undefined) {
       // Status is the same, just ensure status_tracker exists
       const currentTracker = Array.isArray(leadRecord.status_tracker) 
         ? leadRecord.status_tracker 
@@ -58,6 +114,17 @@ export async function PATCH(request, { params }) {
         // Initialize tracker with current status if empty
         updateData.status_tracker = [leadRecord.status]
       }
+    }
+
+    // Handle assigned user update (allow null for unassign)
+    if (assigned_user !== undefined) {
+      if (assigned_user && assigned_user === leadRecord.lister_id) {
+        return NextResponse.json(
+          { error: 'Owner/super admin cannot be selected as leads manager' },
+          { status: 400 }
+        )
+      }
+      updateData.assigned_user = assigned_user || null
     }
 
     // Handle notes update - always update if provided
@@ -184,6 +251,21 @@ export async function PATCH(request, { params }) {
         }
       }
     }
+
+    captureAuditEvent('lead_updated', {
+      user_id: updatedRecord?.lister_id || updatedRecord?.seeker_id || 'unknown',
+      user_type: updatedRecord?.lister_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/leads/[id]',
+      metadata: {
+        lead_id: id,
+        status: updateData.status || null,
+        assigned_user: updateData.assigned_user !== undefined ? updateData.assigned_user : leadRecord.assigned_user || null,
+        updated_by: userInfo.user_id || null,
+        reminders_changed: reminders !== undefined
+      }
+    }, updatedRecord?.lister_id || updatedRecord?.seeker_id || 'unknown')
 
     return NextResponse.json({
       success: true,

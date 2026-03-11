@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // GET - Fetch user's current subscription
 export async function GET(request) {
@@ -117,6 +118,17 @@ export async function GET(request) {
         details: subError.message 
       }, { status: 500 })
     }
+
+    captureAuditEvent('subscription_listed', {
+      user_id: userId,
+      user_type: dbUserType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/subscriptions',
+      metadata: {
+        has_subscription: !!subscription
+      }
+    }, userId)
 
     return NextResponse.json({ 
       success: true,
@@ -512,6 +524,16 @@ export async function POST(request) {
     } else {
       message = 'Subscription created successfully. Payment pending admin confirmation.'
     }
+
+    captureAuditEvent('subscription_created', {
+      user_id: userId,
+      user_type: dbUserType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/subscriptions',
+      resource_id: subscriptionId,
+      package_id,
+    });
 
     return NextResponse.json({ 
       success: true,

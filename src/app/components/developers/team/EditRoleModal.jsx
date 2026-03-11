@@ -7,7 +7,8 @@ import { FiX, FiShield } from 'react-icons/fi'
 import PermissionsEditor from './PermissionsEditor'
 
 const EditRoleModal = ({ isOpen, onClose, role, onSuccess, organizationType = 'developer' }) => {
-  const { developerToken } = useAuth()
+  const { developerToken, agencyToken } = useAuth()
+  const token = organizationType === 'agency' ? agencyToken : developerToken
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
@@ -47,7 +48,7 @@ const EditRoleModal = ({ isOpen, onClose, role, onSuccess, organizationType = 'd
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${developerToken}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(formData)
       })

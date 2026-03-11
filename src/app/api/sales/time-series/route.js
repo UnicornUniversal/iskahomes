@@ -17,9 +17,18 @@ export async function GET(request) {
       )
     }
 
+    // For agency, user_id is required (agency_id)
+    if (accountType === 'agency' && !userId) {
+      return NextResponse.json(
+        { error: 'User ID is required for agency' },
+        { status: 400 }
+      )
+    }
+
+    const accountType = searchParams.get('account_type') || 'developer'
     let finalUserId = userId
 
-    // Get user_id from slug if needed
+    // Get user_id from slug if needed (developer only)
     if (slug && !userId) {
       const { data: developer, error: devError } = await supabaseAdmin
         .from('developers')
@@ -37,33 +46,67 @@ export async function GET(request) {
       finalUserId = developer.developer_id
     }
 
-    // Build query with date filters if provided
-    let query = supabaseAdmin
-      .from('sales_listings')
-      .select('sale_date, sale_price')
-      .eq('user_id', finalUserId)
-      .not('sale_date', 'is', null)
+    // For agency: get sales from listings where listing_agency_id = agency_id (join with listings)
+    // For developer/agent: get sales where user_id = finalUserId
+    let sales
+    if (accountType === 'agency' && finalUserId) {
+      // Get listing IDs for this agency
+      const { data: agencyListings, error: listingsError } = await supabaseAdmin
+        .from('listings')
+        .select('id')
+        .eq('listing_agency_id', finalUserId)
 
-    // Apply date range filter if provided
-    if (dateFrom) {
-      query = query.gte('sale_date', dateFrom)
-    }
-    if (dateTo) {
-      // Add time to end of day for inclusive end date
-      const endDate = new Date(dateTo)
-      endDate.setHours(23, 59, 59, 999)
-      query = query.lte('sale_date', endDate.toISOString())
-    }
+      if (listingsError || !agencyListings?.length) {
+        return NextResponse.json({
+          success: true,
+          data: { labels: [], sales: [], revenue: [] }
+        })
+      }
 
-    // OPTIMIZED: Fetch only needed fields
-    const { data: sales, error: salesError } = await query.order('sale_date', { ascending: true })
+      const listingIds = agencyListings.map(l => l.id)
+      let salesQuery = supabaseAdmin
+        .from('sales_listings')
+        .select('sale_date, sale_price')
+        .in('listing_id', listingIds)
+        .not('sale_date', 'is', null)
 
-    if (salesError) {
-      console.error('Error fetching sales:', salesError)
-      return NextResponse.json(
-        { error: 'Failed to fetch sales', details: salesError.message },
-        { status: 500 }
-      )
+      if (dateFrom) salesQuery = salesQuery.gte('sale_date', dateFrom)
+      if (dateTo) {
+        const endDate = new Date(dateTo)
+        endDate.setHours(23, 59, 59, 999)
+        salesQuery = salesQuery.lte('sale_date', endDate.toISOString())
+      }
+
+      const { data: salesData, error: salesError } = await salesQuery.order('sale_date', { ascending: true })
+      if (salesError) {
+        console.error('Error fetching agency sales:', salesError)
+        return NextResponse.json({ error: 'Failed to fetch sales' }, { status: 500 })
+      }
+      sales = salesData || []
+    } else {
+      // Developer/agent: query by user_id
+      let query = supabaseAdmin
+        .from('sales_listings')
+        .select('sale_date, sale_price')
+        .eq('user_id', finalUserId)
+        .not('sale_date', 'is', null)
+
+      if (dateFrom) query = query.gte('sale_date', dateFrom)
+      if (dateTo) {
+        const endDate = new Date(dateTo)
+        endDate.setHours(23, 59, 59, 999)
+        query = query.lte('sale_date', endDate.toISOString())
+      }
+
+      const { data: salesData, error: salesError } = await query.order('sale_date', { ascending: true })
+      if (salesError) {
+        console.error('Error fetching sales:', salesError)
+        return NextResponse.json(
+          { error: 'Failed to fetch sales', details: salesError.message },
+          { status: 500 }
+        )
+      }
+      sales = salesData || []
     }
 
     if (!sales || sales.length === 0) {

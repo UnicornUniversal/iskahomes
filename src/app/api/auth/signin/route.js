@@ -3,6 +3,7 @@ import { signIn } from '@/lib/auth'
 import { developerDB, agentDB, homeSeekerDB } from '@/lib/database'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { generateToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function POST(request) {
   console.log('🔐 SIGNIN API: Request received');
@@ -115,7 +116,7 @@ export async function POST(request) {
               const { data: agencyOrg } = await supabaseAdmin
                 .from('agencies')
                 .select('slug, name, agency_id')
-                .eq('agency_id', member.organization_id)
+                .eq('id', member.organization_id)
                 .single()
               orgSlug = agencyOrg?.slug
               orgName = agencyOrg?.name
@@ -190,7 +191,7 @@ export async function POST(request) {
             const { data: agencyOrg } = await supabaseAdmin
               .from('agencies')
               .select('slug, name, agency_id')
-              .eq('agency_id', teamMember.organization_id)
+              .eq('id', teamMember.organization_id)
               .single()
             organizationSlug = agencyOrg?.slug
             organizationName = agencyOrg?.name
@@ -266,7 +267,7 @@ export async function POST(request) {
           const { data: agencyOrg } = await supabaseAdmin
             .from('agencies')
             .select('slug, name, agency_id')
-            .eq('agency_id', profile.organization_id)
+            .eq('id', profile.organization_id)
             .single()
           if (agencyOrg) {
             profile.organization_slug = profile.organization_slug || agencyOrg?.slug
@@ -293,7 +294,7 @@ export async function POST(request) {
           const { data: agencyOrg } = await supabaseAdmin
             .from('agencies')
             .select('slug')
-            .eq('agency_id', profile.organization_id)
+            .eq('id', profile.organization_id)
             .single()
           organizationSlug = agencyOrg?.slug
         }
@@ -386,6 +387,16 @@ export async function POST(request) {
 
     console.log('🔐 SIGNIN API: Sending response to client...');
 
+    const userId = userType === 'property_seeker' ? profile?.user_id : user.id
+    captureAuditEvent('auth_signin', {
+      user_id: userId,
+      user_type: userType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/auth/signin',
+      organization_type: profile?.organization_type,
+    }, userId)
+
     // Build profile response based on user type
     let profileData = null;
     if (profile) {
@@ -406,7 +417,7 @@ export async function POST(request) {
           const { data: agencyOrg } = await supabaseAdmin
             .from('agencies')
             .select('slug, name')
-            .eq('agency_id', profile.organization_id)
+            .eq('id', profile.organization_id)
             .single()
           organizationSlug = agencyOrg?.slug
           organizationName = agencyOrg?.name

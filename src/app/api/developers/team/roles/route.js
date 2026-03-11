@@ -1,27 +1,23 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
+import { authenticateRequest, requirePermission } from '@/lib/apiPermissionMiddleware'
 
-// GET - Fetch all roles for a developer organization
+// GET - Fetch all roles for an organization (developer or agency)
 export async function GET(request) {
   try {
-    // Authenticate request (handles both developers and team members)
-    const { userInfo, error: authError, status } = await authenticateRequest(request)
+    const { userInfo, error: authError, status } = await requirePermission(request, 'team.view')
     
     if (authError) {
       return NextResponse.json({ error: authError }, { status })
     }
 
-    // Must be developer organization
-    if (userInfo.organization_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
-    }
+    const organizationType = userInfo.organization_type || 'developer'
 
-    // Fetch all roles for this developer organization
+    // Fetch all roles for this organization
     const { data: roles, error } = await supabaseAdmin
       .from('organization_roles')
       .select('*')
-      .eq('organization_type', 'developer')
+      .eq('organization_type', organizationType)
       .eq('organization_id', userInfo.organization_id)
       .order('created_at', { ascending: true })
 
@@ -50,45 +46,13 @@ export async function GET(request) {
 // POST - Create a new role
 export async function POST(request) {
   try {
-    // Authenticate request (handles both developers and team members)
-    const { userInfo, error: authError, status } = await authenticateRequest(request)
+    const { userInfo, error: authError, status } = await requirePermission(request, 'team.manage_roles')
     
     if (authError) {
       return NextResponse.json({ error: authError }, { status })
     }
 
-    // Must be developer organization
-    if (userInfo.organization_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
-    }
-
-    // Check permissions - only Super Admin/Admin can create roles
-    const { data: teamMember } = await supabaseAdmin
-      .from('organization_team_members')
-      .select('permissions, role_id')
-      .eq('organization_type', 'developer')
-      .eq('organization_id', userInfo.organization_id)
-      .eq('user_id', userInfo.user_id)
-      .eq('status', 'active')
-      .maybeSingle()
-
-    if (!teamMember) {
-      return NextResponse.json({ error: 'Team member not found' }, { status: 403 })
-    }
-
-    const permissions = teamMember.permissions || {}
-    if (!permissions.team?.invite && !permissions.team?.edit) {
-      // Check if user has Super Admin/Admin role
-      const { data: role } = await supabaseAdmin
-        .from('organization_roles')
-        .select('name')
-        .eq('id', teamMember.role_id)
-        .single()
-
-      if (role?.name !== 'Super Admin' && role?.name !== 'Admin') {
-        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-      }
-    }
+    const organizationType = userInfo.organization_type || 'developer'
 
     const body = await request.json()
     const { name, description, permissions: rolePermissions, is_default } = body
@@ -101,10 +65,10 @@ export async function POST(request) {
     const { data: existingRole } = await supabaseAdmin
       .from('organization_roles')
       .select('id')
-      .eq('organization_type', 'developer')
-      .eq('organization_id', developer.id)
+      .eq('organization_type', organizationType)
+      .eq('organization_id', userInfo.organization_id)
       .eq('name', name)
-      .single()
+      .maybeSingle()
 
     if (existingRole) {
       return NextResponse.json({ error: 'Role name already exists' }, { status: 400 })
@@ -114,7 +78,7 @@ export async function POST(request) {
     const { data: newRole, error } = await supabaseAdmin
       .from('organization_roles')
       .insert({
-        organization_type: 'developer',
+        organization_type: organizationType,
         organization_id: userInfo.organization_id,
         name,
         description: description || null,

@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
-import { getDeveloperId } from '@/lib/developerIdHelper'
+import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function GET(request, { params }) {
   try {
     const { id } = params
+    const authHeader = request.headers.get('authorization')
+    let decoded = null
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      decoded = verifyToken(authHeader.substring(7))
+    }
 
     const { data, error } = await supabase
       .from('listings')
@@ -29,6 +34,16 @@ export async function GET(request, { params }) {
         { status: 404 }
       )
     }
+
+    const auditUserId = decoded?.user_id || decoded?.developer_id || decoded?.agent_id || decoded?.agency_id || 'anonymous'
+    captureAuditEvent('unit_viewed', {
+      user_id: auditUserId,
+      user_type: decoded?.user_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/units/[id]',
+      metadata: { unit_id: id, listing_id: data?.id || id }
+    }, auditUserId)
 
     return NextResponse.json({ data })
   } catch (error) {
@@ -179,6 +194,15 @@ export async function PUT(request, { params }) {
       )
     }
 
+    captureAuditEvent('unit_updated', {
+      user_id: decoded.user_id || decoded.developer_id || 'unknown',
+      user_type: decoded.user_type || 'developer',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/units/[id]',
+      metadata: { unit_id: id, listing_id: data?.id || id }
+    }, decoded.user_id || decoded.developer_id || 'unknown')
+
     return NextResponse.json({ 
       success: true, 
       message: 'Unit updated successfully',
@@ -251,6 +275,15 @@ export async function DELETE(request, { params }) {
         { status: 500 }
       )
     }
+
+    captureAuditEvent('unit_deleted', {
+      user_id: decoded.user_id || decoded.developer_id || 'unknown',
+      user_type: decoded.user_type || 'developer',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/units/[id]',
+      metadata: { unit_id: id, listing_id: id }
+    }, decoded.user_id || decoded.developer_id || 'unknown')
 
     return NextResponse.json({ 
       success: true, 

@@ -14,10 +14,33 @@ export async function GET(request, { params }) {
   console.log(`[API] Fetching agent with slug: ${slug}`);
 
   try {
-    // 1. Fetch Agent details (No Join)
+    // 1. Fetch Agent details - display fields only, no analytics
     const { data: agent, error: agentError } = await supabase
       .from('agents')
-      .select('*')
+      .select(`
+        id,
+        agent_id,
+        agency_id,
+        name,
+        email,
+        phone,
+        secondary_email,
+        secondary_phone,
+        profile_image,
+        bio,
+        slug,
+        website,
+        address,
+        city,
+        region,
+        state,
+        country,
+        social_media,
+        account_status,
+        agent_status,
+        total_listings,
+        created_at
+      `)
       .eq('slug', slug)
       .eq('account_status', 'active')
       .eq('agent_status', 'active')
@@ -44,8 +67,23 @@ export async function GET(request, { params }) {
         console.log(`[API] Fetching agency: ${agent.agency_id}`);
         const { data: agencyData, error: agencyError } = await supabase
             .from('agencies')
-            .select('*')
-            .eq('agency_id', agent.agency_id) // using agency_id based on previous file structure
+            .select(`
+              agency_id,
+              name,
+              slug,
+              profile_image,
+              email,
+              phone,
+              website,
+              address,
+              city,
+              country,
+              social_media,
+              description,
+              total_listings,
+              total_agents
+            `)
+            .eq('agency_id', agent.agency_id)
             .single();
         
         if (agencyError) {
@@ -56,11 +94,34 @@ export async function GET(request, { params }) {
         }
     }
 
-    // 3. Fetch Agent's Listings
+    // 3. Fetch Agent's Listings - display fields only, no analytics
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('*')
-      .eq('user_id', agent.agent_id) // Using agent_id column which links to the listings
+      .select(`
+        id,
+        slug,
+        listing_type,
+        title,
+        description,
+        price,
+        currency,
+        price_type,
+        duration,
+        media,
+        specifications,
+        types,
+        city,
+        state,
+        country,
+        purposes,
+        status,
+        is_featured,
+        is_verified,
+        is_premium,
+        available_from,
+        created_at
+      `)
+      .eq('user_id', agent.agent_id)
       .eq('listing_status', 'active')
       .eq('listing_condition', 'completed')
       .order('created_at', { ascending: false })

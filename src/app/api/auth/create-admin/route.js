@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { signUp } from '@/lib/auth'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function POST(request) {
   try {
@@ -26,6 +27,14 @@ export async function POST(request) {
         { status: 400 }
       )
     }
+
+    captureAuditEvent('auth_admin_created', {
+      user_id: authData.user.id,
+      user_type: 'admin',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/auth/create-admin',
+    }, authData.user.id)
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // GET - Fetch agent's own profile
 export async function GET(request) {
@@ -56,6 +57,14 @@ export async function GET(request) {
       agent.agency_name = agency.name
       agent.agency_slug = agency.slug
     }
+
+    captureAuditEvent('agent_profile_viewed', {
+      user_id: decoded.user_id,
+      user_type: 'agent',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/agents/profile'
+    }, decoded.user_id)
 
     return NextResponse.json({
       success: true,
@@ -214,6 +223,17 @@ export async function PUT(request) {
         { status: 500 }
       )
     }
+
+    const updatedFields = Object.keys(profileData).filter(k => !['updated_at'].includes(k))
+    captureAuditEvent('agent_profile_updated', {
+      user_id: decoded.user_id,
+      user_type: 'agent',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/agents/profile',
+      agent_id: decoded.user_id,
+      metadata: { updated_fields: updatedFields },
+    }, decoded.user_id)
 
     return NextResponse.json({
       success: true,

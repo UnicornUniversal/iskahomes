@@ -13,8 +13,11 @@ import {
     FiUser,
     FiMessageSquare,
     FiTrendingUp,
-    FiLogOut
+    FiLogOut,
+    FiShield,
+    FiActivity
 } from 'react-icons/fi'
+import { userCanAccessRoute } from '@/lib/permissionHelpers'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
@@ -24,7 +27,7 @@ const AgencyNav = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const [isLoggingOut, setIsLoggingOut] = useState(false)
     const pathname = usePathname()
-    const { logout } = useAuth()
+    const { user, logout } = useAuth()
 
     // Extract slug from pathname (e.g., /agency/premier-realty/dashboard -> premier-realty)
     const getSlug = () => {
@@ -79,11 +82,26 @@ const AgencyNav = () => {
             icon: FiCreditCard
         },
         {
+            label: 'Team',
+            href: `/agency/${slug}/team`,
+            icon: FiShield,
+            permission: 'team'
+        },
+        {
+            label: 'Audit',
+            href: `/agency/${slug}/audit`,
+            icon: FiActivity
+        },
+        {
             label: 'Profile',
             href: `/agency/${slug}/profile`,
             icon: FiUser
         }
-    ]
+    ].filter((item) => {
+        if (!item.permission) return true
+        if (user?.user_type === 'agent') return true
+        return userCanAccessRoute(user, item.permission)
+    })
 
     const toggleMobileMenu = () => {
         setIsMobileMenuOpen(!isMobileMenuOpen)
@@ -194,13 +212,31 @@ const AgencyNav = () => {
                     ? 'translate-x-0' 
                     : '-translate-x-full lg:translate-x-0'
             }`}>
-                <div className="mb-8">
+                {/* Logo - first element, links to homepage */}
+                <div className="mb-6 flex-shrink-0">
+                    <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
+                        <img src="/iska-dark.png" alt="ISKA Homes" className="max-w-[120px] w-24" />
+                    </Link>
+                </div>
+
+                {/* Close button - small/medium devices only */}
+                <button
+                    onClick={toggleMobileMenu}
+                    className="lg:hidden absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                    aria-label="Close navigation"
+                >
+                    <FiX className="w-5 h-5" />
+                </button>
+
+                <div className="mb-8 flex-shrink-0">
                     <h5 className="text-sm text-gray-500 mb-2 font-medium">Agency</h5>
                     <h3 className="text-2xl font-bold text-primary_color mb-2">Dashboard</h3>
                     <div className="w-12 h-1 bg-secondary_color rounded-full"></div>
                 </div>
                 
-                <div className="space-y-2 w-full flex-1">
+                {/* Scrollable nav area */}
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+                <div className="space-y-2 w-full">
                     {navItems.map((item, index) => {
                         const IconComponent = item.icon
                         const active = isActive(item.href)
@@ -260,11 +296,12 @@ const AgencyNav = () => {
                 </div>
 
                 {/* Agency Info Footer */}
-                <div className="mt-auto pt-6 border-t border-gray-200">
+                <div className="pt-6 pb-4 border-t border-gray-200">
                     <div className="px-4 py-3 bg-primary_color/5 rounded-lg">
                         <p className="text-xs text-gray-500 mb-1">Agency Name</p>
                         <p className="text-sm font-semibold text-primary_color">Premier Realty</p>
                     </div>
+                </div>
                 </div>
             </nav>
         </>

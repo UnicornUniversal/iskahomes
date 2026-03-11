@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/supabase'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function POST(request) {
   try {
@@ -95,7 +96,8 @@ export async function POST(request) {
             phone: userData.phone || '',
             website: userData.companyWebsite || '',
             license_number: userData.registrationNumber || '',
-            account_status: 'active',
+            account_status: 'pending',
+            admin_status: 'pending',
             slug: slug,
             profile_completion_percentage: 0,
             total_units: 0,
@@ -126,6 +128,9 @@ export async function POST(request) {
             agency_name: userData.agencyName || '',
             license_id: userData.licenseId || '',
             status: 'active',
+            account_status: 'active',
+            agent_status: 'active',
+            admin_status: 'approved',
             // Signup status fields
             invitation_status: 'sent',
             signup_status: 'pending', // Will be 'verified' after email confirmation
@@ -147,6 +152,7 @@ export async function POST(request) {
             email: email,
             phone: userData.phone || '',
             status: 'active',
+            admin_status: 'approved',
             // Signup status fields
             invitation_status: 'sent',
             signup_status: 'pending', // Will be 'verified' after email confirmation
@@ -177,7 +183,8 @@ export async function POST(request) {
             phone: userData.phone || '',
             website: userData.companyWebsite || '',
             license_number: userData.registrationNumber || '',
-            account_status: 'active',
+            account_status: 'pending',
+            admin_status: 'pending',
             slug: agencySlug,
             profile_completion_percentage: 0,
             total_agents: 0,
@@ -230,6 +237,14 @@ export async function POST(request) {
         { status: 500 }
       )
     }
+
+    captureAuditEvent('auth_signup', {
+      user_id: newUser.id,
+      user_type: userType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/auth/signup-supabase',
+    }, newUser.id)
 
     return NextResponse.json({
       success: true,

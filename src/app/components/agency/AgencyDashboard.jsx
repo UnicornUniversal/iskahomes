@@ -26,6 +26,9 @@ const AgencyDashboard = () => {
   const pathname = usePathname()
   const slug = pathname?.split('/')[2] || ''
   
+  // Use agency_id for all data - works for both owners and team members
+  const accountId = user?.profile?.agency_id || user?.id
+  
   const [viewsTimeSeries, setViewsTimeSeries] = useState([])
   const [impressionsTimeSeries, setImpressionsTimeSeries] = useState([])
   const [loading, setLoading] = useState(true)
@@ -60,7 +63,7 @@ const AgencyDashboard = () => {
     return 'GHS'
   }, [user?.profile?.company_locations])
 
-  // Get values directly from user profile
+  // Get values from user profile (includes agency stats for team members from AuthContext)
   const totalAgents = user?.profile?.total_agents ?? 0
   const totalListings = user?.profile?.total_listings ?? 0
   const totalLeads = user?.profile?.total_leads ?? 0
@@ -68,7 +71,7 @@ const AgencyDashboard = () => {
 
   // Fetch analytics data
   useEffect(() => {
-    if (!user?.id) {
+    if (!accountId) {
       setLoading(false)
       return
     }
@@ -81,7 +84,7 @@ const AgencyDashboard = () => {
         
         // Fetch views data
         const viewsParams = new URLSearchParams({
-          user_id: user.id,
+          user_id: accountId,
           user_type: 'agency',
           period: 'week',
           metric: 'views'
@@ -105,7 +108,7 @@ const AgencyDashboard = () => {
 
         // Fetch impressions data
         const impressionsParams = new URLSearchParams({
-          user_id: user.id,
+          user_id: accountId,
           user_type: 'agency',
           period: 'week',
           metric: 'impressions'
@@ -141,7 +144,7 @@ const AgencyDashboard = () => {
     return () => {
       isMounted = false
     }
-  }, [user?.id])
+  }, [accountId])
 
   const stats = [
     {
@@ -211,7 +214,7 @@ const AgencyDashboard = () => {
       {/* Statistics View | Simple Services */}
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-4'>
         <div className='lg:col-span-2'>
-          <StatisticsView userId={user?.id} accountType="agency" />
+          <StatisticsView userId={accountId} accountType="agency" />
         </div>
         <div>
           <SimpleServices />
@@ -221,20 +224,20 @@ const AgencyDashboard = () => {
       {/* Popular Listings | Top Agents */}
       <div className='grid grid-cols-1 lg:grid-cols-2 gap-4'>
         <div className='bg-white rounded-xl shadow-sm border border-gray-100'>
-          <PopularListings limit={4} userId={user?.id} accountType="agency" />
+          <PopularListings limit={4} userId={accountId} accountType="agency" />
         </div>
         <div>
-          <TopAgents limit={4} agencyId={user?.id} />
+          <TopAgents limit={4} agencyId={accountId} />
         </div>
       </div>
 
       {/* Recent Messages | Latest Leads */}
       <div className='grid grid-cols-1 lg:grid-cols-2 gap-4'>
         <div className='secondary_bg p-4 rounded-2xl shadow-sm'>
-          <RecentMessages userId={user?.id} accountType="agency" />
+          <RecentMessages userId={accountId} accountType="agency" />
         </div>
         <div className='secondary_bg p-4 rounded-2xl shadow-sm'>
-          <LatestLeads listerId={user?.id} listerType="agency" />
+          <LatestLeads listerId={accountId} listerType="agency" />
         </div>
       </div>
     </div>

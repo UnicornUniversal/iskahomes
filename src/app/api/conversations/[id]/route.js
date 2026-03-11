@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { verifyToken } from '@/lib/jwt';
+import { captureAuditEvent } from '@/lib/auditLogger';
 
 // GET single conversation
 export async function GET(request, { params }) {
@@ -137,6 +138,27 @@ export async function GET(request, { params }) {
     } catch (err) {
       console.error('Error fetching user profile:', err);
     }
+
+    captureAuditEvent('conversation_viewed', {
+      user_id: userId,
+      user_type: userType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/conversations/[id]',
+      metadata: {
+        conversation_id: id
+      }
+    }, userId);
+    captureAuditEvent('message_viewed', {
+      user_id: userId,
+      user_type: userType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/conversations/[id]',
+      metadata: {
+        conversation_id: id
+      }
+    }, userId);
 
     return NextResponse.json({
       success: true,

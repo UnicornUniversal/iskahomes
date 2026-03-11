@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { verifyToken } from '@/lib/jwt';
+import { captureAuditEvent } from '@/lib/auditLogger';
 
 // POST - Mark conversation as read
 export async function POST(request, { params }) {
@@ -97,6 +98,17 @@ export async function POST(request, { params }) {
       console.error('Error marking messages as read:', messagesError);
       // Don't fail the request if messages update fails, conversation is already updated
     }
+
+    captureAuditEvent('conversation_marked_read', {
+      user_id: userId,
+      user_type: userType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/conversations/[id]/read',
+      metadata: {
+        conversation_id: id
+      }
+    }, userId);
 
     return NextResponse.json({
       success: true,

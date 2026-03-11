@@ -243,7 +243,8 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType = 'developer' 
             size: formData.size,
             status: formData.status,
             listing_type: formData.listing_type,
-            development_id: formData.development_id
+            development_id: formData.development_id,
+            ...(formData.status && ['Sold', 'Rented Out', 'Taken'].includes(formData.status) && formData.sales_info ? { sales_info: formData.sales_info } : {})
           }
           break
 

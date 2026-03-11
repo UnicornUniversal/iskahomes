@@ -19,7 +19,7 @@ export const getUserFromToken = async (token) => {
 
     // If team member, get their info from organization_team_members
     if (decoded.user_type === 'team_member') {
-      const { data: teamMember, error } = await supabaseAdmin
+      let query = supabaseAdmin
         .from('organization_team_members')
         .select(`
           *,
@@ -27,11 +27,14 @@ export const getUserFromToken = async (token) => {
         `)
         .eq('user_id', decoded.user_id)
         .eq('status', 'active')
-        .maybeSingle()
+      if (decoded.organization_id) {
+        query = query.eq('organization_id', decoded.organization_id)
+      }
+      const { data: teamMember, error } = await query.maybeSingle()
 
       if (error || !teamMember) return null
 
-      return {
+      const result = {
         user_id: decoded.user_id,
         user_type: 'team_member',
         organization_type: teamMember.organization_type,
@@ -41,6 +44,25 @@ export const getUserFromToken = async (token) => {
         permissions: teamMember.permissions,
         role: teamMember.role
       }
+
+      // Add developer_id or agency_id for APIs that need it
+      if (teamMember.organization_type === 'developer') {
+        const { data: dev } = await supabaseAdmin
+          .from('developers')
+          .select('developer_id')
+          .eq('id', teamMember.organization_id)
+          .single()
+        result.developer_id = dev?.developer_id
+      } else if (teamMember.organization_type === 'agency') {
+        const { data: agency } = await supabaseAdmin
+          .from('agencies')
+          .select('agency_id')
+          .eq('id', teamMember.organization_id)
+          .single()
+        result.agency_id = agency?.agency_id
+      }
+
+      return result
     }
 
     // If developer/agency owner - check organization_team_members for permissions
@@ -77,10 +99,11 @@ export const getUserFromToken = async (token) => {
     }
 
     if (decoded.user_type === 'agency') {
+      const agencyLookupId = decoded.agency_id || decoded.user_id
       const { data: agency, error } = await supabaseAdmin
         .from('agencies')
         .select('id, agency_id')
-        .eq('agency_id', decoded.user_id)
+        .eq('agency_id', agencyLookupId)
         .single()
 
       if (error || !agency) return null
@@ -105,6 +128,26 @@ export const getUserFromToken = async (token) => {
         // Load permissions from organization_team_members, or null if not found (Super Admin)
         permissions: teamMember?.permissions || null,
         role_id: teamMember?.role_id || null
+      }
+    }
+
+    // Agent: JWT user_id is the same as agents.agent_id and listings.user_id
+    if (decoded.user_type === 'agent') {
+      const { data: agent, error } = await supabaseAdmin
+        .from('agents')
+        .select('id, agent_id')
+        .eq('agent_id', decoded.user_id)
+        .eq('account_status', 'active')
+        .maybeSingle()
+
+      if (error || !agent) return null
+
+      return {
+        user_id: decoded.user_id,
+        user_type: 'agent',
+        organization_type: 'agent',
+        organization_id: agent.id,
+        agent_id: agent.agent_id
       }
     }
 

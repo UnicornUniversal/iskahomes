@@ -2,26 +2,30 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 import { getDeveloperId } from '@/lib/developerIdHelper'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function GET(request) {
   try {
-    // Authenticate request (handles both developers and team members)
+    // Authenticate request (handles developers, team members, and agents)
     const { userInfo, error: authError, status: authStatus } = await authenticateRequest(request)
     
     if (authError) {
       return NextResponse.json({ error: authError }, { status: authStatus })
     }
 
-    // Must be developer organization
-    if (userInfo.organization_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
-    }
+    let userId
 
-    // Get the actual developer's user_id
-    const userId = await getDeveloperId(userInfo)
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'Developer ID not found' }, { status: 404 })
+    if (userInfo.organization_type === 'developer') {
+      // Developer or team member: resolve developer's user_id
+      userId = await getDeveloperId(userInfo)
+      if (!userId) {
+        return NextResponse.json({ error: 'Developer ID not found' }, { status: 404 })
+      }
+    } else if (userInfo.user_type === 'agent') {
+      // Agent: user_id from token is the same as listings.user_id (agent_id)
+      userId = userInfo.user_id
+    } else {
+      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
     }
 
     // Get query parameters
@@ -132,6 +136,20 @@ export async function GET(request) {
     }
 
     const { count: totalCount } = await countQuery
+
+    captureAuditEvent('user_listings_listed', {
+      user_id: userInfo.user_id,
+      user_type: userInfo.user_type || userInfo.organization_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/user-listings',
+      metadata: {
+        page,
+        limit,
+        result_count: listings?.length || 0,
+        total_count: totalCount || 0
+      }
+    }, userInfo.user_id)
 
     return NextResponse.json({ 
       success: true,

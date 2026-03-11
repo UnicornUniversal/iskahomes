@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // GET - Fetch user's subscription requests
 export async function GET(request) {
@@ -59,6 +60,17 @@ export async function GET(request) {
         details: error.message 
       }, { status: 500 })
     }
+
+    captureAuditEvent('subscription_request_listed', {
+      user_id: userId,
+      user_type: dbUserType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/subscriptions-requests',
+      metadata: {
+        result_count: requests?.length || 0
+      }
+    }, userId)
 
     return NextResponse.json({ 
       success: true,
@@ -247,6 +259,20 @@ export async function POST(request) {
         details: requestError.message 
       }, { status: 500 })
     }
+
+    captureAuditEvent('subscription_request_created', {
+      user_id: userId,
+      user_type: dbUserType,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/subscriptions-requests',
+      metadata: {
+        subscription_request_id: requestData?.id,
+        package_id,
+        amount,
+        currency
+      }
+    }, userId)
 
     return NextResponse.json({ 
       success: true,

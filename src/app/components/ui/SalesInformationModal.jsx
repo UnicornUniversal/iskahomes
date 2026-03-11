@@ -1,27 +1,50 @@
 "use client"
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Input } from './input'
-import { Button } from './button'
+import { FiSearch } from 'react-icons/fi'
 
 const SalesInformationModal = ({ 
   isOpen, 
   onClose, 
   onConfirm, 
   saleType = 'sold', // 'sold' or 'rented'
-  isLoading = false 
+  isLoading = false,
+  useClientSelector = false 
 }) => {
   const [buyerName, setBuyerName] = useState('')
+  const [selectedClient, setSelectedClient] = useState(null)
+  const [clientSearch, setClientSearch] = useState('')
+  const [clientDropdownOpen, setClientDropdownOpen] = useState(false)
+  const [clients, setClients] = useState([])
   const [salesSource, setSalesSource] = useState('Iska Homes')
   const [otherSource, setOtherSource] = useState('')
   const [notes, setNotes] = useState('')
 
+  useEffect(() => {
+    if (!isOpen || !useClientSelector) return
+    const token = localStorage.getItem('developer_token')
+    if (!token) return
+    const qs = new URLSearchParams()
+    if (clientSearch.trim()) qs.set('search', clientSearch.trim())
+    fetch(`/api/clients?${qs.toString()}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => res.json())
+      .then(data => { if (data.success) setClients(data.data || []) })
+      .catch(() => setClients([]))
+  }, [isOpen, useClientSelector, clientSearch])
+
   if (!isOpen) return null
+
+  const clientsFiltered = clientSearch.trim()
+    ? clients.filter(c => (c.name || '').toLowerCase().includes(clientSearch.toLowerCase()))
+    : clients.slice(0, 8)
 
   const handleSubmit = (e) => {
     e.preventDefault()
     const finalSalesSource = salesSource === 'Other' ? otherSource : salesSource
+    const buyer = useClientSelector && selectedClient ? selectedClient.name : (buyerName.trim() || null)
     onConfirm({
-      buyer_name: buyerName.trim() || null,
+      buyer_name: buyer,
+      client_id: useClientSelector && selectedClient ? selectedClient.id : null,
       sale_source: finalSalesSource || 'Iska Homes',
       notes: notes.trim() || null
     })
@@ -30,14 +53,17 @@ const SalesInformationModal = ({
   const handleSkip = () => {
     onConfirm({
       buyer_name: null,
+      client_id: null,
       sale_source: 'Iska Homes',
       notes: null
     })
   }
 
   const handleCancel = () => {
-    // Reset form
     setBuyerName('')
+    setSelectedClient(null)
+    setClientSearch('')
+    setClientDropdownOpen(false)
     setSalesSource('Iska Homes')
     setOtherSource('')
     setNotes('')
@@ -46,7 +72,7 @@ const SalesInformationModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full transform transition-all duration-300 ease-out">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full transform transition-all duration-300 ease-out max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="p-6 pb-4">
           <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full">
@@ -61,27 +87,61 @@ const SalesInformationModal = ({
           
           <p className="text-gray-600 text-center text-sm leading-relaxed">
             {saleType === 'sold' 
-              ? 'Congratulations on the sale! Please provide additional information (optional).'
-              : 'Congratulations on the rental! Please provide additional information (optional).'}
+              ? 'Congratulations on the sale! Select the client from your database (optional).'
+              : 'Congratulations on the rental! Select the client from your database (optional).'}
           </p>
         </div>
 
         {/* Content */}
         <form onSubmit={handleSubmit} className="px-6 pb-6">
           <div className="space-y-4 mb-6">
-            {/* Buyer Name */}
+            {/* Client selector (for developers) or Buyer Name */}
             <div>
-              <label htmlFor="buyerName" className="block text-sm font-medium text-gray-700 mb-2">
-                {saleType === 'sold' ? 'Buyer Name' : 'Tenant Name'} <span className="text-gray-400 text-xs">(Optional)</span>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {saleType === 'sold' ? 'Buyer / Client' : 'Tenant / Client'} <span className="text-gray-400 text-xs">(Optional)</span>
               </label>
-              <Input
-                id="buyerName"
-                type="text"
-                value={buyerName}
-                onChange={(e) => setBuyerName(e.target.value)}
-                placeholder={`Enter ${saleType === 'sold' ? 'buyer' : 'tenant'} name`}
-                className="w-full"
-              />
+              {useClientSelector ? (
+                <div className="relative">
+                  <div className="relative">
+                    <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search clients..."
+                      value={selectedClient ? selectedClient.name : clientSearch}
+                      onChange={(e) => { setClientSearch(e.target.value); setSelectedClient(null); setClientDropdownOpen(true) }}
+                      onFocus={() => setClientDropdownOpen(true)}
+                      onBlur={() => setTimeout(() => setClientDropdownOpen(false), 150)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm"
+                    />
+                  </div>
+                  {clientDropdownOpen && clientsFiltered.length > 0 && (
+                    <ul className="absolute top-full left-0 right-0 mt-1 z-10 bg-white rounded-lg border border-gray-200 shadow-lg py-2 max-h-48 overflow-y-auto text-sm">
+                      {clientsFiltered.map(c => (
+                        <li
+                          key={c.id}
+                          className="flex flex-col px-3 py-2 cursor-pointer hover:bg-gray-100 text-gray-900"
+                          onMouseDown={(e) => { e.preventDefault(); setSelectedClient(c); setClientDropdownOpen(false); setClientSearch('') }}
+                        >
+                          <span className="font-medium">{c.name}</span>
+                          <span className="text-xs text-gray-600">{c.clientType || c.clientCode || ''}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {selectedClient && (
+                    <p className="text-xs text-gray-600 mt-1">Selected: {selectedClient.name}</p>
+                  )}
+                </div>
+              ) : (
+                <Input
+                  id="buyerName"
+                  type="text"
+                  value={buyerName}
+                  onChange={(e) => setBuyerName(e.target.value)}
+                  placeholder={`Enter ${saleType === 'sold' ? 'buyer' : 'tenant'} name`}
+                  className="w-full"
+                />
+              )}
             </div>
 
             {/* Sales Source */}

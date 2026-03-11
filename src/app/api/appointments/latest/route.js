@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function GET(request) {
   try {
@@ -76,6 +77,19 @@ export async function GET(request) {
         }
       }
     })) || []
+
+    captureAuditEvent('appointment_latest_viewed', {
+      user_id: accountId,
+      user_type: 'developer',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/appointments/latest',
+      metadata: {
+        account_id: accountId,
+        limit,
+        result_count: transformedAppointments.length
+      }
+    }, accountId)
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
+import { authenticateRequest, requirePermission } from '@/lib/apiPermissionMiddleware'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // GET - Fetch a specific team member
 export async function GET(request, { params }) {
@@ -8,17 +9,13 @@ export async function GET(request, { params }) {
     const resolvedParams = params instanceof Promise ? await params : params
     const { id } = resolvedParams
 
-    // Authenticate request (handles both developers and team members)
-    const { userInfo, error: authError, status } = await authenticateRequest(request)
+    const { userInfo, error: authError, status } = await requirePermission(request, 'team.view')
     
     if (authError) {
       return NextResponse.json({ error: authError }, { status })
     }
 
-    // Must be developer organization
-    if (userInfo.organization_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
-    }
+    const organizationType = userInfo.organization_type || 'developer'
 
     // Fetch the team member with role info
     const { data: member, error } = await supabaseAdmin
@@ -28,7 +25,7 @@ export async function GET(request, { params }) {
         role:organization_roles(id, name, description, is_system_role)
       `)
       .eq('id', id)
-      .eq('organization_type', 'developer')
+      .eq('organization_type', organizationType)
       .eq('organization_id', userInfo.organization_id)
       .single()
 
@@ -59,24 +56,20 @@ export async function PUT(request, { params }) {
     const resolvedParams = params instanceof Promise ? await params : params
     const { id } = resolvedParams
 
-    // Authenticate request (handles both developers and team members)
-    const { userInfo, error: authError, status } = await authenticateRequest(request)
+    const { userInfo, error: authError, status } = await requirePermission(request, 'team.edit')
     
     if (authError) {
       return NextResponse.json({ error: authError }, { status })
     }
 
-    // Must be developer organization
-    if (userInfo.organization_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
-    }
+    const organizationType = userInfo.organization_type || 'developer'
 
     // Check if team member exists
     const { data: existingMember } = await supabaseAdmin
       .from('organization_team_members')
       .select('*')
       .eq('id', id)
-      .eq('organization_type', 'developer')
+      .eq('organization_type', organizationType)
       .eq('organization_id', userInfo.organization_id)
       .single()
 
@@ -84,19 +77,17 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Team member not found' }, { status: 404 })
     }
 
-    // Check permissions - use userInfo which already has role_id and permissions
-    const { data: userRole } = await supabaseAdmin
-      .from('organization_roles')
-      .select('name')
-      .eq('id', userInfo.role_id)
-      .single()
-
-    if (!userRole) {
-      return NextResponse.json({ error: 'User role not found' }, { status: 403 })
+    // Check permissions - owners (permissions null) have full access
+    let canEdit = userInfo.permissions === null
+    if (!canEdit && userInfo.role_id) {
+      const { data: userRole } = await supabaseAdmin
+        .from('organization_roles')
+        .select('name')
+        .eq('id', userInfo.role_id)
+        .single()
+      const permissions = userInfo.permissions || {}
+      canEdit = permissions.team?.edit || userRole?.name === 'Super Admin' || userRole?.name === 'Admin'
     }
-
-    const permissions = userInfo.permissions || {}
-    const canEdit = permissions.team?.edit || userRole.name === 'Super Admin' || userRole.name === 'Admin'
 
     if (!canEdit) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -109,8 +100,13 @@ export async function PUT(request, { params }) {
         .select('name')
         .eq('id', existingMember.role_id)
         .single()
+      const { data: currentUserRole } = await supabaseAdmin
+        .from('organization_roles')
+        .select('name')
+        .eq('id', userInfo.role_id)
+        .maybeSingle()
 
-      if (memberRole?.name === 'Super Admin' && userRole?.name !== 'Super Admin') {
+      if (memberRole?.name === 'Super Admin' && currentUserRole?.name !== 'Super Admin') {
         return NextResponse.json({ error: 'Cannot modify Super Admin team member' }, { status: 403 })
       }
     }
@@ -158,7 +154,7 @@ export async function PUT(request, { params }) {
         .from('organization_roles')
         .select('id, permissions')
         .eq('id', role_id)
-        .eq('organization_type', 'developer')
+        .eq('organization_type', organizationType)
         .eq('organization_id', userInfo.organization_id)
         .single()
 
@@ -200,6 +196,17 @@ export async function PUT(request, { params }) {
     // Remove sensitive data
     const { password_hash, invitation_token, ...sanitized } = updatedMember
 
+    const auditUserId = userInfo.developer_id || userInfo.agency_id || userInfo.user_id
+    captureAuditEvent('team_member_updated', {
+      user_id: auditUserId,
+      user_type: userInfo.user_type || userInfo.organization_type,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/developers/team/members/[id]',
+      resource_id: id,
+      updated_fields: Object.keys(updateData),
+    });
+
     return NextResponse.json({ 
       success: true,
       data: sanitized,
@@ -221,24 +228,20 @@ export async function DELETE(request, { params }) {
     const resolvedParams = params instanceof Promise ? await params : params
     const { id } = resolvedParams
 
-    // Authenticate request (handles both developers and team members)
-    const { userInfo, error: authError, status } = await authenticateRequest(request)
+    const { userInfo, error: authError, status } = await requirePermission(request, 'team.remove')
     
     if (authError) {
       return NextResponse.json({ error: authError }, { status })
     }
 
-    // Must be developer organization
-    if (userInfo.organization_type !== 'developer') {
-      return NextResponse.json({ error: 'Invalid organization type' }, { status: 403 })
-    }
+    const organizationType = userInfo.organization_type || 'developer'
 
     // Check if team member exists
     const { data: existingMember } = await supabaseAdmin
       .from('organization_team_members')
       .select('role_id, user_id')
       .eq('id', id)
-      .eq('organization_type', 'developer')
+      .eq('organization_type', organizationType)
       .eq('organization_id', userInfo.organization_id)
       .single()
 
@@ -251,13 +254,6 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: 'Cannot remove yourself' }, { status: 400 })
     }
 
-    // Check permissions - use userInfo which already has role_id
-    const { data: userRole } = await supabaseAdmin
-      .from('organization_roles')
-      .select('name')
-      .eq('id', userInfo.role_id)
-      .single()
-
     // Check if trying to remove Owner
     const { data: memberRole } = await supabaseAdmin
       .from('organization_roles')
@@ -269,8 +265,17 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: 'Cannot remove Super Admin' }, { status: 403 })
     }
 
-    if (userRole?.name !== 'Super Admin' && userRole?.name !== 'Admin') {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    // Owners (permissions null) or Super Admin/Admin can remove
+    const canRemove = userInfo.permissions === null
+    if (!canRemove && userInfo.role_id) {
+      const { data: currentUserRole } = await supabaseAdmin
+        .from('organization_roles')
+        .select('name')
+        .eq('id', userInfo.role_id)
+        .maybeSingle()
+      if (currentUserRole?.name !== 'Super Admin' && currentUserRole?.name !== 'Admin') {
+        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+      }
     }
 
     // Soft delete - set status to 'deleted' instead of actually deleting
@@ -286,6 +291,16 @@ export async function DELETE(request, { params }) {
         details: error.message 
       }, { status: 500 })
     }
+
+    const auditUserId = userInfo.developer_id || userInfo.agency_id || userInfo.user_id
+    captureAuditEvent('team_member_removed', {
+      user_id: auditUserId,
+      user_type: userInfo.user_type || userInfo.organization_type,
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/developers/team/members/[id]',
+      resource_id: id,
+    });
 
     return NextResponse.json({ 
       success: true,

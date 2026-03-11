@@ -11,8 +11,9 @@ const RecentMessages = ({ userId: propUserId = null, accountType: propAccountTyp
   const [loading, setLoading] = useState(true)
 
   // Use provided userId/accountType or fall back to auth user
-  const userId = propUserId || user?.id
+  // developer_id for developers, agency_id for agencies (set in AuthContext for team members)
   const accountType = propAccountType || user?.profile?.account_type || 'developer'
+  const userId = propUserId || (accountType === 'agency' ? (user?.profile?.agency_id || user?.id) : (user?.profile?.developer_id || user?.id))
 
   useEffect(() => {
     if (!userId) {

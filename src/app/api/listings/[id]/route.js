@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 import { processCurrencyConversions } from '@/lib/currencyConversion'
 import { updateAdminAnalytics } from '@/lib/adminAnalytics'
 import { updateAdminListingsAnalytics, updateAdminSalesAnalytics } from '@/lib/adminAnalyticsHelpers'
@@ -1173,6 +1174,17 @@ async function createSalesListingEntry(listingId, userId, listingData, saleType,
     if (error) {
       console.error('Error creating sales_listings entry:', error)
       return null
+    }
+
+    // If client_id provided, add listing to client's clients_properties
+    if (salesInfo.client_id && listingId) {
+      const { data: client } = await supabaseAdmin.from('clients').select('clients_properties').eq('id', salesInfo.client_id).single()
+      if (client) {
+        const props = Array.isArray(client.clients_properties) ? [...client.clients_properties] : []
+        const exists = props.some(p => (typeof p === 'object' ? p?.id : p) === listingId)
+        if (!exists) props.push({ id: listingId })
+        await supabaseAdmin.from('clients').update({ clients_properties: props }).eq('id', salesInfo.client_id)
+      }
     }
 
     return data
@@ -2441,6 +2453,15 @@ export async function PUT(request, { params }) {
       }
     }
 
+    captureAuditEvent('listing_updated', {
+      user_id: userId,
+      user_type: decoded.user_type || decoded.account_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/listings/[id]',
+      listing_id: id,
+    }, userId)
+
     return NextResponse.json({ 
       success: true,
       data: finalizedListing || updatedListing,
@@ -2560,6 +2581,15 @@ export async function DELETE(request, { params }) {
       operation: 'delete',
       listingData: existingListing
     })
+
+    captureAuditEvent('listing_deleted', {
+      user_id: userId,
+      user_type: decoded.user_type || decoded.account_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/listings/[id]',
+      listing_id: id,
+    }, userId)
 
     return NextResponse.json({ 
       success: true,

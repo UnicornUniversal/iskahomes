@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { verifyToken } from '@/lib/jwt';
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function POST(request) {
   try {
@@ -104,6 +105,21 @@ export async function POST(request) {
       path: filePath,
       uploadedAt: new Date().toISOString()
     };
+
+    captureAuditEvent('upload_completed', {
+      user_id: decoded.user_id || decoded.agent_id || decoded.agency_id || decoded.developer_id || 'unknown',
+      user_type: decoded.user_type || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/upload',
+      metadata: {
+        folder,
+        subfolder,
+        file_type: file.type,
+        file_size: file.size,
+        file_path: filePath
+      }
+    }, decoded.user_id || decoded.agent_id || decoded.agency_id || decoded.developer_id || 'unknown')
 
     return NextResponse.json({ 
       success: true,

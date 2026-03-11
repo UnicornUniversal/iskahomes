@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { captureAuditEvent } from '@/lib/auditLogger'
 
 // GET - Fetch agency profile
 export async function GET(request) {
@@ -66,6 +67,15 @@ export async function GET(request) {
     } else {
       agency.locations = []
     }
+
+    const auditId = decoded.agency_id || decoded.user_id
+    captureAuditEvent('agency_profile_viewed', {
+      user_id: auditId,
+      user_type: decoded.user_type || 'agency',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/agencies/profile'
+    }, auditId)
 
     return NextResponse.json({ 
       success: true,
@@ -512,6 +522,18 @@ export async function PUT(request) {
         details: updateError.message 
       }, { status: 500 })
     }
+
+    const auditId = decoded.agency_id || decoded.user_id
+    const updatedFields = Object.keys(updateData).filter(k => !['updated_at'].includes(k))
+    captureAuditEvent('agency_profile_updated', {
+      user_id: auditId,
+      user_type: 'agency',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/agencies/profile',
+      agency_id: auditId,
+      metadata: { updated_fields: updatedFields },
+    }, auditId)
 
     // Map company_locations to locations for frontend compatibility
     if (updatedAgency.company_locations) {

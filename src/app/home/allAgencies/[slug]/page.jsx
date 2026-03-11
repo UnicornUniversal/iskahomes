@@ -390,13 +390,12 @@ const AgencyProfile = () => {
                 {/* Right Side - Sticky Lead Form */}
                 <div className="lg:col-span-1">
                     <div className="sticky top-8">
-                        {agency.id && (
+                        {(agency?.agency_id || agency?.id) && (
                              <LeadContactForm 
                                 contextType="profile"
-                                profileId={agency.id} // Assuming agency has an ID
+                                profileId={agency.agency_id || agency.id}
                                 profile={agency}
-                                agency={agency} // Pass as agency
-                                developer={null}
+                                agency={agency}
                                 propertyTitle={`Consultation with ${agency.name}`}
                             />
                         )}

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
+import { captureAuditEvent } from '@/lib/auditLogger'
+import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 
 // Helper to check if string is UUID
 function isUUID(str) {
@@ -36,6 +38,8 @@ function calculateLeadScore(leadActions) {
         // Default to direct messaging
         score += 20
       }
+    } else if (actionType === 'lead_manual') {
+      score += 10
     }
   })
 
@@ -47,8 +51,10 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url)
     const listerId = searchParams.get('lister_id')
     const listerType = searchParams.get('lister_type') || 'developer'
+    const assignedUserFilter = searchParams.get('assigned_user')
     const listingId = searchParams.get('listing_id')
     const status = searchParams.get('status')
+    const leadTypeFilter = searchParams.get('lead_type')
     
     console.log('🔍 GET /api/leads - Params:', {
       listerId,
@@ -64,16 +70,35 @@ export async function GET(request) {
     const pageSize = parseInt(searchParams.get('page_size') || '20', 10)
     const offset = page * pageSize
 
-    if (!listerId) {
+    const { userInfo, error: authError, status: authStatus } = await authenticateRequest(request)
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status: authStatus || 401 })
+    }
+
+    let roleName = userInfo?.role?.name || userInfo?.role_name || ''
+    if (!roleName && userInfo?.role_id) {
+      const { data: roleRecord } = await supabaseAdmin
+        .from('organization_roles')
+        .select('name')
+        .eq('id', userInfo.role_id)
+        .maybeSingle()
+      roleName = roleRecord?.name || ''
+    }
+
+    const isSuperAdmin = userInfo?.permissions === null || /super\s*admin/i.test(String(roleName))
+    const effectiveAssignedUser = isSuperAdmin ? (assignedUserFilter || null) : userInfo.user_id
+    const auditActorId = userInfo.user_id || listerId || 'unknown'
+
+    if (!listerId && !effectiveAssignedUser) {
       return NextResponse.json(
-        { error: 'Lister ID is required' },
+        { error: 'Lister ID or assigned user is required' },
         { status: 400 }
       )
     }
 
     // Convert slug to developer_id if needed
     let finalListerId = listerId
-    if (listerType === 'developer' && !isUUID(listerId)) {
+    if (listerId && listerType === 'developer' && !isUUID(listerId)) {
       // It's a slug, fetch developer by slug
       const { data: developer, error: devError } = await supabaseAdmin
         .from('developers')
@@ -137,9 +162,18 @@ export async function GET(request) {
       .select(`
         id,
         listing_id,
+        development_id,
         lister_id,
         lister_type,
         seeker_id,
+        is_anonymous,
+        lead_name,
+        lead_email,
+        lead_phone,
+        lead_type,
+        lead_source,
+        lead_origin,
+        assigned_user,
         lead_actions,
         total_actions,
         lead_score,
@@ -153,34 +187,44 @@ export async function GET(request) {
         updated_at,
         context_type
       `)
-      .eq('lister_id', finalListerId)
       .eq('lister_type', listerType)
-      .not('seeker_id', 'is', null) // Only leads with seeker_id
-      .or('is_anonymous.is.null,is_anonymous.eq.false') // Exclude anonymous leads (only get non-anonymous leads)
+
+    if (finalListerId) {
+      dataQuery = dataQuery.eq('lister_id', finalListerId)
+    }
+    if (effectiveAssignedUser) {
+      dataQuery = dataQuery.eq('assigned_user', effectiveAssignedUser)
+    }
       
     console.log('🔍 Query filters:', {
-      lister_id: finalListerId,
+      lister_id: finalListerId || 'not_provided',
       lister_type: listerType,
+      assigned_user: effectiveAssignedUser || 'all',
       listing_id: listingId || 'all listing-based leads'
     })
 
     if (listingId) {
       console.log('🔍 Filtering leads by listing_id:', listingId)
       dataQuery = dataQuery.eq('listing_id', listingId)
-      // Also ensure context_type is 'listing' when filtering by listing_id
       dataQuery = dataQuery.eq('context_type', 'listing')
     } else {
-      console.log('🔍 Filtering leads: listing_id is not null (all listing-based leads)')
-      dataQuery = dataQuery.not('listing_id', 'is', null)
+      // Include all leads: listing-based, development-based, profile, and manual (no listing filter)
+      console.log('🔍 Fetching all leads for lister')
     }
 
     if (status) {
       dataQuery = dataQuery.eq('status', status)
     }
+    if (leadTypeFilter) {
+      dataQuery = dataQuery.eq('lead_type', leadTypeFilter)
+    }
 
-    const { data: allLeads, error: leadsError } = await dataQuery
+    const { data: rawLeads, error: leadsError } = await dataQuery
       .order('last_action_date', { ascending: false })
       .order('created_at', { ascending: false })
+
+    // Filter: exclude only anonymous leads
+    const allLeads = (rawLeads || []).filter(lead => lead.is_anonymous !== true)
 
     console.log('🔍 Raw leads from database:', {
       count: allLeads?.length || 0,
@@ -207,12 +251,12 @@ export async function GET(request) {
       })
     }
 
-    // Group leads by (seeker_id, listing_id)
-    // This merges multiple records for the same seeker+listing combination
+    // Group leads by (seeker_id, listing_id) - manual leads stay as single records (group by id)
     const groupedLeadsMap = {}
     allLeads.forEach(lead => {
-      // Create unique key: seeker_id + listing_id (or 'null' if listing_id is null)
-      const groupKey = `${lead.seeker_id}_${lead.listing_id || 'null'}`
+      const groupKey = lead.lead_type === 'manual'
+        ? `manual_${lead.id}` // Manual leads: one per record
+        : `${lead.seeker_id}_${lead.listing_id || 'null'}_${lead.development_id || 'null'}` // Automated: group by seeker+context
       if (!groupedLeadsMap[groupKey]) {
         groupedLeadsMap[groupKey] = []
       }
@@ -265,7 +309,9 @@ export async function GET(request) {
       }, group[0])
 
       // Create grouped_lead_key for fetching reminders
-      const groupedLeadKey = `${primary.seeker_id}_${primary.listing_id || 'null'}`
+      const groupedLeadKey = primary.lead_type === 'manual'
+        ? `manual_${primary.id}`
+        : `${primary.seeker_id}_${primary.listing_id || 'null'}`
 
       return {
         ...primary,
@@ -293,13 +339,19 @@ export async function GET(request) {
     // Apply filters if provided (before pagination)
     let filteredLeads = mergedLeads
     
-    // Search filter - search in available fields (listing_title and seeker_name are added later in transformation)
+    // Search filter - search in name, email, phone, listing
     if (search) {
       const searchLower = search.toLowerCase()
-      filteredLeads = filteredLeads.filter(lead =>
-        (lead.seeker_id || '').toLowerCase().includes(searchLower) ||
-        (lead.listing_id || '').toLowerCase().includes(searchLower)
-      )
+      filteredLeads = filteredLeads.filter(lead => {
+        const name = (lead.lead_type === 'manual' ? lead.lead_name : null) || ''
+        const email = (lead.lead_type === 'manual' ? lead.lead_email : null) || ''
+        const phone = (lead.lead_type === 'manual' ? lead.lead_phone : null) || ''
+        return (lead.seeker_id || '').toLowerCase().includes(searchLower) ||
+          (lead.listing_id || '').toLowerCase().includes(searchLower) ||
+          (name || '').toLowerCase().includes(searchLower) ||
+          (email || '').toLowerCase().includes(searchLower) ||
+          (phone || '').toLowerCase().includes(searchLower)
+      })
     }
 
     // Action type filter - check if any action in lead_actions matches the action_type
@@ -533,6 +585,12 @@ export async function GET(request) {
     let transformedLeads = leadsWithReminders.map(lead => {
       const listing = lead.listing_id ? listingsMap[lead.listing_id] || null : null
       const seeker = lead.seeker_id ? seekersMap[lead.seeker_id] || null : null
+      // Manual leads: use lead_name, lead_email, lead_phone; Automated: use seeker from property_seekers
+      const displayName = lead.lead_type === 'manual'
+        ? (lead.lead_name || 'Unknown')
+        : (seeker?.name || lead.seeker_id)
+      const displayEmail = lead.lead_type === 'manual' ? lead.lead_email : seeker?.email
+      const displayPhone = lead.lead_type === 'manual' ? lead.lead_phone : seeker?.phone
 
       return {
         id: lead.id,
@@ -540,8 +598,8 @@ export async function GET(request) {
         listing_title: listing?.title || null,
         listing_slug: listing?.slug || null,
         listing_type: listing?.listing_type || null,
-        listing_status: listing?.listing_status || null, // Internal status (active, sold, rented)
-        listing_status_display: listing?.status || null, // Display status (Available, Sold, Taken, etc.) - any value
+        listing_status: listing?.listing_status || null,
+        listing_status_display: listing?.status || null,
         listing_image: listing?.image || null,
         listing_location: listing ? [listing.town, listing.city, listing.state, listing.country].filter(Boolean).join(', ') : null,
         listing_full_address: listing?.full_address || null,
@@ -552,9 +610,13 @@ export async function GET(request) {
         lister_id: lead.lister_id,
         lister_type: lead.lister_type,
         seeker_id: lead.seeker_id,
-        seeker_name: seeker?.name || lead.seeker_id,
-        seeker_email: seeker?.email || null,
-        seeker_phone: seeker?.phone || null,
+        seeker_name: displayName,
+        seeker_email: displayEmail,
+        seeker_phone: displayPhone,
+        lead_type: lead.lead_type || 'automated',
+        lead_source: lead.lead_source,
+        lead_origin: lead.lead_origin,
+        assigned_user: lead.assigned_user || null,
         lead_actions: Array.isArray(lead.lead_actions) ? lead.lead_actions : [],
         total_actions: lead.total_actions || 0,
         lead_score: lead.lead_score || 0,
@@ -571,6 +633,24 @@ export async function GET(request) {
         updated_at: lead.updated_at
       }
     })
+
+    captureAuditEvent('lead_listed', {
+      user_id: auditActorId,
+      user_type: listerType || 'unknown',
+      timestamp: new Date().toISOString(),
+      success: true,
+      api_route: '/api/leads',
+      metadata: {
+        lister_id: finalListerId || null,
+        lister_type: listerType,
+        assigned_user: effectiveAssignedUser || null,
+        viewer_scope: isSuperAdmin ? 'super_admin' : 'assigned_only',
+        listing_id: listingId,
+        page,
+        page_size: pageSize,
+        result_count: transformedLeads.length
+      }
+    }, auditActorId)
 
     return NextResponse.json({
       success: true,

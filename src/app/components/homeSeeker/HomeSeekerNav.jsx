@@ -1,7 +1,9 @@
 'use client'
 
 import React, { useState } from 'react'
+import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
+import { toast } from 'react-toastify'
 import { 
     FiHome, 
     FiCalendar, 
@@ -11,11 +13,11 @@ import {
     FiLogOut,
     FiMenu,
     FiX
-    // FiFileText
 } from 'react-icons/fi'
 
 const HomeSeekerNav = ({ pathname }) => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const [isLoggingOut, setIsLoggingOut] = useState(false)
     const { user, logout } = useAuth()
 
     // Get user ID from pathname or user context
@@ -64,6 +66,53 @@ const HomeSeekerNav = ({ pathname }) => {
         setIsMobileMenuOpen(!isMobileMenuOpen)
     }
 
+    const handleLogout = async () => {
+        if (isLoggingOut) return
+        setIsLoggingOut(true)
+        setIsMobileMenuOpen(false)
+
+        const loadingToastId = toast.loading('Logging out...', {
+            position: 'top-center',
+            autoClose: false,
+            hideProgressBar: false,
+            closeOnClick: false,
+            pauseOnHover: true,
+            draggable: false
+        })
+
+        try {
+            const result = await logout()
+            if (result.success) {
+                toast.update(loadingToastId, {
+                    render: 'Logged out successfully!',
+                    type: 'success',
+                    autoClose: 2000,
+                    isLoading: false
+                })
+            } else {
+                toast.update(loadingToastId, {
+                    render: 'Logout completed with warnings',
+                    type: 'warning',
+                    autoClose: 2000,
+                    isLoading: false
+                })
+            }
+        } catch (error) {
+            console.error('Logout error:', error)
+            toast.update(loadingToastId, {
+                render: 'Logout completed with errors',
+                type: 'error',
+                autoClose: 2000,
+                isLoading: false
+            })
+        } finally {
+            setIsLoggingOut(false)
+            setTimeout(() => {
+                window.location.href = '/'
+            }, 1000)
+        }
+    }
+
     return (
         <>
             {/* Mobile Menu Toggle Button */}
@@ -88,23 +137,32 @@ const HomeSeekerNav = ({ pathname }) => {
             )}
 
             {/* Navigation Menu */}
-            <nav className={`fixed lg:sticky lg:top-0 flex flex-col default_bg min-h-screen py-6 lg:py-8 w-[85vw] max-w-[280px] px-4 lg:px-6 shadow-xl border-r border-primary_color/10 z-50 transition-transform duration-300 ease-in-out ${
+            <nav className={`fixed lg:sticky lg:top-0 flex flex-col bg-white min-h-screen py-6 lg:py-8 w-[85vw] max-w-[280px] px-4 lg:px-6 shadow-xl border-r border-gray-100 z-50 transition-transform duration-300 ease-in-out ${
                 isMobileMenuOpen 
                     ? 'translate-x-0' 
                     : '-translate-x-full lg:translate-x-0'
             }`}>
-                {/* Logo/Header Section */}
-                <div className="mb-8 pb-6 border-b border-primary_color/10">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary_color to-primary_color/80 flex items-center justify-center shadow-lg">
-                            <FiHome className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                            <h5 className="text-xs font-semibold text-primary_color/70 uppercase tracking-wider">Property Seeker</h5>
-                            <h3 className="text-lg font-bold text-primary_color">Dashboard</h3>
-                        </div>
-                    </div>
-                    <div className="w-16 h-1 bg-gradient-to-r from-primary_color to-secondary_color rounded-full"></div>
+                {/* ISKA Logo - first element, links to homepage (extra top padding on mobile so it doesn't overlap with toggle) */}
+                <div className="mb-6 pt-14 lg:pt-0">
+                    <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
+                        <img src="/iska-dark.png" alt="ISKA Homes" className="max-w-[120px] w-24" />
+                    </Link>
+                </div>
+
+                {/* Close button - small/medium devices only */}
+                <button
+                    onClick={toggleMobileMenu}
+                    className="lg:hidden absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                    aria-label="Close navigation"
+                >
+                    <FiX className="w-5 h-5" />
+                </button>
+
+                {/* Header Section */}
+                <div className="mb-8 pb-6 border-b border-gray-100">
+                    <h5 className="text-xs font-semibold text-primary_color/70 uppercase tracking-wider mb-1">Property Seeker</h5>
+                    <h3 className="text-lg font-bold text-primary_color">Dashboard</h3>
+                    <div className="w-16 h-1 bg-gradient-to-r from-primary_color to-secondary_color rounded-full mt-2"></div>
                 </div>
                 
                 {/* Navigation Items */}
@@ -161,14 +219,12 @@ const HomeSeekerNav = ({ pathname }) => {
                 {/* Logout Button */}
                 <div className="mt-6 pt-6 border-t border-primary_color/10">
                     <button
-                        onClick={() => {
-                            setIsMobileMenuOpen(false)
-                            logout()
-                        }}
-                        className="group relative flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 bg-red-500/10 hover:bg-red-500 text-red-600 hover:text-white hover:shadow-lg hover:shadow-red-500/30"
+                        onClick={handleLogout}
+                        disabled={isLoggingOut}
+                        className={`group relative flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 bg-red-500/10 hover:bg-red-500 text-red-600 hover:text-white hover:shadow-lg hover:shadow-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
-                        <FiLogOut className="w-5 h-5" />
-                        <span className="text-sm font-medium">Logout</span>
+                        <FiLogOut className={`w-5 h-5 ${isLoggingOut ? 'animate-spin' : ''}`} />
+                        <span className="text-sm font-medium">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
                     </button>
                 </div>
             </nav>
