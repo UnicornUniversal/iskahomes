@@ -119,7 +119,15 @@ export async function sendVerificationEmail(email, name, verificationToken) {
     if (error.response) {
       console.error('SendGrid error details:', error.response.body)
     }
-    return { success: false, error: error.message }
+    return {
+      success: false,
+      error: error.message,
+      code: error?.code,
+      statusCode: error?.response?.statusCode || error?.code,
+      responseBody: error?.response?.body,
+      responseHeaders: error?.response?.headers,
+      fullError: JSON.stringify(error, Object.getOwnPropertyNames(error || {}))
+    }
   }
 }
 

@@ -41,7 +41,7 @@ export async function POST(request) {
       emailResult = await sendVerificationEmail(email, userData.fullName || 'there', verificationToken)
       
       if (!emailResult.success) {
-        console.error('❌ Failed to send verification email:', emailResult.error)
+        console.error('❌ Failed to send verification email (exact error):', emailResult)
         return NextResponse.json(
           { error: 'Failed to send verification email. Please try again or contact support.' },
           { status: 500 }
@@ -49,7 +49,16 @@ export async function POST(request) {
       }
       console.log('✅ Verification email sent successfully via SendGrid')
     } catch (emailError) {
-      console.error('❌ Error sending verification email:', emailError)
+      const sendGridExactError = {
+        message: emailError?.message,
+        code: emailError?.code,
+        statusCode: emailError?.response?.statusCode || emailError?.code,
+        responseBody: emailError?.response?.body,
+        responseHeaders: emailError?.response?.headers,
+        stack: emailError?.stack,
+        fullError: JSON.stringify(emailError, Object.getOwnPropertyNames(emailError || {}))
+      }
+      console.error('❌ Error sending verification email (exact SendGrid error):', sendGridExactError)
       return NextResponse.json(
         { error: 'Failed to send verification email. Please try again or contact support.' },
         { status: 500 }
