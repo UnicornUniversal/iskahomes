@@ -4,12 +4,100 @@ import { developerDB, agentDB, homeSeekerDB } from '@/lib/database'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { generateToken } from '@/lib/jwt'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import crypto from 'crypto'
+import { setKey, getKey, deleteKey } from '@/lib/redis'
+
+const OTP_TTL_SECONDS = 180
+const OTP_MAX_ATTEMPTS = 5
+
+function parseSettings(settings) {
+  if (!settings) return {}
+  if (typeof settings === 'object') return settings
+  if (typeof settings === 'string') {
+    try {
+      return JSON.parse(settings)
+    } catch {
+      return {}
+    }
+  }
+  return {}
+}
+
+function isTwoFactorSmsEnabled(settings) {
+  const normalized = parseSettings(settings)
+  return normalized?.two_factor?.sms === true
+}
+
+function maskPhone(phone = '') {
+  const text = String(phone)
+  if (text.length <= 4) return text
+  return `${'*'.repeat(Math.max(0, text.length - 4))}${text.slice(-4)}`
+}
+
+function generateOtpCode() {
+  return String(Math.floor(100000 + Math.random() * 900000))
+}
+
+function hashOtp(otp) {
+  return crypto.createHash('sha256').update(String(otp)).digest('hex')
+}
+
+function normalizePhoneForMnotify(phone = '') {
+  return String(phone).replace(/\D/g, '')
+}
+
+async function sendOtpViaMnotify(phone, otpCode) {
+  const apiKey = process.env.MNOTIFY_API_KEY
+  if (!apiKey) {
+    return { success: false, error: 'MNOTIFY_API_KEY must be set' }
+  }
+
+  const normalizedRecipient = normalizePhoneForMnotify(phone)
+  if (!normalizedRecipient) {
+    return { success: false, error: 'Recipient phone number is invalid' }
+  }
+
+  const senderId = process.env.MNOTIFY_SENDER_ID || 'IskaHomes'
+  const message = `Your Iska Homes sign-in OTP is ${otpCode}. It expires in 3 minutes.`
+
+  const response = await fetch(`https://api.mnotify.com/api/sms/quick?key=${encodeURIComponent(apiKey)}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      recipient: [normalizedRecipient],
+      sender: senderId,
+      message,
+      is_schedule: false,
+      schedule_date: ''
+    })
+  })
+
+  const rawBody = await response.text()
+  let data = null
+  try {
+    data = rawBody ? JSON.parse(rawBody) : null
+  } catch {
+    data = { rawBody }
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      error: data?.message || data?.error || 'mNotify request failed while sending OTP',
+      providerResponse: data
+    }
+  }
+
+  return { success: true, providerResponse: data }
+}
 
 export async function POST(request) {
   console.log('🔐 SIGNIN API: Request received');
   try {
     const body = await request.json()
-    const { email, password, organization_id: selectedOrganizationId } = body
+    const { email, password, organization_id: selectedOrganizationId, otp_ticket: otpTicket } = body
 
     console.log('🔐 SIGNIN API: Request body:', {
       email: email,
@@ -275,6 +363,95 @@ export async function POST(request) {
           }
         }
       }
+    }
+
+    // Determine if SMS 2FA is enabled and enforce OTP challenge
+    let twoFactorEnabled = false
+    let otpDestinationPhone = null
+
+    if (userType === 'team_member' && profile) {
+      if (profile.organization_type === 'developer') {
+        const { data: orgData } = await supabaseAdmin
+          .from('developers')
+          .select('settings')
+          .eq('id', profile.organization_id)
+          .maybeSingle()
+        twoFactorEnabled = isTwoFactorSmsEnabled(orgData?.settings)
+      } else if (profile.organization_type === 'agency') {
+        const { data: orgData } = await supabaseAdmin
+          .from('agencies')
+          .select('settings')
+          .eq('id', profile.organization_id)
+          .maybeSingle()
+        twoFactorEnabled = isTwoFactorSmsEnabled(orgData?.settings)
+      }
+      otpDestinationPhone = profile.phone || null
+    } else {
+      twoFactorEnabled = isTwoFactorSmsEnabled(profile?.settings)
+      otpDestinationPhone = profile?.phone || null
+    }
+
+    if (twoFactorEnabled) {
+      if (!otpDestinationPhone) {
+        return NextResponse.json(
+          { error: 'Two-factor authentication is enabled but no phone number is configured.' },
+          { status: 400 }
+        )
+      }
+
+      if (!otpTicket) {
+        const otpCode = generateOtpCode()
+        const ticket = crypto.randomUUID()
+        const otpPayload = {
+          email,
+          userId: user.id,
+          otpHash: hashOtp(otpCode),
+          attempts: 0,
+          maxAttempts: OTP_MAX_ATTEMPTS,
+          createdAt: new Date().toISOString()
+        }
+
+        const saved = await setKey(`signin:otp:${ticket}`, otpPayload, { ttl: OTP_TTL_SECONDS })
+        if (!saved) {
+          return NextResponse.json(
+            { error: 'Unable to initialize OTP verification. Please try again.' },
+            { status: 500 }
+          )
+        }
+
+        const smsResult = await sendOtpViaMnotify(otpDestinationPhone, otpCode)
+        if (!smsResult.success) {
+          await deleteKey(`signin:otp:${ticket}`)
+          console.error('❌ Failed to send signin OTP via mNotify:', smsResult)
+          return NextResponse.json(
+            { error: 'Failed to send OTP. Please try again.' },
+            { status: 500 }
+          )
+        }
+
+        return NextResponse.json({
+          success: false,
+          requiresOtp: true,
+          otpTicket: ticket,
+          expiresIn: OTP_TTL_SECONDS,
+          maskedPhone: maskPhone(otpDestinationPhone)
+        })
+      }
+
+      const verifiedOtp = await getKey(`signin:otp:verified:${otpTicket}`)
+      if (!verifiedOtp || verifiedOtp.userId !== user.id || verifiedOtp.email !== email) {
+        return NextResponse.json(
+          {
+            success: false,
+            requiresOtp: true,
+            error: 'OTP verification is required before sign in.'
+          },
+          { status: 401 }
+        )
+      }
+
+      // One-time use ticket
+      await deleteKey(`signin:otp:verified:${otpTicket}`)
     }
 
     // Generate JWT token for developers, agencies, agents, team members, and property seekers

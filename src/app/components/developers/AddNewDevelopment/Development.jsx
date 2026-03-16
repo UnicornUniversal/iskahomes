@@ -258,7 +258,8 @@ const Development = ({ isAddMode, developmentId }) => {
         }, 1500);
       } else {
         const error = await response.json();
-        toast.error(error.message || 'Failed to delete development', {
+        const errorMessage = error?.error || error?.message || 'Failed to delete development';
+        toast.error(errorMessage, {
           position: "top-center",
           autoClose: 3000,
         });
@@ -266,7 +267,7 @@ const Development = ({ isAddMode, developmentId }) => {
       }
     } catch (error) {
       console.error('Error deleting development:', error);
-      toast.error('Error deleting development', {
+      toast.error(`Error deleting development: ${error?.message || 'Please try again.'}`, {
         position: "top-center",
         autoClose: 3000,
       });
@@ -510,7 +511,7 @@ const Development = ({ isAddMode, developmentId }) => {
         // Show success toast
         toast.success(
           isAddMode 
-            ? 'Development created successfully! Redirecting...' 
+            ? 'Development added successfully! Redirecting...'
             : 'Development updated successfully!',
           {
             position: "top-center",

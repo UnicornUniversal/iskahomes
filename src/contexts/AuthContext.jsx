@@ -806,18 +806,29 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, []);
 
-  const login = async (email, password, organizationId = null) => {
+  const login = async (email, password, organizationId = null, otpTicket = null) => {
     try {
       const response = await fetch('/api/auth/signin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password, organization_id: organizationId }),
+        body: JSON.stringify({ email, password, organization_id: organizationId, otp_ticket: otpTicket }),
       });
 
       if (response.ok) {
         const data = await response.json();
+
+        if (data.requiresOtp) {
+          return {
+            success: false,
+            requiresOtp: true,
+            otpTicket: data.otpTicket,
+            expiresIn: data.expiresIn,
+            maskedPhone: data.maskedPhone,
+            error: data.error
+          };
+        }
         
         // Handle multiple organizations case
         if (data.multipleOrganizations && data.organizations) {
@@ -1069,7 +1080,7 @@ export const AuthProvider = ({ children }) => {
         }
       } else {
         const errorData = await response.json();
-        return { success: false, error: errorData.message || 'Login failed' };
+        return { success: false, error: errorData.error || errorData.message || 'Login failed' };
       }
     } catch (error) {
       return { success: false, error: 'Network error' };

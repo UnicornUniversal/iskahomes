@@ -71,7 +71,7 @@ const DevelopmentDescription = ({ formData, updateFormData, isEditMode, developm
         const salesCreated = result.salesCreated || 0
         
         toast.success(
-          `Successfully marked development as Sold Out. ${listingsUpdated} listings updated, ${salesCreated} sales records created.`,
+          `Development status updated to Sold Out. ${listingsUpdated} listings updated, ${salesCreated} sales records created.`,
           { autoClose: 5000 }
         )
       } else {

@@ -98,17 +98,19 @@ export default function AgentProfilePage() {
   }
 
   return (
-    <div className='w-full normal_div'>
-      <AgentNav agentSlug={agentSlug} />
-      <div className='w-full flex flex-col gap-[2em] p-6'>
-        <AgentHeader agent={agent} />
+    <div className='w-full '>
         <AgentProfile 
           agent={agent} 
           loading={loading} 
           isEditable={true}
           onUpdate={handleUpdate}
         />
-      </div>
+
+      {/* <AgentNav agentSlug={agentSlug} />
+      <div className='w-full flex flex-col gap-[2em] p-6'>
+        <AgentHeader agent={agent} />
+      
+      </div> */}
     </div>
   )
 }

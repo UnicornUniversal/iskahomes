@@ -50,7 +50,7 @@ const DevelopmentCard = ({ development, viewMode = 'list' }) => {
   const isList = viewMode === 'list'
 
   return (
-    <Link href={`/developer/${params.slug}/developments/${development?.slug || development?.id}`}>
+    <Link href={`/developer/${params.slug}/developments/${development?.id || development?.slug}`}>
       <div className='rounded-lg border border-primary_color text-primary_color overflow-hidden hover:shadow-lg transition-shadow duration-300 cursor-pointer h-full flex flex-col '>
         <div className={`flex ${isGrid ? 'flex-col' : 'flex-col md:flex-row'} h-full`}>
           {/* Development Image */}
