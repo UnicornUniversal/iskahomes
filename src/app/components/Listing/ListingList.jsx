@@ -44,12 +44,11 @@ const ListingList = ({ listings = [], loading = false, error = null }) => {
 
   return (
     <div className="w-full">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 items-center justify-center lg:grid-cols-3 xl:grid-cols-4 gap-5 ">
         {listings.map((listing, index) => (
-          <SecondaryListingCard 
-            key={listing.id || index} 
-            listing={listing} 
-          />
+          <div key={listing.id || index} className={index % 2 === 0 ? ' md:mt-[10em]' : ' mt-0'}>
+            <SecondaryListingCard listing={listing} />
+          </div>
         ))}
       </div>
     </div>

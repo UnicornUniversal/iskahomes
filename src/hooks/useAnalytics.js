@@ -146,6 +146,24 @@ export function useAnalytics() {
     }
   }, [user])
 
+  // Normalize frontend distinct-lead labeling metadata.
+  // Backend remains source of truth for aggregation; these fields make rule intent explicit.
+  const getDistinctLeadContext = useCallback((additionalContext = {}) => {
+    const ownerType = additionalContext.distinct_owner_type || additionalContext.distinctOwnerType || null
+    const ownerId = additionalContext.distinct_owner_id || additionalContext.distinctOwnerId || null
+    const ownerBucket = additionalContext.distinct_owner_bucket || additionalContext.distinctOwnerBucket || null
+    const parentAgencyId = additionalContext.distinct_parent_agency_id || additionalContext.distinctParentAgencyId || null
+    const agencyBucket = additionalContext.distinct_agency_bucket || additionalContext.distinctAgencyBucket || null
+
+    return {
+      distinct_owner_type: ownerType,
+      distinct_owner_id: ownerId,
+      distinct_owner_bucket: ownerBucket,
+      distinct_parent_agency_id: parentAgencyId,
+      distinct_agency_bucket: agencyBucket
+    }
+  }, [])
+
   // ============================================
   // 1. PROPERTY VIEWS
   // ============================================
@@ -314,6 +332,7 @@ export function useAnalytics() {
   const trackPhoneInteraction = useCallback(async (phoneAction, context = {}) => {
     const seekerContext = getSeekerContext(context)
     const listerContext = getListerContext(context)
+    const distinctContext = getDistinctLeadContext(context)
     
     // Send to PostHog for analytics
     captureAndQueue('lead', {
@@ -328,6 +347,7 @@ export function useAnalytics() {
       phone_number: seekerContext.phoneNumber, // Optional: store hashed or masked version
       seeker_id: seekerContext.seekerId, // Property seeker ID for logged-in users
       is_logged_in: seekerContext.is_logged_in,
+      ...distinctContext,
       timestamp: nowIso()
     })
 
@@ -350,7 +370,8 @@ export function useAnalytics() {
             is_logged_in: seekerContext.is_logged_in,
             timestamp: nowIso(),
             lead_source: seekerContext.lead_source || 'website',
-            lead_origin: 'platform'
+            lead_origin: 'platform',
+            ...distinctContext
           })
         })
       } catch (error) {
@@ -358,7 +379,7 @@ export function useAnalytics() {
         // Don't throw - analytics should not break the app
       }
     }
-  }, [posthog, getSeekerContext, getListerContext, captureAndQueue])
+  }, [posthog, getSeekerContext, getListerContext, getDistinctLeadContext, captureAndQueue])
 
   /**
    * Track when user clicks on messages/chat
@@ -367,6 +388,7 @@ export function useAnalytics() {
   const trackMessageClick = useCallback(async (context = {}) => {
     const seekerContext = getSeekerContext(context)
     const listerContext = getListerContext(context)
+    const distinctContext = getDistinctLeadContext(context)
     
     // Send to PostHog for analytics
     captureAndQueue('lead', {
@@ -380,6 +402,7 @@ export function useAnalytics() {
       message_type: seekerContext.messageType, // 'direct_message', 'whatsapp', 'email'
       seeker_id: seekerContext.seekerId, // Property seeker ID for logged-in users
       is_logged_in: seekerContext.is_logged_in,
+      ...distinctContext,
       timestamp: nowIso()
     })
 
@@ -401,7 +424,8 @@ export function useAnalytics() {
             is_logged_in: seekerContext.is_logged_in,
             timestamp: nowIso(),
             lead_source: seekerContext.lead_source || 'website',
-            lead_origin: 'platform'
+            lead_origin: 'platform',
+            ...distinctContext
           })
         })
       } catch (error) {
@@ -409,7 +433,7 @@ export function useAnalytics() {
         // Don't throw - analytics should not break the app
       }
     }
-  }, [posthog, getSeekerContext, getListerContext, captureAndQueue])
+  }, [posthog, getSeekerContext, getListerContext, getDistinctLeadContext, captureAndQueue])
 
   /**
    * Track when user clicks to book an appointment
@@ -418,6 +442,7 @@ export function useAnalytics() {
   const trackAppointmentClick = useCallback(async (context = {}) => {
     const seekerContext = getSeekerContext(context)
     const listerContext = getListerContext(context)
+    const distinctContext = getDistinctLeadContext(context)
     
     // Send to PostHog for analytics
     captureAndQueue('lead', {
@@ -431,6 +456,7 @@ export function useAnalytics() {
       appointment_type: seekerContext.appointmentType, // 'viewing', 'consultation', etc.
       seeker_id: seekerContext.seekerId, // Property seeker ID for logged-in users
       is_logged_in: seekerContext.is_logged_in,
+      ...distinctContext,
       timestamp: nowIso()
     })
 
@@ -452,7 +478,8 @@ export function useAnalytics() {
             is_logged_in: seekerContext.is_logged_in,
             timestamp: nowIso(),
             lead_source: seekerContext.lead_source || 'website',
-            lead_origin: 'platform'
+            lead_origin: 'platform',
+            ...distinctContext
           })
         })
       } catch (error) {
@@ -460,7 +487,7 @@ export function useAnalytics() {
         // Don't throw - analytics should not break the app
       }
     }
-  }, [posthog, getSeekerContext, getListerContext, captureAndQueue])
+  }, [posthog, getSeekerContext, getListerContext, getDistinctLeadContext, captureAndQueue])
 
   // ============================================
   // ADDITIONAL UTILITY EVENTS
@@ -630,6 +657,7 @@ export function useAnalytics() {
   const trackDevelopmentLead = useCallback(async (developmentId, leadType, context = {}) => {
     const listerContext = getListerContext(context)
     const seekerContext = getSeekerContext(context)
+    const distinctContext = getDistinctLeadContext(context)
     
     // Send to PostHog for analytics
     captureAndQueue('development_lead', {
@@ -640,6 +668,7 @@ export function useAnalytics() {
       contact_method: context.contactMethod,
       seeker_id: seekerContext.seekerId,
       is_logged_in: seekerContext.is_logged_in,
+      ...distinctContext,
       timestamp: nowIso()
     })
 
@@ -673,7 +702,8 @@ export function useAnalytics() {
               : undefined,
             appointment_type: leadType === 'appointment' ? (context.appointmentType || 'viewing') : undefined,
             is_logged_in: seekerContext.is_logged_in,
-            timestamp: nowIso()
+            timestamp: nowIso(),
+            ...distinctContext
           })
         })
       } catch (error) {
@@ -681,7 +711,7 @@ export function useAnalytics() {
         // Don't throw - analytics should not break the app
       }
     }
-  }, [posthog, getListerContext, getSeekerContext, captureAndQueue])
+  }, [posthog, getListerContext, getSeekerContext, getDistinctLeadContext, captureAndQueue])
 
   return {
     // Core Analytics (Main 4 categories)

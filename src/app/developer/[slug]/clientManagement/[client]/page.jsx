@@ -42,7 +42,7 @@ import {
 const ENGAGEMENT_STATUSES = ['Pending', 'Completed', 'Overdue']
 const TRANSACTION_TYPES = ['Deposit', 'Installment', 'Full payment', 'Adjustment']
 const TRANSACTION_STATUSES = ['Pending', 'Completed', 'Failed', 'Reversed']
-const SERVICE_CHARGE_STATUSES = ['Pending', 'Paid', 'Overdue']
+const SERVICE_CHARGE_STATUSES = ['Pending', 'Paid']
 
 const NAV_ITEMS = [
   { id: 'info', label: 'Info', icon: FiUser },
@@ -1096,7 +1096,7 @@ const SingleClientPage = () => {
             {(client.serviceCharges || []).length === 0 ? <p className="text-sm text-primary_color/70">No service charges yet. Add one to get started.</p> : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border-0">
-                  <thead><tr className="border-b text-left text-sm font-medium text-primary_color/70"><th className="px-3 py-2">Unit</th><th className="px-3 py-2">Period</th><th className="px-3 py-2">Amount</th><th className="px-3 py-2">Next due</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Paid at</th><th className="px-3 py-2 w-20"></th></tr></thead>
+                  <thead><tr className="border-b text-left text-sm font-medium text-primary_color/70"><th className="px-3 py-2">Unit</th><th className="px-3 py-2">Period</th><th className="px-3 py-2">Amount</th><th className="px-3 py-2">Next due</th><th className="px-3 py-2">Next due status</th><th className="px-3 py-2">Overdue days</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Paid at</th><th className="px-3 py-2 w-20"></th></tr></thead>
                   <tbody className="divide-y divide-gray-200 text-primary_color">
                     {(client.serviceCharges || []).map(sc => {
                       const u = sc.unitDetails || (client.units || []).find(x => String(x?.id) === String(sc.unitId))
@@ -1107,8 +1107,12 @@ const SingleClientPage = () => {
                       const nextDue = sc.nextDueDate ? (() => { const d = new Date(sc.nextDueDate + 'T00:00:00'); d.setHours(0, 0, 0, 0); return d })() : null
                       const today = new Date()
                       today.setHours(0, 0, 0, 0)
-                      const isOverdue = nextDue && sc.status !== 'Paid' && nextDue < today
-                      const isDueSoon = nextDue && sc.status !== 'Paid' && nextDue >= today && (() => { const week = new Date(today); week.setDate(week.getDate() + 7); return nextDue <= week })()
+                      const rawNextDueStatus = String(sc.nextDueStatus || 'not_due').toLowerCase()
+                      const closed = rawNextDueStatus === 'paid'
+                      const isOverdue = !closed && nextDue && nextDue < today
+                      const isDueSoon = !closed && nextDue && nextDue >= today && (() => { const week = new Date(today); week.setDate(week.getDate() + 7); return nextDue <= week })()
+                      const computedNextDueStatus = closed ? 'paid' : isOverdue ? 'overdue' : (nextDue && nextDue.getTime() === today.getTime() ? 'due' : 'not_due')
+                      const overdueDays = Number(sc.overdueTime || 0)
                       return (
                         <tr key={sc.id}>
                           <td className="px-3 py-2">
@@ -1131,6 +1135,20 @@ const SingleClientPage = () => {
                               </span>
                             ) : '—'}
                           </td>
+                          <td className="px-3 py-2">
+                            <span className={`px-1.5 py-0.5 rounded text-sm ${
+                              computedNextDueStatus === 'paid'
+                                ? 'bg-green-100 text-green-700'
+                                : computedNextDueStatus === 'overdue'
+                                  ? 'bg-red-100 text-red-700'
+                                  : computedNextDueStatus === 'due'
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : 'default_bg text-primary_color/80'
+                            }`}>
+                              {computedNextDueStatus.replace('_', ' ')}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">{overdueDays}</td>
                           <td className="px-3 py-2"><span className={`px-1.5 py-0.5 rounded text-sm ${sc.status === 'Paid' ? 'bg-primary_color/20 text-primary_color' : 'default_bg text-primary_color/80'}`}>{sc.status}</span></td>
                           <td className="px-3 py-2">{sc.paidAt ? formatPeriodDate(sc.paidAt) : '—'}</td>
                           <td className="px-3 py-2">

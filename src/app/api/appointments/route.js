@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { NOTIFICATION_TYPES } from '@/lib/notifications/constants'
+import { cancelNotificationByRecord, rescheduleNotificationFromRecord, scheduleNotificationFromRecord } from '@/lib/notifications/scheduler'
+import { startNotificationWorker } from '@/lib/notifications/worker'
 
 export async function POST(request) {
   try {
@@ -95,7 +98,8 @@ export async function POST(request) {
         client_email,
         client_phone,
         notes,
-        status: 'pending'
+        status: 'pending',
+        notification_status: 'pending'
       })
       .select()
       .single()
@@ -216,6 +220,18 @@ export async function POST(request) {
         account_type
       }
     }, decoded.id)
+
+    try {
+      startNotificationWorker()
+      await scheduleNotificationFromRecord({
+        notificationType: NOTIFICATION_TYPES.APPOINTMENT,
+        recordId: appointment.id,
+        userId: decoded.id,
+        userType: decoded.user_type || 'property_seeker'
+      })
+    } catch (scheduleError) {
+      console.error('Failed to schedule appointment notification:', scheduleError)
+    }
 
     return NextResponse.json({
       success: true,
@@ -423,6 +439,33 @@ export async function PUT(request) {
         status: updateData.status || null
       }
     }, appointment?.seeker_id || appointment?.account_id || 'unknown')
+
+    try {
+      const normalizedStatus = String(appointment?.status || '').toLowerCase()
+      const shouldCancel = ['completed', 'cancelled', 'rejected'].includes(normalizedStatus)
+      const shouldReschedule = !shouldCancel && (
+        Object.prototype.hasOwnProperty.call(updateData, 'appointment_date') ||
+        Object.prototype.hasOwnProperty.call(updateData, 'appointment_time') ||
+        Object.prototype.hasOwnProperty.call(updateData, 'status')
+      )
+
+      if (shouldCancel) {
+        await cancelNotificationByRecord({
+          notificationType: NOTIFICATION_TYPES.APPOINTMENT,
+          recordId: id
+        })
+      } else if (shouldReschedule && appointment?.seeker_id) {
+        startNotificationWorker()
+        await rescheduleNotificationFromRecord({
+          notificationType: NOTIFICATION_TYPES.APPOINTMENT,
+          recordId: id,
+          userId: appointment.seeker_id,
+          userType: 'property_seeker'
+        })
+      }
+    } catch (scheduleError) {
+      console.error('Failed to sync appointment notification schedule:', scheduleError)
+    }
 
     return NextResponse.json({
       success: true,

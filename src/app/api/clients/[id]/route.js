@@ -218,6 +218,8 @@ export async function GET(request, { params }) {
       periodStart: c.period_start?.slice?.(0, 10) || null,
       periodEnd: c.period_end?.slice?.(0, 10) || null,
       nextDueDate: c.next_due_date?.slice?.(0, 10) || null,
+      nextDueStatus: c.next_due_status || 'not_due',
+      overdueTime: c.overdue_time ?? 0,
       status: c.status,
       paidAt: c.paid_at?.slice?.(0, 10) || null,
       billingReference: c.billing_reference

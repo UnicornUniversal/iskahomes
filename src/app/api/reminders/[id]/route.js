@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { NOTIFICATION_TYPES } from '@/lib/notifications/constants'
+import { cancelNotificationByRecord, rescheduleNotificationFromRecord } from '@/lib/notifications/scheduler'
+import { startNotificationWorker } from '@/lib/notifications/worker'
 
 // PATCH /api/reminders/[id] - Update reminder status or details
 export async function PATCH(request, { params }) {
@@ -74,6 +77,32 @@ export async function PATCH(request, { params }) {
       }
     }, reminder.user_id || 'unknown')
 
+    const shouldCancel = reminder.status === 'completed' || reminder.status === 'cancelled'
+    const shouldReschedule = !shouldCancel && (
+      Object.prototype.hasOwnProperty.call(updateData, 'reminder_date') ||
+      Object.prototype.hasOwnProperty.call(updateData, 'reminder_time') ||
+      Object.prototype.hasOwnProperty.call(updateData, 'status')
+    )
+
+    try {
+      if (shouldCancel) {
+        await cancelNotificationByRecord({
+          notificationType: NOTIFICATION_TYPES.REMINDER,
+          recordId: id
+        })
+      } else if (shouldReschedule && reminder.user_id && reminder.user_type) {
+        startNotificationWorker()
+        await rescheduleNotificationFromRecord({
+          notificationType: NOTIFICATION_TYPES.REMINDER,
+          recordId: id,
+          userId: reminder.user_id,
+          userType: reminder.user_type
+        })
+      }
+    } catch (scheduleError) {
+      console.error('Reminder notification scheduling sync failed:', scheduleError)
+    }
+
     return NextResponse.json({
       success: true,
       data: reminder
@@ -121,6 +150,15 @@ export async function DELETE(request, { params }) {
         reminder_id: id
       }
     }, existingReminder?.user_id || 'unknown')
+
+    try {
+      await cancelNotificationByRecord({
+        notificationType: NOTIFICATION_TYPES.REMINDER,
+        recordId: id
+      })
+    } catch (scheduleError) {
+      console.error('Failed to cancel deleted reminder notification:', scheduleError)
+    }
 
     return NextResponse.json({
       success: true,

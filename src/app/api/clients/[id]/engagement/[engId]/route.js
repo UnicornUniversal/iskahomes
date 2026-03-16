@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 import { getDeveloperId } from '@/lib/developerIdHelper'
+import { NOTIFICATION_TYPES } from '@/lib/notifications/constants'
+import { cancelNotificationByRecord, rescheduleNotificationFromRecord } from '@/lib/notifications/scheduler'
+import { startNotificationWorker } from '@/lib/notifications/worker'
 
 async function verifyClientAccess(clientId, developerId) {
   const { data } = await supabaseAdmin
@@ -53,6 +56,32 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Failed to update engagement' }, { status: 500 })
     }
 
+    try {
+      const normalizedStatus = String(data?.status || '').toLowerCase()
+      const shouldCancel = ['completed', 'cancelled', 'done'].includes(normalizedStatus)
+      const shouldReschedule = !shouldCancel && (
+        Object.prototype.hasOwnProperty.call(update, 'date_time') ||
+        Object.prototype.hasOwnProperty.call(update, 'status')
+      )
+
+      if (shouldCancel) {
+        await cancelNotificationByRecord({
+          notificationType: NOTIFICATION_TYPES.ENGAGEMENT,
+          recordId: engId
+        })
+      } else if (shouldReschedule) {
+        startNotificationWorker()
+        await rescheduleNotificationFromRecord({
+          notificationType: NOTIFICATION_TYPES.ENGAGEMENT,
+          recordId: engId,
+          userId: data.created_by || userInfo.user_id,
+          userType: data.created_by_user_type || userInfo.user_type || userInfo.organization_type || 'developer'
+        })
+      }
+    } catch (scheduleError) {
+      console.error('Failed to sync engagement notification schedule:', scheduleError)
+    }
+
     return NextResponse.json({ success: true, data })
   } catch (err) {
     console.error('Engagement update error:', err)
@@ -88,6 +117,15 @@ export async function DELETE(request, { params }) {
     if (error) {
       console.error('Engagement delete error:', error)
       return NextResponse.json({ error: 'Failed to delete engagement' }, { status: 500 })
+    }
+
+    try {
+      await cancelNotificationByRecord({
+        notificationType: NOTIFICATION_TYPES.ENGAGEMENT,
+        recordId: engId
+      })
+    } catch (scheduleError) {
+      console.error('Failed to cancel engagement notification:', scheduleError)
     }
 
     return NextResponse.json({ success: true })

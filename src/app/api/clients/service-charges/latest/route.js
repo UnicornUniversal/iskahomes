@@ -54,11 +54,12 @@ export async function GET(request) {
 
     const todayStr = new Date().toISOString().slice(0, 10)
 
-    // Fetch only where next_due_date < today (overdue) - status not used
+    // Fetch only where next_due_date < today and cycle has not been closed as paid
     const { data: charges, error } = await supabaseAdmin
       .from('client_service_charges')
       .select('*')
       .in('client_id', clientIds)
+      .not('next_due_status', 'eq', 'paid')
       .lt('next_due_date', todayStr)
       .order('next_due_date', { ascending: true })
       .order('created_at', { ascending: false })
@@ -94,6 +95,8 @@ export async function GET(request) {
       periodStart: c.period_start?.slice?.(0, 10) || null,
       periodEnd: c.period_end?.slice?.(0, 10) || null,
       nextDueDate: c.next_due_date?.slice?.(0, 10) || null,
+      nextDueStatus: c.next_due_status || 'not_due',
+      overdueTime: c.overdue_time ?? 0,
       status: c.status,
       paidAt: c.paid_at?.slice?.(0, 10) || null,
       billingReference: c.billing_reference,

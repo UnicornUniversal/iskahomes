@@ -142,6 +142,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
   const [showAddLeadModal, setShowAddLeadModal] = useState(false)
   const [assignableUsers, setAssignableUsers] = useState([])
   const [loadingAssignableUsers, setLoadingAssignableUsers] = useState(false)
+  const [leadsToday, setLeadsToday] = useState(0)
 
   const offset = useMemo(() => page * pageSize, [page, pageSize])
   const authToken = listerType === 'agency' || listerType === 'agent' ? agencyToken : developerToken
@@ -294,8 +295,49 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
     }
   }
 
+  async function loadLeadsToday() {
+    if (!listerId || listingId) return
+
+    try {
+      const now = new Date()
+      const yyyy = now.getFullYear()
+      const mm = String(now.getMonth() + 1).padStart(2, '0')
+      const dd = String(now.getDate()).padStart(2, '0')
+      const today = `${yyyy}-${mm}-${dd}`
+
+      const params = new URLSearchParams({
+        lister_id: listerId,
+        lister_type: listerType,
+        page: '0',
+        page_size: '1',
+        date_from: today,
+        date_to: today
+      })
+
+      if (!isSuperAdmin && currentUserId) {
+        params.append('assigned_user', currentUserId)
+      }
+
+      const response = await fetch(`/api/leads?${params.toString()}`, {
+        headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+      })
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        // /api/leads total = grouped contactable (non-anonymous) leads
+        setLeadsToday(result.total || 0)
+      } else {
+        setLeadsToday(0)
+      }
+    } catch (err) {
+      console.error('Error loading leads today:', err)
+      setLeadsToday(0)
+    }
+  }
+
   useEffect(() => {
     loadLeads()
+    loadLeadsToday()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listerId, listerType, listingId, statusFilter, actionFilter, leadTypeFilter, dateFrom, dateTo, search, page, pageSize, isSuperAdmin, currentUserId, authToken])
 
@@ -741,6 +783,18 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
       }
     }
 
+    // Parse distinct lead breakdown JSON
+    let distinctLeadBreakdown = null
+    if (profileData.distinct_lead_breakdown) {
+      try {
+        distinctLeadBreakdown = typeof profileData.distinct_lead_breakdown === 'string'
+          ? JSON.parse(profileData.distinct_lead_breakdown)
+          : profileData.distinct_lead_breakdown
+      } catch (e) {
+        console.error('Error parsing distinct_lead_breakdown:', e)
+      }
+    }
+
     // Parse conversion_rate (can be string or number)
     let conversionRate = 0
     if (profileData.conversion_rate) {
@@ -763,16 +817,31 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
     const appointmentLeads = profileData.total_appointments ?? leadsBreakdown?.appointment?.total ?? leadsBreakdown?.appointment_leads?.total ?? 0
     const websiteLeads = leadsBreakdown?.website?.total ?? leadsBreakdown?.website_leads?.total ?? 0
 
-    // SOURCE OF TRUTH: Use actual leads count from API (total) - this matches the leads list
-    // Profile total_leads/total_unique_leads can be stale (cron-updated) and cause mismatch
+    // SOURCE OF TRUTH (per product requirement): use user profile aggregate fields directly.
+    // Do not derive Total Leads from /api/leads total for the summary cards.
     const totalUniqueLeads = profileData.total_unique_leads || 0
     const profileUniqueLeads = profileData.unique_leads || 0
-    const totalLeadsFallback = profileUniqueLeads > 0 ? profileUniqueLeads : (leadsBreakdown?.total_leads || profileData.total_leads || 0)
-    // Prefer API count when available; fallback to profile only before fetch completes
-    const finalTotalLeads = total > 0 ? total : (totalUniqueLeads > 0 ? totalUniqueLeads : totalLeadsFallback)
+    const finalTotalLeads = profileData.total_leads || 0
+
+    // DISTINCT LEADS (new metric model)
+    // This is distinct lead records by business buckets, not distinct seekers and not lead actions.
+    const totalDistinctLeads = profileData.total_distincts_leads || 0
+    const distinctProfileLeads = distinctLeadBreakdown?.profile?.total_amount || 0
+    const distinctListingsLeads = distinctLeadBreakdown?.listings?.total_amount || 0
+    const distinctDevelopmentLeads = distinctLeadBreakdown?.development?.total_amount || 0
+    const distinctAgentsLeads = distinctLeadBreakdown?.agents?.total_amount || 0
+    const totalAgentsLeads = profileData.agents_total_leads || 0
     
     return {
       total_leads: finalTotalLeads, // Aggregate across all contexts (NON-ANONYMOUS ONLY)
+      leads_today: leadsToday, // Distinct contactable leads created today
+      total_distincts_leads: totalDistinctLeads, // New canonical aggregate distinct leads metric
+      distinct_lead_breakdown: distinctLeadBreakdown,
+      distinct_profile_leads: distinctProfileLeads,
+      distinct_listings_leads: distinctListingsLeads,
+      distinct_development_leads: distinctDevelopmentLeads,
+      distinct_agents_leads: distinctAgentsLeads,
+      total_agents_leads: totalAgentsLeads,
       unique_leads: totalUniqueLeads, // Aggregate unique logged-in leads (non-anonymous)
       profile_unique_leads: profileUniqueLeads, // Profile-specific only (non-anonymous, for reference)
       phone_leads: phoneLeads,
@@ -797,29 +866,34 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
       {!listingId && totalLeadsData && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:grid-rows-2 gap-6 mb-8">
           <DataCard
-            title="Total Leads"
-            value={(totalLeadsData.total_leads || 0).toLocaleString()}
+            title="Leads Today"
+            value={(totalLeadsData.leads_today || 0).toLocaleString()}
             icon={BarChart3}
+          />
+          <DataCard
+            title="Property Seeker Leads"
+            value={(totalLeadsData.unique_leads || 0).toLocaleString()}
+            icon={FiUser}
+          />
+          <DataCard
+            title="Distinct Leads"
+            value={(totalLeadsData.total_distincts_leads || 0).toLocaleString()}
+            icon={MessageCircle}
+          />
+          <DataCard
+            title={listerType === 'agency' ? 'Total Agents Leads' : 'Listing Leads'}
+            value={(listerType === 'agency' ? totalLeadsData.total_agents_leads : totalLeadsData.distinct_listings_leads || 0).toLocaleString()}
+            icon={Phone}
+          />
+          <DataCard
+            title="Profile Leads"
+            value={(totalLeadsData.distinct_profile_leads || 0).toLocaleString()}
+            icon={Calendar}
           />
           <DataCard
             title="Conversion Rate"
             value={`${(totalLeadsData.conversion_rate || 0).toFixed(2)}%`}
             icon={TrendingUp}
-          />
-          <DataCard
-            title="Phone Leads"
-            value={(totalLeadsData.phone_leads || 0).toLocaleString()}
-            icon={Phone}
-          />
-          <DataCard
-            title="Message Leads"
-            value={(totalLeadsData.message_leads || 0).toLocaleString()}
-            icon={MessageCircle}
-          />
-          <DataCard
-            title="Appointments"
-            value={(totalLeadsData.appointment_leads || 0).toLocaleString()}
-            icon={Calendar}
           />
         </div>
       )}

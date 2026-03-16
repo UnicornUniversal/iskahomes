@@ -63,7 +63,9 @@ export async function GET(request) {
     if (statusFilter) query = query.eq('status', statusFilter)
     if (filter === 'overdue') {
       const todayStr = new Date().toISOString().slice(0, 10)
-      query = query.lt('next_due_date', todayStr)
+      query = query
+        .not('next_due_status', 'eq', 'paid')
+        .lt('next_due_date', todayStr)
     }
 
     const { data: charges, error } = await query
@@ -102,8 +104,15 @@ export async function GET(request) {
 
     const data = (charges || []).map((c) => {
       const dueDate = parseDate(c.next_due_date || c.period_end)
-      const isOverdue = dueDate && dueDate < today
-      const isDueSoon = dueDate && dueDate >= today && dueDate <= oneWeekFromNow
+      const normalizedNextDueStatus = String(c.next_due_status || 'not_due').toLowerCase()
+      const isClosed = normalizedNextDueStatus === 'paid'
+      const isOverdue = !isClosed && dueDate && dueDate < today
+      const isDueSoon = !isClosed && dueDate && dueDate >= today && dueDate <= oneWeekFromNow
+      const computedNextDueStatus = isClosed
+        ? 'paid'
+        : isOverdue
+          ? 'overdue'
+          : (dueDate && dueDate.getTime() === today.getTime() ? 'due' : 'not_due')
 
       return {
         id: c.id,
@@ -115,6 +124,8 @@ export async function GET(request) {
         periodStart: c.period_start?.slice?.(0, 10) || null,
         periodEnd: c.period_end?.slice?.(0, 10) || null,
         nextDueDate: c.next_due_date?.slice?.(0, 10) || null,
+        nextDueStatus: computedNextDueStatus,
+        overdueTime: c.overdue_time ?? 0,
         status: c.status,
         paidAt: c.paid_at?.slice?.(0, 10) || null,
         billingReference: c.billing_reference,

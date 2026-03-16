@@ -2,6 +2,57 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 
+const ALLOWED_API_LIMIT_DATA_TYPES = ['number', 'text']
+
+function normalizeApiLimits(apiLimitsInput) {
+  if (!apiLimitsInput) return {}
+
+  const result = {}
+
+  // Preferred format: object map keyed by limit name
+  if (typeof apiLimitsInput === 'object' && !Array.isArray(apiLimitsInput)) {
+    for (const [rawName, rawConfig] of Object.entries(apiLimitsInput)) {
+      const name = String(rawName || '').trim()
+      if (!name || typeof rawConfig !== 'object' || rawConfig === null) continue
+
+      const dataType = String(rawConfig.data_type || '').toLowerCase().trim()
+      if (!ALLOWED_API_LIMIT_DATA_TYPES.includes(dataType)) continue
+
+      if (dataType === 'number') {
+        const parsedNumber = Number(rawConfig.value)
+        if (Number.isFinite(parsedNumber)) {
+          result[name] = { data_type: 'number', value: parsedNumber }
+        }
+      } else {
+        result[name] = { data_type: 'text', value: String(rawConfig.value ?? '') }
+      }
+    }
+    return result
+  }
+
+  // Backward-compatible format: array of {name, data_type, value}
+  if (Array.isArray(apiLimitsInput)) {
+    for (const item of apiLimitsInput) {
+      if (!item || typeof item !== 'object') continue
+      const name = String(item.name || '').trim()
+      const dataType = String(item.data_type || '').toLowerCase().trim()
+
+      if (!name || !ALLOWED_API_LIMIT_DATA_TYPES.includes(dataType)) continue
+
+      if (dataType === 'number') {
+        const parsedNumber = Number(item.value)
+        if (Number.isFinite(parsedNumber)) {
+          result[name] = { data_type: 'number', value: parsedNumber }
+        }
+      } else {
+        result[name] = { data_type: 'text', value: String(item.value ?? '') }
+      }
+    }
+  }
+
+  return result
+}
+
 // GET - Fetch a single package
 export async function GET(request, { params }) {
   try {
@@ -87,6 +138,7 @@ export async function PUT(request, { params }) {
       name,
       description,
       features,
+      api_limits,
       local_currency_price,
       international_currency_price,
       duration,
@@ -163,6 +215,7 @@ export async function PUT(request, { params }) {
         feature_value: ''
       }
     }).filter(f => f.feature_name) // Remove empty features
+    const normalizedApiLimits = normalizeApiLimits(api_limits)
 
     // Calculate total amounts: ideal_duration * monthly_price
     const parsedLocalPrice = parseFloat(local_currency_price)
@@ -182,6 +235,7 @@ export async function PUT(request, { params }) {
       name,
       description: description || null,
       features: featuresArray,
+      api_limits: normalizedApiLimits,
       local_currency: 'GHS', // Non-negotiable
       local_currency_price: parsedLocalPrice,
       international_currency: 'USD', // Non-negotiable

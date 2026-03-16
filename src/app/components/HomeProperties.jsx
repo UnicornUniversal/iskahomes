@@ -1,14 +1,68 @@
 "use client"
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import ListingList from './Listing/ListingList'
 import Filter from './Filters/Filter'
 import LoadingSpinner from './ui/LoadingSpinner'
+import { motion, useScroll, useTransform } from 'framer-motion'
+import { Playfair_Display } from 'next/font/google'
 // import { listings as dummyListings } from './Data/StaticData'
+
+const playfairDisplay = Playfair_Display({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700']
+})
+
+const headingElementVariants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: (index) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.55, delay: index * 0.08, ease: 'easeOut' }
+  })
+}
+
+const heroHeadingElements = [
+  { id: 'word-1', type: 'word', content: 'Explore' },
+  { id: 'word-2', type: 'word', content: 'our' },
+  { id: 'word-3', type: 'word', content: 'select' },
+  {
+    id: 'image-1',
+    type: 'image',
+    variant: 'inline',
+    src: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=400',
+    alt: 'modern building facade'
+  },
+  { id: 'word-4', type: 'word', content: 'properties,' },
+  { id: 'break-1', type: 'break' },
+  { id: 'word-5', type: 'word', content: 'offering' },
+  { id: 'word-6', type: 'word', content: 'premium' },
+  { id: 'word-7', type: 'word', content: 'standards' },
+  { id: 'word-8', type: 'word', content: 'of' },
+  { id: 'word-9', type: 'word', content: 'comfort' },
+  { id: 'word-10', type: 'word', content: '&' },
+  { id: 'break-2', type: 'break' },
+  { id: 'word-11', type: 'word', content: 'quality.' },
+  { id: 'word-12', type: 'word', content: 'An' },
+  { id: 'word-13', type: 'word', content: 'ideal' },
+  { id: 'word-14', type: 'word', content: 'place' },
+  { id: 'word-15', type: 'word', content: 'to' },
+  { id: 'word-16', type: 'word', content: 'call' },
+  { id: 'word-17', type: 'word', content: 'your' },
+  { id: 'word-18', type: 'word', content: 'own' },
+  {
+    id: 'image-2',
+    type: 'image',
+    variant: 'block',
+    src: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=600',
+    alt: 'property'
+  }
+]
 
 const HomeProperties = () => {
   const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const listingSectionRef = useRef(null)
   const [filters, setFilters] = useState({
     purpose: '',
     sector: '',
@@ -61,29 +115,97 @@ const HomeProperties = () => {
     fetchListings()
   }, []); // Remove filters dependency since we're not using them
 
+  const { scrollYProgress } = useScroll({
+    target: listingSectionRef,
+    offset: ['start end', 'start start']
+  })
+
+  // Fade starts immediately when listing enters viewport.
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.18], [1, 0.05])
+
   return (
-    <div className='w-full h-full'>
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex  items-start justify-start w-full">
-          <h2 className="font text-[1.5em] md:text-[2em] max-w-4xl w-full text-left text-primary_color">
-          Discover our carefully selected properties, each offering comfort, quality, and a place you’ll be proud to call home.
-          </h2>
-          {/* <p className="text-sm text-gray-500">
-            Discover our main properties and find your dream home
-          </p> */}
-        </div>
+    <div className='w-full h-full relative'>
+      <div className="relative">
+          <motion.div
+            className="sticky top-[100px] z-0 flex flex-col items-center justify-center max-h-[1200px] w-full h-[70vh] min-h-[600px] px-4 transition-opacity duration-300 md:mb-[10em]"
+            style={{ opacity: heroOpacity }}
+          >
+            <motion.h2
+              className={`${playfairDisplay.className} text-center max-w-5xl text-[2em] md:text-[3.2em] w-full text-primary_color leading-[1.2]`}
+            >
+              {heroHeadingElements.map((element, index) => {
+                if (element.type === 'break') {
+                  return <br key={element.id} className="hidden md:block" />
+                }
+
+                if (element.type === 'image') {
+                  const imageClassName = element.variant === 'inline'
+                    ? 'inline-block mx-3 align-middle overflow-hidden rounded-xl w-32 h-16 md:w-44 md:h-24'
+                    : 'block mt-8 mb-10 mx-auto overflow-hidden rounded-xl w-32 h-16 md:w-44 md:h-24'
+
+                  return (
+                    <motion.span
+                      key={element.id}
+                      custom={index}
+                      variants={headingElementVariants}
+                      initial="hidden"
+                      whileInView="visible"
+                      viewport={{ once: true, amount: 0.3 }}
+                      className={imageClassName}
+                    >
+                      <img src={element.src} alt={element.alt} className="object-cover w-full h-full" />
+                    </motion.span>
+                  )
+                }
+
+                return (
+                  <motion.span
+                    key={element.id}
+                    custom={index}
+                    variants={headingElementVariants}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, amount: 0.3 }}
+                    className="inline-block mr-2"
+                  >
+                    {element.content}
+                  </motion.span>
+                )
+              })}
+            </motion.h2>
+
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center">
+              <button className="px-6 py-3 rounded-[30px] border border-primary_color text-primary_color hover:bg-primary_color hover:text-white transition flex items-center gap-3">
+                Sign Up to List Properties 
+                <svg className="w-5 h-5 font-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
+                  <circle cx="12" cy="12" r="10" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l4-4-4-4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h7" />
+                </svg>
+              </button>
+              <button className="px-6 py-3 rounded-[30px] border border-primary_color text-primary_color hover:bg-primary_color hover:text-white transition flex items-center gap-3">
+                Explore Properties
+                <svg className="w-5 h-5 font-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
+                  <circle cx="12" cy="12" r="10" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l4-4-4-4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h7" />
+                </svg>
+              </button>
+            </div>
+          </motion.div>
+          {/* Sticky Filter */}
+          {/* <div className="mb-6 sticky top-20 z-10 flex flex-col items-start">
+            <div className="rounded-md p-4 inline-block">
+              <Filter filters={filters} setFilters={setFilters} totalProperties={listings.length} />
+            </div>
+          </div> */}
+
+          {/* Properties List */}
+          <div ref={listingSectionRef} className="relative z-20 mt-[8vh]">
+            <ListingList listings={listings} loading={loading} error={error} />
+          </div>
       </div>
-
-      {/* Sticky Filter */}
-      {/* <div className="mb-6 sticky top-20 z-10 flex flex-col items-start">
-        <div className="rounded-md p-4 inline-block">
-          <Filter filters={filters} setFilters={setFilters} totalProperties={listings.length} />
-        </div>
-      </div> */}
-
-      {/* Properties List */}
-      <ListingList listings={listings} loading={loading} error={error} />
+   
     </div>
   )
 }

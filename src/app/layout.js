@@ -8,8 +8,7 @@ import { PostHogProvider } from "./providers";
 import DisableNumberInputScroll from "./components/DisableNumberInputScroll";
 import ToastProvider from "./components/ToastProvider";
 
-import Nav from "./components/Nav";
-import Footer from "./components/Footer";
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

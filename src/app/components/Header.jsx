@@ -293,14 +293,18 @@ const Header = () => {
             className={`${playfairDisplay.className} text-primary_color text-[2.4rem] leading-[1.18] sm:text-[3rem] md:text-[3.6rem] lg:text-[4.8rem]`}
             variants={titleVariants}
           >
-            <motion.h1
-                className={`${playfairDisplay.className} text-primary_color text-[2.4rem] leading-[1.18] sm:text-[3rem] md:text-[3.6rem] lg:text-[5rem]`}
-                variants={titleVariants}
-            >Your Realty Quest</motion.h1>
-            <motion.h1 
+            <motion.span
+              className="block"
               variants={titleVariants}
-            className={`${playfairDisplay.className} text-primary_color text-[2.4rem] ml-[1em] leading-[1.18] sm:text-[3rem] md:text-[3.6rem] lg:text-[5.5rem]`}
-            >Concludes Here</motion.h1>
+            >
+              Your Realty Quest
+            </motion.span>
+            <motion.span
+              variants={titleVariants}
+              className="ml-[1em] block"
+            >
+              Concludes Here
+            </motion.span>
           
            
           </motion.h1>

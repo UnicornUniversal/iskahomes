@@ -3,6 +3,10 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 import { getDeveloperId } from '@/lib/developerIdHelper'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { NOTIFICATION_TYPES } from '@/lib/notifications/constants'
+import { scheduleNotificationFromRecord } from '@/lib/notifications/scheduler'
+import { startNotificationWorker } from '@/lib/notifications/worker'
+import { cancelNotificationJob } from '@/lib/notifications/queue'
 
 async function verifyClientAccess(clientId, developerId) {
   const { data } = await supabaseAdmin
@@ -51,6 +55,8 @@ export async function GET(request, { params }) {
       periodStart: c.period_start?.slice?.(0, 10) || null,
       periodEnd: c.period_end?.slice?.(0, 10) || null,
       nextDueDate: c.next_due_date?.slice?.(0, 10) || null,
+      nextDueStatus: c.next_due_status || 'not_due',
+      overdueTime: c.overdue_time ?? 0,
       status: c.status,
       paidAt: c.paid_at?.slice?.(0, 10) || null,
       billingReference: c.billing_reference,
@@ -118,6 +124,16 @@ export async function POST(request, { params }) {
       return d.toISOString().slice(0, 10)
     })() : null
 
+    // Get previous cycle for same client + unit.
+    const { data: previousEntry } = await supabaseAdmin
+      .from('client_service_charges')
+      .select('id, next_due_date')
+      .eq('client_id', clientId)
+      .eq('unit_id', unitId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
     const insert = {
       client_id: clientId,
       unit_id: unitId,
@@ -127,7 +143,12 @@ export async function POST(request, { params }) {
       next_due_date: nextDueDate,
       status: chargeStatus || 'Pending',
       paid_at: paidAt || null,
-      billing_reference: billingReference || null
+      billing_reference: billingReference || null,
+      next_due_status: 'not_due',
+      overdue_time: 0,
+      created_by_user_id: userInfo.user_id,
+      created_by_user_type: userInfo.user_type || userInfo.organization_type || 'developer',
+      notification_status: 'pending'
     }
 
     const { data, error } = await supabaseAdmin
@@ -141,6 +162,32 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Failed to create service charge' }, { status: 500 })
     }
 
+    if (previousEntry?.id && previousEntry.id !== data.id) {
+      const effectiveDate = paidAt || periodStart || new Date().toISOString().slice(0, 10)
+      let overdueDays = 0
+
+      if (previousEntry.next_due_date) {
+        const due = new Date(`${previousEntry.next_due_date}T00:00:00`)
+        const paid = new Date(`${effectiveDate}T00:00:00`)
+        const diffMs = paid.getTime() - due.getTime()
+        overdueDays = diffMs > 0 ? Math.floor(diffMs / (1000 * 60 * 60 * 24)) : 0
+      }
+
+      await supabaseAdmin
+        .from('client_service_charges')
+        .update({
+          next_due_status: 'paid',
+          overdue_time: overdueDays
+        })
+        .eq('id', previousEntry.id)
+
+      try {
+        await cancelNotificationJob(NOTIFICATION_TYPES.SERVICE_CHARGE, previousEntry.id)
+      } catch (cancelError) {
+        console.error('Failed to cancel previous service charge notification job:', cancelError)
+      }
+    }
+
     const out = {
       id: data.id,
       unitId: data.unit_id,
@@ -149,6 +196,8 @@ export async function POST(request, { params }) {
       periodStart: data.period_start?.slice?.(0, 10) || null,
       periodEnd: data.period_end?.slice?.(0, 10) || null,
       nextDueDate: data.next_due_date?.slice?.(0, 10) || null,
+      nextDueStatus: data.next_due_status || 'not_due',
+      overdueTime: data.overdue_time ?? 0,
       status: data.status,
       paidAt: data.paid_at?.slice?.(0, 10) || null,
       billingReference: data.billing_reference,
@@ -167,6 +216,18 @@ export async function POST(request, { params }) {
       api_route: '/api/clients/[id]/service-charges',
       metadata: { client_id: clientId, service_charge_id: data?.id, unit_id: data?.unit_id || null }
     }, userInfo.user_id)
+
+    try {
+      startNotificationWorker()
+      await scheduleNotificationFromRecord({
+        notificationType: NOTIFICATION_TYPES.SERVICE_CHARGE,
+        recordId: data.id,
+        userId: userInfo.user_id,
+        userType: userInfo.user_type || userInfo.organization_type || 'developer'
+      })
+    } catch (scheduleError) {
+      console.error('Failed to schedule service charge notification:', scheduleError)
+    }
 
     return NextResponse.json({ success: true, data: out })
   } catch (err) {

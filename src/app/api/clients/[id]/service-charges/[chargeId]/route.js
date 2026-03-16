@@ -3,6 +3,9 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 import { getDeveloperId } from '@/lib/developerIdHelper'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { NOTIFICATION_TYPES } from '@/lib/notifications/constants'
+import { cancelNotificationByRecord, rescheduleNotificationFromRecord } from '@/lib/notifications/scheduler'
+import { startNotificationWorker } from '@/lib/notifications/worker'
 
 async function verifyClientAccess(clientId, developerId) {
   const { data } = await supabaseAdmin
@@ -35,7 +38,7 @@ export async function PUT(request, { params }) {
 
     const body = await request.json()
     console.log('[PUT service-charges] body:', JSON.stringify(body))
-    const { unitId, amount, periodStart, periodEnd, status: chargeStatus, paidAt, billingReference } = body
+    const { unitId, amount, periodStart, periodEnd, status: chargeStatus, paidAt, billingReference, nextDueStatus, overdueTime } = body
 
     const update = {}
     if (unitId !== undefined) update.unit_id = unitId
@@ -52,6 +55,8 @@ export async function PUT(request, { params }) {
     if (chargeStatus !== undefined) update.status = chargeStatus
     if (paidAt !== undefined) update.paid_at = paidAt || null
     if (billingReference !== undefined) update.billing_reference = billingReference || null
+    if (nextDueStatus !== undefined) update.next_due_status = nextDueStatus
+    if (overdueTime !== undefined) update.overdue_time = Number(overdueTime) || 0
 
     const { data, error } = await supabaseAdmin
       .from('client_service_charges')
@@ -74,6 +79,8 @@ export async function PUT(request, { params }) {
       periodStart: data.period_start?.slice?.(0, 10) || null,
       periodEnd: data.period_end?.slice?.(0, 10) || null,
       nextDueDate: data.next_due_date?.slice?.(0, 10) || null,
+      nextDueStatus: data.next_due_status || 'not_due',
+      overdueTime: data.overdue_time ?? 0,
       status: data.status,
       paidAt: data.paid_at?.slice?.(0, 10) || null,
       billingReference: data.billing_reference
@@ -91,6 +98,33 @@ export async function PUT(request, { params }) {
       api_route: '/api/clients/[id]/service-charges/[chargeId]',
       metadata: { client_id: clientId, service_charge_id: chargeId, status: data?.status || null }
     }, userInfo.user_id)
+
+    try {
+      const normalizedNextDueStatus = String(data?.next_due_status || '').toLowerCase()
+      const shouldCancel = normalizedNextDueStatus === 'paid'
+      const shouldReschedule = !shouldCancel && (
+        Object.prototype.hasOwnProperty.call(update, 'period_end') ||
+        Object.prototype.hasOwnProperty.call(update, 'next_due_date') ||
+        Object.prototype.hasOwnProperty.call(update, 'next_due_status')
+      )
+
+      if (shouldCancel) {
+        await cancelNotificationByRecord({
+          notificationType: NOTIFICATION_TYPES.SERVICE_CHARGE,
+          recordId: chargeId
+        })
+      } else if (shouldReschedule) {
+        startNotificationWorker()
+        await rescheduleNotificationFromRecord({
+          notificationType: NOTIFICATION_TYPES.SERVICE_CHARGE,
+          recordId: chargeId,
+          userId: data.created_by_user_id || userInfo.user_id,
+          userType: data.created_by_user_type || userInfo.user_type || userInfo.organization_type || 'developer'
+        })
+      }
+    } catch (scheduleError) {
+      console.error('Failed to sync service charge notification schedule:', scheduleError)
+    }
 
     return NextResponse.json({ success: true, data: out })
   } catch (err) {
@@ -137,6 +171,15 @@ export async function DELETE(request, { params }) {
       api_route: '/api/clients/[id]/service-charges/[chargeId]',
       metadata: { client_id: clientId, service_charge_id: chargeId }
     }, userInfo.user_id)
+
+    try {
+      await cancelNotificationByRecord({
+        notificationType: NOTIFICATION_TYPES.SERVICE_CHARGE,
+        recordId: chargeId
+      })
+    } catch (scheduleError) {
+      console.error('Failed to cancel service charge notification:', scheduleError)
+    }
 
     return NextResponse.json({ success: true })
   } catch (err) {

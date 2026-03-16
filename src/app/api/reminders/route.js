@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { NOTIFICATION_TYPES } from '@/lib/notifications/constants'
+import { scheduleNotificationFromRecord } from '@/lib/notifications/scheduler'
+import { startNotificationWorker } from '@/lib/notifications/worker'
 
 // GET /api/reminders - Fetch reminders for a grouped lead or user
 export async function GET(request) {
@@ -244,7 +247,8 @@ export async function POST(request) {
         priority: priority || 'normal',
         status: 'incomplete',
         user_id: user_id || null,
-        user_type: user_type || null
+        user_type: user_type || null,
+        notification_status: 'pending'
       })
       .select()
       .single()
@@ -270,6 +274,20 @@ export async function POST(request) {
         grouped_lead_key: grouped_lead_key
       }
     }, auditUserId)
+
+    if (user_id && user_type) {
+      try {
+        startNotificationWorker()
+        await scheduleNotificationFromRecord({
+          notificationType: NOTIFICATION_TYPES.REMINDER,
+          recordId: reminder.id,
+          userId: user_id,
+          userType: user_type
+        })
+      } catch (scheduleError) {
+        console.error('Failed to schedule reminder notification:', scheduleError)
+      }
+    }
 
     return NextResponse.json({
       success: true,

@@ -172,8 +172,53 @@ const LeadContactForm = ({
   }
   const contactInfo = getContactInfo()
 
+  // Distinct lead rule mapping used across lead actions.
+  // This does not calculate totals on frontend; it labels each action so backend can aggregate correctly:
+  // - developer: profile | listings | development
+  // - agent: profile | listings
+  // - agency rollup: profile | listings | agents
+  const getDistinctLeadRuleContext = () => {
+    const ownerType = getAccountType() // developer | agent | agency
+    const ownerId = getAccountId()
+
+    const resolvedAgencyId =
+      agency?.agency_id ||
+      agency?.id ||
+      agent?.agency_id ||
+      profile?.agency_id ||
+      listing?.agency_id ||
+      null
+
+    let ownerBucket = 'listings'
+    if (ownerType === 'developer') {
+      if (contextType === 'profile') ownerBucket = 'profile'
+      else if (contextType === 'development') ownerBucket = 'development'
+      else ownerBucket = 'listings'
+    } else if (ownerType === 'agent') {
+      ownerBucket = contextType === 'profile' ? 'profile' : 'listings'
+    } else if (ownerType === 'agency') {
+      ownerBucket = contextType === 'profile' ? 'profile' : 'listings'
+    }
+
+    let agencyBucket = null
+    if (ownerType === 'agency') {
+      agencyBucket = contextType === 'profile' ? 'profile' : 'listings'
+    } else if (ownerType === 'agent' && resolvedAgencyId) {
+      agencyBucket = contextType === 'profile' ? 'agents' : 'listings'
+    }
+
+    return {
+      distinct_owner_type: ownerType,
+      distinct_owner_id: ownerId,
+      distinct_owner_bucket: ownerBucket,
+      distinct_parent_agency_id: resolvedAgencyId,
+      distinct_agency_bucket: agencyBucket
+    }
+  }
+
   // Build analytics context so lister_id/lister_type are correct for agents, agencies, developers
   const getAnalyticsContext = (extra = {}) => ({
+    ...getDistinctLeadRuleContext(),
     contextType: contextType,
     context_type: contextType,
     listingId: contextType === 'listing' ? (propertyId || listing?.id) : null,

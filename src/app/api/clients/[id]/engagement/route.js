@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 import { getDeveloperId } from '@/lib/developerIdHelper'
+import { NOTIFICATION_TYPES } from '@/lib/notifications/constants'
+import { scheduleNotificationFromRecord } from '@/lib/notifications/scheduler'
+import { startNotificationWorker } from '@/lib/notifications/worker'
 
 async function verifyClientAccess(clientId, developerId) {
   const { data } = await supabaseAdmin
@@ -95,7 +98,9 @@ export async function POST(request, { params }) {
       date_time: dateTime,
       is_reminder: !!isReminder,
       status: engStatus || null,
-      created_by: userInfo.user_id
+      created_by: userInfo.user_id,
+      created_by_user_type: userInfo.user_type || userInfo.organization_type || 'developer',
+      notification_status: 'pending'
     }
 
     const { data, error } = await supabaseAdmin
@@ -107,6 +112,18 @@ export async function POST(request, { params }) {
     if (error) {
       console.error('Engagement create error:', error)
       return NextResponse.json({ error: 'Failed to create engagement' }, { status: 500 })
+    }
+
+    try {
+      startNotificationWorker()
+      await scheduleNotificationFromRecord({
+        notificationType: NOTIFICATION_TYPES.ENGAGEMENT,
+        recordId: data.id,
+        userId: userInfo.user_id,
+        userType: userInfo.user_type || userInfo.organization_type || 'developer'
+      })
+    } catch (scheduleError) {
+      console.error('Failed to schedule engagement notification:', scheduleError)
     }
 
     return NextResponse.json({ success: true, data: toCamel(data) })
