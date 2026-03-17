@@ -22,17 +22,40 @@ function createBullConnection() {
 
 export function startNotificationWorker() {
   if (globalForNotifications.notificationWorker) {
+    console.log('[notifications][worker] reusing existing worker')
     return globalForNotifications.notificationWorker
   }
 
+  console.log('[notifications][worker] starting worker', {
+    queueName: NOTIFICATION_QUEUE_NAME,
+    hasRedisUrl: !!process.env.REDIS_URL,
+    redisHost: process.env.REDIS_HOST || null,
+    redisPort: process.env.REDIS_PORT || null
+  })
+
   const worker = new Worker(
     NOTIFICATION_QUEUE_NAME,
-    async (job) => dispatchNotificationJob(job.data),
+    async (job) => {
+      console.log('[notifications][worker] processing job', {
+        id: job.id,
+        name: job.name,
+        data: job.data
+      })
+      return dispatchNotificationJob(job.data)
+    },
     {
       connection: createBullConnection(),
       concurrency: 5
     }
   )
+
+  worker.on('ready', () => {
+    console.log('[notifications][worker] ready')
+  })
+
+  worker.on('error', (error) => {
+    console.error('[notifications][worker] worker error', error?.message || error)
+  })
 
   worker.on('failed', (job, error) => {
     console.error(`[notification-worker] job failed: ${job?.id}`, error?.message || error)

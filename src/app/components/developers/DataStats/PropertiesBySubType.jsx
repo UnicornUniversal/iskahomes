@@ -23,18 +23,20 @@ const pieColors = [
   '#9966FF', // Light Purple
 ]
 
-const PropertiesBySubType = () => {
+const PropertiesBySubType = ({ statsData = null, totalUnits = null }) => {
   const { user } = useAuth()
   
   // Get data from user profile
   const subtypes = useMemo(() => {
+    if (Array.isArray(statsData) && statsData.length > 0) return statsData
     if (!user?.profile?.property_subtypes_stats) return []
     return user.profile.property_subtypes_stats
-  }, [user?.profile?.property_subtypes_stats])
+  }, [statsData, user?.profile?.property_subtypes_stats])
   
   const total = useMemo(() => {
+    if (typeof totalUnits === 'number') return totalUnits
     return user?.profile?.total_units || 0
-  }, [user?.profile?.total_units])
+  }, [totalUnits, user?.profile?.total_units])
 
   if (!subtypes || subtypes.length === 0) {
     return (
@@ -106,7 +108,7 @@ const PropertiesBySubType = () => {
         {/* Summary/Legend */}
         <div className="mt-8 w-full grid grid-cols-1 sm:grid-cols-2 gap-4">
           {pieLabels.map((label, i) => (
-            <div key={label} className="flex items-center gap-3">
+            <div key={`${label}-${i}`} className="flex items-center gap-3">
               <span
                 className="inline-block rounded-full"
                 style={{ width: 12, height: 12, background: pieColors[i], boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}

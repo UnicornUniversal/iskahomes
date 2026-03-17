@@ -70,10 +70,20 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    // Fetch all packages
+    // Fetch all packages sorted in DB:
+    // 1) developers first
+    // 2) highest local_currency_price first
+    // SQL equivalent:
+    // SELECT * FROM subscriptions_package
+    // ORDER BY
+    //   CASE WHEN user_type = 'developers' THEN 0 ELSE 1 END ASC,
+    //   local_currency_price DESC,
+    //   created_at DESC;
     const { data: packages, error } = await supabaseAdmin
       .from('subscriptions_package')
       .select('*')
+      .order('user_type', { ascending: false, nullsFirst: false })
+      .order('local_currency_price', { ascending: false })
       .order('created_at', { ascending: false })
 
     if (error) {

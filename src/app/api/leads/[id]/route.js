@@ -3,6 +3,9 @@ import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { captureAuditEvent } from '@/lib/auditLogger'
 import { verifyToken } from '@/lib/jwt'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
+import { NOTIFICATION_TYPES } from '@/lib/notifications/constants'
+import { cancelNotificationByRecord, rescheduleNotificationFromRecord, scheduleNotificationFromRecord } from '@/lib/notifications/scheduler'
+import { startNotificationWorker } from '@/lib/notifications/worker'
 
 export async function GET(request, { params }) {
   try {
@@ -167,6 +170,10 @@ export async function PATCH(request, { params }) {
     let remindersResult = { created: [], updated: [], deleted: [] }
 
     if (reminders !== undefined && Array.isArray(reminders)) {
+      const ensureWorker = () => {
+        startNotificationWorker()
+      }
+
       // Get current reminders for this grouped lead
       const { data: currentReminders, error: fetchRemindersError } = await supabaseAdmin
         .from('reminders')
@@ -186,6 +193,14 @@ export async function PATCH(request, { params }) {
             .eq('id', reminder.id)
           if (!deleteError) {
             remindersResult.deleted.push(reminder.id)
+            try {
+              await cancelNotificationByRecord({
+                notificationType: NOTIFICATION_TYPES.REMINDER,
+                recordId: reminder.id
+              })
+            } catch (scheduleError) {
+              console.error('Failed to cancel deleted reminder notification:', scheduleError)
+            }
           }
         }
 
@@ -199,7 +214,9 @@ export async function PATCH(request, { params }) {
             const updateData = {
               ...updateFields,
               ...(user_id && { user_id }),
-              ...(user_type && { user_type })
+              ...(user_type && { user_type }),
+              notification_status: 'pending',
+              notification_error: null
             }
             const { data: updated, error: updateReminderError } = await supabaseAdmin
               .from('reminders')
@@ -209,6 +226,33 @@ export async function PATCH(request, { params }) {
               .single()
             if (!updateReminderError && updated) {
               remindersResult.updated.push(updated)
+
+              const shouldCancel = updated.status === 'completed' || updated.status === 'cancelled'
+              const reminderUserId = updated.user_id || user_id || null
+              const reminderUserType = updated.user_type || user_type || null
+
+              if (shouldCancel) {
+                try {
+                  await cancelNotificationByRecord({
+                    notificationType: NOTIFICATION_TYPES.REMINDER,
+                    recordId: updated.id
+                  })
+                } catch (scheduleError) {
+                  console.error('Failed to cancel updated reminder notification:', scheduleError)
+                }
+              } else if (reminderUserId && reminderUserType) {
+                try {
+                  ensureWorker()
+                  await rescheduleNotificationFromRecord({
+                    notificationType: NOTIFICATION_TYPES.REMINDER,
+                    recordId: updated.id,
+                    userId: reminderUserId,
+                    userType: reminderUserType
+                  })
+                } catch (scheduleError) {
+                  console.error('Failed to reschedule updated reminder notification:', scheduleError)
+                }
+              }
             }
           } else if (!reminder.id) {
             // Create new reminder (only if it doesn't have an id)
@@ -225,12 +269,28 @@ export async function PATCH(request, { params }) {
                 priority: reminder.priority || 'normal',
                 status: reminder.status || 'incomplete',
                 user_id: user_id || null,
-                user_type: user_type || null
+                user_type: user_type || null,
+                notification_status: 'pending',
+                notification_error: null
               })
               .select()
               .single()
             if (!createReminderError && created) {
               remindersResult.created.push(created)
+
+              if (created.user_id && created.user_type && created.status !== 'completed' && created.status !== 'cancelled') {
+                try {
+                  ensureWorker()
+                  await scheduleNotificationFromRecord({
+                    notificationType: NOTIFICATION_TYPES.REMINDER,
+                    recordId: created.id,
+                    userId: created.user_id,
+                    userType: created.user_type
+                  })
+                } catch (scheduleError) {
+                  console.error('Failed to schedule created reminder notification:', scheduleError)
+                }
+              }
             }
           }
         }

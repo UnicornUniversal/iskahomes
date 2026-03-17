@@ -30,6 +30,7 @@ const PackageSinglePage = () => {
     is_active: true
   })
   const [newFeature, setNewFeature] = useState({ feature_name: '', feature_value: '' })
+  const [editingFeatureIndex, setEditingFeatureIndex] = useState(null)
   const [newApiLimit, setNewApiLimit] = useState({ name: '', data_type: 'number', value: '' })
   const [editingApiLimitIndex, setEditingApiLimitIndex] = useState(null)
   const isMountedRef = useRef(true)
@@ -146,20 +147,46 @@ const PackageSinglePage = () => {
     }
   }, [fetchPackage])
 
-  const handleAddFeature = () => {
-    if (!newFeature.feature_name?.trim()) return
+  const handleAddOrUpdateFeature = () => {
+    const featureName = newFeature.feature_name?.trim()
+    if (!featureName) return
 
-    setFormData(prev => ({
-      ...prev,
-      features: [
-        ...(prev.features || []),
-        {
-          feature_name: newFeature.feature_name.trim(),
-          feature_value: (newFeature.feature_value || '').trim()
-        }
-      ]
-    }))
+    setFormData(prev => {
+      const nextFeatures = [...(prev.features || [])]
+      const payload = {
+        feature_name: featureName,
+        feature_value: (newFeature.feature_value || '').trim()
+      }
+
+      if (
+        editingFeatureIndex !== null &&
+        editingFeatureIndex >= 0 &&
+        editingFeatureIndex < nextFeatures.length
+      ) {
+        nextFeatures[editingFeatureIndex] = payload
+      } else {
+        nextFeatures.push(payload)
+      }
+
+      return {
+        ...prev,
+        features: nextFeatures
+      }
+    })
+
     setNewFeature({ feature_name: '', feature_value: '' })
+    setEditingFeatureIndex(null)
+  }
+
+  const handleEditFeature = (index) => {
+    const target = formData.features[index]
+    if (!target) return
+
+    setNewFeature({
+      feature_name: String(target.feature_name || ''),
+      feature_value: String(target.feature_value || '')
+    })
+    setEditingFeatureIndex(index)
   }
 
   const handleRemoveFeature = (index) => {
@@ -167,6 +194,11 @@ const PackageSinglePage = () => {
       ...prev,
       features: (prev.features || []).filter((_, i) => i !== index)
     }))
+
+    if (editingFeatureIndex === index) {
+      setEditingFeatureIndex(null)
+      setNewFeature({ feature_name: '', feature_value: '' })
+    }
   }
 
   const handleAddOrUpdateApiLimit = () => {
@@ -531,7 +563,7 @@ const PackageSinglePage = () => {
                 onKeyPress={(e) => {
                   if (e.key === 'Enter' && newFeature.feature_name?.trim()) {
                     e.preventDefault()
-                    handleAddFeature()
+                    handleAddOrUpdateFeature()
                   }
                 }}
                 className="col-span-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -545,7 +577,7 @@ const PackageSinglePage = () => {
                   onKeyPress={(e) => {
                     if (e.key === 'Enter' && newFeature.feature_name?.trim()) {
                       e.preventDefault()
-                      handleAddFeature()
+                      handleAddOrUpdateFeature()
                     }
                   }}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -553,11 +585,11 @@ const PackageSinglePage = () => {
                 />
                 <button
                   type="button"
-                  onClick={handleAddFeature}
+                  onClick={handleAddOrUpdateFeature}
                   disabled={!newFeature.feature_name?.trim()}
                   className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors disabled:opacity-50"
                 >
-                  Add
+                  {editingFeatureIndex !== null ? 'Update' : 'Add'}
                 </button>
               </div>
             </div>
@@ -568,9 +600,14 @@ const PackageSinglePage = () => {
                     <span className="text-sm font-medium text-gray-900">{feature.feature_name}:</span>
                     <span className="text-sm text-gray-600">{feature.feature_value}</span>
                   </div>
-                  <button type="button" onClick={() => handleRemoveFeature(index)} className="text-red-600 hover:text-red-800">
-                    <FiXCircle />
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button type="button" onClick={() => handleEditFeature(index)} className="text-blue-600 hover:text-blue-800">
+                      <FiEdit />
+                    </button>
+                    <button type="button" onClick={() => handleRemoveFeature(index)} className="text-red-600 hover:text-red-800">
+                      <FiXCircle />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

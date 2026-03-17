@@ -95,7 +95,7 @@ const PropertiesByStatus = () => {
         {/* Summary/Legend */}
         <div className="mt-8 w-full grid grid-cols-1 sm:grid-cols-2 gap-4">
           {pieLabels.map((label, i) => (
-            <div key={label} className="flex items-center gap-3">
+            <div key={`${label}-${i}`} className="flex items-center gap-3">
               <span
                 className="inline-block rounded-full"
                 style={{ width: 12, height: 12, background: statusColors[i], boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}

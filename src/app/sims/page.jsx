@@ -13,6 +13,12 @@ const SimsPage = () => {
   const [emailMessage, setEmailMessage] = useState('Hello, this is a test email from Iska Homes via SendGrid.')
   const [emailStatus, setEmailStatus] = useState('')
   const [isSendingEmail, setIsSendingEmail] = useState(false)
+  const [redisKey, setRedisKey] = useState('')
+  const [redisValue, setRedisValue] = useState('')
+  const [redisTtl, setRedisTtl] = useState('300')
+  const [redisStatus, setRedisStatus] = useState('')
+  const [isSavingRedis, setIsSavingRedis] = useState(false)
+  const [isGettingRedis, setIsGettingRedis] = useState(false)
 
   const handleSendSms = async (event) => {
     event.preventDefault()
@@ -74,6 +80,63 @@ const SimsPage = () => {
       setEmailStatus(error.message || 'Email request failed')
     } finally {
       setIsSendingEmail(false)
+    }
+  }
+
+  const handleSaveRedis = async (event) => {
+    event.preventDefault()
+    setIsSavingRedis(true)
+    setRedisStatus('')
+
+    try {
+      const response = await fetch('/api/sims/redis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          key: redisKey,
+          value: redisValue,
+          ttl: redisTtl ? Number(redisTtl) : undefined
+        })
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to save Redis key/value')
+      }
+
+      setRedisStatus(`Saved key "${data?.data?.key}" successfully.`)
+    } catch (error) {
+      setRedisStatus(error.message || 'Redis save request failed')
+    } finally {
+      setIsSavingRedis(false)
+    }
+  }
+
+  const handleGetRedis = async () => {
+    if (!redisKey.trim()) {
+      setRedisStatus('Please enter a key first.')
+      return
+    }
+
+    setIsGettingRedis(true)
+    setRedisStatus('')
+
+    try {
+      const response = await fetch(`/api/sims/redis?key=${encodeURIComponent(redisKey.trim())}`)
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to fetch Redis key')
+      }
+
+      setRedisValue(typeof data?.data?.value === 'string' ? data.data.value : JSON.stringify(data.data.value))
+      setRedisStatus(`Fetched key "${data?.data?.key}" successfully.`)
+    } catch (error) {
+      setRedisStatus(error.message || 'Redis get request failed')
+    } finally {
+      setIsGettingRedis(false)
     }
   }
 
@@ -154,6 +217,57 @@ const SimsPage = () => {
           </button>
         </form>
         {emailStatus && <p className="mt-4 text-sm">{emailStatus}</p>}
+      </section>
+
+      <section>
+        <h2 className="mb-4 text-2xl font-semibold">Redis Key/Value Test</h2>
+        <form onSubmit={handleSaveRedis} className="space-y-4">
+          <input
+            type="text"
+            placeholder="Key"
+            value={redisKey}
+            onChange={(event) => setRedisKey(event.target.value)}
+            className="w-full rounded border p-2"
+            required
+          />
+          <textarea
+            placeholder="Value"
+            value={redisValue}
+            onChange={(event) => setRedisValue(event.target.value)}
+            className="w-full rounded border p-2"
+            rows={4}
+            required
+          />
+          <input
+            type="number"
+            placeholder="TTL in seconds (optional)"
+            value={redisTtl}
+            onChange={(event) => setRedisTtl(event.target.value)}
+            className="w-full rounded border p-2"
+            min={1}
+          />
+          <p className="text-sm text-gray-600">
+            Uses <code>REDIS_HOST</code>, <code>REDIS_PORT</code>, and <code>REDIS_PASSWORD</code>.
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={isSavingRedis}
+              className="rounded bg-green-600 px-4 py-2 text-white disabled:opacity-60"
+            >
+              {isSavingRedis ? 'Saving...' : 'Save to Redis'}
+            </button>
+            <button
+              type="button"
+              onClick={handleGetRedis}
+              disabled={isGettingRedis}
+              className="rounded bg-gray-800 px-4 py-2 text-white disabled:opacity-60"
+            >
+              {isGettingRedis ? 'Fetching...' : 'Get from Redis'}
+            </button>
+          </div>
+        </form>
+        {redisStatus && <p className="mt-4 text-sm">{redisStatus}</p>}
       </section>
     </div>
   )

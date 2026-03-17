@@ -25,6 +25,13 @@ function createBullConnection() {
 
 function getQueue() {
   if (!globalForNotifications.notificationQueue) {
+    console.log('[notifications][queue] initializing queue', {
+      queueName: NOTIFICATION_QUEUE_NAME,
+      hasRedisUrl: !!process.env.REDIS_URL,
+      redisHost: process.env.REDIS_HOST || null,
+      redisPort: process.env.REDIS_PORT || null
+    })
+
     globalForNotifications.notificationQueue = new Queue(NOTIFICATION_QUEUE_NAME, {
       connection: createBullConnection(),
       defaultJobOptions: {
@@ -47,7 +54,8 @@ function getQueue() {
 }
 
 export function buildNotificationJobId(notificationType, recordId) {
-  return `${notificationType}:${recordId}`
+  // BullMQ custom job ids cannot contain ":".
+  return `${notificationType}__${recordId}`
 }
 
 export async function enqueueNotificationJob({
@@ -61,7 +69,18 @@ export async function enqueueNotificationJob({
   const delay = Math.max(0, new Date(scheduledFor).getTime() - Date.now())
   const jobId = buildNotificationJobId(notificationType, recordId)
 
-  return queue.add(
+  console.log('[notifications][queue] enqueue job', {
+    queueName: NOTIFICATION_QUEUE_NAME,
+    jobId,
+    notificationType,
+    recordId,
+    userId,
+    userType,
+    scheduledFor,
+    delayMs: delay
+  })
+
+  const job = await queue.add(
     'send-notification',
     {
       notificationType,
@@ -74,6 +93,14 @@ export async function enqueueNotificationJob({
       delay
     }
   )
+
+  console.log('[notifications][queue] job enqueued', {
+    jobId: job.id,
+    notificationType,
+    recordId
+  })
+
+  return job
 }
 
 export async function cancelNotificationJob(notificationType, recordId) {
@@ -82,10 +109,20 @@ export async function cancelNotificationJob(notificationType, recordId) {
   const job = await queue.getJob(jobId)
 
   if (job) {
+    console.log('[notifications][queue] cancelling job', {
+      jobId,
+      notificationType,
+      recordId
+    })
     await job.remove()
     return true
   }
 
+  console.log('[notifications][queue] cancel skipped, job not found', {
+    jobId,
+    notificationType,
+    recordId
+  })
   return false
 }
 

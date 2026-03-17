@@ -103,6 +103,20 @@ const page = () => {
 
   // Use local data if available (from refresh), otherwise use user profile
   const profileData = localUserData || user?.profile
+
+  const parseStatsArray = (value) => {
+    if (!value) return []
+    if (Array.isArray(value)) return value
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value)
+        return Array.isArray(parsed) ? parsed : []
+      } catch (error) {
+        return []
+      }
+    }
+    return []
+  }
   
   // Get values directly from user profile (for other metrics)
   const totalUnits = profileData?.total_units ?? 0
@@ -110,6 +124,9 @@ const page = () => {
   const totalRevenue = profileData?.total_revenue ?? 0
   const totalViews = profileData?.total_views ?? 0
   const totalImpressions = profileData?.total_impressions ?? 0
+  const propertyPurposesStats = parseStatsArray(profileData?.property_purposes_stats)
+  const propertyTypesStats = parseStatsArray(profileData?.property_types_stats)
+  const propertySubtypesStats = parseStatsArray(profileData?.property_subtypes_stats)
 
   return (
     <div className=' w-full flex flex-col gap-4  h-full overflow-y-auto'>
@@ -204,15 +221,15 @@ const page = () => {
 
         <div className='w-full grid grid-cols-1 lg:grid-cols-3 gap-4'>
          
-         <PropertiesByCategories />
+         <PropertiesByCategories statsData={propertyPurposesStats} totalUnits={totalUnits} />
     
     
  
 
      
-         {/* <PropertiesByStatus /> */}
-         <PropertiesByType />
-         <PropertiesBySubType />
+  
+         <PropertiesByType statsData={propertyTypesStats} totalUnits={totalUnits} />
+         <PropertiesBySubType statsData={propertySubtypesStats} totalUnits={totalUnits} />
      </div>
 
 
