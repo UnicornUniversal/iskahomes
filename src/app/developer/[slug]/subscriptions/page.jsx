@@ -26,9 +26,10 @@ import {
   FiExternalLink,
   FiSave
 } from 'react-icons/fi'
-import DeveloperNav from '@/app/components/developers/DeveloperNav'
+import { useAuth } from '@/contexts/AuthContext'
 
-const SubscriptionsPage = () => {
+export const SubscriptionsManager = () => {
+  const { user } = useAuth()
   const [selectedPlan, setSelectedPlan] = useState(null)
   const [billingCycle, setBillingCycle] = useState('monthly')
   const [currency, setCurrency] = useState('GHS') // GHS or USD
@@ -45,6 +46,7 @@ const SubscriptionsPage = () => {
   const [invoices, setInvoices] = useState([])
   const [subscriptionHistory, setSubscriptionHistory] = useState([])
   const [subscriptionRequests, setSubscriptionRequests] = useState([])
+  const [addonSubscriptions, setAddonSubscriptions] = useState([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
@@ -68,10 +70,33 @@ const SubscriptionsPage = () => {
   // Get auth token
   const getAuthToken = useCallback(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('developer_token') || localStorage.getItem('agent_token') || ''
+      return localStorage.getItem('developer_token')
+        || localStorage.getItem('agency_token')
+        || localStorage.getItem('agent_token')
+        || ''
     }
     return ''
   }, [])
+
+  const dbUserType = user?.user_type === 'developer'
+    ? 'developer'
+    : user?.user_type === 'agency'
+      ? 'agency'
+      : user?.user_type === 'agent'
+        ? 'agent'
+        : 'developer'
+
+  const packageUserType = dbUserType === 'developer'
+    ? 'developers'
+    : dbUserType === 'agency'
+      ? 'agencies'
+      : 'agents'
+
+  const profileEndpoint = dbUserType === 'agency'
+    ? '/api/agencies/profile'
+    : dbUserType === 'agent'
+      ? '/api/agents/profile'
+      : '/api/developers/profile'
 
   // Fetch all data - only once on mount
   const fetchAllData = useCallback(async () => {
@@ -97,187 +122,126 @@ const SubscriptionsPage = () => {
     }
 
     try {
-      // Fetch developer profile to determine currency
-      const profileRes = await fetch('/api/developers/profile', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        signal: abortController.signal
-      })
-      
-      // Check if request was aborted
-      if (abortController.signal.aborted) return
+      const authHeaders = { Authorization: `Bearer ${token}` }
 
-      if (profileRes.ok && isMountedRef.current) {
-        const { data: developer } = await profileRes.json()
-        if (developer && isMountedRef.current) {
-          // Determine currency from primary location
-          let determinedCurrency = 'USD' // Default to USD
-          if (developer.company_locations) {
-            let locations = []
-            if (typeof developer.company_locations === 'string') {
-              try {
-                locations = JSON.parse(developer.company_locations)
-              } catch (e) {
-                locations = []
-              }
-            } else {
-              locations = developer.company_locations
+      const fetchJson = async (url, options = {}) => {
+        const res = await fetch(url, { ...options, signal: abortController.signal })
+        if (!res.ok) return null
+        return res.json()
+      }
+
+      // Fetch critical resources in parallel so initial render is fast.
+      const [profileResult, packagesResult, subscriptionResult] = await Promise.allSettled([
+        fetchJson(profileEndpoint, { headers: authHeaders }),
+        fetchJson(`/api/packages?user_type=${packageUserType}`),
+        fetchJson('/api/subscriptions', { headers: authHeaders })
+      ])
+
+      if (abortController.signal.aborted || !isMountedRef.current) return
+
+      if (packagesResult.status === 'fulfilled' && packagesResult.value) {
+        const packageData = packagesResult.value.data || []
+        setPackages(packageData)
+        if (packageData.length > 0) {
+          setSelectedPlan(prev => prev || packageData[0].id)
+        }
+      }
+
+      let hasSubscriptionCurrency = false
+      if (subscriptionResult.status === 'fulfilled' && subscriptionResult.value) {
+        const { data, addons, currency: subscriptionCurrency } = subscriptionResult.value
+        setCurrentSubscription(data || null)
+        setAddonSubscriptions(addons || [])
+        if (data?.package_id) {
+          setSelectedPlan(data.package_id)
+        }
+        if (subscriptionCurrency) {
+          setCurrency(subscriptionCurrency)
+          hasSubscriptionCurrency = true
+        }
+      }
+
+      if (!hasSubscriptionCurrency && profileResult.status === 'fulfilled' && profileResult.value?.data) {
+        const profileData = profileResult.value.data
+        let determinedCurrency = 'USD'
+        if (profileData.company_locations) {
+          let locations = []
+          if (typeof profileData.company_locations === 'string') {
+            try {
+              locations = JSON.parse(profileData.company_locations)
+            } catch (e) {
+              locations = []
             }
+          } else {
+            locations = profileData.company_locations
+          }
 
-            const primaryLocation = Array.isArray(locations) 
-              ? locations.find(loc => loc.primary_location === true)
-              : null
+          const primaryLocation = Array.isArray(locations)
+            ? locations.find(loc => loc.primary_location === true)
+            : null
 
-            if (primaryLocation) {
-              if (primaryLocation.country?.toLowerCase() === 'ghana' || 
-                  primaryLocation.currency === 'GHS') {
+          if (primaryLocation && (primaryLocation.country?.toLowerCase() === 'ghana' || primaryLocation.currency === 'GHS')) {
+            determinedCurrency = 'GHS'
+          } else if (profileData.default_currency) {
+            try {
+              const defaultCurrency = typeof profileData.default_currency === 'string'
+                ? JSON.parse(profileData.default_currency)
+                : profileData.default_currency
+              if (defaultCurrency?.code === 'GHS') {
                 determinedCurrency = 'GHS'
-              } else {
-                determinedCurrency = 'USD'
               }
-            } else if (developer.default_currency) {
-              try {
-                const defaultCurrency = typeof developer.default_currency === 'string'
-                  ? JSON.parse(developer.default_currency)
-                  : developer.default_currency
-                if (defaultCurrency?.code === 'GHS') {
-                  determinedCurrency = 'GHS'
-                }
-              } catch (e) {
-                if (developer.default_currency === 'GHS' || developer.default_currency?.includes('GHS')) {
-                  determinedCurrency = 'GHS'
-                }
+            } catch (e) {
+              if (profileData.default_currency === 'GHS' || profileData.default_currency?.includes('GHS')) {
+                determinedCurrency = 'GHS'
               }
             }
           }
-          if (isMountedRef.current) setCurrency(determinedCurrency)
+        }
+        setCurrency(determinedCurrency)
+      }
+
+      // Primary UI is ready here.
+      setLoading(false)
+
+      // Load secondary tabs data in background.
+      const [billingResult, invoicesResult, historyResult, requestsResult] = await Promise.allSettled([
+        fetchJson('/api/billing-information', { headers: authHeaders }),
+        fetchJson('/api/subscriptions/invoices', { headers: authHeaders }),
+        fetchJson('/api/subscriptions/history', { headers: authHeaders }),
+        fetchJson('/api/subscriptions-requests', { headers: authHeaders })
+      ])
+
+      if (abortController.signal.aborted || !isMountedRef.current) return
+
+      if (billingResult.status === 'fulfilled' && billingResult.value) {
+        const billingData = billingResult.value.data || []
+        const primaryBilling = billingData.find(b => b.is_primary) || billingData[0] || null
+        setBillingInfo(primaryBilling)
+        if (primaryBilling) {
+          setBillingFormData({
+            preferred_payment_method: primaryBilling.preferred_payment_method || 'mobile_money',
+            mobile_money_provider: primaryBilling.mobile_money_provider || 'mtn',
+            mobile_money_number: primaryBilling.mobile_money_number || '',
+            mobile_money_account_name: primaryBilling.mobile_money_account_name || '',
+            bank_name: primaryBilling.bank_name || '',
+            bank_account_number: primaryBilling.bank_account_number || '',
+            bank_account_name: primaryBilling.bank_account_name || '',
+            bank_branch: primaryBilling.bank_branch || '',
+            billing_email: primaryBilling.billing_email || '',
+            billing_phone: primaryBilling.billing_phone || '',
+            billing_address: primaryBilling.billing_address || ''
+          })
         }
       }
 
-      // Fetch packages
-      const packagesRes = await fetch('/api/packages?user_type=developers', {
-        signal: abortController.signal
-      })
-      
-      if (abortController.signal.aborted) return
-
-      if (packagesRes.ok && isMountedRef.current) {
-        const { data } = await packagesRes.json()
-        if (isMountedRef.current) {
-          setPackages(data || [])
-          if (data && data.length > 0) {
-            setSelectedPlan(prev => prev || data[0].id)
-          }
-        }
+      if (invoicesResult.status === 'fulfilled' && invoicesResult.value) {
+        setInvoices(invoicesResult.value.data || [])
       }
-
-      // Fetch current subscription
-      const subRes = await fetch('/api/subscriptions', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        signal: abortController.signal
-      })
-      
-      if (abortController.signal.aborted) return
-
-      if (subRes.ok && isMountedRef.current) {
-        const { data, currency: subscriptionCurrency } = await subRes.json()
-        if (isMountedRef.current) {
-          setCurrentSubscription(data)
-          if (data?.package_id) {
-            setSelectedPlan(data.package_id)
-          }
-          // Use currency from subscription if available (fallback)
-          if (subscriptionCurrency) {
-            setCurrency(subscriptionCurrency)
-          }
-        }
+      if (historyResult.status === 'fulfilled' && historyResult.value) {
+        setSubscriptionHistory(historyResult.value.data || [])
       }
-
-      // Fetch billing information
-      const billingRes = await fetch('/api/billing-information', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        signal: abortController.signal
-      })
-      
-      if (abortController.signal.aborted) return
-
-      if (billingRes.ok && isMountedRef.current) {
-        const { data } = await billingRes.json()
-        const primaryBilling = data?.find(b => b.is_primary) || data?.[0] || null
-        if (isMountedRef.current) {
-          setBillingInfo(primaryBilling)
-          if (primaryBilling) {
-            setBillingFormData({
-              preferred_payment_method: primaryBilling.preferred_payment_method || 'mobile_money',
-              mobile_money_provider: primaryBilling.mobile_money_provider || 'mtn',
-              mobile_money_number: primaryBilling.mobile_money_number || '',
-              mobile_money_account_name: primaryBilling.mobile_money_account_name || '',
-              bank_name: primaryBilling.bank_name || '',
-              bank_account_number: primaryBilling.bank_account_number || '',
-              bank_account_name: primaryBilling.bank_account_name || '',
-              bank_branch: primaryBilling.bank_branch || '',
-              billing_email: primaryBilling.billing_email || '',
-              billing_phone: primaryBilling.billing_phone || '',
-              billing_address: primaryBilling.billing_address || ''
-            })
-          }
-        }
-      }
-
-      // Fetch invoices
-      const invoicesRes = await fetch('/api/subscriptions/invoices', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        signal: abortController.signal
-      })
-      
-      if (abortController.signal.aborted) return
-
-      if (invoicesRes.ok && isMountedRef.current) {
-        const { data } = await invoicesRes.json()
-        if (isMountedRef.current) {
-          setInvoices(data || [])
-        }
-      }
-
-      // Fetch subscription history
-      const historyRes = await fetch('/api/subscriptions/history', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        signal: abortController.signal
-      })
-      
-      if (abortController.signal.aborted) return
-
-      if (historyRes.ok && isMountedRef.current) {
-        const { data } = await historyRes.json()
-        if (isMountedRef.current) {
-          setSubscriptionHistory(data || [])
-        }
-      }
-
-      // Fetch subscription requests
-      const requestsRes = await fetch('/api/subscriptions-requests', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        signal: abortController.signal
-      })
-      
-      if (abortController.signal.aborted) return
-
-      if (requestsRes.ok && isMountedRef.current) {
-        const { data } = await requestsRes.json()
-        if (isMountedRef.current) {
-          setSubscriptionRequests(data || [])
-        }
+      if (requestsResult.status === 'fulfilled' && requestsResult.value) {
+        setSubscriptionRequests(requestsResult.value.data || [])
       }
 
       } catch (error) {
@@ -294,7 +258,7 @@ const SubscriptionsPage = () => {
         setLoading(false)
       }
     }
-  }, [getAuthToken])
+  }, [getAuthToken, packageUserType, profileEndpoint])
 
   useEffect(() => {
     isMountedRef.current = true
@@ -497,6 +461,7 @@ const SubscriptionsPage = () => {
         },
         body: JSON.stringify({
           package_id: packageId,
+          subscriptions_type: selectedPackage?.subscriptions_type || 'package',
           payment_method: 'free' // Special flag for free plan
         })
       })
@@ -510,14 +475,15 @@ const SubscriptionsPage = () => {
           headers: { 'Authorization': `Bearer ${token}` }
         })
         if (subRes.ok) {
-          const { data } = await subRes.json()
+          const { data, addons } = await subRes.json()
           setCurrentSubscription(data)
+          setAddonSubscriptions(addons || [])
           if (data?.package_id) {
             setSelectedPlan(data.package_id)
           }
         }
         // Refresh packages to get updated info
-        const packagesRes = await fetch('/api/packages?user_type=developers')
+        const packagesRes = await fetch(`/api/packages?user_type=${packageUserType}`)
         if (packagesRes.ok) {
           const { data: packagesData } = await packagesRes.json()
           setPackages(packagesData || [])
@@ -554,7 +520,8 @@ const SubscriptionsPage = () => {
             'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
-            package_id: selectedPackageForPayment.id
+            package_id: selectedPackageForPayment.id,
+            subscriptions_type: selectedPackageForPayment.subscriptions_type || 'package'
           })
         })
 
@@ -580,8 +547,9 @@ const SubscriptionsPage = () => {
             headers: { 'Authorization': `Bearer ${token}` }
           })
           if (subRes.ok) {
-            const { data } = await subRes.json()
+            const { data, addons } = await subRes.json()
             setCurrentSubscription(data)
+            setAddonSubscriptions(addons || [])
             if (data?.package_id) {
               setSelectedPlan(data.package_id)
             }
@@ -860,7 +828,7 @@ const SubscriptionsPage = () => {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-gradient-to-r from-primary_color to-blue-600 rounded-xl flex items-center justify-center">
                   <FiCreditCard className="w-6 h-6 text-white" />
@@ -915,6 +883,16 @@ const SubscriptionsPage = () => {
                 <div>
                   <p className="text-sm text-gray-600">Payment Method</p>
                   <p className="font-semibold text-gray-900 text-sm">{formatPaymentMethod(billingInfo)}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                  <FiGrid className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Active Addons</p>
+                  <p className="font-semibold text-gray-900">{addonSubscriptions.length}</p>
                 </div>
               </div>
             </div>
@@ -1866,5 +1844,7 @@ const SubscriptionsPage = () => {
 
   )
 }
+
+const SubscriptionsPage = () => <SubscriptionsManager />
 
 export default SubscriptionsPage

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { FiPlus, FiSearch, FiBriefcase, FiUser, FiUsers } from 'react-icons/fi'
 import { useAuth } from '@/contexts/AuthContext'
+import { SubscriptionGate } from '@/app/components/shared/SubscriptionGate'
 import { CLIENT_STATUSES, CLIENT_SOURCE_CHANNELS } from './dummyClients'
 
 const ClientManagementPage = () => {
@@ -40,8 +41,10 @@ const ClientManagementPage = () => {
 
   const filteredClients = clients
   const basePath = `/developer/${slug}/clientManagement`
+  const subscriptionPath = `/developer/${slug}/subscriptions`
 
   return (
+    <SubscriptionGate subscriptionPath={subscriptionPath}>
     <div className="min-h-screen p-4 md:p-6">
       <div className="w-full">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -157,6 +160,7 @@ const ClientManagementPage = () => {
         </div>
       </div>
     </div>
+    </SubscriptionGate>
   )
 }
 

@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 
 const ALLOWED_API_LIMIT_DATA_TYPES = ['number', 'text']
+const VALID_SUBSCRIPTION_TYPES = ['package', 'addon']
 
 function normalizeApiLimits(apiLimitsInput) {
   if (!apiLimitsInput) return {}
@@ -145,6 +146,7 @@ export async function PUT(request, { params }) {
       span,
       display_text,
       ideal_duration,
+      subscriptions_type,
       user_type,
       is_active
     } = body
@@ -181,11 +183,22 @@ export async function PUT(request, { params }) {
     // Validate user_type if provided
     let userTypeLower = null
     if (user_type) {
-      const validUserTypes = ['developers', 'agents', 'agencies']
+      const validUserTypes = ['developers', 'agents', 'agencies', 'all']
       userTypeLower = user_type.toLowerCase()
       if (!validUserTypes.includes(userTypeLower)) {
         return NextResponse.json({ 
-          error: 'User type must be one of: developers, agents, agencies' 
+          error: 'User type must be one of: developers, agents, agencies, all' 
+        }, { status: 400 })
+      }
+    }
+
+    // Validate subscriptions_type if provided
+    let normalizedSubscriptionType
+    if (subscriptions_type !== undefined && subscriptions_type !== null) {
+      normalizedSubscriptionType = String(subscriptions_type).toLowerCase()
+      if (!VALID_SUBSCRIPTION_TYPES.includes(normalizedSubscriptionType)) {
+        return NextResponse.json({
+          error: 'subscriptions_type must be one of: package, addon'
         }, { status: 400 })
       }
     }
@@ -244,6 +257,7 @@ export async function PUT(request, { params }) {
       span: span || null,
       display_text: display_text || null,
       ideal_duration: parsedIdealDuration > 0 ? parsedIdealDuration : null,
+      subscriptions_type: normalizedSubscriptionType,
       user_type: userTypeLower || undefined,
       is_active: is_active !== undefined ? is_active : true,
       total_amount_usd: totalAmountUSD,

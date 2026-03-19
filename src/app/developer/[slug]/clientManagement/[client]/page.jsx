@@ -30,6 +30,8 @@ import {
 import { Input } from '@/app/components/ui/input'
 import UnitCard from '@/app/components/developers/units/UnitCard'
 import { useAuth } from '@/contexts/AuthContext'
+import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits'
+import { SubscriptionGate } from '@/app/components/shared/SubscriptionGate'
 import { toast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import {
@@ -134,6 +136,7 @@ export const ClientManagementContent = ({ forcedTab = null, hideClientChrome = f
   const [loading, setLoading] = useState(!isAddNew)
   const [assignableUsers, setAssignableUsers] = useState([])
   const basePath = `/developer/${slug}/clientManagement`
+  const { hasClientManagementAddon, loading: limitsLoading } = useSubscriptionLimits()
 
   const token = () => developerToken || (typeof window !== 'undefined' ? localStorage.getItem('developer_token') : null)
   const authHeaders = () => ({ Authorization: `Bearer ${token()}` })
@@ -739,6 +742,14 @@ export const ClientManagementContent = ({ forcedTab = null, hideClientChrome = f
           <p className="mb-4">Client not found.</p>
           <Link href={basePath}><span className="secondary_button inline-block">Back to clients</span></Link>
         </div>
+      </div>
+    )
+  }
+
+  if (!limitsLoading && !hasClientManagementAddon) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <SubscriptionGate subscriptionPath={`/developer/${slug}/subscriptions`} />
       </div>
     )
   }

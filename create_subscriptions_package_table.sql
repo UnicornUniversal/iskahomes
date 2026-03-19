@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS subscriptions_package (
   
   -- Subscription settings
   ideal_duration INTEGER, -- Minimum subscription duration in months (e.g., 3 for 3 months minimum, 12 for 1 year minimum)
-  user_type VARCHAR(20) CHECK (user_type IN ('developers', 'agents', 'agencies')), -- Type of user this package is intended for (stored in lowercase)
+  user_type VARCHAR(20) CHECK (user_type IN ('developers', 'agents', 'agencies', 'all')), -- Type of user this package is intended for (stored in lowercase)
   
   -- Timestamps
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -86,5 +86,5 @@ COMMENT ON COLUMN subscriptions_package.duration IS 'Duration number (e.g., 1, 3
 COMMENT ON COLUMN subscriptions_package.span IS 'Duration span: month/months or year/years';
 COMMENT ON COLUMN subscriptions_package.display_text IS 'Display text showing price and duration (e.g., "GHS 100 / month" or "USD 50 / year")';
 COMMENT ON COLUMN subscriptions_package.ideal_duration IS 'Minimum subscription duration in months (e.g., 3 for 3 months minimum, 12 for 1 year minimum)';
-COMMENT ON COLUMN subscriptions_package.user_type IS 'Type of user this package is intended for: developers, agents, or agencies (stored in lowercase)';
+COMMENT ON COLUMN subscriptions_package.user_type IS 'Type of user this package is intended for: developers, agents, agencies, or all (stored in lowercase)';
 

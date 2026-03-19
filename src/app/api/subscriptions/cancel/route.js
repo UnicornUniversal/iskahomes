@@ -45,6 +45,7 @@ export async function POST(request) {
       .select('id, package_id, status')
       .eq('user_id', userId)
       .eq('user_type', dbUserType)
+      .eq('subscriptions_type', 'package')
       .in('status', ['pending', 'active', 'grace_period'])
       .order('created_at', { ascending: false })
       .limit(1)

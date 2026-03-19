@@ -227,7 +227,7 @@ const page = () => {
           </div>
 
           <div className='secondary_bg p-4 rounded-2xl shadow-sm flex-1'>
-            <LatestReminders />
+            <LatestReminders limit={5} />
           </div>
         </div>
      

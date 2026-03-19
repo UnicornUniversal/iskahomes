@@ -1,7 +1,8 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import Layout1 from '@/app/layout/Layout1'
-import { FiSearch, FiFilter, FiMapPin, FiCheckCircle, FiX, FiBriefcase, FiPhone, FiMail } from 'react-icons/fi'
+import GeneralHeader from '@/app/components/general/GeneralHeader'
+import { FiSearch, FiMapPin, FiCheckCircle, FiX, FiBriefcase, FiPhone, FiMail } from 'react-icons/fi'
 import Link from 'next/link'
 
 const AllAgents = () => {
@@ -94,6 +95,21 @@ const AllAgents = () => {
     }
   }
 
+  const headerImages = [
+    {
+      src: 'https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&w=900&q=80',
+      alt: 'Real estate professionals meeting'
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1556157382-97eda2d62296?auto=format&fit=crop&w=900&q=80',
+      alt: 'Agent discussing property options'
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=900&q=80',
+      alt: 'Teamwork in a modern office'
+    }
+  ]
+
   return (
     <Layout1>
       <div className="min-h-screen relative overflow-hidden font-sans">
@@ -104,15 +120,14 @@ const AllAgents = () => {
          </div>
 
         <div className="relative z-10 pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-8xl mx-auto">
-          {/* Header Section */}
-          <div className="text-center mb-16 space-y-4">
-            <h1 className="text-4xl md:text-6xl font-extrabold text-primary_color tracking-tight">
-              Meet Our <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary_color to-secondary_color">Agents</span>
-            </h1>
-            <p className="text-lg md:text-xl text-gray-500 max-w-2xl mx-auto font-light">
-              Connect with top-tier real estate professionals dedicated to finding your perfect property.
-            </p>
-          </div>
+          <GeneralHeader
+            headingOne="Discover"
+            headingTwo="Agents"
+            description="Connect with top-tier real estate professionals dedicated to finding your perfect property."
+            stats={[{ label: 'Total Agents', value: agents.length }]}
+            images={headerImages}
+            className="mb-12"
+          />
 
           {/* Search & Filter Bar */}
           <div className="max-w-5xl mx-auto mb-16">

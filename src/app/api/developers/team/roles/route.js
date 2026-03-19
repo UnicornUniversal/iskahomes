@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest, requirePermission } from '@/lib/apiPermissionMiddleware'
+import { getSubscriptionLimitsForUser } from '@/lib/subscriptionLimitsServer'
+import { checkNumericLimit } from '@/lib/subscriptionLimits'
 
 // GET - Fetch all roles for an organization (developer or agency)
 export async function GET(request) {
@@ -59,6 +61,23 @@ export async function POST(request) {
 
     if (!name || !rolePermissions) {
       return NextResponse.json({ error: 'Name and permissions are required' }, { status: 400 })
+    }
+
+    const subscriptionUserId = userInfo.developer_id || userInfo.agency_id || userInfo.user_id
+    const dbUserType = organizationType === 'agency' ? 'agency' : 'developer'
+    const { limits } = await getSubscriptionLimitsForUser(subscriptionUserId, dbUserType)
+    const { count: currentRoles } = await supabaseAdmin
+      .from('organization_roles')
+      .select('*', { count: 'exact', head: true })
+      .eq('organization_id', userInfo.organization_id)
+      .eq('organization_type', organizationType)
+    const countAfterCreate = (currentRoles ?? 0) + 1
+    const { allowed } = checkNumericLimit(limits, 'total_roles_limit', countAfterCreate)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'You have reached your plan limit for roles. Please upgrade your subscription to add more.' },
+        { status: 403 }
+      )
     }
 
     // Check if role name already exists

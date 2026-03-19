@@ -1,26 +1,39 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
+// Featured developer plans (strong IDs, not names)
+const FEATURED_DEVELOPER_PACKAGE_IDS = [
+  'cc8a96fb-0a20-41af-9aa1-d68f5d1752ce', // Infinite (top-tier)
+  'b6668135-af4d-42cb-a776-06a1f1c9e21f'  // Platinum (mid-tier)
+]
+
 export async function GET(request) {
   try {
-    // Step 1: Get Infinity Plan package ID
-    const { data: infinityPlan, error: packageError } = await supabase
+    // Step 1: Get featured developer packages by ID (stronger than name matching)
+    const { data: featuredPlans, error: packageError } = await supabase
       .from('subscriptions_package')
       .select('id, name, features')
-      .eq('name', 'Infinity Plan')
       .eq('is_active', true)
-      .single()
+      .eq('user_type', 'developers')
+      .in('id', FEATURED_DEVELOPER_PACKAGE_IDS)
 
-    if (packageError || !infinityPlan) {
-      console.error('Error fetching Infinity Plan:', packageError)
+    if (packageError || !featuredPlans?.length) {
+      if (packageError) console.error('Error fetching featured plans:', packageError)
       return NextResponse.json({ data: [] })
     }
 
-    // Step 2: Get active subscriptions with Infinity Plan
+    const packageIds = featuredPlans.map((p) => p.id)
+    // Prefer "Infinite" for rank; fallback to first plan
+    const rankPlan =
+      featuredPlans.find((p) => p.id === FEATURED_DEVELOPER_PACKAGE_IDS[0]) ||
+      featuredPlans[0]
+
+    // Step 2: Get active subscriptions on any of these plans (main package only)
     const { data: subscriptions, error: subError } = await supabase
       .from('subscriptions')
       .select('user_id, package_id')
-      .eq('package_id', infinityPlan.id)
+      .in('package_id', packageIds)
+      .eq('subscriptions_type', 'package')
       .eq('status', 'active')
       .eq('user_type', 'developer')
 
@@ -111,14 +124,14 @@ export async function GET(request) {
       }
     }
 
-    // Step 5: Extract rank from package features
+    // Step 5: Extract rank from package features (use top plan e.g. Infinite for priority)
     let rank = 0
-    if (infinityPlan.features && Array.isArray(infinityPlan.features)) {
-      const rankFeature = infinityPlan.features.find(
-        f => f.feature_name && f.feature_name.toLowerCase().includes('rank')
+    if (rankPlan.features && Array.isArray(rankPlan.features)) {
+      const rankFeature = rankPlan.features.find(
+        (f) => f.feature_name && f.feature_name.toLowerCase().includes('rank')
       )
       if (rankFeature && rankFeature.feature_value) {
-        rank = parseInt(rankFeature.feature_value) || 0
+        rank = parseInt(rankFeature.feature_value, 10) || 0
       }
     }
 

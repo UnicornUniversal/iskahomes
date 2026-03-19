@@ -24,6 +24,7 @@ export async function POST(request) {
       user_id,
       user_type,
       package_id,
+      subscriptions_type,
       status,
       paid_status,
       start_date,
@@ -63,6 +64,20 @@ export async function POST(request) {
 
     if (packageError || !packageData) {
       return NextResponse.json({ error: 'Package not found' }, { status: 404 })
+    }
+
+    const normalizedSubscriptionType = String(
+      subscriptions_type || packageData.subscriptions_type || 'package'
+    ).toLowerCase()
+    if (!['package', 'addon'].includes(normalizedSubscriptionType)) {
+      return NextResponse.json({
+        error: 'subscriptions_type must be package or addon'
+      }, { status: 400 })
+    }
+    if (packageData.subscriptions_type && packageData.subscriptions_type !== normalizedSubscriptionType) {
+      return NextResponse.json({
+        error: `Selected package is ${packageData.subscriptions_type}, but request sent ${normalizedSubscriptionType}`
+      }, { status: 400 })
     }
 
     // Calculate dates if not provided
@@ -148,6 +163,7 @@ export async function POST(request) {
       user_id,
       user_type,
       package_id,
+      subscriptions_type: normalizedSubscriptionType,
       status: status || 'active',
       paid_status: paid_status || 'pending',
       start_date: startDate.toISOString(),
@@ -309,6 +325,7 @@ export async function POST(request) {
             currency: finalCurrency,
             amount: finalAmount,
             duration_months: duration,
+            subscriptions_type: normalizedSubscriptionType,
             start_date: startDate.toISOString(),
             end_date: endDate.toISOString()
           }

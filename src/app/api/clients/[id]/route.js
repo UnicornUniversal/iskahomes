@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 import { getDeveloperId } from '@/lib/developerIdHelper'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { getSubscriptionLimitsForUser } from '@/lib/subscriptionLimitsServer'
 
 function toCamelClient(obj) {
   if (!obj) return null
@@ -80,6 +81,14 @@ export async function GET(request, { params }) {
 
     const developerId = await getDeveloperId(userInfo)
     if (!developerId) return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
+
+    const { hasClientManagementAddon } = await getSubscriptionLimitsForUser(developerId, 'developer')
+    if (!hasClientManagementAddon) {
+      return NextResponse.json(
+        { error: 'Client management requires the Additional Addons subscription. Please subscribe to access this feature.' },
+        { status: 403 }
+      )
+    }
 
     const { data: client, error } = await supabaseAdmin
       .from('clients')
@@ -388,6 +397,14 @@ export async function PUT(request, { params }) {
     const developerId = await getDeveloperId(userInfo)
     if (!developerId) return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
 
+    const { hasClientManagementAddon } = await getSubscriptionLimitsForUser(developerId, 'developer')
+    if (!hasClientManagementAddon) {
+      return NextResponse.json(
+        { error: 'Client management requires the Additional Addons subscription. Please subscribe to access this feature.' },
+        { status: 403 }
+      )
+    }
+
     const { data: existing } = await supabaseAdmin
       .from('clients')
       .select('id')
@@ -479,6 +496,14 @@ export async function DELETE(request, { params }) {
 
     const developerId = await getDeveloperId(userInfo)
     if (!developerId) return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
+
+    const { hasClientManagementAddon } = await getSubscriptionLimitsForUser(developerId, 'developer')
+    if (!hasClientManagementAddon) {
+      return NextResponse.json(
+        { error: 'Client management requires the Additional Addons subscription. Please subscribe to access this feature.' },
+        { status: 403 }
+      )
+    }
 
     const { error } = await supabaseAdmin
       .from('clients')

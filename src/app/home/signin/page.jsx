@@ -384,7 +384,7 @@ const SignInPage = () => {
   }
 
   return (
-    <div className="min-h-screen flex ">
+    <div className="min-h-screen  flex items-start justify-start">
       {/* Left Side - Image */}
       <div className="hidden lg:flex lg:w-1/2 relative ">
         <div className="absolute inset-0  max-h-[700px] bg-gradient-to-br from-primary_color/20 to-secondary_color/20 z-10"></div>
@@ -398,7 +398,7 @@ const SignInPage = () => {
 
       {/* Right Side - Sign In Form */}
       <div className="w-full lg:w-1/2 flex items-start justify-start p-8 bg-white">
-        <div className="w-full max-w-md space-y-8">
+        <div className="w-full max-w-2xl space-y-8">
         {/* <div className=" inset-0 z-20 flex items-center justify-center md:text-left md:justify-start">
           <div className="text-center md:text-left text-white">
             <h1 className="text-4xl font-bold mb-4">Welcome to Iska Homes</h1>

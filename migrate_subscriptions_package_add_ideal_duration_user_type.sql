@@ -30,9 +30,9 @@ BEGIN
         AND column_name = 'user_type'
     ) THEN
         ALTER TABLE subscriptions_package 
-        ADD COLUMN user_type VARCHAR(20) CHECK (user_type IN ('developers', 'agents', 'agencies'));
+        ADD COLUMN user_type VARCHAR(20) CHECK (user_type IN ('developers', 'agents', 'agencies', 'all'));
         
-        COMMENT ON COLUMN subscriptions_package.user_type IS 'Type of user this package is intended for: developers, agents, or agencies (stored in lowercase)';
+        COMMENT ON COLUMN subscriptions_package.user_type IS 'Type of user this package is intended for: developers, agents, agencies, or all (stored in lowercase)';
         
         -- Add index for better query performance
         CREATE INDEX IF NOT EXISTS idx_subscriptions_package_user_type ON subscriptions_package(user_type);

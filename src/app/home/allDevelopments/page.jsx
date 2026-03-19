@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { MapPin, Building2, Search, Filter, ArrowRight, X } from 'lucide-react'
 import Nav from '@/app/components/Nav'
 import FeaturedDevelopments from '@/app/components/general/FeaturedDevelopments'
+import GeneralHeader from '@/app/components/general/GeneralHeader'
 
 const AllDevelopmentsPage = () => {
   const [developments, setDevelopments] = useState([])
@@ -95,6 +96,21 @@ const AllDevelopmentsPage = () => {
   }
 
   const hasActiveFilters = Object.values(filters).some(val => val !== '') || searchTerm !== ''
+
+  const headerImages = [
+    {
+      src: 'https://images.unsplash.com/photo-1479839672679-a46483c0e7c8?auto=format&fit=crop&w=900&q=80',
+      alt: 'Modern skyline with mixed-use developments'
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1464146072230-91cabc968266?auto=format&fit=crop&w=900&q=80',
+      alt: 'Luxury housing community'
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1519999482648-25049ddd37b1?auto=format&fit=crop&w=900&q=80',
+      alt: 'Contemporary city development project'
+    }
+  ]
 
   // Filter Component
   const FiltersPanel = ({ isMobile = false }) => (
@@ -200,22 +216,14 @@ const AllDevelopmentsPage = () => {
     <>
       <Nav />
       <div className="min-h-screen ">
-        {/* Hero Section */}
-        <div className="p-6 md:p-10">
-          <div className="text-center text-left flex flex-col md:flex-row items-start">
-            <div>
-              <h1 className="text-5xl md:text-6xl font-light tracking-tight mb-6">
-                Discover 
-              </h1>
-              <h1 className="text-5xl md:text-[7em] font-light tracking-tight mb-6">
-                Developments
-              </h1>
-            </div>
-            <p className="text-sm max-w-3xl leading-relaxed">
-              Explore premium residential and commercial developments across Ghana and all around the world. 
-            </p>
-          </div>
-        </div>
+        <GeneralHeader
+          headingOne="Discover"
+          headingTwo="Developments"
+          description="Explore premium residential and commercial developments across Ghana and all around the world."
+          stats={[{ label: 'Total Developments', value: pagination.total }]}
+          images={headerImages}
+          className="pb-10"
+        />
 
         <FeaturedDevelopments />
 

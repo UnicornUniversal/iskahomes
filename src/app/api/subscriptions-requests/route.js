@@ -103,7 +103,7 @@ export async function POST(request) {
     }
 
     const body = await request.json()
-    const { package_id } = body
+    const { package_id, subscriptions_type } = body
 
     if (!package_id) {
       return NextResponse.json({ error: 'Package ID is required' }, { status: 400 })
@@ -181,6 +181,34 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Package not found or inactive' }, { status: 404 })
     }
 
+    // Validate package user type eligibility
+    const requestUserType = dbUserType === 'developer'
+      ? 'developers'
+      : dbUserType === 'agency'
+        ? 'agencies'
+        : 'agents'
+    const packageAllowed =
+      !packageData.user_type ||
+      packageData.user_type === 'all' ||
+      packageData.user_type === requestUserType
+
+    if (!packageAllowed) {
+      return NextResponse.json({
+        error: 'This package is not available for your user type'
+      }, { status: 400 })
+    }
+
+    const packageSubscriptionType = String(packageData.subscriptions_type || 'package').toLowerCase()
+    const requestedSubscriptionType = String(subscriptions_type || packageSubscriptionType).toLowerCase()
+    if (!['package', 'addon'].includes(requestedSubscriptionType)) {
+      return NextResponse.json({ error: 'subscriptions_type must be package or addon' }, { status: 400 })
+    }
+    if (requestedSubscriptionType !== packageSubscriptionType) {
+      return NextResponse.json({
+        error: `Selected item is a ${packageSubscriptionType}, but request sent ${requestedSubscriptionType}`
+      }, { status: 400 })
+    }
+
     // Get monthly price based on currency
     const monthlyPrice = currency === 'GHS' 
       ? parseFloat(packageData.local_currency_price || 0)
@@ -211,15 +239,22 @@ export async function POST(request) {
       : (packageData.total_amount_usd || (monthlyPrice * durationMonths))
 
     // Get user's current subscription (previous subscription)
-    const { data: currentSubscription } = await supabaseAdmin
+    let currentSubscriptionQuery = supabaseAdmin
       .from('subscriptions')
       .select('id')
       .eq('user_id', userId)
       .eq('user_type', dbUserType)
+      .eq('subscriptions_type', requestedSubscriptionType)
       .in('status', ['pending', 'active', 'grace_period'])
       .order('created_at', { ascending: false })
       .limit(1)
-      .maybeSingle()
+
+    // For addons, track previous request against the same addon package.
+    if (requestedSubscriptionType === 'addon') {
+      currentSubscriptionQuery = currentSubscriptionQuery.eq('package_id', package_id)
+    }
+
+    const { data: currentSubscription } = await currentSubscriptionQuery.maybeSingle()
 
     // Get user's primary billing information
     const { data: billingInfo } = await supabaseAdmin

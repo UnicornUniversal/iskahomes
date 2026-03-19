@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 import { getDeveloperId } from '@/lib/developerIdHelper'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { getSubscriptionLimitsForUser } from '@/lib/subscriptionLimitsServer'
 import { NOTIFICATION_TYPES } from '@/lib/notifications/constants'
 import { scheduleNotificationFromRecord } from '@/lib/notifications/scheduler'
 import { startNotificationWorker } from '@/lib/notifications/worker'
@@ -44,6 +45,14 @@ export async function GET(request, { params }) {
     if (!developerId) return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
     if (!(await verifyClientAccess(clientId, developerId))) {
       return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+    }
+
+    const { hasClientManagementAddon } = await getSubscriptionLimitsForUser(developerId, 'developer')
+    if (!hasClientManagementAddon) {
+      return NextResponse.json(
+        { error: 'Service charges require the Additional Addons subscription. Please subscribe to access this feature.' },
+        { status: 403 }
+      )
     }
 
     const { data, error } = await supabaseAdmin
@@ -116,6 +125,14 @@ export async function POST(request, { params }) {
     if (!developerId) return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
     if (!(await verifyClientAccess(clientId, developerId))) {
       return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+    }
+
+    const { hasClientManagementAddon } = await getSubscriptionLimitsForUser(developerId, 'developer')
+    if (!hasClientManagementAddon) {
+      return NextResponse.json(
+        { error: 'Service charges require the Additional Addons subscription. Please subscribe to access this feature.' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()

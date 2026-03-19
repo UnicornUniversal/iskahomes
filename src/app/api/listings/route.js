@@ -5,6 +5,8 @@ import { getDeveloperId } from '@/lib/developerIdHelper'
 import { processCurrencyConversions } from '@/lib/currencyConversion'
 import { updateAdminAnalytics } from '@/lib/adminAnalytics'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { getSubscriptionLimitsForUser } from '@/lib/subscriptionLimitsServer'
+import { checkNumericLimit } from '@/lib/subscriptionLimits'
 
 // Verify import immediately
 console.log('📦 Import check - updateAdminAnalytics type:', typeof updateAdminAnalytics)
@@ -956,23 +958,61 @@ export async function POST(request) {
       )
     }
     
+    // Enforce subscription limits for developer units (units per development)
+    const accountType = propertyData.account_type || existingListing?.account_type
+    const developmentId = propertyData.development_id || existingListing?.development_id
+    if (accountType === 'developer' && listingType === 'unit' && developmentId) {
+      const { limits } = await getSubscriptionLimitsForUser(userId, 'developer')
+      const { data: dev } = await supabaseAdmin
+        .from('developments')
+        .select('total_units')
+        .eq('id', developmentId)
+        .eq('developer_id', userId)
+        .single()
+      const currentUnits = (dev?.total_units ?? 0) + (existingListing ? 0 : 1)
+      const { allowed } = checkNumericLimit(limits, 'units_per_development', currentUnits)
+      if (!allowed) {
+        return NextResponse.json(
+          { error: 'You have reached the unit limit for this development. Please upgrade your subscription to add more units.' },
+          { status: 403 }
+        )
+      }
+    }
+
     // Get agency_id for agents - check both propertyData and existingListing
     let agencyId = null
-    const accountType = propertyData.account_type || existingListing?.account_type
     if (accountType === 'agent') {
       const { data: agent, error: agentError } = await supabaseAdmin
         .from('agents')
         .select('agency_id')
         .eq('agent_id', userId)
         .single()
-      
+
       if (!agentError && agent?.agency_id) {
         agencyId = agent.agency_id
       } else {
         console.warn('⚠️ Agent not found or agency_id missing for user:', userId)
       }
+
+      // Enforce agency listing_limits when agent creates a new listing
+      if (agencyId && !existingListing) {
+        const { limits } = await getSubscriptionLimitsForUser(agencyId, 'agency')
+        const { data: agency } = await supabaseAdmin
+          .from('agencies')
+          .select('total_listings')
+          .eq('agency_id', agencyId)
+          .single()
+        const countAfterCreate = (agency?.total_listings ?? 0) + 1
+        const { allowed } = checkNumericLimit(limits, 'listing_limits', countAfterCreate)
+        if (!allowed) {
+          return NextResponse.json(
+            { error: 'Your agency has reached its plan limit for listings. Please upgrade your subscription to add more.' },
+            { status: 403 }
+          )
+        }
+      }
     }
-    
+
     // Extract basic listing data from parsed propertyData
     const listingData = {
       account_type: propertyData.account_type || 'developer',

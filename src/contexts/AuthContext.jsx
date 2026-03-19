@@ -138,7 +138,7 @@ export const AuthProvider = ({ children }) => {
         return null
       }
 
-      // Fetch active subscription with package details
+      // Fetch active PACKAGE subscription only (not addons) – the main plan
       const { data: subscription, error } = await supabase
         .from('subscriptions')
         .select(`
@@ -160,6 +160,7 @@ export const AuthProvider = ({ children }) => {
         `)
         .eq('user_id', userId)
         .eq('user_type', dbUserType)
+        .eq('subscriptions_type', 'package')
         .in('status', ['pending', 'active', 'grace_period'])
         .order('created_at', { ascending: false })
         .limit(1)

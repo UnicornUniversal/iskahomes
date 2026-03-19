@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react'
 import DevelopmentHeaders from '@/app/components/developers/DevelopmentHeaders'
 import DeveloperCard from '@/app/components/developers/DeveloperCard'
+import GeneralHeader from '@/app/components/general/GeneralHeader'
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner'
 import useInfiniteScroll from '@/hooks/useInfiniteScroll'
 import Layout1 from '@/app/layout/Layout1'
@@ -135,33 +136,34 @@ const AllDevelopersPage = () => {
     ))
   ), [developers])
 
+  const headerImages = [
+    {
+      src: 'https://images.unsplash.com/photo-1487958449943-2429e8be8625?auto=format&fit=crop&w=900&q=80',
+      alt: 'Large mixed-use development'
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1460317442991-0ec209397118?auto=format&fit=crop&w=900&q=80',
+      alt: 'Urban towers at sunset'
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=900&q=80',
+      alt: 'High-end residential interior'
+    }
+  ]
+
   return (
     <>
     <Nav />
     <Layout1>
-        <div className="min-h-screen">
-      <div className=" mx-auto md:px-4 ">
-        {/* Header */}
-        <div className=" md:p-4 grid grid-cols-3 gap-4 text-left mb-12">
-     <div className="">
-     <h4 className="">
-            Discover 
-          </h4>
-          <h1 className="md:text-[5em]">
-             Developers
-          </h1>
-     </div>
-
-          <p className="max-w-2xl">
-            Explore top developers and their amazing projects. Find your next dream home with trusted developers.
-          </p>
-
-          <div>
-            <p>Total Developers</p>
-            <h1 className="text-primary_color text-[5em] ">24k</h1>
-          </div>
-        </div>
-      </div>
+      <div className="min-h-screen">
+      <GeneralHeader
+        headingOne="Discover"
+        headingTwo="Developers"
+        description="Explore top developers and their amazing projects. Find your next dream home with trusted developers."
+        stats={[{ label: 'Total Developers', value: developers.length }]}
+        images={headerImages}
+        className="mb-8"
+      />
 
       {/* Featured Developers Header - Full Width */}
       <DevelopmentHeaders />

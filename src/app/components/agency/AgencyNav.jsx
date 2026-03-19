@@ -82,6 +82,11 @@ const AgencyNav = () => {
             icon: FiCreditCard
         },
         {
+            label: 'Subscriptions',
+            href: `/agency/${slug}/subscriptions`,
+            icon: FiCreditCard
+        },
+        {
             label: 'Team',
             href: `/agency/${slug}/team`,
             icon: FiShield,

@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 import { getDeveloperId } from '@/lib/developerIdHelper'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { getSubscriptionLimitsForUser } from '@/lib/subscriptionLimitsServer'
 
 function toCamel(obj) {
   if (!obj) return null
@@ -40,6 +41,14 @@ export async function GET(request) {
 
     const developerId = await getDeveloperId(userInfo)
     if (!developerId) return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
+
+    const { hasClientManagementAddon } = await getSubscriptionLimitsForUser(developerId, 'developer')
+    if (!hasClientManagementAddon) {
+      return NextResponse.json(
+        { error: 'Client management requires the Additional Addons subscription. Please subscribe to access this feature.' },
+        { status: 403 }
+      )
+    }
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
@@ -128,6 +137,14 @@ export async function POST(request) {
 
     const developerId = await getDeveloperId(userInfo)
     if (!developerId) return NextResponse.json({ error: 'Developer not found' }, { status: 404 })
+
+    const { hasClientManagementAddon } = await getSubscriptionLimitsForUser(developerId, 'developer')
+    if (!hasClientManagementAddon) {
+      return NextResponse.json(
+        { error: 'Client management requires the Additional Addons subscription. Please subscribe to access this feature.' },
+        { status: 403 }
+      )
+    }
 
     const body = await request.json()
     const {

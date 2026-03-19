@@ -3,6 +3,9 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 import { captureAuditEvent } from '@/lib/auditLogger'
 
+const ACTIVE_SUBSCRIPTION_STATUSES = ['pending', 'active', 'grace_period']
+const VALID_SUBSCRIPTION_TYPES = ['package', 'addon']
+
 // GET - Fetch user's current subscription
 export async function GET(request) {
   try {
@@ -87,7 +90,7 @@ export async function GET(request) {
       }
     }
 
-    // Get current subscription
+    // Get current main package subscription
     const { data: subscription, error: subError } = await supabaseAdmin
       .from('subscriptions')
       .select(`
@@ -96,6 +99,7 @@ export async function GET(request) {
           id,
           name,
           description,
+          subscriptions_type,
           features,
           local_currency_price,
           international_currency_price,
@@ -106,7 +110,8 @@ export async function GET(request) {
       `)
       .eq('user_id', userId)
       .eq('user_type', dbUserType)
-      .in('status', ['pending', 'active', 'grace_period'])
+      .eq('subscriptions_type', 'package')
+      .in('status', ACTIVE_SUBSCRIPTION_STATUSES)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -116,6 +121,38 @@ export async function GET(request) {
       return NextResponse.json({ 
         error: 'Failed to fetch subscription', 
         details: subError.message 
+      }, { status: 500 })
+    }
+
+    // Get active addon subscriptions for this user
+    const { data: addons, error: addonsError } = await supabaseAdmin
+      .from('subscriptions')
+      .select(`
+        *,
+        subscriptions_package:package_id (
+          id,
+          name,
+          description,
+          subscriptions_type,
+          features,
+          local_currency_price,
+          international_currency_price,
+          duration,
+          span,
+          display_text
+        )
+      `)
+      .eq('user_id', userId)
+      .eq('user_type', dbUserType)
+      .eq('subscriptions_type', 'addon')
+      .in('status', ACTIVE_SUBSCRIPTION_STATUSES)
+      .order('created_at', { ascending: false })
+
+    if (addonsError) {
+      console.error('Database error (addons):', addonsError)
+      return NextResponse.json({
+        error: 'Failed to fetch addon subscriptions',
+        details: addonsError.message
       }, { status: 500 })
     }
 
@@ -133,6 +170,7 @@ export async function GET(request) {
     return NextResponse.json({ 
       success: true,
       data: subscription || null,
+      addons: addons || [],
       currency: currency // Return determined currency
     })
 
@@ -162,10 +200,15 @@ export async function POST(request) {
     }
 
     const body = await request.json()
-    const { package_id, payment_method } = body
+    const { package_id, payment_method, subscriptions_type } = body
 
     if (!package_id) {
       return NextResponse.json({ error: 'Package ID is required' }, { status: 400 })
+    }
+
+    const normalizedSubscriptionType = String(subscriptions_type || 'package').toLowerCase()
+    if (!VALID_SUBSCRIPTION_TYPES.includes(normalizedSubscriptionType)) {
+      return NextResponse.json({ error: 'subscriptions_type must be package or addon' }, { status: 400 })
     }
 
     // Get user type and ID
@@ -253,8 +296,23 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Package not found or inactive' }, { status: 404 })
     }
 
+    const packageType = String(packageData.subscriptions_type || 'package').toLowerCase()
+    if (!VALID_SUBSCRIPTION_TYPES.includes(packageType)) {
+      return NextResponse.json({ error: 'Selected package has invalid subscriptions_type' }, { status: 400 })
+    }
+    if (packageType !== normalizedSubscriptionType) {
+      return NextResponse.json({
+        error: `Selected item is a ${packageType}, but request sent ${normalizedSubscriptionType}`
+      }, { status: 400 })
+    }
+
     // Check if package is for correct user type
-    if (packageData.user_type && packageData.user_type !== dbUserType + 's') {
+    const isPackageAllowedForUser =
+      !packageData.user_type ||
+      packageData.user_type === 'all' ||
+      packageData.user_type === dbUserType + 's'
+
+    if (!isPackageAllowedForUser) {
       return NextResponse.json({ 
         error: 'This package is not available for your user type' 
       }, { status: 400 })
@@ -306,15 +364,6 @@ export async function POST(request) {
     const gracePeriodEndDate = new Date(endDate)
     gracePeriodEndDate.setDate(gracePeriodEndDate.getDate() + 7)
 
-    // Check if user has an existing active subscription
-    const { data: existingSub, error: existingError } = await supabaseAdmin
-      .from('subscriptions')
-      .select('id, status, package_id')
-      .eq('user_id', userId)
-      .eq('user_type', dbUserType)
-      .in('status', ['pending', 'active', 'grace_period'])
-      .maybeSingle()
-
     let subscriptionId
     let subscriptionData
 
@@ -324,12 +373,55 @@ export async function POST(request) {
       initialStatus = 'active'
     }
 
+    let existingSub = null
+    if (normalizedSubscriptionType === 'package') {
+      const { data: existingPackageSub, error: existingPackageError } = await supabaseAdmin
+        .from('subscriptions')
+        .select('id, status, package_id')
+        .eq('user_id', userId)
+        .eq('user_type', dbUserType)
+        .eq('subscriptions_type', 'package')
+        .in('status', ACTIVE_SUBSCRIPTION_STATUSES)
+        .maybeSingle()
+
+      if (existingPackageError) {
+        console.error('Existing package subscription error:', existingPackageError)
+        return NextResponse.json({
+          error: 'Failed to check current package subscription',
+          details: existingPackageError.message
+        }, { status: 500 })
+      }
+
+      existingSub = existingPackageSub
+    } else {
+      const { data: existingAddonSub, error: existingAddonError } = await supabaseAdmin
+        .from('subscriptions')
+        .select('id, status, package_id')
+        .eq('user_id', userId)
+        .eq('user_type', dbUserType)
+        .eq('subscriptions_type', 'addon')
+        .eq('package_id', package_id)
+        .in('status', ACTIVE_SUBSCRIPTION_STATUSES)
+        .maybeSingle()
+
+      if (existingAddonError) {
+        console.error('Existing addon subscription error:', existingAddonError)
+        return NextResponse.json({
+          error: 'Failed to check current addon subscription',
+          details: existingAddonError.message
+        }, { status: 500 })
+      }
+
+      existingSub = existingAddonSub
+    }
+
     if (existingSub) {
       // Update existing subscription (upgrade/downgrade)
       const { data: updatedSub, error: updateError } = await supabaseAdmin
         .from('subscriptions')
         .update({
           package_id,
+          subscriptions_type: normalizedSubscriptionType,
           status: initialStatus,
           currency,
           amount,
@@ -369,9 +461,14 @@ export async function POST(request) {
           to_package_id: package_id,
           from_status: existingSub.status,
           to_status: initialStatus,
-          reason: fromPackageId !== package_id ? 'User changed subscription plan' : 'User renewed subscription',
+          reason: fromPackageId !== package_id
+            ? `User changed ${normalizedSubscriptionType} plan`
+            : `User renewed ${normalizedSubscriptionType}`,
           changed_by: 'user',
-          changed_by_user_id: userId
+          changed_by_user_id: userId,
+          metadata: {
+            subscriptions_type: normalizedSubscriptionType
+          }
         })
 
     } else {
@@ -382,6 +479,7 @@ export async function POST(request) {
           user_id: userId,
           user_type: dbUserType,
           package_id,
+          subscriptions_type: normalizedSubscriptionType,
           status: initialStatus,
           currency,
           amount,
@@ -417,9 +515,14 @@ export async function POST(request) {
           event_date: new Date().toISOString(),
           to_package_id: package_id,
           to_status: initialStatus,
-          reason: isFreePlan ? 'User selected free plan' : 'User selected subscription package',
+          reason: isFreePlan
+            ? `User selected free ${normalizedSubscriptionType} plan`
+            : `User selected ${normalizedSubscriptionType} package`,
           changed_by: 'user',
-          changed_by_user_id: userId
+          changed_by_user_id: userId,
+          metadata: {
+            subscriptions_type: normalizedSubscriptionType
+          }
         })
     }
 
@@ -505,6 +608,7 @@ export async function POST(request) {
           id,
           name,
           description,
+          subscriptions_type,
           features,
           local_currency_price,
           international_currency_price,
@@ -516,13 +620,13 @@ export async function POST(request) {
       .eq('id', subscriptionId)
       .single()
 
-    let message = 'Subscription created successfully.'
+    let message = `${normalizedSubscriptionType === 'addon' ? 'Addon' : 'Subscription'} created successfully.`
     if (isFreePlan) {
-      message = 'Free plan activated successfully!'
+      message = `Free ${normalizedSubscriptionType} plan activated successfully!`
     } else if (payment_method === 'manual') {
-      message = 'Subscription request created. Please submit payment proof for admin review.'
+      message = `${normalizedSubscriptionType === 'addon' ? 'Addon' : 'Subscription'} request created. Please submit payment proof for admin review.`
     } else {
-      message = 'Subscription created successfully. Payment pending admin confirmation.'
+      message = `${normalizedSubscriptionType === 'addon' ? 'Addon' : 'Subscription'} created successfully. Payment pending admin confirmation.`
     }
 
     captureAuditEvent('subscription_created', {
@@ -533,6 +637,7 @@ export async function POST(request) {
       api_route: '/api/subscriptions',
       resource_id: subscriptionId,
       package_id,
+      subscriptions_type: normalizedSubscriptionType,
     });
 
     return NextResponse.json({ 

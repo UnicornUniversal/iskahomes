@@ -4,6 +4,8 @@ import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 import { captureAuditEvent } from '@/lib/auditLogger'
 import { cache } from 'react'
 import { invalidateDevelopmentsCache } from '@/lib/cacheInvalidation'
+import { getSubscriptionLimitsForUser } from '@/lib/subscriptionLimitsServer'
+import { checkNumericLimit } from '@/lib/subscriptionLimits'
 
 // Helper function to update developer's total_developments count
 async function updateDeveloperTotalDevelopments(developerIdFromRequest) {
@@ -322,6 +324,21 @@ export async function POST(request) {
         return NextResponse.json({ error: 'Invalid developer ID' }, { status: 403 })
       }
       actualDeveloperId = developer_id
+    }
+
+    const { limits } = await getSubscriptionLimitsForUser(actualDeveloperId, 'developer')
+    const { count: currentDevelopments } = await supabaseAdmin
+      .from('developments')
+      .select('*', { count: 'exact', head: true })
+      .eq('developer_id', actualDeveloperId)
+      .neq('development_status', 'deleted')
+    const countAfterCreate = (currentDevelopments ?? 0) + 1
+    const { allowed } = checkNumericLimit(limits, 'developments_limit', countAfterCreate)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'You have reached your plan limit for developments. Please upgrade your subscription to add more.' },
+        { status: 403 }
+      )
     }
 
     // Debug: Log the data being sent

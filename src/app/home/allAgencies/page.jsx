@@ -1,7 +1,8 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import Layout1 from '@/app/layout/Layout1'
-import { FiSearch, FiFilter, FiMapPin, FiCheckCircle, FiX, FiBriefcase } from 'react-icons/fi'
+import GeneralHeader from '@/app/components/general/GeneralHeader'
+import { FiSearch, FiMapPin, FiCheckCircle, FiX } from 'react-icons/fi'
 import Link from 'next/link'
 
 const AllAgencies = () => {
@@ -89,6 +90,21 @@ const AllAgencies = () => {
     setSelectedCountry('')
   }
 
+  const headerImages = [
+    {
+      src: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=900&q=80',
+      alt: 'Modern agency office building'
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=900&q=80',
+      alt: 'Contemporary architecture detail'
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=900&q=80',
+      alt: 'Luxury residential area'
+    }
+  ]
+
   if (loading) {
     return (
       <Layout1>
@@ -127,17 +143,14 @@ const AllAgencies = () => {
         <div className="fixed inset-0 pointer-events-none z-[-1] ocean-sunset_main_bg opacity-30"></div>
         <div className="fixed inset-0 pointer-events-none z-[-2] bg-white/80"></div>
 
-        {/* Hero Section */}
-        <div className="relative pt-12 pb-20 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto text-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-primary_color mb-6 tracking-tight">
-              Premier Real Estate Agencies
-            </h1>
-            <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto font-light leading-relaxed">
-              Discover trusted partners for your property journey. From luxury estates to commercial investments, connect with Ghana's finest real estate professionals.
-            </p>
-          </div>
-        </div>
+        <GeneralHeader
+          headingOne="Discover"
+          headingTwo="Agencies"
+          description="Discover trusted partners for your property journey. From luxury estates to commercial investments, connect with Ghana's finest real estate professionals."
+          stats={[{ label: 'Total Agencies', value: agencies.length }]}
+          images={headerImages}
+          className="pb-10"
+        />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
           {/* Filters Section - Glassmorphic Design */}

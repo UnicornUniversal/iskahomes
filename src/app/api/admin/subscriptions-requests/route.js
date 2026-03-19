@@ -213,6 +213,7 @@ export async function PUT(request) {
       if (!packageData) {
         return NextResponse.json({ error: 'Package not found' }, { status: 404 })
       }
+      const packageSubscriptionType = String(packageData.subscriptions_type || 'package').toLowerCase()
 
       // Calculate subscription dates
       const now = new Date()
@@ -237,13 +238,20 @@ export async function PUT(request) {
       gracePeriodEndDate.setDate(gracePeriodEndDate.getDate() + 7)
 
       // Check if user already has an active subscription
-      const { data: existingSub } = await supabaseAdmin
+      let existingSubscriptionQuery = supabaseAdmin
         .from('subscriptions')
         .select('id, status, package_id')
         .eq('user_id', requestData.user_id)
         .eq('user_type', requestData.user_type)
+        .eq('subscriptions_type', packageSubscriptionType)
         .in('status', ['pending', 'active', 'grace_period'])
-        .maybeSingle()
+
+      // For addons, only update an existing subscription if it is the same addon package.
+      if (packageSubscriptionType === 'addon') {
+        existingSubscriptionQuery = existingSubscriptionQuery.eq('package_id', requestData.package_id)
+      }
+
+      const { data: existingSub } = await existingSubscriptionQuery.maybeSingle()
 
       let subscriptionId
       let invoiceId
@@ -254,6 +262,7 @@ export async function PUT(request) {
           .from('subscriptions')
           .update({
             package_id: requestData.package_id,
+            subscriptions_type: packageSubscriptionType,
             status: 'active',
             currency: requestData.currency,
             amount: requestData.amount,
@@ -314,6 +323,7 @@ export async function PUT(request) {
             user_id: requestData.user_id,
             user_type: requestData.user_type,
             package_id: requestData.package_id,
+            subscriptions_type: packageSubscriptionType,
             status: 'active',
             currency: requestData.currency,
             amount: requestData.amount,

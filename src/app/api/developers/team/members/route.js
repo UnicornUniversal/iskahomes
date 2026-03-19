@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest, requirePermission } from '@/lib/apiPermissionMiddleware'
 import { sendTeamMemberInvitationEmail } from '@/lib/sendgrid'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { getSubscriptionLimitsForUser } from '@/lib/subscriptionLimitsServer'
+import { checkNumericLimit } from '@/lib/subscriptionLimits'
 import crypto from 'crypto'
 
 // GET - Fetch all team members for a developer organization
@@ -116,6 +118,23 @@ export async function POST(request) {
 
     if (!role) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
+    }
+
+    const subscriptionUserId = userInfo.developer_id || userInfo.agency_id || userInfo.user_id
+    const dbUserType = organizationType === 'agency' ? 'agency' : 'developer'
+    const { limits } = await getSubscriptionLimitsForUser(subscriptionUserId, dbUserType)
+    const { count: currentMembers } = await supabaseAdmin
+      .from('organization_team_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('organization_id', organizationId)
+      .eq('organization_type', organizationType)
+      .eq('status', 'active')
+    const { allowed } = checkNumericLimit(limits, 'total_users_limit', (currentMembers ?? 0) + 1)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'You have reached your plan limit for team members. Please upgrade your subscription to add more.' },
+        { status: 403 }
+      )
     }
 
     // Check if email already exists for this organization

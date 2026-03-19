@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 import { sendAgentInvitationEmail } from '@/lib/sendgrid'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { getSubscriptionLimitsForUser } from '@/lib/subscriptionLimitsServer'
+import { checkNumericLimit } from '@/lib/subscriptionLimits'
 import crypto from 'crypto'
 
 // POST - Send agent invitation
@@ -35,6 +37,19 @@ export async function POST(request) {
     }
     if (!agencyId) {
       return NextResponse.json({ error: 'Agency not found' }, { status: 401 })
+    }
+
+    const { limits } = await getSubscriptionLimitsForUser(agencyId, 'agency')
+    const { count: currentAgents } = await supabaseAdmin
+      .from('agents')
+      .select('*', { count: 'exact', head: true })
+      .eq('agency_id', agencyId)
+    const { allowed } = checkNumericLimit(limits, 'number_of_agents', (currentAgents ?? 0) + 1)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'You have reached your plan limit for agents. Please upgrade your subscription to add more.' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()

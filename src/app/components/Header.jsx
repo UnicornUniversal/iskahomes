@@ -60,16 +60,16 @@ const Header = () => {
     "https://images.unsplash.com/photo-1723110994499-df46435aa4b3?q=80&w=1179&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
   ]
 
-  // Cross-fade through images while loading
+  // Cross-fade through placeholder images when loading or when no featured properties
   useEffect(() => {
-    if (loading) {
+    const showPlaceholder = loading || headerProperties.length === 0
+    if (showPlaceholder) {
       const interval = setInterval(() => {
         setCurrentImageIndex((prev) => (prev + 1) % loadingImages.length)
-      }, 2000) // Change image every 2 seconds
-
+      }, 2000)
       return () => clearInterval(interval)
     }
-  }, [loading, loadingImages.length])
+  }, [loading, headerProperties.length, loadingImages.length])
 
   useEffect(() => {
     const fetchFeaturedListings = async () => {
@@ -350,44 +350,9 @@ const Header = () => {
           </div>
         </motion.div>
 
-        {/* right side - Swiper carousel */}
-        <div className="w-full lg:w-[44%]  relative">
-          {loading ? (
-            <motion.div
-              initial={{ scale: 0.7, opacity: 0 }}
-              animate={{ scale: 0.7, opacity: 1 }}
-              exit={{ scale: 1, opacity: 0 }}
-              transition={{ duration: 0.5 }}
-              className="h-[260px] sm:h-[300px] md:h-[340px] w-full max-w-[360px] mx-auto relative overflow-hidden shadow-lg rounded-t-[200px]"
-           
-            >
-              {/* Cross-fading images */}
-              <div className="relative h-full w-full">
-                {loadingImages.map((image, idx) => (
-                  <motion.div
-                    key={idx}
-                    className="absolute inset-0"
-                    initial={{ opacity: 0 }}
-                    animate={{
-                      opacity: idx === currentImageIndex ? 1 : 0,
-                    }}
-                    transition={{
-                      duration: 1,
-                      ease: "easeInOut"
-                    }}
-                  >
-                    <Image
-                      src={image}
-                      alt={`Real estate ${idx + 1}`}
-                      fill
-                      className="object-cover"
-                      priority={idx === 0}
-                    />
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          ) : headerProperties.length > 0 ? (
+        {/* right side - Swiper carousel or same-size placeholder (loading / no featured) */}
+        <div className="w-full lg:w-[44%] relative">
+          {headerProperties.length > 0 ? (
             <motion.div
               initial={{ scale: 0.7, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -404,32 +369,30 @@ const Header = () => {
                 className="header-featured-swiper h-full w-full"
               >
                 {headerProperties.map((property, idx) => (
-                  <SwiperSlide key={property.id || idx} className='relative h-full w-full'>
-                    <div className='relative h-full w-full flex flex-col'>
-                      <div className='relative h-[350px] sm:h-[500px] md:h-[400px] w-full overflow-hidden rounded-t-[200px] shadow-lg'>
-                      <Image 
-                        src={property.property_images[0]} 
-                        alt={property.propertyName} 
-                        fill 
-                        className='object-cover'
-                        priority={idx === 0}
-                      />
+                  <SwiperSlide key={property.id || idx} className="relative h-full w-full">
+                    <div className="relative h-full w-full flex flex-col">
+                      <div className="relative h-[350px] sm:h-[500px] md:h-[400px] w-full overflow-hidden rounded-t-[200px] shadow-lg">
+                        <Image
+                          src={property.property_images[0]}
+                          alt={property.propertyName}
+                          fill
+                          className="object-cover"
+                          priority={idx === 0}
+                        />
                       </div>
-                      <div className='pt-3 text-primary_color'>
-                       <span className='flex items-center justify-between flex-wrap gap-2'>
-                       <h6 className='text-sm font-medium bg-primary_color text-white px-2 py-1 rounded-md  tracking-wide'>{property.propertyType}</h6>
-                        <p className='text-base font-semibold mt-1'>{property.propertyPrice}</p>
-                       
-                       </span>
-                        <h3 className='text-[1.2rem] leading-tight font-semibold mt-1'>{property.propertyName}</h3>
-  
-                        <p className='text-sm mt-1'>{property.propertyLocation}</p>
+                      <div className="pt-3 text-primary_color">
+                        <span className="flex items-center justify-between flex-wrap gap-2">
+                          <h6 className="text-sm font-medium bg-primary_color text-white px-2 py-1 rounded-md tracking-wide">{property.propertyType}</h6>
+                          <p className="text-base font-semibold mt-1">{property.propertyPrice}</p>
+                        </span>
+                        <h3 className="text-[1.2rem] leading-tight font-semibold mt-1">{property.propertyName}</h3>
+                        <p className="text-sm mt-1">{property.propertyLocation}</p>
                         {property.specifications?.length > 0 && (
-                          <div className='mt-2 flex flex-wrap gap-x-4 gap-y-2 text-base'>
+                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-base">
                             {property.specifications.map((spec, specIndex) => (
                               <span
                                 key={`${property.id || idx}-spec-${specIndex}`}
-                                className='text-primary_color inline-flex items-center gap-1.5'
+                                className="text-primary_color inline-flex items-center gap-1.5"
                               >
                                 {spec.icon ? <spec.icon className="h-4 w-4" /> : null}
                                 <span>{spec.label}</span>
@@ -444,9 +407,38 @@ const Header = () => {
               </Swiper>
             </motion.div>
           ) : (
-            <div className="h-full w-full flex items-center justify-center">
-              <div className="text-gray-500">No featured properties available</div>
-            </div>
+            <motion.div
+              initial={{ scale: 0.7, opacity: 0 }}
+              animate={{ scale: 0.7, opacity: 1 }}
+              transition={{ duration: 0.5 }}
+              className="w-full max-w-[360px] mx-auto relative overflow-hidden shadow-lg rounded-t-[200px] h-[350px] sm:h-[500px] md:h-[400px]"
+            >
+              {/* Same width/height as featured carousel – show loading/placeholder images */}
+              <div className="relative h-full w-full">
+                {loadingImages.map((image, idx) => (
+                  <motion.div
+                    key={idx}
+                    className="absolute inset-0"
+                    initial={{ opacity: 0 }}
+                    animate={{
+                      opacity: idx === currentImageIndex ? 1 : 0,
+                    }}
+                    transition={{
+                      duration: 1,
+                      ease: "easeInOut"
+                    }}
+                  >
+                    <Image
+                      src={image}
+                      alt={`Featured property ${idx + 1}`}
+                      fill
+                      className="object-cover"
+                      priority={idx === 0}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
           )}
         </div>
       </div>

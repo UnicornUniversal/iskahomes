@@ -26,6 +26,7 @@ const PackageSinglePage = () => {
     span: '',
     display_text: '',
     ideal_duration: '',
+    subscriptions_type: 'package',
     user_type: '',
     is_active: true
   })
@@ -124,6 +125,7 @@ const PackageSinglePage = () => {
         span: pkg?.span || '',
         display_text: pkg?.display_text || '',
         ideal_duration: pkg?.ideal_duration?.toString() || '',
+        subscriptions_type: pkg?.subscriptions_type || 'package',
         user_type: pkg?.user_type || '',
         is_active: pkg?.is_active !== false
       })
@@ -314,6 +316,7 @@ const PackageSinglePage = () => {
           span: formData.span || null,
           display_text: formData.display_text || null,
           ideal_duration: formData.ideal_duration ? parseInt(formData.ideal_duration, 10) : null,
+          subscriptions_type: formData.subscriptions_type || 'package',
           user_type: formData.user_type ? formData.user_type.toLowerCase() : null,
           features: formData.features,
           api_limits: buildApiLimitsObject(formData.api_limits)
@@ -536,6 +539,30 @@ const PackageSinglePage = () => {
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Subscription Type
+            </label>
+            <div className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
+              <input
+                type="checkbox"
+                id="is_addon"
+                checked={formData.subscriptions_type === 'addon'}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  subscriptions_type: e.target.checked ? 'addon' : 'package'
+                }))}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="is_addon" className="text-sm font-medium text-gray-700">
+                This package is an addon
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Unchecked = main package, checked = addon package.
+            </p>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               User Type
               <span className="text-xs text-gray-500 ml-2">Required for paid plans</span>
@@ -550,6 +577,7 @@ const PackageSinglePage = () => {
               <option value="developers">Developers</option>
               <option value="agents">Agents</option>
               <option value="agencies">Agencies</option>
+              <option value="all">All Users</option>
             </select>
           </div>
 

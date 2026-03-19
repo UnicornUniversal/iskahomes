@@ -19,7 +19,8 @@ export async function GET(request) {
       const validUserTypes = ['developers', 'agents', 'agencies']
       const userTypeLower = userType.toLowerCase()
       if (validUserTypes.includes(userTypeLower)) {
-        query = query.eq('user_type', userTypeLower)
+        // Include packages meant for the specific type + global packages + legacy null user_type
+        query = query.or(`user_type.eq.${userTypeLower},user_type.eq.all,user_type.is.null`)
       }
     }
 

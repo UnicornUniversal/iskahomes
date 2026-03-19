@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   user_id UUID NOT NULL,
   user_type VARCHAR(20) NOT NULL CHECK (user_type IN ('developer', 'agent', 'agency')),
   package_id UUID NOT NULL REFERENCES subscriptions_package(id) ON DELETE RESTRICT,
+  subscriptions_type VARCHAR(20) NOT NULL DEFAULT 'package' CHECK (subscriptions_type IN ('package', 'addon')),
   
   -- Status & Dates
   status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'expired', 'cancelled', 'suspended', 'grace_period')),
@@ -48,15 +49,18 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user_type ON subscriptions(user_type);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_package_id ON subscriptions(package_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_subscriptions_type ON subscriptions(subscriptions_type);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_end_date ON subscriptions(end_date);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_grace_period_end_date ON subscriptions(grace_period_end_date);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user_composite ON subscriptions(user_id, user_type, status);
 
--- Create unique constraint: one active subscription per user
-CREATE UNIQUE INDEX IF NOT EXISTS idx_subscriptions_unique_active_user 
+-- Create unique constraint: one active MAIN package subscription per user.
+-- Addon subscriptions can coexist as separate rows.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_subscriptions_unique_active_main_package
 ON subscriptions(user_id, user_type) 
-WHERE status IN ('active', 'grace_period', 'pending');
+WHERE status IN ('active', 'grace_period', 'pending')
+  AND subscriptions_type = 'package';
 
 -- =============================================
 -- 2. SUBSCRIPTION_HISTORY TABLE
@@ -275,6 +279,7 @@ COMMENT ON COLUMN subscriptions.status IS 'Subscription status: pending (awaitin
 COMMENT ON COLUMN subscriptions.grace_period_end_date IS 'Calculated as end_date + 7 days. User has access until this date even after end_date passes';
 COMMENT ON COLUMN subscriptions.auto_renew IS 'Whether subscription should auto-renew (currently false since payments are manual)';
 COMMENT ON COLUMN subscriptions.duration_months IS 'Actual subscription duration in months (e.g., 1, 3, 12)';
+COMMENT ON COLUMN subscriptions.subscriptions_type IS 'Subscription kind: package (main subscription) or addon (optional feature subscription)';
 
 -- Subscription history table comments
 COMMENT ON TABLE subscription_history IS 'Audit trail of all subscription changes and events';
