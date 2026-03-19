@@ -14,12 +14,19 @@ const LEAD_ORIGIN_OPTIONS = [
   { value: 'other', label: 'Other' }
 ]
 
+const LEAD_CLASSIFICATION_OPTIONS = [
+  { value: 'Premium', label: 'Premium' },
+  { value: 'High Value', label: 'High Value' },
+  { value: 'Standard', label: 'Standard' }
+]
+
 export default function AddLeadModal({ isOpen, onClose, onSubmit, listerId, listerType, token }) {
   const [form, setForm] = useState({
     lead_name: '',
     lead_email: '',
     lead_phone: '',
     lead_origin: 'platform',
+    lead_classification: 'Standard',
     listing_id: '',
     development_id: '',
     notes: ''
@@ -78,6 +85,7 @@ export default function AddLeadModal({ isOpen, onClose, onSubmit, listerId, list
         lead_email: form.lead_email?.trim() || null,
         lead_phone: form.lead_phone?.trim() || null,
         lead_origin: form.lead_origin,
+        lead_classification: form.lead_classification || 'Standard',
         listing_id: form.listing_id || null,
         development_id: form.development_id || null,
         lister_id: listerId,
@@ -97,7 +105,16 @@ export default function AddLeadModal({ isOpen, onClose, onSubmit, listerId, list
       if (data.success) {
         onSubmit?.(data.lead)
         onClose?.()
-        setForm({ lead_name: '', lead_email: '', lead_phone: '', lead_origin: 'platform', listing_id: '', development_id: '', notes: '' })
+        setForm({
+          lead_name: '',
+          lead_email: '',
+          lead_phone: '',
+          lead_origin: 'platform',
+          lead_classification: 'Standard',
+          listing_id: '',
+          development_id: '',
+          notes: ''
+        })
       } else {
         setError(data.error || 'Failed to create lead')
       }
@@ -176,6 +193,19 @@ export default function AddLeadModal({ isOpen, onClose, onSubmit, listerId, list
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary_color/20 focus:border-primary_color"
             >
               {LEAD_ORIGIN_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Lead Classification</label>
+            <select
+              name="lead_classification"
+              value={form.lead_classification}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary_color/20 focus:border-primary_color"
+            >
+              {LEAD_CLASSIFICATION_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>

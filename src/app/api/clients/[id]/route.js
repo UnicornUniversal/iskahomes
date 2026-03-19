@@ -29,6 +29,32 @@ function toCamelClient(obj) {
   }
 }
 
+function resolveDeveloperPrimaryCurrency(developerRecord) {
+  let primaryCurrency = 'USD'
+  if (!developerRecord) return primaryCurrency
+
+  if (developerRecord.company_locations && Array.isArray(developerRecord.company_locations)) {
+    const primaryLocation = developerRecord.company_locations.find(
+      loc => loc.primary_location === true || loc.primary_location === 'true'
+    )
+    if (primaryLocation?.currency) primaryCurrency = primaryLocation.currency
+  }
+
+  if (primaryCurrency === 'USD' && developerRecord.default_currency) {
+    let defaultCurrency = developerRecord.default_currency
+    if (typeof defaultCurrency === 'string') {
+      try {
+        defaultCurrency = JSON.parse(defaultCurrency)
+      } catch {
+        if (defaultCurrency.trim()) return defaultCurrency.trim()
+      }
+    }
+    if (defaultCurrency?.code) primaryCurrency = defaultCurrency.code
+  }
+
+  return primaryCurrency
+}
+
 async function getDeveloperOrgId(developerId) {
   const { data } = await supabaseAdmin
     .from('developers')
@@ -126,31 +152,54 @@ export async function GET(request, { params }) {
       serviceChargesRaw = scData || []
     }
 
+    const { data: developerRecord } = await supabaseAdmin
+      .from('developers')
+      .select('company_locations, default_currency')
+      .eq('developer_id', developerId)
+      .maybeSingle()
+    const primaryCurrency = resolveDeveloperPrimaryCurrency(developerRecord)
+
     let assignedUsers = []
     if (assignments?.length && orgId) {
       const userIds = [...new Set(assignments.map(a => a.user_id))]
       const { data: teamMembers } = await supabaseAdmin
         .from('organization_team_members')
-        .select('user_id, first_name, last_name')
+        .select('user_id, first_name, last_name, role_id')
         .eq('organization_type', 'developer')
         .eq('organization_id', orgId)
         .in('user_id', userIds)
 
       const nameMap = {}
+      const roleByUser = {}
       ;(teamMembers || []).forEach(t => {
         nameMap[t.user_id] = [t.first_name, t.last_name].filter(Boolean).join(' ').trim() || 'Unknown'
+        roleByUser[t.user_id] = t.role_id || null
       })
+
+      const roleIds = [...new Set((teamMembers || []).map(t => t.role_id).filter(Boolean))]
+      let roleMap = {}
+      if (roleIds.length) {
+        const { data: roles } = await supabaseAdmin
+          .from('organization_roles')
+          .select('id, name')
+          .in('id', roleIds)
+        roleMap = (roles || []).reduce((m, r) => {
+          m[r.id] = r.name
+          return m
+        }, {})
+      }
 
       assignedUsers = assignments.map(a => ({
         id: a.user_id,
         name: nameMap[a.user_id] || 'Unknown',
-        role: a.role,
+        role: a.role || roleMap[roleByUser[a.user_id]] || 'Team member',
         permissions: a.permissions || {}
       }))
     }
 
     const clientsProperties = client.clients_properties || []
     let units = []
+    let sales = []
     if (clientsProperties.length) {
       const listingIds = clientsProperties.map(p => (typeof p === 'object' ? p?.id : p)).filter(Boolean)
       if (listingIds.length) {
@@ -158,11 +207,12 @@ export async function GET(request, { params }) {
           .from('listings')
           .select('id, title, development_id, media, country, state, city, town, full_address, price, currency, price_type, status, estimated_revenue')
           .in('id', listingIds)
-        const { data: sales } = await supabaseAdmin
+        const { data: salesData } = await supabaseAdmin
           .from('sales_listings')
           .select('listing_id, sale_date, sale_price, currency')
           .in('listing_id', listingIds)
           .order('sale_date', { ascending: false })
+        sales = salesData || []
         const saleMap = (sales || []).reduce((m, s) => {
           if (!m[s.listing_id]) m[s.listing_id] = s
           return m
@@ -218,6 +268,7 @@ export async function GET(request, { params }) {
       periodStart: c.period_start?.slice?.(0, 10) || null,
       periodEnd: c.period_end?.slice?.(0, 10) || null,
       nextDueDate: c.next_due_date?.slice?.(0, 10) || null,
+      nextDueTime: c.next_due_time?.slice?.(0, 5) || '08:00',
       nextDueStatus: c.next_due_status || 'not_due',
       overdueTime: c.overdue_time ?? 0,
       status: c.status,
@@ -250,7 +301,10 @@ export async function GET(request, { params }) {
         id: d.id,
         fileName: d.file_name,
         fileUrl: d.file_url
-      }))
+      })),
+      totalUnitsPurchased: 0,
+      totalSalesRevenue: 0,
+      totalSalesCurrency: primaryCurrency
     }
 
     const txListingIds = [...new Set((transactions || []).map(t => t.unit_id).filter(Boolean))]
@@ -291,6 +345,15 @@ export async function GET(request, { params }) {
         }
       })
     }
+
+    const totalSalesRevenue = (sales || []).reduce((sum, sale) => {
+      const amount = typeof sale?.sale_price === 'string' ? parseFloat(sale.sale_price) : (sale?.sale_price || 0)
+      if (!Number.isFinite(amount)) return sum
+      return sum + amount
+    }, 0)
+    const totalUnitsPurchased = new Set((sales || []).map(s => s.listing_id).filter(Boolean)).size
+    payload.totalSalesRevenue = totalSalesRevenue
+    payload.totalUnitsPurchased = totalUnitsPurchased || (payload.units || []).length
 
     captureAuditEvent('client_viewed', {
       user_id: userInfo.user_id,

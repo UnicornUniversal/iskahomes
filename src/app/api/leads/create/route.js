@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { captureAuditEvent } from '@/lib/auditLogger'
 import crypto from 'crypto'
 
+const LEAD_CLASSIFICATIONS = ['Premium', 'High Value', 'Standard']
+
 /**
  * Real-time lead creation endpoint
  * Creates leads immediately when user actions occur (phone, message, appointment)
@@ -27,7 +29,8 @@ export async function POST(request) {
       is_logged_in = false,
       timestamp,
       lead_source, // Share medium: whatsapp, copy_link, website, etc.
-      lead_origin // Where from: platform, their_website, etc. (default: platform for automated)
+      lead_origin, // Where from: platform, their_website, etc. (default: platform for automated)
+      lead_classification = 'Standard'
     } = body
 
     // Validation
@@ -42,6 +45,13 @@ export async function POST(request) {
     if (!context_type || !['listing', 'profile', 'development'].includes(context_type)) {
       return NextResponse.json(
         { error: 'Invalid context_type. Must be: listing, profile, or development' },
+        { status: 400 }
+      )
+    }
+
+    if (!LEAD_CLASSIFICATIONS.includes(lead_classification)) {
+      return NextResponse.json(
+        { error: 'Invalid lead_classification value' },
         { status: 400 }
       )
     }
@@ -217,6 +227,7 @@ export async function POST(request) {
         lead_type: 'automated',
         lead_source: lead_source || 'website',
         lead_origin: lead_origin || 'platform',
+        lead_classification,
         lead_actions: [actionObj],
         total_actions: 1,
         lead_score: leadScore,

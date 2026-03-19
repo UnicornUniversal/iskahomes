@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import PasswordField from '@/app/components/PasswordField'
+import Link from 'next/link'
 
 
 const SignupPage = () => {
@@ -308,24 +309,59 @@ const SignupPage = () => {
   )
 }
 
+const TermsAgreementField = ({ checked, onChange }) => (
+  <div className="rounded-xl border border-gray-200 p-4 bg-gray-50">
+    <label className="flex items-start gap-3 cursor-pointer">
+      <input
+        type="checkbox"
+        name="acceptTerms"
+        checked={checked}
+        onChange={onChange}
+        className="mt-1 h-4 w-4 rounded border-gray-300 text-[#17637C] focus:ring-[#17637C]"
+        required
+      />
+      <span className="text-sm text-gray-700 leading-6">
+        I agree to the{' '}
+        <Link href="/home/terms-of-agreement" className="text-[#17637C] font-semibold hover:underline">
+          Terms of Agreement
+        </Link>
+        ,{' '}
+        <Link href="/home/privacy-policy" className="text-[#17637C] font-semibold hover:underline">
+          Privacy Policy
+        </Link>
+        , and{' '}
+        <Link href="/home/cookie-policy" className="text-[#17637C] font-semibold hover:underline">
+          Cookie Policy
+        </Link>
+        .
+      </span>
+    </label>
+  </div>
+)
+
 // Property Seeker Form Component
 const PropertySeekerForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast }) => {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     phone: '',
-    password: ''
+    password: '',
+    acceptTerms: false
   })
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value
     })
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!formData.acceptTerms) {
+      showErrorToast('You must accept the Terms of Agreement to continue.')
+      return
+    }
     setIsLoading(true)
     
     try {
@@ -336,6 +372,7 @@ const PropertySeekerForm = ({ isLoading, setIsLoading, showErrorToast, showSucce
         },
         body: JSON.stringify({
           ...formData,
+          terms_of_agreement: formData.acceptTerms ? 'accepted' : 'awaiting_acceptance',
           userType: 'property_seeker'
         })
       })
@@ -349,7 +386,8 @@ const PropertySeekerForm = ({ isLoading, setIsLoading, showErrorToast, showSucce
           fullName: '',
           email: '',
           phone: '',
-          password: ''
+          password: '',
+          acceptTerms: false
         })
         // Show success toast
         const successMessage = result.message || 'Account created successfully! Please check your email for verification link.'
@@ -416,6 +454,8 @@ const PropertySeekerForm = ({ isLoading, setIsLoading, showErrorToast, showSucce
         placeholder="Enter your password"
       />
 
+      <TermsAgreementField checked={formData.acceptTerms} onChange={handleChange} />
+
       <button
         type="submit"
         disabled={isLoading}
@@ -442,18 +482,23 @@ const AgentForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast }
     phone: '',
     password: '',
     agencyName: '',
-    licenseId: ''
+    licenseId: '',
+    acceptTerms: false
   })
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value
     })
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!formData.acceptTerms) {
+      showErrorToast('You must accept the Terms of Agreement to continue.')
+      return
+    }
     setIsLoading(true)
     
     try {
@@ -464,6 +509,7 @@ const AgentForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast }
         },
         body: JSON.stringify({
           ...formData,
+          terms_of_agreement: formData.acceptTerms ? 'accepted' : 'awaiting_acceptance',
           userType: 'agent'
         })
       })
@@ -479,7 +525,8 @@ const AgentForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast }
           phone: '',
           password: '',
           agencyName: '',
-          licenseId: ''
+          licenseId: '',
+          acceptTerms: false
         })
         // Show success toast
         const successMessage = result.message || 'Account created successfully! Please check your email for verification link.'
@@ -570,6 +617,8 @@ const AgentForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast }
         />
       </div>
 
+      <TermsAgreementField checked={formData.acceptTerms} onChange={handleChange} />
+
       <button
         type="submit"
         disabled={isLoading}
@@ -596,18 +645,23 @@ const AgencyForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast 
     phone: '',
     password: '',
     companyWebsite: '',
-    registrationNumber: ''
+    registrationNumber: '',
+    acceptTerms: false
   })
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value
     })
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!formData.acceptTerms) {
+      showErrorToast('You must accept the Terms of Agreement to continue.')
+      return
+    }
     setIsLoading(true)
     
     try {
@@ -618,6 +672,7 @@ const AgencyForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast 
         },
         body: JSON.stringify({
           ...formData,
+          terms_of_agreement: formData.acceptTerms ? 'accepted' : 'awaiting_acceptance',
           userType: 'agency'
         })
       })
@@ -633,7 +688,8 @@ const AgencyForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast 
           phone: '',
           password: '',
           companyWebsite: '',
-          registrationNumber: ''
+          registrationNumber: '',
+          acceptTerms: false
         })
         // Show success toast
         const successMessage = result.message || 'Account created successfully! Please check your email for verification link.'
@@ -724,6 +780,8 @@ const AgencyForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast 
         />
       </div>
 
+      <TermsAgreementField checked={formData.acceptTerms} onChange={handleChange} />
+
       <button
         type="submit"
         disabled={isLoading}
@@ -750,18 +808,23 @@ const DeveloperForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToa
     phone: '',
     password: '',
     companyWebsite: '',
-    registrationNumber: ''
+    registrationNumber: '',
+    acceptTerms: false
   })
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value
     })
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!formData.acceptTerms) {
+      showErrorToast('You must accept the Terms of Agreement to continue.')
+      return
+    }
     setIsLoading(true)
     
     try {
@@ -772,6 +835,7 @@ const DeveloperForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToa
         },
         body: JSON.stringify({
           ...formData,
+          terms_of_agreement: formData.acceptTerms ? 'accepted' : 'awaiting_acceptance',
           userType: 'developer'
         })
       })
@@ -787,7 +851,8 @@ const DeveloperForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToa
           phone: '',
           password: '',
           companyWebsite: '',
-          registrationNumber: ''
+          registrationNumber: '',
+          acceptTerms: false
         })
         // Show success toast
         const successMessage = result.message || 'Account created successfully! Please check your email for verification link.'
@@ -877,6 +942,8 @@ const DeveloperForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToa
           placeholder="Enter registration number"
         />
       </div>
+
+      <TermsAgreementField checked={formData.acceptTerms} onChange={handleChange} />
 
       <button
         type="submit"

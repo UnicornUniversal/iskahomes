@@ -103,6 +103,9 @@ const page = () => {
 
   // Use local data if available (from refresh), otherwise use user profile
   const profileData = localUserData || user?.profile
+  const adminStatus = String(profileData?.admin_status || '').toLowerCase()
+  const isApprovedAccount = adminStatus === 'approved'
+  const adminStatusLabel = profileData?.admin_status || 'unknown'
 
   const parseStatsArray = (value) => {
     if (!value) return []
@@ -127,6 +130,17 @@ const page = () => {
   const propertyPurposesStats = parseStatsArray(profileData?.property_purposes_stats)
   const propertyTypesStats = parseStatsArray(profileData?.property_types_stats)
   const propertySubtypesStats = parseStatsArray(profileData?.property_subtypes_stats)
+
+  if (!authLoading && profileData && !isApprovedAccount) {
+    return (
+      <div className="w-full min-h-[60vh] flex items-center justify-center">
+     <div className='flex flex-col items-center justify-center gap-2'>
+     <p> Account Status: </p>
+    <h3 className="text-primary_color text-7xl ">{String(adminStatusLabel ?? '').toUpperCase()}</h3>
+     </div>
+      </div>
+    )
+  }
 
   return (
     <div className=' w-full flex flex-col gap-4  h-full overflow-y-auto'>

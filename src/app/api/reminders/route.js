@@ -212,9 +212,9 @@ export async function POST(request) {
     const { lead_id, grouped_lead_key, note_text, reminder_date, reminder_time, priority } = body
 
     // Validation
-    if (!lead_id || !grouped_lead_key || !note_text || !reminder_date) {
+    if (!lead_id || !grouped_lead_key || !note_text || !reminder_date || !reminder_time) {
       return NextResponse.json(
-        { error: 'lead_id, grouped_lead_key, note_text, and reminder_date are required' },
+        { error: 'lead_id, grouped_lead_key, note_text, reminder_date, and reminder_time are required' },
         { status: 400 }
       )
     }
@@ -243,7 +243,7 @@ export async function POST(request) {
         grouped_lead_key,
         note_text,
         reminder_date,
-        reminder_time: reminder_time || null,
+        reminder_time,
         priority: priority || 'normal',
         status: 'incomplete',
         user_id: user_id || null,

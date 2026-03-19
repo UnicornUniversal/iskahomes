@@ -1,15 +1,23 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { FiMessageCircle, FiEdit3, FiTrash2, FiPlus, FiX, FiSend, FiUser, FiCalendar, FiPhone, FiMail, FiImage, FiStar } from 'react-icons/fi'
+import { FiMessageCircle, FiEdit3, FiTrash2, FiPlus, FiX, FiSend, FiUser, FiCalendar, FiPhone, FiMail, FiImage, FiStar, FiEye, FiExternalLink } from 'react-icons/fi'
 import { BarChart3, MessageCircle, Phone, Calendar, TrendingUp, Award } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useParams, useRouter } from 'next/navigation'
 import DataCard from '@/app/components/developers/DataCard'
 import { toast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import Reminders from './Reminders'
 import CustomDropdown from '@/app/components/propertyManagement/modules/CustomDropdown'
 import AddLeadModal from './AddLeadModal'
+
+const LEAD_CLASSIFICATION_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'Premium', label: 'Premium' },
+  { value: 'High Value', label: 'High Value' },
+  { value: 'Standard', label: 'Standard' }
+]
 
 // Helper function to get lead category from score
 function getLeadCategory(score) {
@@ -112,8 +120,10 @@ function getActionIcon(action) {
   return MessageCircle
 }
 
-export default function LeadsManagement({ listerId, listerType = 'developer', listingId = null, pageSize = 20 }) {
+export default function LeadsManagement({ listerId, listerType = 'developer', listingId = null, pageSize = 20, initialLeadId = null, singleLeadMode = false }) {
   const { user, developerToken, agencyToken, propertySeekerToken } = useAuth()
+  const params = useParams()
+  const router = useRouter()
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -121,6 +131,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
   const [statusFilter, setStatusFilter] = useState('')
   const [actionFilter, setActionFilter] = useState('')
   const [leadTypeFilter, setLeadTypeFilter] = useState('')
+  const [leadClassificationFilter, setLeadClassificationFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [search, setSearch] = useState('')
@@ -148,6 +159,25 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
   const authToken = listerType === 'agency' || listerType === 'agent' ? agencyToken : developerToken
   const currentUserId = user?.id || user?.profile?.user_id || null
   const isSuperAdmin = user?.profile?.permissions === null || /super\s*admin/i.test(String(user?.profile?.role_name || ''))
+  const routeSlug = Array.isArray(params?.slug) ? params.slug[0] : params?.slug
+
+  function openLeadDetailsPage(leadId) {
+    if (!leadId) return
+    const pathSlug = routeSlug || listerId
+    if (!pathSlug) return
+    router.push(`/developer/${pathSlug}/leads/${leadId}`)
+  }
+
+  function closeLeadDetails() {
+    if (singleLeadMode) {
+      const pathSlug = routeSlug || listerId
+      if (pathSlug) {
+        router.push(`/developer/${pathSlug}/leads`)
+      }
+      return
+    }
+    setSelectedLead(null)
+  }
   const assignableManagerOptions = useMemo(() => {
     return (assignableUsers || []).filter((userOption) => {
       const optionRole = String(userOption?.role || '')
@@ -215,12 +245,19 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
     setError(null)
     
     try {
+      const currentPage = singleLeadMode ? 0 : page
+      const currentPageSize = singleLeadMode ? Math.max(pageSize, 200) : pageSize
+
       const params = new URLSearchParams({
         lister_id: listerId,
         lister_type: listerType,
-        page: page.toString(),
-        page_size: pageSize.toString()
+        page: currentPage.toString(),
+        page_size: currentPageSize.toString()
       })
+
+      if (initialLeadId) {
+        params.append('lead_id', initialLeadId)
+      }
       
       if (listingId) {
         params.append('listing_id', listingId)
@@ -234,6 +271,9 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
       }
       if (leadTypeFilter) {
         params.append('lead_type', leadTypeFilter)
+      }
+      if (leadClassificationFilter) {
+        params.append('lead_classification', leadClassificationFilter)
       }
       
       if (actionFilter) {
@@ -272,6 +312,15 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
       if (response.ok && result.success) {
         setLeads(result.data || [])
         setTotal(result.total || 0)
+        if (singleLeadMode && initialLeadId) {
+          const requestedLead = (result.data || []).find(l => l.id === initialLeadId)
+          if (requestedLead) {
+            setSelectedLead(requestedLead)
+            setReminders(requestedLead.reminders || [])
+          } else {
+            setError('Lead not found')
+          }
+        }
         // If a lead is selected, update its reminders
         if (selectedLead) {
           const updatedLead = result.data?.find(l => l.id === selectedLead.id)
@@ -339,7 +388,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
     loadLeads()
     loadLeadsToday()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listerId, listerType, listingId, statusFilter, actionFilter, leadTypeFilter, dateFrom, dateTo, search, page, pageSize, isSuperAdmin, currentUserId, authToken])
+  }, [listerId, listerType, listingId, statusFilter, actionFilter, leadTypeFilter, leadClassificationFilter, dateFrom, dateTo, search, page, pageSize, isSuperAdmin, currentUserId, authToken, initialLeadId, singleLeadMode])
 
   function updateLeadStatusLocally(leadId, newStatus) {
     // Update locally (will be saved when user clicks "Save Changes")
@@ -363,6 +412,19 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         return {
           ...prev,
           assigned_user: assignedUserId || null
+        }
+      }
+      return prev
+    })
+    setHasChanges(true)
+  }
+
+  function updateLeadClassificationLocally(leadId, leadClassification) {
+    setSelectedLead(prev => {
+      if (prev && prev.id === leadId) {
+        return {
+          ...prev,
+          lead_classification: leadClassification || 'Standard'
         }
       }
       return prev
@@ -467,8 +529,13 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         // If converting note to reminder
         if (isReminder) {
           const reminderDate = document.getElementById('reminder_date')?.value
+          const reminderTime = document.getElementById('reminder_time')?.value
           if (!reminderDate) {
             alert('Please select a reminder date')
+            return
+          }
+          if (!reminderTime) {
+            alert('Please select a reminder time')
             return
           }
           
@@ -480,7 +547,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
           const newReminder = {
             note_text: newNoteText.trim(),
             reminder_date: reminderDate,
-            reminder_time: document.getElementById('reminder_time')?.value || null,
+            reminder_time: reminderTime,
             priority: document.getElementById('reminder_priority')?.value || 'normal',
             status: 'incomplete'
           }
@@ -508,15 +575,20 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         } else {
           // Update reminder
           const reminderDate = document.getElementById('reminder_date')?.value
+          const reminderTime = document.getElementById('reminder_time')?.value
           if (!reminderDate) {
             toast.error('Please select a reminder date')
+            return
+          }
+          if (!reminderTime) {
+            toast.error('Please select a reminder time')
             return
           }
           
           const updatedReminder = {
             note_text: newNoteText.trim(),
             reminder_date: reminderDate,
-            reminder_time: document.getElementById('reminder_time')?.value || null,
+            reminder_time: reminderTime,
             priority: document.getElementById('reminder_priority')?.value || 'normal',
             status: reminders.find(r => r.id === editingItem.id)?.status || 'incomplete'
           }
@@ -536,8 +608,13 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
     // If it's a reminder, validate reminder fields
     if (isReminder) {
       const reminderDate = document.getElementById('reminder_date')?.value
+      const reminderTime = document.getElementById('reminder_time')?.value
       if (!reminderDate) {
         toast.error('Please select a reminder date')
+        return
+      }
+      if (!reminderTime) {
+        toast.error('Please select a reminder time')
         return
       }
 
@@ -545,7 +622,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
       const newReminder = {
         note_text: newNoteText.trim(),
         reminder_date: reminderDate,
-        reminder_time: document.getElementById('reminder_time')?.value || null,
+        reminder_time: reminderTime,
         priority: document.getElementById('reminder_priority')?.value || 'normal',
         status: 'incomplete'
       }
@@ -578,12 +655,19 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
 
     setSaving(true)
     try {
+      const invalidReminder = reminders.find(r => !r.reminder_date || !r.reminder_time)
+      if (invalidReminder) {
+        toast.error('Every reminder must include both date and time before saving.')
+        setSaving(false)
+        return
+      }
+
       // Prepare reminders data (include all reminders with their current state)
       const remindersToSave = reminders.map(r => ({
         id: r.id || null, // null for new reminders
         note_text: r.note_text,
         reminder_date: r.reminder_date,
-        reminder_time: r.reminder_time || null,
+        reminder_time: r.reminder_time,
         priority: r.priority || 'normal',
         status: r.status || 'incomplete'
       }))
@@ -606,8 +690,10 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         body: JSON.stringify({
           status: selectedLead.status,
           assigned_user: selectedLead.assigned_user || null,
+          lead_classification: selectedLead.lead_classification || 'Standard',
           notes: notesToSave,
           reminders: remindersToSave,
+          grouped_lead_key: selectedLead.grouped_lead_key || null,
           user_id: user?.id || null,
           user_type: user?.user_type || null
         })
@@ -658,6 +744,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
             notes: result.data.notes || prev.notes || [],
             status: result.data.status || prev.status,
             assigned_user: result.data.assigned_user || null,
+            lead_classification: result.data.lead_classification || prev.lead_classification || 'Standard',
             status_tracker: result.data.status_tracker || prev.status_tracker || [],
             _previousStatus: undefined // Clear stored previous status
           }))
@@ -862,6 +949,8 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
   return (
     <div className="w-full space-y-6 text-primary_color">
       <ToastContainer position="top-right" autoClose={3000} />
+      {!singleLeadMode && (
+        <>
       {/* Data Cards - Only show when NOT viewing a specific listing (since it's shown in ListingLeadsInsights) */}
       {!listingId && totalLeadsData && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:grid-rows-2 gap-6 mb-8">
@@ -949,7 +1038,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         </div>
 
         {/* Filters Grid - Hidden on small, visible on medium+ */}
-        <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-7 gap-4">
           <div>
             <label className="block text-sm font-medium text-secondary_color-700 mb-1">Status</label>
             <CustomDropdown
@@ -998,6 +1087,15 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
             />
           </div>
           <div>
+            <label className="block text-sm font-medium text-secondary_color-700 mb-1">Classification</label>
+            <CustomDropdown
+              options={LEAD_CLASSIFICATION_OPTIONS}
+              value={leadClassificationFilter}
+              onChange={(value) => { setPage(0); setLeadClassificationFilter(value) }}
+              placeholder="All"
+            />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-secondary_color-700 mb-1">From Date</label>
             <input
               type="date"
@@ -1023,6 +1121,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                 setStatusFilter('')
                 setActionFilter('')
                 setLeadTypeFilter('')
+                setLeadClassificationFilter('')
                 setDateFrom('')
                 setDateTo('')
                 setSearch('')
@@ -1107,6 +1206,15 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                     />
                   </div>
                   <div>
+                    <label className="block text-sm font-medium text-secondary_color-700 mb-1">Classification</label>
+                    <CustomDropdown
+                      options={LEAD_CLASSIFICATION_OPTIONS}
+                      value={leadClassificationFilter}
+                      onChange={(value) => { setPage(0); setLeadClassificationFilter(value) }}
+                      placeholder="All"
+                    />
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-secondary_color-700 mb-1">From Date</label>
                     <input
                       type="date"
@@ -1132,6 +1240,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                         setStatusFilter('')
                         setActionFilter('')
                         setLeadTypeFilter('')
+                        setLeadClassificationFilter('')
                         setDateFrom('')
                         setDateTo('')
                         setSearch('')
@@ -1167,9 +1276,9 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                     <th className="px-4 py-4 text-left text-xs font-medium text-secondary_color-500 uppercase tracking-wider">Manage</th>
                     <th className="px-4 py-4 text-left text-xs font-medium text-secondary_color-500 uppercase tracking-wider w-32">Seeker</th>
                     <th className="px-4 py-4 text-left text-xs font-medium text-secondary_color-500 uppercase tracking-wider">Listing</th>
+                    <th className="px-4 py-4 text-left text-xs font-medium text-secondary_color-500 uppercase tracking-wider">Classification</th>
                     <th className="px-4 py-4 text-left text-xs font-medium text-secondary_color-500 uppercase tracking-wider">Score</th>
                     <th className="px-4 py-4 text-left text-xs font-medium text-secondary_color-500 uppercase tracking-wider">Actions</th>
-                    <th className="px-4 py-4 text-left text-xs font-medium text-secondary_color-500 uppercase tracking-wider">Status</th>
                   </tr>
                 </thead>
                 <tbody className="default_bg divide-y divide-gray-200">
@@ -1199,7 +1308,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                       <FiUser className="h-12 w-12 text-secondary_color-400 mb-4" />
                       <h3 className="text-sm font-medium text-secondary_color-900 mb-1">No leads found</h3>
                       <p className="text-sm text-secondary_color-500">
-                        {search || statusFilter ? 'Try adjusting your filters' : 'No leads have been generated yet'}
+                        {search || statusFilter || actionFilter || leadTypeFilter || leadClassificationFilter || dateFrom || dateTo ? 'Try adjusting your filters' : 'No leads have been generated yet'}
                       </p>
                     </div>
                   </td>
@@ -1208,31 +1317,31 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
               {filteredLeads.map((lead) => (
                 <tr 
                   key={lead.id} 
-                  className="hover:bg-gray-50 transition-colors cursor-pointer"
-                  onClick={() => setSelectedLead(lead)}
+                  className="hover:bg-gray-50 transition-colors"
                 >
                   <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                    {lead.seeker_id ? (
+                    <div className="flex items-center gap-2">
                       <button
                         className="text-blue-600 hover:text-blue-900 transition-colors relative"
                         onClick={(e) => {
                           e.stopPropagation()
-                          const listingLink = lead.listing_id && lead.listing_slug && lead.listing_type
-                            ? `${window.location.origin}/property/${lead.listing_type}/${lead.listing_slug}/${lead.listing_id}`
-                            : null
-                          const defaultMessage = listingLink
-                            ? `Hi! I noticed your interest in ${lead.listing_title || 'this property'}. Here's the link: ${listingLink}`
-                            : `Hi! I noticed your interest in ${lead.listing_title || 'this property'}. How can I help you?`
-                          setChatMessage(defaultMessage)
-                          setMessageBoxLead(lead)
+                          setSelectedLead(lead)
                         }}
-                        title="Message"
+                        title="Open lead details modal"
                       >
-                        <FiMessageCircle className="box_holder border-1 border-primary_color w-8 h-8" />
+                        <FiEye className="box_holder border-1 border-primary_color w-8 h-8" />
                       </button>
-                    ) : (
-                      <span className="text-gray-300" title="Manual lead - no in-app messaging">—</span>
-                    )}
+                      <button
+                        className="text-blue-600 hover:text-blue-900 transition-colors relative"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openLeadDetailsPage(lead.id)
+                        }}
+                        title="Open lead details page"
+                      >
+                        <FiExternalLink className="box_holder border-1 border-primary_color w-8 h-8" />
+                      </button>
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -1306,6 +1415,11 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                     </div>
                   </td>
                   <td className="px-4 py-3">
+                    <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium border bg-gray-100 text-secondary_color-800 border-gray-200">
+                      {lead.lead_classification || 'Standard'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
                     <div className="flex flex-col gap-1.5">
                       <div className="flex items-center gap-2">
                         {/* <FiStar className="w-10 h-10 text-yellow-500" /> */}
@@ -1336,68 +1450,6 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                           +{(lead.lead_actions || []).length - 3}
                         </span>
                       )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="w-32">
-                      <CustomDropdown
-                        options={[
-                          { value: 'new', label: 'New' },
-                          { value: 'contacted', label: 'Contacted' },
-                          { value: 'scheduled', label: 'Scheduled' },
-                          { value: 'responded', label: 'Responded' },
-                          { value: 'closed', label: 'Closed' },
-                          { value: 'cold_lead', label: 'Cold Lead' },
-                          { value: 'abandoned', label: 'Abandoned' }
-                        ]}
-                        value={lead.status || 'new'}
-                        onChange={async (newStatus) => {
-                          // For table view, save immediately
-                          try {
-                            const previousStatus = lead.status || 'new'
-                            const response = await fetch(`/api/leads/${lead.id}`, {
-                              method: 'PATCH',
-                              headers: {
-                                'Content-Type': 'application/json',
-                                ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-                              },
-                              body: JSON.stringify({ status: newStatus })
-                            })
-                            if (response.ok) {
-                              const result = await response.json()
-                              // If status changed to 'closed' and context_type is 'listing', update listing
-                              if (newStatus === 'closed' && previousStatus !== 'closed' && lead.context_type === 'listing' && lead.listing_id) {
-                                try {
-                                  const listingResponse = await fetch(`/api/listings/${lead.listing_id}`)
-                                  const listingData = await listingResponse.json()
-                                  
-                                  if (listingData.success && listingData.data) {
-                                    const currentListing = listingData.data
-                                    if (currentListing.listing_status !== 'sold' && currentListing.listing_status !== 'rented') {
-                                      await fetch(`/api/listings/${lead.listing_id}`, {
-                                        method: 'PUT',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({
-                                          listing_status: 'sold',
-                                          status: 'sold'
-                                        })
-                                      })
-                                      toast.success('Lead closed and listing marked as sold!')
-                                    }
-                                  }
-                                } catch (err) {
-                                  console.error('Error updating listing status:', err)
-                                }
-                              }
-                              loadLeads()
-                            }
-                          } catch (err) {
-                            console.error('Error updating status:', err)
-                            toast.error('Failed to update lead status')
-                          }
-                        }}
-                        placeholder="Select Status"
-                      />
                     </div>
                   </td>
                 </tr>
@@ -1433,6 +1485,14 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         </div>
       </div>
         </div>
+        </>
+      )}
+
+      {singleLeadMode && !selectedLead && !loading && !error && (
+        <div className="p-6 default_bg rounded-xl border border-gray-200 text-secondary_color-600">
+          Lead details were not found.
+        </div>
+      )}
 
         {/* Reminders Sidebar - Takes 1/3 width */}
         {/* <div className="lg:col-span-1">
@@ -1440,11 +1500,14 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         </div> */}
  
 
-      {/* Lead Details Modal */}
+      {/* Lead Details View */}
       {selectedLead && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white/40 backdrop-blur-lg md:mt-[4em] ounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden">
-            {/* Modal Header */}
+        <div className={singleLeadMode ? 'w-full' : 'fixed inset-0 z-[9999] flex items-center justify-center p-4'}>
+          <div className={singleLeadMode
+            ? 'bg-white/20 rounded-2xl shadow-sm w-full border border-white/20'
+            : 'bg-white/40 backdrop-blur-lg md:mt-[4em] rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden'}
+          >
+            {/* Header */}
             <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex-1">
@@ -1460,6 +1523,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                     </div>
                   )}
                 </div>
+                {!singleLeadMode && (
                 <button 
                   className="px-4 py-2 text-sm font-medium text-secondary_color-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                   onClick={() => {
@@ -1468,7 +1532,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                         return
                       }
                     }
-                    setSelectedLead(null)
+                    closeLeadDetails()
                     setHasChanges(false)
                     setEditingItem(null)
                     setNewNoteText('')
@@ -1477,11 +1541,12 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                 >
                   <FiX className="w-5 h-5" />
                 </button>
+                )}
               </div>
             </div>
 
-            {/* Modal Body - Scrollable */}
-            <div className="p-6 overflow-y-auto flex-1 min-h-0">
+            {/* Body */}
+            <div className={singleLeadMode ? 'p-6' : 'p-6 overflow-y-auto flex-1 min-h-0'}>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Lead Information */}
                 <div className="lg:col-span-1 space-y-4">
@@ -1540,6 +1605,17 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                             value={selectedLead.status || 'new'}
                             onChange={(value) => updateLeadStatusLocally(selectedLead.id, value)}
                             placeholder="Select Status"
+                          />
+                        </div>
+                      </div>
+                      <div className="w-full">
+                        <span className="text-sm text-secondary_color-500">Lead Classification:</span>
+                        <div className="max-w-[300px]">
+                          <CustomDropdown
+                            options={LEAD_CLASSIFICATION_OPTIONS.filter((option) => option.value)}
+                            value={selectedLead.lead_classification || 'Standard'}
+                            onChange={(value) => updateLeadClassificationLocally(selectedLead.id, value)}
+                            placeholder="Select Classification"
                           />
                         </div>
                       </div>
@@ -1878,11 +1954,12 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-secondary_color-700 mb-1">Time (optional)</label>
+                              <label className="block text-xs font-medium text-secondary_color-700 mb-1">Time *</label>
                               <input
                                 id="reminder_time"
                                 type="time"
                                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                required
                               />
                             </div>
                           </div>
@@ -2082,12 +2159,13 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
               </div>
             </div>
 
-            {/* Modal Footer with Save Changes Button - Fixed at bottom */}
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between flex-shrink-0">
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
               <div className="text-sm text-secondary_color-600">
                 {hasChanges && <span className="text-orange-600 font-medium">You have unsaved changes</span>}
               </div>
               <div className="flex gap-3">
+                {!singleLeadMode && (
                 <button
                   onClick={() => {
                     if (hasChanges) {
@@ -2095,7 +2173,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                         return
                       }
                     }
-                    setSelectedLead(null)
+                    closeLeadDetails()
                     setHasChanges(false)
                     setEditingItem(null)
                     setNewNoteText('')
@@ -2105,6 +2183,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                 >
                   {hasChanges ? 'Cancel' : 'Close'}
                 </button>
+                )}
                 {hasChanges && (
                   <button
                     onClick={saveAllChanges}

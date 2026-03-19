@@ -17,6 +17,16 @@ async function verifyClientAccess(clientId, developerId) {
   return !!data
 }
 
+function normalizeServiceChargeTime(value) {
+  if (value === undefined || value === null) return null
+  const raw = String(value).trim()
+  if (!raw) return null
+  const match = raw.match(/^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/)
+  if (!match) return null
+  const [, hh, mm, ss] = match
+  return `${hh}:${mm}:${ss || '00'}`
+}
+
 export async function PUT(request, { params }) {
   try {
     const resolvedParams = params instanceof Promise ? await params : params
@@ -38,7 +48,7 @@ export async function PUT(request, { params }) {
 
     const body = await request.json()
     console.log('[PUT service-charges] body:', JSON.stringify(body))
-    const { unitId, amount, periodStart, periodEnd, status: chargeStatus, paidAt, billingReference, nextDueStatus, overdueTime } = body
+    const { unitId, amount, periodStart, periodEnd, nextDueTime, status: chargeStatus, paidAt, billingReference, nextDueStatus, overdueTime } = body
 
     const update = {}
     if (unitId !== undefined) update.unit_id = unitId
@@ -52,6 +62,7 @@ export async function PUT(request, { params }) {
         return d.toISOString().slice(0, 10)
       })() : null
     }
+    if (nextDueTime !== undefined) update.next_due_time = normalizeServiceChargeTime(nextDueTime) || null
     if (chargeStatus !== undefined) update.status = chargeStatus
     if (paidAt !== undefined) update.paid_at = paidAt || null
     if (billingReference !== undefined) update.billing_reference = billingReference || null
@@ -79,6 +90,7 @@ export async function PUT(request, { params }) {
       periodStart: data.period_start?.slice?.(0, 10) || null,
       periodEnd: data.period_end?.slice?.(0, 10) || null,
       nextDueDate: data.next_due_date?.slice?.(0, 10) || null,
+      nextDueTime: data.next_due_time?.slice?.(0, 5) || '08:00',
       nextDueStatus: data.next_due_status || 'not_due',
       overdueTime: data.overdue_time ?? 0,
       status: data.status,
@@ -101,10 +113,12 @@ export async function PUT(request, { params }) {
 
     try {
       const normalizedNextDueStatus = String(data?.next_due_status || '').toLowerCase()
-      const shouldCancel = normalizedNextDueStatus === 'paid'
+      const hasNextDueDate = !!data?.next_due_date
+      const shouldCancel = normalizedNextDueStatus === 'paid' || !hasNextDueDate
       const shouldReschedule = !shouldCancel && (
         Object.prototype.hasOwnProperty.call(update, 'period_end') ||
         Object.prototype.hasOwnProperty.call(update, 'next_due_date') ||
+        Object.prototype.hasOwnProperty.call(update, 'next_due_time') ||
         Object.prototype.hasOwnProperty.call(update, 'next_due_status')
       )
 

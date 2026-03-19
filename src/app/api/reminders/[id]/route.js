@@ -12,6 +12,26 @@ export async function PATCH(request, { params }) {
     const body = await request.json()
     const { status, priority, note_text, reminder_date, reminder_time } = body
 
+    const { data: existingReminder, error: existingReminderError } = await supabaseAdmin
+      .from('reminders')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (existingReminderError) {
+      return NextResponse.json(
+        { error: 'Failed to fetch existing reminder', details: existingReminderError.message },
+        { status: 500 }
+      )
+    }
+
+    if (!existingReminder) {
+      return NextResponse.json(
+        { error: 'Reminder not found' },
+        { status: 404 }
+      )
+    }
+
     // Build update object
     const updateData = {}
     if (status !== undefined) {
@@ -43,6 +63,17 @@ export async function PATCH(request, { params }) {
       )
     }
 
+    const nextStatus = status !== undefined ? status : existingReminder.status
+    const nextReminderDate = reminder_date !== undefined ? reminder_date : existingReminder.reminder_date
+    const nextReminderTime = reminder_time !== undefined ? reminder_time : existingReminder.reminder_time
+
+    if (nextStatus === 'incomplete' && (!nextReminderDate || !nextReminderTime)) {
+      return NextResponse.json(
+        { error: 'Incomplete reminders must have both reminder_date and reminder_time' },
+        { status: 400 }
+      )
+    }
+
     const { data: reminder, error } = await supabaseAdmin
       .from('reminders')
       .update(updateData)
@@ -55,13 +86,6 @@ export async function PATCH(request, { params }) {
       return NextResponse.json(
         { error: 'Failed to update reminder', details: error.message },
         { status: 500 }
-      )
-    }
-
-    if (!reminder) {
-      return NextResponse.json(
-        { error: 'Reminder not found' },
-        { status: 404 }
       )
     }
 

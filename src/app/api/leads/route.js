@@ -55,6 +55,8 @@ export async function GET(request) {
     const listingId = searchParams.get('listing_id')
     const status = searchParams.get('status')
     const leadTypeFilter = searchParams.get('lead_type')
+    const leadClassificationFilter = searchParams.get('lead_classification')
+    const leadId = searchParams.get('lead_id')
     
     console.log('🔍 GET /api/leads - Params:', {
       listerId,
@@ -173,6 +175,7 @@ export async function GET(request) {
         lead_type,
         lead_source,
         lead_origin,
+        lead_classification,
         assigned_user,
         lead_actions,
         total_actions,
@@ -217,6 +220,9 @@ export async function GET(request) {
     }
     if (leadTypeFilter) {
       dataQuery = dataQuery.eq('lead_type', leadTypeFilter)
+    }
+    if (leadClassificationFilter) {
+      dataQuery = dataQuery.eq('lead_classification', leadClassificationFilter)
     }
 
     const { data: rawLeads, error: leadsError } = await dataQuery
@@ -331,6 +337,8 @@ export async function GET(request) {
         status: mostRecentRecord.status || primary.status,
         // Add grouped_lead_key for reminders
         grouped_lead_key: groupedLeadKey,
+        // Keep merged IDs for optional filtering by specific lead record ID
+        _merged_record_ids: group.map(item => item.id),
         // Keep track of how many records were merged (for debugging)
         _merged_count: group.length
       }
@@ -338,6 +346,12 @@ export async function GET(request) {
 
     // Apply filters if provided (before pagination)
     let filteredLeads = mergedLeads
+
+    if (leadId) {
+      filteredLeads = filteredLeads.filter(lead =>
+        lead.id === leadId || (Array.isArray(lead._merged_record_ids) && lead._merged_record_ids.includes(leadId))
+      )
+    }
     
     // Search filter - search in name, email, phone, listing
     if (search) {
@@ -616,6 +630,7 @@ export async function GET(request) {
         lead_type: lead.lead_type || 'automated',
         lead_source: lead.lead_source,
         lead_origin: lead.lead_origin,
+        lead_classification: lead.lead_classification || 'Standard',
         assigned_user: lead.assigned_user || null,
         lead_actions: Array.isArray(lead.lead_actions) ? lead.lead_actions : [],
         total_actions: lead.total_actions || 0,

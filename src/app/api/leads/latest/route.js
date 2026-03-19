@@ -54,7 +54,7 @@ export async function GET(request) {
     // IMPORTANT: Exclude anonymous/unknown seekers - only get leads with user IDs (non-anonymous)
     const { data: allLeads, error: leadsError } = await supabase
       .from('leads')
-      .select('id, listing_id, seeker_id, lister_id, lister_type, context_type, total_actions, lead_score, lead_actions, first_action_date, last_action_date, last_action_type, status, status_tracker, created_at')
+      .select('id, listing_id, seeker_id, lister_id, lister_type, context_type, total_actions, lead_score, lead_actions, first_action_date, last_action_date, last_action_type, status, status_tracker, lead_classification, created_at')
       .eq('lister_id', listerId)
       .not('seeker_id', 'is', null) // Only leads with seeker_id
       .or('is_anonymous.is.null,is_anonymous.eq.false') // Exclude anonymous leads (only get non-anonymous leads)
@@ -177,6 +177,7 @@ export async function GET(request) {
         lastActionType: lead.last_action_type,
         status: lead.status,
         statusTracker: Array.isArray(lead.status_tracker) ? lead.status_tracker : [],
+        leadClassification: lead.lead_classification || 'Standard',
         createdAt: lead.created_at,
         listing: listing ? {
           id: listing.id,

@@ -18,6 +18,16 @@ async function verifyClientAccess(clientId, developerId) {
   return !!data
 }
 
+function normalizeServiceChargeTime(value) {
+  if (value === undefined || value === null) return null
+  const raw = String(value).trim()
+  if (!raw) return null
+  const match = raw.match(/^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/)
+  if (!match) return null
+  const [, hh, mm, ss] = match
+  return `${hh}:${mm}:${ss || '00'}`
+}
+
 export async function GET(request, { params }) {
   try {
     const resolvedParams = params instanceof Promise ? await params : params
@@ -55,6 +65,7 @@ export async function GET(request, { params }) {
       periodStart: c.period_start?.slice?.(0, 10) || null,
       periodEnd: c.period_end?.slice?.(0, 10) || null,
       nextDueDate: c.next_due_date?.slice?.(0, 10) || null,
+      nextDueTime: c.next_due_time?.slice?.(0, 5) || '08:00',
       nextDueStatus: c.next_due_status || 'not_due',
       overdueTime: c.overdue_time ?? 0,
       status: c.status,
@@ -109,7 +120,7 @@ export async function POST(request, { params }) {
 
     const body = await request.json()
     console.log('[POST service-charges] body:', JSON.stringify(body))
-    const { unitId, amount, periodStart, periodEnd, status: chargeStatus, paidAt, billingReference } = body
+    const { unitId, amount, periodStart, periodEnd, nextDueTime, status: chargeStatus, paidAt, billingReference } = body
 
     if (amount == null) {
       return NextResponse.json({ error: 'amount is required' }, { status: 400 })
@@ -134,6 +145,11 @@ export async function POST(request, { params }) {
       .limit(1)
       .maybeSingle()
 
+    const normalizedNextDueTime = normalizeServiceChargeTime(nextDueTime) || '08:00:00'
+
+    const nextDueStatus = 'not_due'
+    const shouldScheduleNotification = !!nextDueDate && String(nextDueStatus).toLowerCase() !== 'paid'
+
     const insert = {
       client_id: clientId,
       unit_id: unitId,
@@ -141,14 +157,15 @@ export async function POST(request, { params }) {
       period_start: periodStart || null,
       period_end: periodEnd || null,
       next_due_date: nextDueDate,
+      next_due_time: normalizedNextDueTime,
       status: chargeStatus || 'Pending',
       paid_at: paidAt || null,
       billing_reference: billingReference || null,
-      next_due_status: 'not_due',
+      next_due_status: nextDueStatus,
       overdue_time: 0,
       created_by_user_id: userInfo.user_id,
       created_by_user_type: userInfo.user_type || userInfo.organization_type || 'developer',
-      notification_status: 'pending'
+      notification_status: shouldScheduleNotification ? 'pending' : 'cancelled'
     }
 
     const { data, error } = await supabaseAdmin
@@ -196,6 +213,7 @@ export async function POST(request, { params }) {
       periodStart: data.period_start?.slice?.(0, 10) || null,
       periodEnd: data.period_end?.slice?.(0, 10) || null,
       nextDueDate: data.next_due_date?.slice?.(0, 10) || null,
+      nextDueTime: data.next_due_time?.slice?.(0, 5) || '08:00',
       nextDueStatus: data.next_due_status || 'not_due',
       overdueTime: data.overdue_time ?? 0,
       status: data.status,
@@ -217,16 +235,18 @@ export async function POST(request, { params }) {
       metadata: { client_id: clientId, service_charge_id: data?.id, unit_id: data?.unit_id || null }
     }, userInfo.user_id)
 
-    try {
-      startNotificationWorker()
-      await scheduleNotificationFromRecord({
-        notificationType: NOTIFICATION_TYPES.SERVICE_CHARGE,
-        recordId: data.id,
-        userId: userInfo.user_id,
-        userType: userInfo.user_type || userInfo.organization_type || 'developer'
-      })
-    } catch (scheduleError) {
-      console.error('Failed to schedule service charge notification:', scheduleError)
+    if (shouldScheduleNotification) {
+      try {
+        startNotificationWorker()
+        await scheduleNotificationFromRecord({
+          notificationType: NOTIFICATION_TYPES.SERVICE_CHARGE,
+          recordId: data.id,
+          userId: userInfo.user_id,
+          userType: userInfo.user_type || userInfo.organization_type || 'developer'
+        })
+      } catch (scheduleError) {
+        console.error('Failed to schedule service charge notification:', scheduleError)
+      }
     }
 
     return NextResponse.json({ success: true, data: out })

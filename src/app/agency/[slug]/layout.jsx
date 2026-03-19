@@ -3,6 +3,7 @@
 import React from 'react'
 import AgencyNav from '@/app/components/agency/AgencyNav'
 import AgencyHeader from '@/app/components/agency/AgencyHeader'
+import AccountStatusGuard from '@/app/components/shared/AccountStatusGuard'
 
 export default function AgencySlugLayout({ children }) {
   return (
@@ -11,7 +12,9 @@ export default function AgencySlugLayout({ children }) {
       <main className="flex-1 lg:ml-0 p-4 lg:p-6 xl:p-8 flex flex-col min-h-0">
         <AgencyHeader />
         <div className="flex-1 min-h-0">
-          {children}
+          <AccountStatusGuard entityType="agency">
+            {children}
+          </AccountStatusGuard>
         </div>
       </main>
     </div>

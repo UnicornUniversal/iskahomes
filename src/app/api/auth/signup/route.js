@@ -9,9 +9,11 @@ export async function POST(request) {
   try {
     const body = await request.json()
     const { email, password, userType, ...userData } = body
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
+    const termsStatus = userData.terms_of_agreement === 'accepted' ? 'accepted' : 'awaiting_acceptance'
 
     // Validate required fields
-    if (!email || !password || !userType) {
+    if (!normalizedEmail || !password || !userType) {
       return NextResponse.json(
         { error: 'Missing required fields: email, password, userType' },
         { status: 400 }
@@ -27,6 +29,54 @@ export async function POST(request) {
       )
     }
 
+    if (termsStatus !== 'accepted') {
+      return NextResponse.json(
+        { error: 'You must accept the Terms of Agreement to continue.' },
+        { status: 400 }
+      )
+    }
+
+    // Prevent sending emails when this account already exists
+    const { data: existingAuthUser, error: existingAuthUserError } = await supabaseAdmin.auth.admin.getUserByEmail(normalizedEmail)
+    if (existingAuthUserError) {
+      console.error('❌ Failed to check existing auth user:', existingAuthUserError)
+      return NextResponse.json(
+        { error: 'Unable to validate account details. Please try again.' },
+        { status: 500 }
+      )
+    }
+    if (existingAuthUser?.user) {
+      return NextResponse.json(
+        { error: 'An account with this email already exists. Please sign in instead.' },
+        { status: 409 }
+      )
+    }
+
+    const profileTables = ['developers', 'agencies', 'agents', 'property_seekers']
+    for (const table of profileTables) {
+      const { data: existingProfile, error: existingProfileError } = await supabaseAdmin
+        .from(table)
+        .select('id')
+        .ilike('email', normalizedEmail)
+        .limit(1)
+        .maybeSingle()
+
+      if (existingProfileError) {
+        console.error(`❌ Failed to check existing ${table} profile:`, existingProfileError)
+        return NextResponse.json(
+          { error: 'Unable to validate account details. Please try again.' },
+          { status: 500 }
+        )
+      }
+
+      if (existingProfile?.id) {
+        return NextResponse.json(
+          { error: 'An account with this email already exists. Please sign in instead.' },
+          { status: 409 }
+        )
+      }
+    }
+
     // Generate verification token for email verification (using SendGrid)
     const verificationToken = crypto.randomBytes(32).toString('hex')
     const expiresAt = new Date()
@@ -35,10 +85,10 @@ export async function POST(request) {
     // ===== SENDGRID EMAIL LOGIC - Send verification email FIRST before creating any database records =====
     // CRITICAL: Send verification email FIRST before creating any database records
     // This ensures we only create users if the email was successfully sent
-    console.log('📧 Attempting to send verification email via SendGrid:', { email, userType })
+    console.log('📧 Attempting to send verification email via SendGrid:', { email: normalizedEmail, userType })
     let emailResult
     try {
-      emailResult = await sendVerificationEmail(email, userData.fullName || 'there', verificationToken)
+      emailResult = await sendVerificationEmail(normalizedEmail, userData.fullName || 'there', verificationToken)
       
       if (!emailResult.success) {
         console.error('❌ Failed to send verification email (exact error):', emailResult)
@@ -131,7 +181,7 @@ export async function POST(request) {
 
     // ===== CREATE USER WITH SUPABASE ADMIN API (NO EMAIL CONFIRMATION) =====
     // Create user with Supabase Admin API - email confirmation disabled since we're using SendGrid
-    console.log('📝 Creating user with Supabase Admin API:', { email, userType })
+    console.log('📝 Creating user with Supabase Admin API:', { email: normalizedEmail, userType })
     
     // Validate Supabase configuration
     // Service role key should be SUPABASE_SERVICE_ROLE_KEY (without NEXT_PUBLIC_ prefix)
@@ -185,7 +235,7 @@ export async function POST(request) {
         
         // Create the actual request promise
         const createUserPromise = supabaseAdmin.auth.admin.createUser({
-          email: email,
+          email: normalizedEmail,
           password: password,
           email_confirm: false, // We handle email verification ourselves via SendGrid
           user_metadata: {
@@ -300,7 +350,7 @@ export async function POST(request) {
           const developerProfile = {
             developer_id: newUser.id,
             name: userData.fullName || '',
-            email: email,
+            email: normalizedEmail,
             phone: userData.phone || '',
             website: userData.companyWebsite || '',
             license_number: userData.registrationNumber || '',
@@ -318,7 +368,8 @@ export async function POST(request) {
             signup_status: 'invited',
             invitation_token: verificationToken,
             invitation_sent_at: new Date().toISOString(),
-            invitation_expires_at: expiresAt.toISOString()
+            invitation_expires_at: expiresAt.toISOString(),
+            terms_of_agreement: termsStatus
           }
           const { data: devData, error: devError } = await supabaseAdmin
             .from('developers')
@@ -366,7 +417,7 @@ export async function POST(request) {
                     organization_type: 'developer',
                     organization_id: devData.id,
                     user_id: newUser.id,
-                    email: email,
+                    email: normalizedEmail,
                     role_id: ownerRole.id,
                     permissions: ownerPermissions, // All permissions set to true
                     status: 'active',
@@ -398,7 +449,7 @@ export async function POST(request) {
           const agentProfile = {
             user_id: newUser.id,
             name: userData.fullName || '',
-            email: email,
+            email: normalizedEmail,
             phone: userData.phone || '',
             agency_name: userData.agencyName || '',
             license_id: userData.licenseId || '',
@@ -411,7 +462,8 @@ export async function POST(request) {
             signup_status: 'invited',
             invitation_token: verificationToken,
             invitation_sent_at: new Date().toISOString(),
-            invitation_expires_at: expiresAt.toISOString()
+            invitation_expires_at: expiresAt.toISOString(),
+            terms_of_agreement: termsStatus
           }
           const { data: agentData, error: agentError } = await supabaseAdmin
             .from('agents')
@@ -431,7 +483,7 @@ export async function POST(request) {
           const seekerProfile = {
             user_id: newUser.id,
             name: userData.fullName || '',
-            email: email,
+            email: normalizedEmail,
             phone: userData.phone || '',
             status: 'active',
             admin_status: 'approved',
@@ -468,7 +520,7 @@ export async function POST(request) {
           const agencyProfile = {
             agency_id: newUser.id,
             name: userData.fullName || '',
-            email: email,
+            email: normalizedEmail,
             phone: userData.phone || '',
             website: userData.companyWebsite || '',
             license_number: userData.registrationNumber || '',
@@ -498,7 +550,8 @@ export async function POST(request) {
             signup_status: 'pending', // Will be 'verified' after email confirmation
             invitation_token: verificationToken,
             invitation_sent_at: new Date().toISOString(),
-            invitation_expires_at: expiresAt.toISOString()
+            invitation_expires_at: expiresAt.toISOString(),
+            terms_of_agreement: termsStatus
           }
           const { data: agencyData, error: agencyError } = await supabaseAdmin
             .from('agencies')
@@ -541,7 +594,7 @@ export async function POST(request) {
                     organization_type: 'agency',
                     organization_id: agencyData.id,
                     user_id: newUser.id,
-                    email: email,
+                    email: normalizedEmail,
                     role_id: ownerRole.id,
                     permissions: ownerPermissions,
                     status: 'active',

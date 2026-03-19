@@ -7,6 +7,8 @@ import { NOTIFICATION_TYPES } from '@/lib/notifications/constants'
 import { cancelNotificationByRecord, rescheduleNotificationFromRecord, scheduleNotificationFromRecord } from '@/lib/notifications/scheduler'
 import { startNotificationWorker } from '@/lib/notifications/worker'
 
+const LEAD_CLASSIFICATIONS = ['Premium', 'High Value', 'Standard']
+
 export async function GET(request, { params }) {
   try {
     const { id } = await params
@@ -64,7 +66,7 @@ export async function PATCH(request, { params }) {
 
     const { id } = await params
     const body = await request.json()
-    const { status: leadStatus, notes, reminders, assigned_user } = body
+    const { status: leadStatus, notes, reminders, assigned_user, lead_classification, grouped_lead_key } = body
 
     if (!id) {
       return NextResponse.json(
@@ -76,7 +78,7 @@ export async function PATCH(request, { params }) {
     // First, fetch the lead record to get seeker_id, listing_id, and context_type
     const { data: leadRecord, error: fetchError } = await supabaseAdmin
       .from('leads')
-      .select('seeker_id, listing_id, lister_id, status, status_tracker, context_type, assigned_user')
+      .select('seeker_id, listing_id, lister_id, status, status_tracker, context_type, assigned_user, lead_classification, lead_type')
       .eq('id', id)
       .single()
 
@@ -130,6 +132,16 @@ export async function PATCH(request, { params }) {
       updateData.assigned_user = assigned_user || null
     }
 
+    if (lead_classification !== undefined) {
+      if (!LEAD_CLASSIFICATIONS.includes(lead_classification)) {
+        return NextResponse.json(
+          { error: 'Invalid lead_classification value' },
+          { status: 400 }
+        )
+      }
+      updateData.lead_classification = lead_classification
+    }
+
     // Handle notes update - always update if provided
     if (notes !== undefined) {
       // Ensure notes is an array
@@ -148,14 +160,39 @@ export async function PATCH(request, { params }) {
       }
     }
 
-    // Update ALL records in the same group (same seeker_id + listing_id)
-    // This ensures consistency across all records for the same lead
-    const { data: updatedLeads, error: updateError } = await supabaseAdmin
+    const normalizedSeekerId =
+      leadRecord.seeker_id && leadRecord.seeker_id !== 'null'
+        ? leadRecord.seeker_id
+        : null
+
+    const normalizedListingId =
+      leadRecord.listing_id && leadRecord.listing_id !== 'null'
+        ? leadRecord.listing_id
+        : null
+
+    // Update ALL records in the same group (same seeker_id + listing_id) for automated leads.
+    // Manual leads are single-record leads, so only update the selected lead id.
+    let updateQuery = supabaseAdmin
       .from('leads')
       .update(updateData)
-      .eq('seeker_id', leadRecord.seeker_id)
-      .eq('listing_id', leadRecord.listing_id)
-      .select()
+
+    if (leadRecord.lead_type === 'manual') {
+      updateQuery = updateQuery.eq('id', id)
+    } else {
+      if (normalizedSeekerId) {
+        updateQuery = updateQuery.eq('seeker_id', normalizedSeekerId)
+      } else {
+        updateQuery = updateQuery.is('seeker_id', null)
+      }
+
+      if (normalizedListingId) {
+        updateQuery = updateQuery.eq('listing_id', normalizedListingId)
+      } else {
+        updateQuery = updateQuery.is('listing_id', null)
+      }
+    }
+
+    const { data: updatedLeads, error: updateError } = await updateQuery.select()
 
     if (updateError) {
       console.error('Error updating leads:', updateError)
@@ -166,10 +203,23 @@ export async function PATCH(request, { params }) {
     }
 
     // Handle reminders updates (create, update, delete) - unified save
-    const groupedLeadKey = `${leadRecord.seeker_id}_${leadRecord.listing_id || 'null'}`
+    const fallbackGroupedLeadKey = leadRecord.lead_type === 'manual'
+      ? `manual_${id}`
+      : `${normalizedSeekerId || 'null'}_${normalizedListingId || 'null'}`
+    const groupedLeadKey = (typeof grouped_lead_key === 'string' && grouped_lead_key.trim())
+      ? grouped_lead_key.trim()
+      : fallbackGroupedLeadKey
     let remindersResult = { created: [], updated: [], deleted: [] }
 
     if (reminders !== undefined && Array.isArray(reminders)) {
+      const invalidReminder = reminders.find((reminder) => !reminder?.note_text || !reminder?.reminder_date || !reminder?.reminder_time)
+      if (invalidReminder) {
+        return NextResponse.json(
+          { error: 'Each reminder must include note_text, reminder_date, and reminder_time' },
+          { status: 400 }
+        )
+      }
+
       const ensureWorker = () => {
         startNotificationWorker()
       }
@@ -182,6 +232,7 @@ export async function PATCH(request, { params }) {
 
       if (!fetchRemindersError && currentReminders) {
         const currentReminderIds = new Set(currentReminders.map(r => r.id))
+        const currentReminderMap = new Map(currentReminders.map(r => [r.id, r]))
         const newReminderIds = new Set(reminders.filter(r => r.id).map(r => r.id))
 
         // Delete reminders that are no longer in the list
@@ -208,15 +259,26 @@ export async function PATCH(request, { params }) {
         for (const reminder of reminders) {
           if (reminder.id && currentReminderIds.has(reminder.id)) {
             // Update existing reminder
+            const previousReminder = currentReminderMap.get(reminder.id) || null
+            const nextStatus = reminder.status || previousReminder?.status || 'incomplete'
+            const nextDate = reminder.reminder_date || previousReminder?.reminder_date || null
+            const nextTime = reminder.reminder_time || previousReminder?.reminder_time || null
+            const hasScheduleChange =
+              nextStatus !== (previousReminder?.status || 'incomplete') ||
+              nextDate !== (previousReminder?.reminder_date || null) ||
+              nextTime !== (previousReminder?.reminder_time || null)
+
             // Include user_id and user_type if provided
             const { id, ...updateFields } = reminder
             const { user_id, user_type } = body
             const updateData = {
               ...updateFields,
               ...(user_id && { user_id }),
-              ...(user_type && { user_type }),
-              notification_status: 'pending',
-              notification_error: null
+              ...(user_type && { user_type })
+            }
+            if (hasScheduleChange) {
+              updateData.notification_status = 'pending'
+              updateData.notification_error = null
             }
             const { data: updated, error: updateReminderError } = await supabaseAdmin
               .from('reminders')
@@ -240,7 +302,7 @@ export async function PATCH(request, { params }) {
                 } catch (scheduleError) {
                   console.error('Failed to cancel updated reminder notification:', scheduleError)
                 }
-              } else if (reminderUserId && reminderUserType) {
+              } else if (hasScheduleChange && reminderUserId && reminderUserType) {
                 try {
                   ensureWorker()
                   await rescheduleNotificationFromRecord({
@@ -265,7 +327,7 @@ export async function PATCH(request, { params }) {
                 grouped_lead_key: groupedLeadKey,
                 note_text: reminder.note_text,
                 reminder_date: reminder.reminder_date,
-                reminder_time: reminder.reminder_time || null,
+                reminder_time: reminder.reminder_time,
                 priority: reminder.priority || 'normal',
                 status: reminder.status || 'incomplete',
                 user_id: user_id || null,
@@ -322,6 +384,7 @@ export async function PATCH(request, { params }) {
         lead_id: id,
         status: updateData.status || null,
         assigned_user: updateData.assigned_user !== undefined ? updateData.assigned_user : leadRecord.assigned_user || null,
+        lead_classification: updateData.lead_classification !== undefined ? updateData.lead_classification : leadRecord.lead_classification || 'Standard',
         updated_by: userInfo.user_id || null,
         reminders_changed: reminders !== undefined
       }

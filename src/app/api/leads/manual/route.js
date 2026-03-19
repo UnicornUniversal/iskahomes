@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 import crypto from 'crypto'
 import { verifyToken } from '@/lib/jwt'
 
+const LEAD_CLASSIFICATIONS = ['Premium', 'High Value', 'Standard']
+
 function isUUID(str) {
   if (!str) return false
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -106,7 +108,8 @@ export async function POST(request) {
       lister_id,
       lister_type,
       notes,
-      context_type
+      context_type,
+      lead_classification = 'Standard'
     } = body
 
     if (!lister_id || !lister_type) {
@@ -127,6 +130,13 @@ export async function POST(request) {
     if (!lead_origin || !validOrigins.includes(lead_origin)) {
       return NextResponse.json(
         { error: 'Valid lead_origin is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!LEAD_CLASSIFICATIONS.includes(lead_classification)) {
+      return NextResponse.json(
+        { error: 'Invalid lead_classification value' },
         { status: 400 }
       )
     }
@@ -166,6 +176,7 @@ export async function POST(request) {
       lead_type: 'manual',
       lead_source: null,
       lead_origin,
+      lead_classification,
       listing_id: listing_id || null,
       development_id: development_id || null,
       lister_id: finalListerId,

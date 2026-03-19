@@ -126,7 +126,8 @@ export function getScheduledAtForRecord(notificationType, record) {
 
   if (notificationType === NOTIFICATION_TYPES.SERVICE_CHARGE) {
     if (!record.next_due_date) return null
-    return new Date(`${record.next_due_date}T09:00:00`)
+    const dueTime = record.next_due_time || '08:00:00'
+    return new Date(`${record.next_due_date}T${dueTime}`)
   }
 
   if (notificationType === NOTIFICATION_TYPES.ENGAGEMENT) {

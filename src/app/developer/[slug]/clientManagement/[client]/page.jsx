@@ -121,7 +121,7 @@ function normalizePermissions(perms) {
 
 // Address search using Google Maps Places API - selects value into fullAddress
 
-const SingleClientPage = () => {
+export const ClientManagementContent = ({ forcedTab = null, hideClientChrome = false }) => {
   const params = useParams()
   const router = useRouter()
   const slug = params?.slug || ''
@@ -137,6 +137,11 @@ const SingleClientPage = () => {
 
   const token = () => developerToken || (typeof window !== 'undefined' ? localStorage.getItem('developer_token') : null)
   const authHeaders = () => ({ Authorization: `Bearer ${token()}` })
+  const getTodayDate = () => {
+    const now = new Date()
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+    return now.toISOString().slice(0, 10)
+  }
 
   const fetchClient = useCallback(() => {
     if (!clientId || isAddNew || !token()) return
@@ -177,7 +182,7 @@ const SingleClientPage = () => {
   const [editingEngagementId, setEditingEngagementId] = useState(null)
   const [openModal, setOpenModal] = useState(null)
   const [newTransaction, setNewTransaction] = useState({ unitId: '', unitName: '', amount: '', transactionType: 'Deposit', transactionDate: '', paymentMethod: '', reference: '', status: 'Completed', attachments: [] })
-  const [newServiceCharge, setNewServiceCharge] = useState({ unitId: '', unitName: '', amount: '', period: '', periodStart: '', periodEnd: '', dueDate: '', status: 'Pending', paidAt: '', billingReference: '' })
+  const [newServiceCharge, setNewServiceCharge] = useState({ unitId: '', unitName: '', amount: '', period: '', periodStart: getTodayDate(), periodEnd: getTodayDate(), dueDate: '', nextDueTime: '08:00', status: 'Pending', paidAt: getTodayDate(), billingReference: '' })
   const [newDocument, setNewDocument] = useState({ fileName: '', fileUrl: '' })
   const [infoForm, setInfoForm] = useState({ name: '', clientType: 'Individual', emails: [''], phones: [''], address: {}, status: 'Qualified', sourceChannel: 'Website', sourceUserId: '', firstContactDate: '', convertedDate: '', notes: '', tags: '' })
   const [editingPermissionsUserId, setEditingPermissionsUserId] = useState(null)
@@ -339,10 +344,13 @@ const SingleClientPage = () => {
   const defaultTab = visibleNavItems[0]?.id
 
   useEffect(() => {
+    if (forcedTab) return
     if (defaultTab && !visibleNavItems.some(t => t.id === activeTab)) {
       setActiveTab(defaultTab)
     }
-  }, [visibleNavItems, defaultTab, activeTab])
+  }, [visibleNavItems, defaultTab, activeTab, forcedTab])
+
+  const resolvedActiveTab = forcedTab || activeTab
 
   const clientUnitOptions = useMemo(() => (client?.units || []).map(u => ({ id: u.id, name: u.title || u.name || 'Unit' })), [client])
 
@@ -358,11 +366,18 @@ const SingleClientPage = () => {
   }
   const getUnitLocation = (unit) => [unit?.city, unit?.town, unit?.state, unit?.country].filter(Boolean).join(', ') || unit?.full_address || '—'
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+  const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   const formatPeriodDate = (d) => {
     if (!d) return ''
     const [y, m, day] = String(d).split('-')
     const mi = parseInt(m, 10) - 1
     return `${parseInt(day, 10)}-${MONTHS[mi] || m}-${y}`
+  }
+  const formatCompactDate = (d) => {
+    if (!d) return ''
+    const [y, m, day] = String(d).split('-')
+    const mi = parseInt(m, 10) - 1
+    return `${parseInt(day, 10)}, ${SHORT_MONTHS[mi] || m}, ${y}`
   }
 
   const handleAssignUser = (user) => {
@@ -537,7 +552,7 @@ const SingleClientPage = () => {
 
   const handleAddServiceCharge = () => {
     if (!client || !newServiceCharge.amount || !newServiceCharge.unitId || !token() || savingServiceCharge) return
-    const payload = { unitId: newServiceCharge.unitId, amount: Number(newServiceCharge.amount), periodStart: newServiceCharge.periodStart || null, periodEnd: newServiceCharge.periodEnd || null, status: newServiceCharge.status, paidAt: newServiceCharge.paidAt || null, billingReference: newServiceCharge.billingReference || null }
+    const payload = { unitId: newServiceCharge.unitId, amount: Number(newServiceCharge.amount), periodStart: newServiceCharge.periodStart || null, periodEnd: newServiceCharge.periodEnd || null, nextDueTime: newServiceCharge.nextDueTime || '08:00', status: newServiceCharge.status, paidAt: newServiceCharge.paidAt || null, billingReference: newServiceCharge.billingReference || null }
     console.log('[client] POST service-charge payload:', payload)
     setSavingServiceCharge(true)
     fetch(`/api/clients/${clientId}/service-charges`, {
@@ -549,7 +564,7 @@ const SingleClientPage = () => {
       .then(data => {
         if (data.success) {
           fetchClient()
-          setNewServiceCharge({ unitId: '', unitName: '', amount: '', period: '', periodStart: '', periodEnd: '', dueDate: '', status: 'Pending', paidAt: '', billingReference: '' })
+          setNewServiceCharge({ unitId: '', unitName: '', amount: '', period: '', periodStart: getTodayDate(), periodEnd: getTodayDate(), dueDate: '', nextDueTime: '08:00', status: 'Pending', paidAt: getTodayDate(), billingReference: '' })
           setOpenModal(null)
           toast.success('Service charge added successfully!')
         } else toast.error(data.error || 'Failed to save')
@@ -569,6 +584,7 @@ const SingleClientPage = () => {
         amount: Number(newServiceCharge.amount),
         periodStart: newServiceCharge.periodStart || null,
         periodEnd: newServiceCharge.periodEnd || null,
+        nextDueTime: newServiceCharge.nextDueTime || '08:00',
         status: newServiceCharge.status,
         paidAt: newServiceCharge.paidAt || null,
         billingReference: newServiceCharge.billingReference || null
@@ -579,7 +595,7 @@ const SingleClientPage = () => {
         if (data.success) {
           fetchClient()
           setEditingServiceChargeId(null)
-          setNewServiceCharge({ unitId: '', unitName: '', amount: '', period: '', periodStart: '', periodEnd: '', dueDate: '', status: 'Pending', paidAt: '', billingReference: '' })
+          setNewServiceCharge({ unitId: '', unitName: '', amount: '', period: '', periodStart: getTodayDate(), periodEnd: getTodayDate(), dueDate: '', nextDueTime: '08:00', status: 'Pending', paidAt: getTodayDate(), billingReference: '' })
           setOpenModal(null)
           toast.success('Service charge updated successfully!')
         } else toast.error(data.error || 'Failed to update')
@@ -736,7 +752,8 @@ const SingleClientPage = () => {
   return (
     <>
       <ToastContainer position="top-right" autoClose={3000} />
-    <div className="min-h-screen p-4 md:p-6">
+    <div className={`${hideClientChrome ? '' : 'min-h-screen p-4 md:p-6'}`}>
+      {!hideClientChrome && (
       <div className="flex items-center justify-between gap-4 mb-4">
         <Link href={basePath} className="inline-flex items-center gap-2 text-sm text-primary_color/80 hover:text-primary_color">
           <FiArrowLeft className="w-4 h-4" /> Back to clients
@@ -747,8 +764,10 @@ const SingleClientPage = () => {
         </Link>
         )}
       </div>
+      )}
 
       {/* Client header */}
+      {!hideClientChrome && (
       <header className="default_bg rounded-xl border border-white/40 p-4 md:p-5 mb-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -780,23 +799,26 @@ const SingleClientPage = () => {
           )}
         </div>
       </header>
+      )}
 
       {/* Tabs nav - only show tabs user has read permission for */}
+      {!hideClientChrome && (
       <nav className="border-b border-white/40 mb-4">
         <div className="flex gap-1 overflow-x-auto pb-px">
           {visibleNavItems?.map(t => {
             const Icon = t.icon
             return (
-              <button key={t.id} type="button" onClick={() => setActiveTab(t.id)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeTab === t.id ? 'border-primary_color text-primary_color' : 'border-transparent text-primary_color/70 hover:text-primary_color'}`}>
+              <button key={t.id} type="button" onClick={() => setActiveTab(t.id)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${resolvedActiveTab === t.id ? 'border-primary_color text-primary_color' : 'border-transparent text-primary_color/70 hover:text-primary_color'}`}>
                 <Icon className="w-4 h-4 flex-shrink-0" />{t.label}
               </button>
             )
           })}
         </div>
       </nav>
+      )}
 
       {/* Content */}
-      <main className={`default_bg rounded-xl p-4 md:p-5 min-h-[320px] ${activeTab === 'serviceCharges' ? '' : 'border border-white/40'}`}>
+      <main className={`default_bg rounded-xl p-4 md:p-5 min-h-[320px] ${resolvedActiveTab === 'serviceCharges' ? '' : 'border border-white/40'}`}>
         <>
         {visibleNavItems.length === 0 ? (
           <div className="py-12 text-center text-primary_color/70">
@@ -805,7 +827,7 @@ const SingleClientPage = () => {
           </div>
         ) : (
         <>
-        {activeTab === 'info' && (
+        {resolvedActiveTab === 'info' && (
           <>
           <fieldset className="space-y-5 border-0 p-0 m-0" disabled={!isAdminOrSuperAdmin || !canUpdate('info')}>
             <div className="flex items-center justify-between">
@@ -927,14 +949,16 @@ const SingleClientPage = () => {
               </div>
             </div>
             {canViewInfoField('totalUnitsSold') && (
-            <div className="grid grid-cols-2 gap-6 text-sm border-t border-white/30 pt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 border-t border-white/30 pt-4">
               <div>
-                <p className="text-primary_color/70 font-medium mb-1">Total income</p>
-                <p className="text-primary_color font-medium">{(client.totalIncomeUsd || 0).toLocaleString()}</p>
+                <p className="text-primary_color/65 text-xs uppercase tracking-wide mb-1">Total sales revenue</p>
+                <p className="text-primary_color text-2xl md:text-3xl font-semibold leading-none">
+                  {(client.totalSalesCurrency || 'USD')} {(Number(client.totalSalesRevenue || 0)).toLocaleString()}
+                </p>
               </div>
               <div>
-                <p className="text-primary_color/70 font-medium mb-1">Total units</p>
-                <p className="text-primary_color font-medium">{(client.units || []).length}</p>
+                <p className="text-primary_color/65 text-xs uppercase tracking-wide mb-1">Total units</p>
+                <p className="text-primary_color text-2xl md:text-3xl font-semibold leading-none">{client.totalUnitsPurchased ?? (client.units || []).length}</p>
               </div>
             </div>
             )}
@@ -969,27 +993,27 @@ const SingleClientPage = () => {
                   />
                 </div>
                 {assignDropdownOpen && assignableUsersFiltered.length > 0 && (
-                  <ul className="absolute top-full left-0 right-0 mt-1 z-20 bg-white rounded-lg border border-gray-200 shadow-lg py-2 max-h-48 overflow-y-auto text-sm">
+                  <ul className="absolute top-full left-0 right-0 mt-1 z-20 bg-white rounded-lg border border-gray-200 shadow-lg py-2 max-h-48 overflow-y-auto">
                     {assignableUsersFiltered.map(u => (
                       <li
                         key={u.id}
-                        className="flex flex-col px-3 py-2 cursor-pointer hover:bg-gray-100 transition-colors text-gray-900 text-sm"
+                        className="flex flex-col px-3 py-2.5 cursor-pointer hover:bg-gray-100 transition-colors text-gray-900"
                         onMouseDown={(e) => { e.preventDefault(); handleAssignUser(u) }}
                       >
-                        <span className="font-medium">{u.name}</span>
-                        <span className="text-gray-600">{u.role || 'Team member'}</span>
+                        <p className="text-base text-primary_color">{u.name}</p>
+                        <p className="text-base italic text-primary_color/70">{u.role || 'Team member'}</p>
                       </li>
                     ))}
                   </ul>
                 )}
               </div>
               )}
-              <ul className="flex flex-wrap gap-3 text-sm mt-3">
+              <ul className="flex flex-wrap gap-3 mt-3">
                 {(client.assignedUsers || []).map(u => (
-                  <li key={u.id} className="inline-flex items-center gap-2 px-3 py-2 default_bg rounded-lg border border-white/40 text-sm">
+                  <li key={u.id} className="inline-flex items-center gap-2 px-3 py-2.5 default_bg rounded-lg border border-white/40">
                     <div>
-                      <p className="font-medium text-primary_color">{u.name}</p>
-                      <p className="text-sm text-primary_color/70">{u.role || '—'}</p>
+                      <p className="text-base text-primary_color">{u.name}</p>
+                      <p className="text-base italic text-primary_color/70">{u.role || '—'}</p>
                     </div>
                     <div className="flex items-center gap-0.5 ml-1">
                       {canManageUserAssignment() && (
@@ -1007,7 +1031,7 @@ const SingleClientPage = () => {
           </>
         )}
 
-        {activeTab === 'units' && (
+        {resolvedActiveTab === 'units' && (
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-primary_color">Units / Properties</h2>
             {(client.units || []).length === 0 ? <p className="text-sm text-primary_color/70">No units assigned.</p> : (
@@ -1029,7 +1053,7 @@ const SingleClientPage = () => {
           </div>
         )}
 
-        {activeTab === 'transactions' && (
+        {resolvedActiveTab === 'transactions' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-primary_color">Financial transactions</h2>
@@ -1085,95 +1109,94 @@ const SingleClientPage = () => {
           </div>
         )}
 
-        {activeTab === 'serviceCharges' && (
+        {resolvedActiveTab === 'serviceCharges' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-primary_color">Service charges</h2>
               {canCreate('serviceCharges') && (
-              <button type="button" onClick={() => { setEditingServiceChargeId(null); setNewServiceCharge({ unitId: '', unitName: '', amount: '', period: '', periodStart: '', periodEnd: '', dueDate: '', status: 'Pending', paidAt: '', billingReference: '' }); setOpenModal('serviceCharge'); }} className="primary_button text-sm py-2 px-3"><FiPlus className="w-3.5 h-3.5 inline mr-1" /> Add service charge</button>
+              <button type="button" onClick={() => { setEditingServiceChargeId(null); setNewServiceCharge({ unitId: '', unitName: '', amount: '', period: '', periodStart: getTodayDate(), periodEnd: getTodayDate(), dueDate: '', nextDueTime: '08:00', status: 'Pending', paidAt: getTodayDate(), billingReference: '' }); setOpenModal('serviceCharge'); }} className="primary_button text-sm py-2 px-3"><FiPlus className="w-3.5 h-3.5 inline mr-1" /> Add service charge</button>
               )}
             </div>
             {(client.serviceCharges || []).length === 0 ? <p className="text-sm text-primary_color/70">No service charges yet. Add one to get started.</p> : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border-0">
-                  <thead><tr className="border-b text-left text-sm font-medium text-primary_color/70"><th className="px-3 py-2">Unit</th><th className="px-3 py-2">Period</th><th className="px-3 py-2">Amount</th><th className="px-3 py-2">Next due</th><th className="px-3 py-2">Next due status</th><th className="px-3 py-2">Overdue days</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Paid at</th><th className="px-3 py-2 w-20"></th></tr></thead>
-                  <tbody className="divide-y divide-gray-200 text-primary_color">
-                    {(client.serviceCharges || []).map(sc => {
-                      const u = sc.unitDetails || (client.units || []).find(x => String(x?.id) === String(sc.unitId))
-                      const curr = u?.currency || (client.units || []).find(x => String(x?.id) === String(sc.unitId))?.currency || 'GHS'
-                      const unitName = sc.unitName || u?.title || '—'
-                      const unitLocation = u ? getUnitLocation(u) : '—'
-                      const unitImg = u ? getUnitImage(u) : null
-                      const nextDue = sc.nextDueDate ? (() => { const d = new Date(sc.nextDueDate + 'T00:00:00'); d.setHours(0, 0, 0, 0); return d })() : null
-                      const today = new Date()
-                      today.setHours(0, 0, 0, 0)
-                      const rawNextDueStatus = String(sc.nextDueStatus || 'not_due').toLowerCase()
-                      const closed = rawNextDueStatus === 'paid'
-                      const isOverdue = !closed && nextDue && nextDue < today
-                      const isDueSoon = !closed && nextDue && nextDue >= today && (() => { const week = new Date(today); week.setDate(week.getDate() + 7); return nextDue <= week })()
-                      const computedNextDueStatus = closed ? 'paid' : isOverdue ? 'overdue' : (nextDue && nextDue.getTime() === today.getTime() ? 'due' : 'not_due')
-                      const overdueDays = Number(sc.overdueTime || 0)
-                      return (
-                        <tr key={sc.id}>
-                          <td className="px-3 py-2">
-                            <div className="flex items-center gap-2">
-                              {unitImg ? <img src={unitImg} alt="" className="w-10 h-10 rounded object-cover flex-shrink-0" /> : <div className="w-10 h-10 rounded bg-gray-200 flex-shrink-0" />}
-                              <div>
-                                <p className="font-medium">{unitName}</p>
-                                <p className="text-xs text-primary_color/70">{unitLocation}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2">{sc.periodStart && sc.periodEnd ? `${formatPeriodDate(sc.periodStart)} – ${formatPeriodDate(sc.periodEnd)}` : (sc.period || '—')}</td>
-                          <td className="px-3 py-2 font-medium">{curr} {sc.amount?.toLocaleString()}</td>
-                          <td className="px-3 py-2">
+              <div className="space-y-2 text-sm text-primary_color">
+                {(client.serviceCharges || []).map(sc => {
+                  const u = sc.unitDetails || (client.units || []).find(x => String(x?.id) === String(sc.unitId))
+                  const curr = u?.currency || (client.units || []).find(x => String(x?.id) === String(sc.unitId))?.currency || 'GHS'
+                  const unitName = sc.unitName || u?.title || '—'
+                  const unitLocation = u ? getUnitLocation(u) : '—'
+                  const unitImg = u ? getUnitImage(u) : null
+                  const nextDue = sc.nextDueDate ? (() => { const d = new Date(sc.nextDueDate + 'T00:00:00'); d.setHours(0, 0, 0, 0); return d })() : null
+                  const today = new Date()
+                  today.setHours(0, 0, 0, 0)
+                  const rawNextDueStatus = String(sc.nextDueStatus || 'not_due').toLowerCase()
+                  const closed = rawNextDueStatus === 'paid'
+                  const isOverdue = !closed && nextDue && nextDue < today
+                  const isDueSoon = !closed && nextDue && nextDue >= today && (() => { const week = new Date(today); week.setDate(week.getDate() + 7); return nextDue <= week })()
+                  const overdueDays = isOverdue && nextDue
+                    ? Math.max(0, Math.floor((today.getTime() - nextDue.getTime()) / (1000 * 60 * 60 * 24)))
+                    : 0
+                  return (
+                    <div key={sc.id} className="rounded-2xl border border-white/30 bg-white/20 p-4 shadow-sm">
+                      <div className="flex flex-wrap items-start gap-4">
+                        <div className="flex min-w-[260px] flex-1 items-start gap-3">
+                          {unitImg ? <img src={unitImg} alt="" className="w-20 h-20 rounded-lg object-cover flex-shrink-0" /> : <div className="w-20 h-20 rounded-lg bg-gray-200 flex-shrink-0" />}
+                          <div className="min-w-0">
+                            <p className="text-xs uppercase tracking-wide text-primary_color/55">Unit</p>
+                            <p className="font-semibold text-base leading-tight">{unitName}</p>
+                            <p className="text-sm text-primary_color/70 leading-snug mt-1">{unitLocation}</p>
+                          </div>
+                        </div>
+                        <div className="min-w-[210px]">
+                          <p className="text-xs uppercase tracking-wide text-primary_color/55">Period</p>
+                          <p className="mt-0.5 font-medium">{sc.periodStart && sc.periodEnd ? `${formatCompactDate(sc.periodStart)} - ${formatCompactDate(sc.periodEnd)}` : (sc.period || '—')}</p>
+                        </div>
+                        <div className="min-w-[130px]">
+                          <p className="text-xs uppercase tracking-wide text-primary_color/55">Amount</p>
+                          <p className="mt-0.5 font-semibold">{curr} {sc.amount?.toLocaleString()}</p>
+                        </div>
+                        <div className="min-w-[210px]">
+                          <p className="text-xs uppercase tracking-wide text-primary_color/55">Next due</p>
+                          <p className={`mt-0.5 font-medium ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-amber-700' : ''}`}>
                             {sc.nextDueDate ? (
-                              <span className={isOverdue ? 'text-red-600 font-medium' : isDueSoon ? 'text-amber-700' : ''}>
-                                {formatPeriodDate(sc.nextDueDate)}
+                              <>
+                                {formatCompactDate(sc.nextDueDate)}
+                                {sc.nextDueTime ? ` ${sc.nextDueTime}` : ''}
                                 {isOverdue && ' (overdue)'}
                                 {isDueSoon && !isOverdue && ' (due soon)'}
-                              </span>
+                              </>
                             ) : '—'}
-                          </td>
-                          <td className="px-3 py-2">
-                            <span className={`px-1.5 py-0.5 rounded text-sm ${
-                              computedNextDueStatus === 'paid'
-                                ? 'bg-green-100 text-green-700'
-                                : computedNextDueStatus === 'overdue'
-                                  ? 'bg-red-100 text-red-700'
-                                  : computedNextDueStatus === 'due'
-                                    ? 'bg-amber-100 text-amber-700'
-                                    : 'default_bg text-primary_color/80'
-                            }`}>
-                              {computedNextDueStatus.replace('_', ' ')}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2">{overdueDays}</td>
-                          <td className="px-3 py-2"><span className={`px-1.5 py-0.5 rounded text-sm ${sc.status === 'Paid' ? 'bg-primary_color/20 text-primary_color' : 'default_bg text-primary_color/80'}`}>{sc.status}</span></td>
-                          <td className="px-3 py-2">{sc.paidAt ? formatPeriodDate(sc.paidAt) : '—'}</td>
-                          <td className="px-3 py-2">
-                            {(canUpdate('serviceCharges') || canDelete('serviceCharges')) && (
-                            <div className="flex gap-1">
-                              {canUpdate('serviceCharges') && (
-                              <button type="button" onClick={() => { setEditingServiceChargeId(sc.id); setNewServiceCharge({ unitId: sc.unitId ?? '', unitName: sc.unitName ?? '', amount: String(sc.amount || ''), periodStart: sc.periodStart || '', periodEnd: sc.periodEnd || '', status: sc.status || 'Pending', paidAt: sc.paidAt || '', billingReference: sc.billingReference || '' }); setOpenModal('serviceCharge'); }} className="text-primary_color/70 hover:text-primary_color" title="Edit"><FiEdit2 className="w-3.5 h-3.5" /></button>
-                              )}
-                              {canDelete('serviceCharges') && (
-                              <button type="button" onClick={() => setDeleteServiceChargeId(sc.id)} className="text-primary_color/70 hover:text-primary_color" title="Delete"><FiTrash2 className="w-3.5 h-3.5" /></button>
-                              )}
-                            </div>
+                          </p>
+                        </div>
+                        <div className="min-w-[120px]">
+                          <p className="text-xs uppercase tracking-wide text-primary_color/55">Overdue</p>
+                          <p className="mt-0.5 font-semibold">{overdueDays} days</p>
+                        </div>
+                        <div className="min-w-[110px]">
+                          <p className="text-xs uppercase tracking-wide text-primary_color/55">Status</p>
+                          <span className={`mt-1 inline-flex px-2 py-1 rounded-md text-xs font-medium ${sc.status === 'Paid' ? 'bg-primary_color/20 text-primary_color' : 'default_bg text-primary_color/80'}`}>{sc.status}</span>
+                        </div>
+                        <div className="ml-auto flex items-center gap-1">
+                        {(canUpdate('serviceCharges') || canDelete('serviceCharges')) && (
+                          <>
+                            {canUpdate('serviceCharges') && (
+                              <button type="button" onClick={() => { setEditingServiceChargeId(sc.id); setNewServiceCharge({ unitId: sc.unitId ?? '', unitName: sc.unitName ?? '', amount: String(sc.amount || ''), periodStart: sc.periodStart || '', periodEnd: sc.periodEnd || '', nextDueTime: sc.nextDueTime || '08:00', status: sc.status || 'Pending', paidAt: sc.paidAt || '', billingReference: sc.billingReference || '' }); setOpenModal('serviceCharge'); }} className="rounded-md p-1.5 text-primary_color/70 hover:text-primary_color hover:bg-primary_color/10" title="Edit"><FiEdit2 className="w-4 h-4" /></button>
                             )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                            {canDelete('serviceCharges') && (
+                              <button type="button" onClick={() => setDeleteServiceChargeId(sc.id)} className="rounded-md p-1.5 text-primary_color/70 hover:text-primary_color hover:bg-primary_color/10" title="Delete"><FiTrash2 className="w-4 h-4" /></button>
+                            )}
+                          </>
+                        )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
         )}
 
-        {activeTab === 'engagement' && (
+        {resolvedActiveTab === 'engagement' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-primary_color">Engagement log</h2>
@@ -1211,7 +1234,7 @@ const SingleClientPage = () => {
           </div>
         )}
 
-        {activeTab === 'documents' && (
+        {resolvedActiveTab === 'documents' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-primary_color">Documents</h2>
@@ -1227,7 +1250,7 @@ const SingleClientPage = () => {
           </div>
         )}
 
-        {activeTab === 'messaging' && (
+        {resolvedActiveTab === 'messaging' && (
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-primary_color">Messaging chain</h2>
             <p className="text-sm text-primary_color/70">Emails between team and client</p>
@@ -1380,6 +1403,7 @@ const SingleClientPage = () => {
                   <div className="grid grid-cols-2 gap-3">
                     <div><label className="block text-sm font-medium text-primary_color mb-1">Status</label><select value={newServiceCharge.status} onChange={e => setNewServiceCharge(prev => ({ ...prev, status: e.target.value }))} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-primary_color">{SERVICE_CHARGE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
                     <div><label className="block text-sm font-medium text-primary_color mb-1">Paid at</label><Input type="date" value={newServiceCharge.paidAt} onChange={e => setNewServiceCharge(prev => ({ ...prev, paidAt: e.target.value }))} className="w-full py-2 border-gray-200" /></div>
+                    <div><label className="block text-sm font-medium text-primary_color mb-1">Notification time</label><Input type="time" value={newServiceCharge.nextDueTime || '08:00'} onChange={e => setNewServiceCharge(prev => ({ ...prev, nextDueTime: e.target.value || '08:00' }))} className="w-full py-2 border-gray-200" /></div>
                     <div className="col-span-2"><label className="block text-sm font-medium text-primary_color mb-1">Billing reference</label><Input value={newServiceCharge.billingReference} onChange={e => setNewServiceCharge(prev => ({ ...prev, billingReference: e.target.value }))} className="w-full py-2 border-gray-200" /></div>
                   </div>
                 </div>
@@ -1544,6 +1568,27 @@ const SingleClientPage = () => {
       )}
     </div>
     </>
+  )
+}
+
+const SingleClientPage = () => {
+  const params = useParams()
+  const router = useRouter()
+  const slug = params?.slug || ''
+  const clientId = params?.client || ''
+
+  useEffect(() => {
+    if (!slug || !clientId || clientId === 'addNewClient') return
+    router.replace(`/developer/${slug}/clientManagement/${clientId}/info`)
+  }, [slug, clientId, router])
+
+  return (
+    <div className="min-h-screen p-6 flex items-center justify-center">
+      <div className="text-center text-primary_color">
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary_color border-t-transparent mx-auto mb-4" />
+        <p>Redirecting...</p>
+      </div>
+    </div>
   )
 }
 

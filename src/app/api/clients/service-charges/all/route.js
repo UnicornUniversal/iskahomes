@@ -124,6 +124,7 @@ export async function GET(request) {
         periodStart: c.period_start?.slice?.(0, 10) || null,
         periodEnd: c.period_end?.slice?.(0, 10) || null,
         nextDueDate: c.next_due_date?.slice?.(0, 10) || null,
+        nextDueTime: c.next_due_time?.slice?.(0, 5) || '08:00',
         nextDueStatus: computedNextDueStatus,
         overdueTime: c.overdue_time ?? 0,
         status: c.status,
