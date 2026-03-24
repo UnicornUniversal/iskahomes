@@ -584,7 +584,7 @@ const PropertyDetailPage = () => {
     // Check if user is logged in as property seeker
     if (!user || !propertySeekerToken || user.user_type !== 'property_seeker') {
       // Redirect to signup page
-      router.push('/signup')
+      router.push('/home/signup')
       return
     }
 

@@ -16,6 +16,7 @@ import {
 import { Line } from 'react-chartjs-2'
 import { DateRangePicker } from '@/app/components/ui/date-range-picker'
 import { ExportDropdown } from '@/app/components/ui/export-dropdown'
+import { analyticsClasses, analyticsPalette, baseChartOptions } from './analyticsTheme'
 
 // Register Chart.js components
 ChartJS.register(
@@ -207,10 +208,10 @@ export default function LeadsTrend({ listerId, listerType = 'developer', listing
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="default_bg rounded-lg shadow p-6">
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
-            <span className="text-gray-600">Loading leads trend data...</span>
+        <div className={analyticsClasses.section}>
+          <div className="flex items-center justify-center py-12 text-slate-500">
+            <Loader2 className="mr-2 h-6 w-6 animate-spin text-teal-600" />
+            <span>Loading leads trend data...</span>
           </div>
         </div>
       </div>
@@ -220,7 +221,7 @@ export default function LeadsTrend({ listerId, listerType = 'developer', listing
   if (error) {
     return (
       <div className="space-y-6">
-        <div className="default_bg rounded-lg shadow p-6">
+        <div className={analyticsClasses.section}>
           <div className="flex items-center justify-center py-12">
             <span className="text-red-600">{error}</span>
           </div>
@@ -230,36 +231,7 @@ export default function LeadsTrend({ listerId, listerType = 'developer', listing
   }
 
   // Chart configuration
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top',
-      },
-      title: {
-        display: false,
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        grid: {
-          color: 'rgba(0, 0, 0, 0.1)',
-        },
-      },
-      x: {
-        grid: {
-          color: 'rgba(0, 0, 0, 0.1)',
-        },
-      },
-    },
-    elements: {
-      line: {
-        tension: 0.4, // Smooth curves
-      },
-    },
-  }
+  const chartOptions = baseChartOptions({ yTitle: 'Lead Count' })
 
   // Deterministic chart data (no new Date / Math.random in render)
   const chartLabels = currentData?.performance?.labels || []
@@ -273,10 +245,17 @@ export default function LeadsTrend({ listerId, listerType = 'developer', listing
 
   return (
     <div className="space-y-6">
-      {/* Leads chart with per-type series */}
-      <div className="default_bg rounded-lg shadow p-6">
-        <div className="flex items-center flex-wrap justify-between mb-4 gap-4">
-          <h3 className="text-lg font-semibold text-gray-900">Leads Trend</h3>
+      <div className={analyticsClasses.section}>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="space-y-3">
+            <span className={analyticsClasses.eyebrow}>Momentum</span>
+            <div>
+              <h3 className={analyticsClasses.title}>Lead Trend</h3>
+              <p className={analyticsClasses.subtitle}>
+                Track how lead volume moves through the selected period with a single, cleaner chart palette.
+              </p>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <DateRangePicker
               startDate={dateRange.startDate}
@@ -290,7 +269,8 @@ export default function LeadsTrend({ listerId, listerType = 'developer', listing
             />
           </div>
         </div>
-        <div className="h-80">
+        <div className="mt-6 rounded-3xl border border-slate-200/80 bg-slate-50/70 p-5">
+          <div className="h-80">
           <Line
             data={{
               labels: chartLabels,
@@ -298,40 +278,40 @@ export default function LeadsTrend({ listerId, listerType = 'developer', listing
                 {
                   label: 'Total',
                   data: totalSeries,
-                  borderColor: 'rgb(59, 130, 246)',
-                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                  borderColor: analyticsPalette.secondary,
+                  backgroundColor: analyticsPalette.secondarySoft,
                   fill: true,
                   tension: 0.4,
                 },
                 {
                   label: 'Phone',
                   data: phoneSeries,
-                  borderColor: 'rgb(16, 185, 129)',
-                  backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                  borderColor: analyticsPalette.primary,
+                  backgroundColor: analyticsPalette.primarySoft,
                   fill: true,
                   tension: 0.4,
                 },
                 {
                   label: 'Message',
                   data: messageSeries,
-                  borderColor: 'rgb(168, 85, 247)',
-                  backgroundColor: 'rgba(168, 85, 247, 0.08)',
+                  borderColor: analyticsPalette.violet,
+                  backgroundColor: analyticsPalette.violetSoft,
                   fill: true,
                   tension: 0.4,
                 },
                 {
                   label: 'Email',
                   data: emailSeries,
-                  borderColor: 'rgb(99, 102, 241)',
-                  backgroundColor: 'rgba(99, 102, 241, 0.08)',
+                  borderColor: analyticsPalette.slate,
+                  backgroundColor: analyticsPalette.slateSoft,
                   fill: true,
                   tension: 0.4,
                 },
                 {
                   label: 'Appointment',
                   data: appointmentSeries,
-                  borderColor: 'rgb(245, 158, 11)',
-                  backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                  borderColor: analyticsPalette.amber,
+                  backgroundColor: analyticsPalette.amberSoft,
                   fill: true,
                   tension: 0.4,
                 }
@@ -339,6 +319,7 @@ export default function LeadsTrend({ listerId, listerType = 'developer', listing
             }}
             options={chartOptions}
           />
+        </div>
         </div>
       </div>
 

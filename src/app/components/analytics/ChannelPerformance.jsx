@@ -12,6 +12,7 @@ import {
   Legend
 } from 'chart.js'
 import { Phone, MessageCircle, Mail, Calendar, TrendingUp, Award } from 'lucide-react'
+import { analyticsClasses, analyticsPalette, baseChartOptions, formatNumber, formatPercent } from './analyticsTheme'
 
 ChartJS.register(
   CategoryScale,
@@ -38,12 +39,39 @@ const channelLabels = {
   appointment: 'Appointment'
 }
 
+const channelStyles = {
+  phone: {
+    iconClass: 'bg-teal-50 text-teal-700 ring-teal-100',
+    color: analyticsPalette.primary,
+    soft: analyticsPalette.primarySoft
+  },
+  whatsapp: {
+    iconClass: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+    color: analyticsPalette.emerald,
+    soft: analyticsPalette.emeraldSoft
+  },
+  direct_message: {
+    iconClass: 'bg-sky-50 text-sky-700 ring-sky-100',
+    color: analyticsPalette.secondary,
+    soft: analyticsPalette.secondarySoft
+  },
+  email: {
+    iconClass: 'bg-indigo-50 text-indigo-700 ring-indigo-100',
+    color: analyticsPalette.violet,
+    soft: analyticsPalette.violetSoft
+  },
+  appointment: {
+    iconClass: 'bg-amber-50 text-amber-700 ring-amber-100',
+    color: analyticsPalette.amber,
+    soft: analyticsPalette.amberSoft
+  }
+}
+
 export default function ChannelPerformance({ data }) {
   if (!data || Object.keys(data).length === 0) {
     return (
-      <div className="default_bg rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Channel Performance</h3>
-        <div className="text-center text-gray-500 py-8">No channel data available</div>
+      <div className={analyticsClasses.section}>
+        <div className={analyticsClasses.empty}>No channel data available yet.</div>
       </div>
     )
   }
@@ -52,12 +80,13 @@ export default function ChannelPerformance({ data }) {
   
   if (channels.length === 0) {
     return (
-      <div className="default_bg rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Channel Performance</h3>
-        <div className="text-center text-gray-500 py-8">No channel data available</div>
+      <div className={analyticsClasses.section}>
+        <div className={analyticsClasses.empty}>No channel data available yet.</div>
       </div>
     )
   }
+
+  const totalTrackedLeads = channels.reduce((sum, channel) => sum + (data[channel]?.total || 0), 0)
 
   const chartData = {
     labels: channels.map(ch => channelLabels[ch] || ch),
@@ -65,59 +94,28 @@ export default function ChannelPerformance({ data }) {
       {
         label: 'Conversion Rate (%)',
         data: channels.map(ch => data[ch].conversionRate),
-        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: channels.map(ch => channelStyles[ch]?.soft || analyticsPalette.secondarySoft),
+        borderColor: channels.map(ch => channelStyles[ch]?.color || analyticsPalette.secondary),
         borderWidth: 1
       },
       {
         label: 'Avg Lead Score',
         data: channels.map(ch => data[ch].avgLeadScore),
-        backgroundColor: 'rgba(16, 185, 129, 0.8)',
-        borderColor: 'rgb(16, 185, 129)',
+        backgroundColor: channels.map(ch => channelStyles[ch]?.color || analyticsPalette.primary),
+        borderColor: channels.map(ch => channelStyles[ch]?.color || analyticsPalette.primary),
         borderWidth: 1,
         yAxisID: 'y1'
       }
     ]
   }
 
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top'
-      },
-      title: {
-        display: false
-      }
-    },
-    scales: {
-      y: {
-        type: 'linear',
-        display: true,
-        position: 'left',
-        title: {
-          display: true,
-          text: 'Conversion Rate (%)'
-        },
-        beginAtZero: true,
-        max: 100
-      },
-      y1: {
-        type: 'linear',
-        display: true,
-        position: 'right',
-        title: {
-          display: true,
-          text: 'Lead Score'
-        },
-        beginAtZero: true,
-        grid: {
-          drawOnChartArea: false
-        }
-      }
+  const chartOptions = baseChartOptions({
+    yMax: 100,
+    yTitle: 'Conversion Rate (%)',
+    secondaryAxis: {
+      title: 'Lead Score'
     }
-  }
+  })
 
   // Sort channels by conversion rate
   const sortedChannels = [...channels].sort((a, b) => 
@@ -125,59 +123,96 @@ export default function ChannelPerformance({ data }) {
   )
 
   return (
-    <div className="default_bg rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold mb-4">Channel Performance Analysis</h3>
-      
-      <div className="mb-6">
+    <div className={analyticsClasses.section}>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-3">
+          <span className={analyticsClasses.eyebrow}>Channel Quality</span>
+          <div>
+            <h3 className={analyticsClasses.title}>Channel Performance</h3>
+            <p className={analyticsClasses.subtitle}>
+              Performance is now derived from the full action history, so WhatsApp and email stay visible when those channels are used.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className={analyticsClasses.subPanel}>
+            <p className={analyticsClasses.metricLabel}>Tracked Channel Touchpoints</p>
+            <p className="mt-2 text-3xl font-semibold tracking-tight text-primary_color">
+              {formatNumber(totalTrackedLeads)}
+            </p>
+          </div>
+          <div className={analyticsClasses.subPanel}>
+            <p className={analyticsClasses.metricLabel}>Top Converting Channel</p>
+            <p className="mt-2 text-2xl font-semibold tracking-tight text-primary_color">
+              {channelLabels[sortedChannels[0]] || sortedChannels[0]}
+            </p>
+            <p className="mt-2 text-xs text-slate-500">
+              {formatPercent(data[sortedChannels[0]]?.conversionRate || 0)} conversion rate
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-3xl border border-slate-200/80 bg-slate-50/70 p-5">
         <div className="h-80">
           <Bar data={chartData} options={chartOptions} />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {sortedChannels.map(channel => {
           const Icon = channelIcons[channel] || MessageCircle
           const stats = data[channel]
+          const channelShare = totalTrackedLeads > 0 ? (stats.total / totalTrackedLeads) * 100 : 0
+          const style = channelStyles[channel] || channelStyles.direct_message
           
           return (
-            <div key={channel} className="border border-gray-200 rounded-lg p-4">
+            <div key={channel} className={analyticsClasses.compactCard}>
               <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <Icon className="w-5 h-5 text-blue-600" />
+                <div className={`${analyticsClasses.iconWrap} ${style.iconClass}`}>
+                  <Icon className="h-5 w-5" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">{channelLabels[channel]}</h4>
-                  <p className="text-sm text-gray-500">{stats.total} leads</p>
+                  <h4 className="font-semibold text-primary_color">{channelLabels[channel]}</h4>
+                  <p className="text-sm text-primary_color/70">
+                    {formatNumber(stats.total)} tracked leads
+                  </p>
                 </div>
               </div>
               
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Conversion Rate</span>
-                  <span className="font-semibold text-blue-600">
-                    {stats.conversionRate.toFixed(1)}%
-                  </span>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-slate-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Share</p>
+                  <p className="mt-2 text-xl font-semibold text-primary_color">{formatPercent(channelShare)}</p>
                 </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Avg Lead Score</span>
-                  <span className="font-semibold text-green-600">
-                    {stats.avgLeadScore.toFixed(1)}
-                  </span>
+                <div className="rounded-2xl bg-slate-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Conversion</p>
+                  <p className="mt-2 text-xl font-semibold text-primary_color">{formatPercent(stats.conversionRate)}</p>
                 </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">High Value Leads</span>
-                  <span className="font-semibold text-purple-600">
-                    {stats.highValueLeads} ({stats.highValuePercentage.toFixed(1)}%)
-                  </span>
+                <div className="rounded-2xl bg-slate-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Avg Score</p>
+                  <p className="mt-2 text-xl font-semibold text-primary_color">{stats.avgLeadScore.toFixed(1)}</p>
                 </div>
-                
-                <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                  <span className="text-sm text-gray-600">Closed</span>
-                  <span className="font-semibold text-gray-900">
-                    {stats.closed} / {stats.total}
-                  </span>
+                <div className="rounded-2xl bg-slate-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">High Value</p>
+                  <p className="mt-2 text-xl font-semibold text-primary_color">
+                    {formatNumber(stats.highValueLeads)}
+                  </p>
+                  <p className="mt-1 text-xs text-primary_color/70">{formatPercent(stats.highValuePercentage)}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between rounded-2xl bg-white/20 px-4 py-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-primary_color/70">
+                  <TrendingUp className="h-4 w-4 text-primary_color/70" />
+                  Closed leads
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold text-primary_color">
+                    {formatNumber(stats.closed)} / {formatNumber(stats.total)}
+                  </p>
+                  <p className="text-xs text-primary_color/70">{formatPercent(stats.conversionRate)}</p>
                 </div>
               </div>
             </div>

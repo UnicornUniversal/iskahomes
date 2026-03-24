@@ -24,7 +24,6 @@ import SimpleServices from '@/app/components/general/SimpleServices'
 import { supabase } from '@/lib/supabase'
 const page = () => {
   const { user, loading: authLoading } = useAuth()
-  const [refreshing, setRefreshing] = useState(false)
   const [localUserData, setLocalUserData] = useState(null)
   const hasRefreshedRef = useRef(false)
 
@@ -38,7 +37,6 @@ const page = () => {
       if (!user?.id || (!isDeveloper && !isTeamMember) || hasRefreshedRef.current) return
       
       hasRefreshedRef.current = true
-      setRefreshing(true)
       try {
         // For team members, use organization_id; for developers, use developer_id
         const developerId = isTeamMember ? user.profile.organization_id : user.id
@@ -54,8 +52,6 @@ const page = () => {
         }
       } catch (error) {
         console.error('Error refreshing user data:', error)
-      } finally {
-        setRefreshing(false)
       }
     }
 
@@ -103,9 +99,6 @@ const page = () => {
 
   // Use local data if available (from refresh), otherwise use user profile
   const profileData = localUserData || user?.profile
-  const adminStatus = String(profileData?.admin_status || '').toLowerCase()
-  const isApprovedAccount = adminStatus === 'approved'
-  const adminStatusLabel = profileData?.admin_status || 'unknown'
 
   const parseStatsArray = (value) => {
     if (!value) return []
@@ -131,13 +124,10 @@ const page = () => {
   const propertyTypesStats = parseStatsArray(profileData?.property_types_stats)
   const propertySubtypesStats = parseStatsArray(profileData?.property_subtypes_stats)
 
-  if (!authLoading && profileData && !isApprovedAccount) {
+  if (authLoading) {
     return (
       <div className="w-full min-h-[60vh] flex items-center justify-center">
-     <div className='flex flex-col items-center justify-center gap-2'>
-     <p> Account Status: </p>
-    <h3 className="text-primary_color text-7xl ">{String(adminStatusLabel ?? '').toUpperCase()}</h3>
-     </div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     )
   }

@@ -13,6 +13,7 @@ import {
   Legend
 } from 'chart.js'
 import { Activity, Target, TrendingUp } from 'lucide-react'
+import { analyticsClasses, analyticsPalette, baseChartOptions, formatNumber, formatPercent } from './analyticsTheme'
 
 ChartJS.register(
   CategoryScale,
@@ -27,9 +28,8 @@ ChartJS.register(
 export default function EngagementAnalysis({ data }) {
   if (!data || Object.keys(data).length === 0) {
     return (
-      <div className="default_bg rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Engagement Analysis</h3>
-        <div className="text-center text-gray-500 py-8">No engagement data available</div>
+      <div className={analyticsClasses.section}>
+        <div className={analyticsClasses.empty}>No engagement data available yet.</div>
       </div>
     )
   }
@@ -38,9 +38,8 @@ export default function EngagementAnalysis({ data }) {
   
   if (engagementTypes.length === 0) {
     return (
-      <div className="default_bg rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Engagement Analysis</h3>
-        <div className="text-center text-gray-500 py-8">No engagement data available</div>
+      <div className={analyticsClasses.section}>
+        <div className={analyticsClasses.empty}>No engagement data available yet.</div>
       </div>
     )
   }
@@ -58,14 +57,14 @@ export default function EngagementAnalysis({ data }) {
       label: 'Conversion Rate (%)',
       data: engagementTypes.map(type => data[type].conversionRate),
       backgroundColor: [
-        'rgba(239, 68, 68, 0.8)',
-        'rgba(245, 158, 11, 0.8)',
-        'rgba(16, 185, 129, 0.8)'
+        analyticsPalette.rose,
+        analyticsPalette.amber,
+        analyticsPalette.emerald
       ],
       borderColor: [
-        'rgb(239, 68, 68)',
-        'rgb(245, 158, 11)',
-        'rgb(16, 185, 129)'
+        analyticsPalette.rose,
+        analyticsPalette.amber,
+        analyticsPalette.emerald
       ],
       borderWidth: 1
     }]
@@ -78,61 +77,53 @@ export default function EngagementAnalysis({ data }) {
     datasets: [{
       data: engagementTypes.map(type => data[type].total),
       backgroundColor: [
-        'rgba(239, 68, 68, 0.8)',
-        'rgba(245, 158, 11, 0.8)',
-        'rgba(16, 185, 129, 0.8)'
+        analyticsPalette.rose,
+        analyticsPalette.amber,
+        analyticsPalette.emerald
       ],
       borderWidth: 2,
       borderColor: '#fff'
     }]
   }
 
+  const singleActionRate = data.singleAction?.conversionRate || 0
+  const highEngagementRate = data.highEngagement?.conversionRate || 0
+  const uplift =
+    singleActionRate > 0 ? ((highEngagementRate / singleActionRate - 1) * 100).toFixed(0) : null
+
   return (
-    <div className="default_bg rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold mb-4">Engagement & Behavior Analysis</h3>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Conversion Rate by Engagement */}
+    <div className={analyticsClasses.section}>
+      <div className="space-y-3">
+        <span className={analyticsClasses.eyebrow}>Behavior Signals</span>
         <div>
-          <h4 className="text-md font-semibold mb-3">Conversion Rate by Engagement Level</h4>
-          <div className="h-64">
+          <h3 className={analyticsClasses.title}>Engagement & Behavior</h3>
+          <p className={analyticsClasses.subtitle}>
+            Understand whether single-touch leads or multi-touch conversations are driving stronger outcomes.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className={analyticsClasses.subPanel}>
+          <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Conversion by Engagement</h4>
+          <div className="mt-4 h-72">
             <Bar
               data={conversionChartData}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: {
-                    display: false
-                  }
-                },
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                      callback: function(value) {
-                        return value + '%'
-                      }
-                    }
-                  }
-                }
-              }}
+              options={baseChartOptions({ showLegend: false, yMax: 100, yTitle: 'Conversion Rate (%)' })}
             />
           </div>
         </div>
 
-        {/* Distribution */}
-        <div>
-          <h4 className="text-md font-semibold mb-3">Lead Distribution by Engagement</h4>
-          <div className="h-64">
+        <div className={analyticsClasses.subPanel}>
+          <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Lead Distribution by Engagement</h4>
+          <div className="mt-4 h-72">
             <Doughnut
               data={distributionChartData}
               options={{
-                responsive: true,
-                maintainAspectRatio: false,
+                ...baseChartOptions({ legendPosition: 'bottom' }),
                 plugins: {
                   legend: {
+                    ...baseChartOptions({ legendPosition: 'bottom' }).plugins.legend,
                     position: 'bottom'
                   }
                 }
@@ -142,8 +133,7 @@ export default function EngagementAnalysis({ data }) {
         </div>
       </div>
 
-      {/* Engagement Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
         {engagementTypes.map(type => {
           const stats = data[type]
           const percentage = totalLeads > 0 
@@ -159,41 +149,39 @@ export default function EngagementAnalysis({ data }) {
             : 'bg-red-50'
           
           return (
-            <div key={type} className="border border-gray-200 rounded-lg p-4">
+            <div key={type} className={analyticsClasses.compactCard}>
               <div className="flex items-center gap-3 mb-3">
-                <div className={`p-2 ${bgColor} rounded-lg`}>
+                <div className={`${analyticsClasses.iconWrap} ${bgColor} ring-1 ring-inset ring-slate-100`}>
                   {type === 'highEngagement' ? (
-                    <Activity className={`w-5 h-5 ${iconColor}`} />
+                    <Activity className={`h-5 w-5 ${iconColor}`} />
                   ) : type === 'multiAction' ? (
-                    <Target className={`w-5 h-5 ${iconColor}`} />
+                    <Target className={`h-5 w-5 ${iconColor}`} />
                   ) : (
-                    <TrendingUp className={`w-5 h-5 ${iconColor}`} />
+                    <TrendingUp className={`h-5 w-5 ${iconColor}`} />
                   )}
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">
+                  <h4 className="font-semibold text-primary_color">
                     {labels[type] || type}
                   </h4>
-                  <p className="text-sm text-gray-500">{percentage}% of total</p>
+                  <p className="text-sm text-slate-500">{formatPercent(percentage)} of total leads</p>
                 </div>
               </div>
               
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Total Leads</span>
-                  <span className="font-semibold text-gray-900">{stats.total}</span>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-slate-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Total Leads</p>
+                  <p className="mt-2 text-xl font-semibold text-primary_color">{formatNumber(stats.total)}</p>
                 </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Closed</span>
-                  <span className="font-semibold text-green-600">{stats.closed}</span>
+                <div className="rounded-2xl bg-slate-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Closed</p>
+                  <p className="mt-2 text-xl font-semibold text-primary_color">{formatNumber(stats.closed)}</p>
                 </div>
-                
-                <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                  <span className="text-sm text-gray-600">Conversion Rate</span>
-                  <span className="font-semibold text-blue-600">
-                    {stats.conversionRate.toFixed(1)}%
-                  </span>
+                <div className="col-span-2 rounded-2xl bg-slate-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Conversion Rate</p>
+                  <p className="mt-2 text-xl font-semibold text-primary_color">
+                    {formatPercent(stats.conversionRate)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -201,18 +189,14 @@ export default function EngagementAnalysis({ data }) {
         })}
       </div>
 
-      {/* Key Insight */}
-      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <h5 className="font-semibold text-blue-900 mb-2">Key Insight</h5>
-        <p className="text-sm text-blue-700">
-          {data.highEngagement && data.highEngagement.conversionRate > data.singleAction?.conversionRate ? (
+      <div className="mt-6 rounded-3xl border border-sky-100 bg-sky-50/70 p-5">
+        <h5 className="text-sm font-semibold uppercase tracking-[0.16em] text-sky-700">Key Insight</h5>
+        <p className="mt-3 text-sm leading-6 text-primary_color/70">
+          {data.highEngagement && highEngagementRate > singleActionRate && uplift !== null ? (
             <>
               High engagement leads (3+ actions) convert at{' '}
-              <span className="font-bold">{data.highEngagement.conversionRate.toFixed(1)}%</span>, which is{' '}
-              <span className="font-bold">
-                {((data.highEngagement.conversionRate / data.singleAction.conversionRate - 1) * 100).toFixed(0)}%
-              </span>{' '}
-              higher than single-action leads. Focus on nurturing leads to increase engagement.
+              <span className="font-semibold text-primary_color">{formatPercent(highEngagementRate)}</span>, which is{' '}
+              <span className="font-semibold text-primary_color">{uplift}%</span> higher than single-action leads.
             </>
           ) : (
             'Engage with leads multiple times to improve conversion rates.'

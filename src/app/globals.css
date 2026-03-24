@@ -529,6 +529,14 @@ html::-webkit-scrollbar:vertical {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
+.default_bg2{
+  background: rgba(255, 255, 255, 0.2);
+  background-attachment: fixed;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
 .secondary_bg{
   background: rgba(255, 255, 255, 0.23);
 padding: 10px;

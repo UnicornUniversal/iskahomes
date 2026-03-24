@@ -41,14 +41,11 @@ export async function GET(request) {
     }
 
     // Build date filter
-    // IMPORTANT: Exclude anonymous/unknown seekers - only get leads with user IDs (non-anonymous)
     let dateFilter = supabaseAdmin
       .from('leads')
       .select('*')
       .eq('lister_id', finalListerId)
       .eq('lister_type', listerType)
-      .not('seeker_id', 'is', null) // Only leads with seeker_id
-      .or('is_anonymous.is.null,is_anonymous.eq.false') // Exclude anonymous leads (only get non-anonymous leads)
 
     if (dateFrom) {
       dateFilter = dateFilter.gte('first_action_date', dateFrom)
@@ -90,6 +87,7 @@ export async function GET(request) {
       
       if (actionType === 'lead_phone') return 'phone'
       if (actionType === 'lead_appointment') return 'appointment'
+      if (actionType === 'lead_email') return 'email'
       if (actionType === 'lead_message') {
         const messageType = String(metadata.message_type || metadata.messageType || 'direct_message').toLowerCase()
         if (messageType === 'email') return 'email'
@@ -184,24 +182,33 @@ export async function GET(request) {
         if (status === 'closed') engagementStats.multiAction.closed++
       }
 
-      // Channel analysis from first action
+      // Channel analysis from the full action history. This keeps WhatsApp and
+      // email visible even when the first recorded action was a different channel.
       const leadActions = Array.isArray(lead.lead_actions) ? lead.lead_actions : []
       if (leadActions.length > 0) {
-        const firstAction = leadActions[0]
-        const channel = getChannelFromAction(firstAction)
-        
-        if (channel && channelStats[channel]) {
+        const channelsUsed = new Set()
+
+        leadActions.forEach(action => {
+          const channel = getChannelFromAction(action)
+          if (channel && channelStats[channel]) {
+            channelsUsed.add(channel)
+          }
+        })
+
+        channelsUsed.forEach(channel => {
           channelStats[channel].leads.push(lead)
           channelStats[channel].total++
           channelStats[channel].scores.push(leadScore)
           if (status === 'closed') {
             channelStats[channel].closed++
           }
-        }
+        })
+
+        const firstTimestampedAction = leadActions.find(action => action?.action_timestamp)
 
         // Response time (if we have timestamps)
-        if (firstAction?.action_timestamp) {
-          const actionTime = new Date(firstAction.action_timestamp)
+        if (firstTimestampedAction?.action_timestamp) {
+          const actionTime = new Date(firstTimestampedAction.action_timestamp)
           const leadCreated = new Date(lead.created_at || lead.first_action_date)
           const responseTime = (actionTime - leadCreated) / (1000 * 60 * 60) // hours
           if (responseTime >= 0 && responseTime < 168) { // Valid response time (0-7 days)

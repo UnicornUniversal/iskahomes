@@ -13,6 +13,7 @@ import {
   Legend
 } from 'chart.js'
 import { Building2, Home, User, TrendingUp } from 'lucide-react'
+import { analyticsClasses, analyticsPalette, baseChartOptions, formatNumber, formatPercent } from './analyticsTheme'
 
 ChartJS.register(
   CategoryScale,
@@ -39,9 +40,8 @@ const contextLabels = {
 export default function ContextAnalysis({ data }) {
   if (!data || Object.keys(data).length === 0) {
     return (
-      <div className="default_bg rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Context-Based Analysis</h3>
-        <div className="text-center text-gray-500 py-8">No context data available</div>
+      <div className={analyticsClasses.section}>
+        <div className={analyticsClasses.empty}>No context data available yet.</div>
       </div>
     )
   }
@@ -50,9 +50,8 @@ export default function ContextAnalysis({ data }) {
   
   if (contexts.length === 0) {
     return (
-      <div className="default_bg rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Context-Based Analysis</h3>
-        <div className="text-center text-gray-500 py-8">No context data available</div>
+      <div className={analyticsClasses.section}>
+        <div className={analyticsClasses.empty}>No context data available yet.</div>
       </div>
     )
   }
@@ -64,14 +63,14 @@ export default function ContextAnalysis({ data }) {
       label: 'Conversion Rate (%)',
       data: contexts.map(ctx => data[ctx].conversionRate),
       backgroundColor: [
-        'rgba(59, 130, 246, 0.8)',
-        'rgba(16, 185, 129, 0.8)',
-        'rgba(139, 92, 246, 0.8)'
+        analyticsPalette.secondary,
+        analyticsPalette.primary,
+        analyticsPalette.violet
       ],
       borderColor: [
-        'rgb(59, 130, 246)',
-        'rgb(16, 185, 129)',
-        'rgb(139, 92, 246)'
+        analyticsPalette.secondary,
+        analyticsPalette.primary,
+        analyticsPalette.violet
       ],
       borderWidth: 1
     }]
@@ -84,9 +83,9 @@ export default function ContextAnalysis({ data }) {
     datasets: [{
       data: contexts.map(ctx => data[ctx].total),
       backgroundColor: [
-        'rgba(59, 130, 246, 0.8)',
-        'rgba(16, 185, 129, 0.8)',
-        'rgba(139, 92, 246, 0.8)'
+        analyticsPalette.secondary,
+        analyticsPalette.primary,
+        analyticsPalette.violet
       ],
       borderWidth: 2,
       borderColor: '#fff'
@@ -99,51 +98,38 @@ export default function ContextAnalysis({ data }) {
   )
 
   return (
-    <div className="default_bg rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold mb-4">Context-Based Intelligence</h3>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Conversion Rates */}
+    <div className={analyticsClasses.section}>
+      <div className="space-y-3">
+        <span className={analyticsClasses.eyebrow}>Source Quality</span>
         <div>
-          <h4 className="text-md font-semibold mb-3">Conversion Rate by Context</h4>
-          <div className="h-64">
+          <h3 className={analyticsClasses.title}>Context-Based Intelligence</h3>
+          <p className={analyticsClasses.subtitle}>
+            Compare how listings, developments, and the profile itself contribute to lead quality and close rate.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className={analyticsClasses.subPanel}>
+          <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Conversion by Context</h4>
+          <div className="mt-4 h-72">
             <Bar
               data={conversionChartData}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: {
-                    display: false
-                  }
-                },
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                      callback: function(value) {
-                        return value + '%'
-                      }
-                    }
-                  }
-                }
-              }}
+              options={baseChartOptions({ showLegend: false, yMax: 100, yTitle: 'Conversion Rate (%)' })}
             />
           </div>
         </div>
 
-        {/* Distribution */}
-        <div>
-          <h4 className="text-md font-semibold mb-3">Lead Distribution by Context</h4>
-          <div className="h-64">
+        <div className={analyticsClasses.subPanel}>
+          <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Lead Distribution by Context</h4>
+          <div className="mt-4 h-72">
             <Doughnut
               data={distributionChartData}
               options={{
-                responsive: true,
-                maintainAspectRatio: false,
+                ...baseChartOptions({ legendPosition: 'bottom' }),
                 plugins: {
                   legend: {
+                    ...baseChartOptions({ legendPosition: 'bottom' }).plugins.legend,
                     position: 'bottom'
                   }
                 }
@@ -153,8 +139,7 @@ export default function ContextAnalysis({ data }) {
         </div>
       </div>
 
-      {/* Context Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
         {sortedContexts.map(context => {
           const Icon = contextIcons[context] || Building2
           const stats = data[context]
@@ -163,42 +148,39 @@ export default function ContextAnalysis({ data }) {
             : 0
           
           return (
-            <div key={context} className="border border-gray-200 rounded-lg p-4">
+            <div key={context} className={analyticsClasses.compactCard}>
               <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <Icon className="w-5 h-5 text-blue-600" />
+                <div className={`${analyticsClasses.iconWrap} ${context === 'listing' ? 'bg-sky-50 text-sky-700 ring-sky-100' : context === 'development' ? 'bg-teal-50 text-teal-700 ring-teal-100' : 'bg-indigo-50 text-indigo-700 ring-indigo-100'}`}>
+                  <Icon className="h-5 w-5" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">
+                  <h4 className="font-semibold text-primary_color">
                     {contextLabels[context]}
                   </h4>
-                  <p className="text-sm text-gray-500">{percentage}% of total</p>
+                  <p className="text-sm text-primary_color/70">{formatPercent(percentage)} of total leads</p>
                 </div>
               </div>
               
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Total Leads</span>
-                  <span className="font-semibold text-gray-900">{stats.total}</span>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-slate-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Total Leads</p>
+                  <p className="mt-2 text-xl font-semibold text-primary_color">{formatNumber(stats.total)}</p>
                 </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Closed</span>
-                  <span className="font-semibold text-green-600">{stats.closed}</span>
+                <div className="rounded-2xl bg-slate-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Closed</p>
+                  <p className="mt-2 text-xl font-semibold text-primary_color">{formatNumber(stats.closed)}</p>
                 </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Conversion Rate</span>
-                  <span className="font-semibold text-blue-600">
-                    {stats.conversionRate.toFixed(1)}%
-                  </span>
+                <div className="rounded-2xl bg-slate-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Conversion</p>
+                  <p className="mt-2 text-xl font-semibold text-primary_color">
+                    {formatPercent(stats.conversionRate)}
+                  </p>
                 </div>
-                
-                <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                  <span className="text-sm text-gray-600">Avg Lead Score</span>
-                  <span className="font-semibold text-purple-600">
+                <div className="rounded-2xl bg-slate-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Avg Score</p>
+                  <p className="mt-2 text-xl font-semibold text-primary_color">
                     {stats.avgLeadScore.toFixed(1)}
-                  </span>
+                  </p>
                 </div>
               </div>
             </div>

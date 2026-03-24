@@ -17,13 +17,13 @@ const GeneralHeader = ({
     <section className={`w-full  px-4 sm:px-6 lg:px-8 pt-8  ${className}`}>
       <div className=" mx-auto">
         {/* Tier 1: First heading + top-right icon */}
-        <div className="flex justify-between items-start flex-wrap">
-          <h2 className="text-3xl sm:text-4xl md:text-[10em]  font-semibold text-primary_color tracking-tight">
+        <div className="flex md:justify-between justify-start items-start flex-wrap">
+          <h2 className="text-5xl sm:text-4xl md:text-[10em]  font-semibold text-primary_color tracking-tight">
             {headingOne}
           </h2>
 
      
-           <h2 className="text-3xl self-end sm:text-4xl md:text-[10em]  font-semibold text-primary_color tracking-tight">
+           <h2 className="text-5xl self-end sm:text-4xl md:text-[10em]  font-semibold text-primary_color tracking-tight">
               {headingTwo}
             </h2>
        

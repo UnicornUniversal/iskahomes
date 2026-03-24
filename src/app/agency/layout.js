@@ -1,7 +1,11 @@
+import AccountStatusGuard from '@/app/components/shared/AccountStatusGuard'
+
 export default function AgencyLayout({ children }) {
   return (
     <div>
-      {children}
+      <AccountStatusGuard entityType="agency">
+        {children}
+      </AccountStatusGuard>
     </div>
   )
 }

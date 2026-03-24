@@ -12,10 +12,10 @@ import EngagementAnalysis from '@/app/components/analytics/EngagementAnalysis'
 import PredictiveMetrics from '@/app/components/analytics/PredictiveMetrics'
 import ComparativeAnalysis from '@/app/components/analytics/ComparativeAnalysis'
 import OperationalEfficiency from '@/app/components/analytics/OperationalEfficiency'
-import DataCard from '@/app/components/developers/DataCard'
+import { analyticsClasses } from '@/app/components/analytics/analyticsTheme'
 import { useParams } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, BarChart3, MessageCircle, Phone, Calendar, TrendingUp, Loader2, UserX } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { BarChart3, MessageCircle, Phone, Calendar, TrendingUp, Loader2, UserX } from 'lucide-react'
 
 const LeadAnalytics = () => {
   const params = useParams()
@@ -130,6 +130,44 @@ const LeadAnalytics = () => {
   }
 
   const totalLeadsData = getTotalLeadsData()
+  const overviewCards = [
+    {
+      title: 'Total Leads',
+      value: (totalLeadsData?.total_leads || 0).toLocaleString(),
+      icon: BarChart3,
+      iconClass: 'bg-sky-50 text-sky-700 ring-sky-100'
+    },
+    {
+      title: 'Conversion Rate',
+      value: `${(totalLeadsData?.conversion_rate || 0).toFixed(2)}%`,
+      icon: TrendingUp,
+      iconClass: 'bg-teal-50 text-teal-700 ring-teal-100'
+    },
+    {
+      title: 'Phone Leads',
+      value: (totalLeadsData?.phone_leads || 0).toLocaleString(),
+      icon: Phone,
+      iconClass: 'bg-emerald-50 text-emerald-700 ring-emerald-100'
+    },
+    {
+      title: 'Message Leads',
+      value: (totalLeadsData?.message_leads || 0).toLocaleString(),
+      icon: MessageCircle,
+      iconClass: 'bg-indigo-50 text-indigo-700 ring-indigo-100'
+    },
+    {
+      title: 'Appointments',
+      value: (totalLeadsData?.appointment_leads || 0).toLocaleString(),
+      icon: Calendar,
+      iconClass: 'bg-amber-50 text-amber-700 ring-amber-100'
+    },
+    {
+      title: 'Anonymous Leads',
+      value: (totalLeadsData?.anonymous_leads || 0).toLocaleString(),
+      icon: UserX,
+      iconClass: 'bg-rose-50 text-rose-700 ring-rose-100'
+    }
+  ]
 
   if (!user) {
     return (
@@ -140,103 +178,86 @@ const LeadAnalytics = () => {
   }
 
   return (
-    <div className="min-h-screen ">
-      <div className="max-w-7xl mx-auto ">
-        {/* Header */}
-        <div className="mb-8">
-          {/* <Link 
-            href={`/developer/${params.slug}/analytics`}
-            className="inline-flex items-center text-blue-600 hover:text-blue-800 mb-4"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Analytics
-          </Link> */}
-          <h1 className=" mb-2">Lead Analytics</h1>
-          <p className="">Track phone calls, messages, emails, and appointment bookings</p>
+    <div className="min-h-screen">
+      <div className="mx-auto  space-y-8 px-4 pb-10 pt-2 sm:px-6 lg:px-8">
+        <div className={analyticsClasses.section}>
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl space-y-3">
+              <span className={analyticsClasses.eyebrow}>Leads Dashboard</span>
+              <div>
+                <h1 className="text-3xl font-semibold tracking-tight text-primary_color md:text-4xl">
+                  Lead Analytics
+                </h1>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-primary_color/70 md:text-base">
+                  A cleaner developer view for how leads arrive, which actions dominate, and where conversion quality is strongest.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="default_bg2 rounded-3xl bg-white/20 p-4">
+                <p className="text-sm font-medium text-primary_color/70">Tracked Messaging</p>
+                <p className="mt-2 text-3xl font-semibold tracking-tight text-primary_color">
+                  {(totalLeadsData?.message_leads || 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="default_bg2 rounded-3xl bg-white/20 p-4">
+                <p className="text-sm font-medium text-primary_color/70">Anonymous Leads</p>
+                <p className="mt-2 text-3xl font-semibold tracking-tight text-primary_color">
+                  {(totalLeadsData?.anonymous_leads || 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Total Leads Overview Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
-          <DataCard
-            title="Total Leads"
-            value={(totalLeadsData?.total_leads || 0).toLocaleString()}
-            icon={BarChart3}
-          />
-          <DataCard
-            title="Conversion Rate"
-            value={`${(totalLeadsData?.conversion_rate || 0).toFixed(2)}%`}
-            icon={TrendingUp}
-          />
-          <DataCard
-            title="Phone Leads"
-            value={(totalLeadsData?.phone_leads || 0).toLocaleString()}
-            icon={Phone}
-          />
-          <DataCard
-            title="Message Leads"
-            value={(totalLeadsData?.message_leads || 0).toLocaleString()}
-            icon={MessageCircle}
-          />
-          <DataCard
-            title="Appointments"
-            value={(totalLeadsData?.appointment_leads || 0).toLocaleString()}
-            icon={Calendar}
-          />
-          <DataCard
-            title="Anonymous Leads"
-            value={(totalLeadsData?.anonymous_leads || 0).toLocaleString()}
-            icon={UserX}
-          />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+          {overviewCards.map(card => {
+            const Icon = card.icon
+            return (
+              <div key={card.title} className={analyticsClasses.section}>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-primary_color/70">{card.title}</p>
+                    <p className="mt-6 text-3xl font-semibold tracking-tight text-primary_color">
+                      {card.value}
+                    </p>
+                  </div>
+                  <div className={`${analyticsClasses.iconWrap} ${card.iconClass}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
 
-        {/* Leads Trend Component */}
         <LeadsTrend listerId={listerId} listerType="developer" />
 
-        {/* Leads Share Component */}
-        <div className="mt-6">
-          <h3 className="text-lg font-semibold  mb-4">Lead Distribution</h3>
-          <LeadsShare totalLeadsData={totalLeadsData} />
-        </div>
+        <LeadsShare totalLeadsData={totalLeadsData} />
 
-        {/* Comprehensive Analytics Sections */}
         {loadingAnalytics ? (
-          <div className="mt-8 flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
-            <span className="text-gray-600">Loading analytics...</span>
+          <div className={`${analyticsClasses.section} mt-8 flex items-center justify-center py-12`}>
+            <Loader2 className="mr-2 h-6 w-6 animate-spin text-teal-600" />
+            <span className="text-primary_color/70">Loading analytics...</span>
           </div>
         ) : analyticsData ? (
           <div className="mt-8 space-y-8">
-            {/* Channel Performance Analysis */}
             <ChannelPerformance data={analyticsData.channelPerformance} />
-
-            {/* Lead Lifecycle & Funnel Analysis */}
             <LeadLifecycle data={analyticsData.lifecycleAnalysis} />
-
-            {/* Temporal Patterns */}
             <TemporalPatterns data={analyticsData.temporalPatterns} />
-
-            {/* Context-Based Analysis */}
             <ContextAnalysis data={analyticsData.contextAnalysis} />
-
-            {/* Engagement Analysis */}
             <EngagementAnalysis data={analyticsData.engagementAnalysis} />
-
-            {/* Predictive Metrics */}
             <PredictiveMetrics data={analyticsData.predictiveMetrics} />
-
-            {/* Comparative Analysis */}
             <ComparativeAnalysis listerId={listerId} listerType="developer" />
-
-            {/* Operational Efficiency */}
             <OperationalEfficiency data={analyticsData.operationalEfficiency} />
           </div>
         ) : (
-          <div className="mt-8 text-center text-gray-500 py-12">
+          <div className={`${analyticsClasses.section} mt-8 py-12 text-center text-primary_color/70`}>
             No analytics data available yet. Analytics will appear as leads are generated.
           </div>
         )}
 
-        {/* Leads Management */}
         {/* <div className="mt-10">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Manage Leads</h3>
           <LeadsManagement listerId={listerId} listerType="developer" />

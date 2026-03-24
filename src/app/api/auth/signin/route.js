@@ -615,20 +615,26 @@ export async function POST(request) {
           last_name: profile.last_name
         };
       } else if (userType === 'developer') {
+        const statusValue = profile.admin_status || profile.status || profile.account_status || null
         profileData = {
           id: profile.id,
           developer_id: profile.developer_id,
           name: profile.name,
           slug: profile.slug,
-          account_status: profile.account_status
+          account_status: statusValue,
+          admin_status: statusValue,
+          status: statusValue
         };
       } else if (userType === 'agency') {
+        const statusValue = profile.admin_status || profile.status || profile.account_status || null
         profileData = {
           id: profile.id,
           agency_id: profile.agency_id,
           name: profile.name,
           slug: profile.slug,
-          account_status: profile.account_status
+          account_status: statusValue,
+          admin_status: statusValue,
+          status: statusValue
         };
       } else if (userType === 'agent') {
         profileData = {

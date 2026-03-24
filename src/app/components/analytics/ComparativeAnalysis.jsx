@@ -15,6 +15,7 @@ import {
 } from 'chart.js'
 import { TrendingUp, TrendingDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { DateRangePicker } from '@/app/components/ui/date-range-picker'
+import { analyticsClasses, analyticsPalette, baseChartOptions, formatNumber, formatPercent } from './analyticsTheme'
 
 ChartJS.register(
   CategoryScale,
@@ -98,18 +99,16 @@ export default function ComparativeAnalysis({ listerId, listerType }) {
 
   if (loading) {
     return (
-      <div className="default_bg rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Comparative Analysis</h3>
-        <div className="text-center text-gray-500 py-8">Loading...</div>
+      <div className={analyticsClasses.section}>
+        <div className={analyticsClasses.empty}>Loading comparative data...</div>
       </div>
     )
   }
 
   if (!currentData || !previousData) {
     return (
-      <div className="default_bg rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Comparative Analysis</h3>
-        <div className="text-center text-gray-500 py-8">No comparative data available</div>
+      <div className={analyticsClasses.section}>
+        <div className={analyticsClasses.empty}>No comparative data available yet.</div>
       </div>
     )
   }
@@ -154,8 +153,8 @@ export default function ComparativeAnalysis({ listerId, listerType }) {
           currentMetrics?.overallConversionRate || 0,
           currentMetrics?.avgLeadScore || 0
         ],
-        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: analyticsPalette.secondary,
+        borderColor: analyticsPalette.secondary,
         borderWidth: 1
       },
       {
@@ -166,8 +165,8 @@ export default function ComparativeAnalysis({ listerId, listerType }) {
           previousMetrics?.overallConversionRate || 0,
           previousMetrics?.avgLeadScore || 0
         ],
-        backgroundColor: 'rgba(156, 163, 175, 0.8)',
-        borderColor: 'rgb(156, 163, 175)',
+        backgroundColor: analyticsPalette.slate,
+        borderColor: analyticsPalette.slate,
         borderWidth: 1
       }
     ]
@@ -178,19 +177,19 @@ export default function ComparativeAnalysis({ listerId, listerType }) {
     const ChangeIcon = isPositive ? ArrowUp : ArrowDown
 
     return (
-      <div className="border border-gray-200 rounded-lg p-4">
-        <p className="text-sm text-gray-600 mb-1">{title}</p>
+      <div className={analyticsClasses.compactCard}>
+        <p className="text-sm text-slate-500 mb-1">{title}</p>
         <div className="flex items-end justify-between">
           <div>
-            <p className="text-2xl font-bold text-gray-900">
-              {isPercentage ? current.toFixed(1) : current.toLocaleString()}{unit}
+            <p className="text-3xl font-semibold tracking-tight text-primary_color">
+              {isPercentage ? current.toFixed(1) : formatNumber(current)}{unit}
             </p>
-            <p className="text-xs text-gray-500 mt-1">
-              Previous: {isPercentage ? previous.toFixed(1) : previous.toLocaleString()}{unit}
+            <p className="mt-2 text-xs text-slate-500">
+              Previous: {isPercentage ? previous.toFixed(1) : formatNumber(previous)}{unit}
             </p>
           </div>
           <div className={`flex items-center gap-1 ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-            <ChangeIcon className="w-4 h-4" />
+            <ChangeIcon className="h-4 w-4" />
             <span className="text-sm font-semibold">
               {isPositive ? '+' : ''}{change.percentage.toFixed(1)}%
             </span>
@@ -201,9 +200,17 @@ export default function ComparativeAnalysis({ listerId, listerType }) {
   }
 
   return (
-    <div className="default_bg rounded-lg shadow p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Period-over-Period Comparison</h3>
+    <div className={analyticsClasses.section}>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-3">
+          <span className={analyticsClasses.eyebrow}>Trend Delta</span>
+          <div>
+            <h3 className={analyticsClasses.title}>Period-over-Period Comparison</h3>
+            <p className={analyticsClasses.subtitle}>
+              Compare the selected period with the immediately preceding period using the same dashboard language.
+            </p>
+          </div>
+        </div>
         <DateRangePicker
           startDate={dateRange.startDate}
           endDate={dateRange.endDate}
@@ -212,8 +219,7 @@ export default function ComparativeAnalysis({ listerId, listerType }) {
         />
       </div>
 
-      {/* Key Metrics Comparison */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           title="Total Leads"
           current={currentMetrics?.totalLeads || 0}
@@ -242,34 +248,19 @@ export default function ComparativeAnalysis({ listerId, listerType }) {
         />
       </div>
 
-      {/* Comparison Chart */}
-      <div className="mb-6">
-        <h4 className="text-md font-semibold mb-3">Metrics Comparison</h4>
-        <div className="h-80">
+      <div className="mt-6 rounded-3xl border border-slate-200/80 bg-slate-50/70 p-5">
+        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Metrics Comparison</h4>
+        <div className="mt-4 h-80">
           <Bar
             data={comparisonChartData}
-            options={{
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {
-                  position: 'top'
-                }
-              },
-              scales: {
-                y: {
-                  beginAtZero: true
-                }
-              }
-            }}
+            options={baseChartOptions({ yTitle: 'Metric Value' })}
           />
         </div>
       </div>
 
-      {/* Channel Performance Comparison */}
       <div className="mt-6">
-        <h4 className="text-md font-semibold mb-3">Channel Performance Changes</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Channel Performance Changes</h4>
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
           {Object.keys(currentData.channelPerformance || {}).map(channel => {
             const current = currentData.channelPerformance[channel]
             const previous = previousData.channelPerformance?.[channel] || { conversionRate: 0 }
@@ -277,21 +268,21 @@ export default function ComparativeAnalysis({ listerId, listerType }) {
             const isPositive = change.percentage >= 0
 
             return (
-              <div key={channel} className="border border-gray-200 rounded-lg p-3">
-                <p className="text-sm font-semibold text-gray-900 mb-2 capitalize">
+              <div key={channel} className={analyticsClasses.compactCard}>
+                <p className="text-sm font-semibold text-primary_color mb-2 capitalize">
                   {channel.replace('_', ' ')}
                 </p>
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-600">Current</span>
-                    <span className="text-sm font-semibold">{current.conversionRate.toFixed(1)}%</span>
+                    <span className="text-xs text-slate-500">Current</span>
+                    <span className="text-sm font-semibold text-primary_color">{formatPercent(current.conversionRate)}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-600">Previous</span>
-                    <span className="text-sm text-gray-500">{previous.conversionRate.toFixed(1)}%</span>
+                    <span className="text-xs text-slate-500">Previous</span>
+                    <span className="text-sm text-slate-500">{formatPercent(previous.conversionRate)}</span>
                   </div>
-                  <div className={`flex items-center gap-1 pt-1 border-t border-gray-200 ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                    {isPositive ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                  <div className={`flex items-center gap-1 pt-2 border-t border-slate-200 ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                    {isPositive ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
                     <span className="text-xs font-semibold">
                       {isPositive ? '+' : ''}{change.percentage.toFixed(1)}%
                     </span>

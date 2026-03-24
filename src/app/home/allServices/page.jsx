@@ -1,13 +1,100 @@
 'use client'
 
-import React, { useState } from 'react'
-import { Camera, Box, Palette, Home, Ruler, CheckCircle, ArrowRight, Mail, Phone, User } from 'lucide-react'
+import React, { useMemo, useState } from 'react'
+import {
+  ArrowRight,
+  Box,
+  Camera,
+  CheckCircle,
+  Home,
+  Mail,
+  Palette,
+  Phone,
+  Ruler,
+  User,
+  X
+} from 'lucide-react'
 import { toast, ToastContainer } from 'react-toastify'
 import { motion, AnimatePresence } from 'framer-motion'
 import 'react-toastify/dist/ReactToastify.css'
 
+const services = [
+  {
+    id: 'virtual-tour',
+    name: 'Virtual Tour',
+    description: 'Experience properties from anywhere with our immersive 360° virtual tours. Perfect for remote viewing and showcasing properties to international clients.',
+    image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0',
+    icon: Camera,
+    features: [
+      '360° panoramic views',
+      'Interactive property exploration',
+      'HD quality imaging',
+      'Mobile-friendly experience',
+      'Shareable tour links'
+    ]
+  },
+  {
+    id: '3d-visualization',
+    name: '3D Visualization',
+    description: 'Bring your property visions to life with stunning 3D renderings and architectural visualizations. Perfect for pre-construction marketing and design presentations.',
+    image: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0',
+    icon: Box,
+    features: [
+      'Photorealistic 3D renders',
+      'Interior and exterior visualization',
+      'Multiple design options',
+      'Virtual staging capabilities',
+      'Animation and walkthroughs'
+    ]
+  },
+  {
+    id: 'interior-design',
+    name: 'Interior Design',
+    description: 'Transform your spaces with professional interior design services. From concept to completion, we create beautiful, functional living environments.',
+    image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0',
+    icon: Palette,
+    features: [
+      'Custom design concepts',
+      'Color scheme selection',
+      'Furniture and decor sourcing',
+      'Space optimization',
+      'Style consultation'
+    ]
+  },
+  {
+    id: 'smart-home-installation',
+    name: 'Smart Home Installation',
+    description: 'Upgrade your property with cutting-edge smart home technology. Control lighting, security, climate, and more from your smartphone.',
+    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0',
+    icon: Home,
+    features: [
+      'Smart lighting systems',
+      'Home security integration',
+      'Climate control automation',
+      'Voice assistant compatibility',
+      'Professional installation'
+    ]
+  },
+  {
+    id: 'space-planning-consultation',
+    name: 'Space Planning Consultation',
+    description: 'Maximize your property\'s potential with expert space planning. Optimize layouts for functionality, flow, and aesthetic appeal.',
+    image: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0',
+    icon: Ruler,
+    features: [
+      'Layout optimization',
+      'Furniture placement',
+      'Traffic flow analysis',
+      'Storage solutions',
+      'Multi-purpose space design'
+    ]
+  }
+]
+
 const AllServicesPage = () => {
   const [selectedServices, setSelectedServices] = useState([])
+  const [activeServiceId, setActiveServiceId] = useState(null)
+  const [servicePickerValue, setServicePickerValue] = useState('')
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -16,86 +103,30 @@ const AllServicesPage = () => {
   })
   const [loading, setLoading] = useState(false)
 
-  const services = [
-    {
-      id: 'virtual-tour',
-      name: 'Virtual Tour',
-      description: 'Experience properties from anywhere with our immersive 360° virtual tours. Perfect for remote viewing and showcasing properties to international clients.',
-      image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0',
-      icon: Camera,
-      features: [
-        '360° panoramic views',
-        'Interactive property exploration',
-        'HD quality imaging',
-        'Mobile-friendly experience',
-        'Shareable tour links'
-      ]
-    },
-    {
-      id: '3d-visualization',
-      name: '3D Visualization',
-      description: 'Bring your property visions to life with stunning 3D renderings and architectural visualizations. Perfect for pre-construction marketing and design presentations.',
-      image: 'https://images.unsplash.com/photo-1568605117034-6095e1e87e1e?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0',
-      icon: Box,
-      features: [
-        'Photorealistic 3D renders',
-        'Interior and exterior visualization',
-        'Multiple design options',
-        'Virtual staging capabilities',
-        'Animation and walkthroughs'
-      ]
-    },
-    {
-      id: 'interior-design',
-      name: 'Interior Design',
-      description: 'Transform your spaces with professional interior design services. From concept to completion, we create beautiful, functional living environments.',
-      image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0',
-      icon: Palette,
-      features: [
-        'Custom design concepts',
-        'Color scheme selection',
-        'Furniture and decor sourcing',
-        'Space optimization',
-        'Style consultation'
-      ]
-    },
-    {
-      id: 'smart-home-installation',
-      name: 'Smart Home Installation',
-      description: 'Upgrade your property with cutting-edge smart home technology. Control lighting, security, climate, and more from your smartphone.',
-      image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0',
-      icon: Home,
-      features: [
-        'Smart lighting systems',
-        'Home security integration',
-        'Climate control automation',
-        'Voice assistant compatibility',
-        'Professional installation'
-      ]
-    },
-    {
-      id: 'space-planning-consultation',
-      name: 'Space Planning Consultation',
-      description: 'Maximize your property\'s potential with expert space planning. Optimize layouts for functionality, flow, and aesthetic appeal.',
-      image: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0',
-      icon: Ruler,
-      features: [
-        'Layout optimization',
-        'Furniture placement',
-        'Traffic flow analysis',
-        'Storage solutions',
-        'Multi-purpose space design'
-      ]
-    }
-  ]
+  const selectedServiceDetails = useMemo(() => {
+    if (!activeServiceId) return null
+    return services.find(service => service.id === activeServiceId) || null
+  }, [activeServiceId])
 
-  const handleServiceToggle = (serviceId) => {
+  const handleServiceSelect = (serviceId) => {
+    if (!serviceId) return
+
+    setSelectedServices(prev => (
+      prev.includes(serviceId) ? prev : [...prev, serviceId]
+    ))
+    setActiveServiceId(serviceId)
+    setServicePickerValue('')
+  }
+
+  const handleRemoveService = (serviceId) => {
     setSelectedServices(prev => {
-      if (prev.includes(serviceId)) {
-        return prev.filter(id => id !== serviceId)
-      } else {
-        return [...prev, serviceId]
+      const updatedServices = prev.filter(id => id !== serviceId)
+
+      if (activeServiceId === serviceId) {
+        setActiveServiceId(updatedServices[updatedServices.length - 1] || null)
       }
+
+      return updatedServices
     })
   }
 
@@ -108,7 +139,7 @@ const AllServicesPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     if (selectedServices.length === 0) {
       toast.error('Please select at least one service')
       return
@@ -138,6 +169,8 @@ const AllServicesPage = () => {
         toast.success('Thank you! We\'ll contact you soon.')
         setFormData({ name: '', email: '', phone: '', message: '' })
         setSelectedServices([])
+        setActiveServiceId(null)
+        setServicePickerValue('')
       } else {
         toast.error(result.error || 'Failed to submit inquiry')
       }
@@ -149,196 +182,200 @@ const AllServicesPage = () => {
     }
   }
 
-  const selectedServiceDetails = selectedServices.length > 0
-    ? services.find(s => s.id === selectedServices[selectedServices.length - 1])
-    : null
-
   return (
-    <div className="w-full min-h-screen bg-white_bg">
-      {/* Header Section */}
-      <div className="bg-gradient-to-r from-primary_color/10 via-primary_color/5 to-transparent border-b border-primary_color/20">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-12">
-          <div className="text-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-primary_color mb-4">
-              Our Services
+    <div className="min-h-screen bg-white_bg text-primary_color">
+      <div className="relative overflow-hidden ">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(37,99,235,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(37,99,235,0.06)_1px,transparent_1px)] bg-[size:44px_44px] opacity-40" />
+        <div className="relative w-full px-4 md:px-8 py-16 md:py-24">
+          <div>
+            <span className="inline-flex items-center  -primary_color/15 bg-primary_color/5 px-4 py-1.5 text-xs uppercase tracking-[0.25em] text-primary_color">
+              Premium Property Services
+            </span>
+            <h1 className="mt-6 text-4xl md:text-6xl lg:text-[5em] max-w-5xl  font-semibold leading-tight text-primary_color">
+              Choose the services you need and explore each one in detail.
             </h1>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Discover how we can help enhance your property experience with our comprehensive range of services.
-            </p>
+            {/* <p className="mt-5 text-base md:text-lg text-gray-600 leading-relaxed">
+              A cleaner way to build your request. Select services from the dropdown, review them below, and click any selected item to see its full details on the left.
+            </p> */}
           </div>
         </div>
       </div>
 
-      {/* Split Screen Layout */}
-      <div className="flex flex-col lg:flex-row min-h-[calc(100vh-200px)]">
-        {/* Left Side - Service Details */}
-        <div className="w-full lg:w-1/2 bg-white/30 backdrop-blur-sm border-r border-primary_color/10 p-6 md:p-8 lg:p-12 overflow-y-auto">
-          <div className="max-w-2xl mx-auto space-y-8">
-            {/* Service Selection */}
-    <div>
-              <h2 className="text-2xl font-bold text-primary_color mb-6 flex items-center gap-2">
-                <span className="w-1 h-8 bg-primary_color rounded-full"></span>
-                Select Your Services
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 gap-3">
-                {services.map((service) => {
-                  const IconComponent = service.icon
-                  const isSelected = selectedServices.includes(service.id)
-                  
-                  return (
-                    <button
-                      key={service.id}
-                      onClick={() => handleServiceToggle(service.id)}
-                      className={`group relative p-4 rounded-xl border-2 transition-all duration-300 text-left ${
-                        isSelected
-                          ? 'border-primary_color bg-primary_color/10 shadow-lg shadow-primary_color/20'
-                          : 'border-gray-200 hover:border-primary_color/50 hover:bg-primary_color/5 hover:shadow-md'
-                      }`}
-                    >
-                      <div className="flex flex-col items-center gap-2">
-                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-300 ${
-                          isSelected
-                            ? 'bg-primary_color text-white scale-110'
-                            : 'bg-primary_color/10 text-primary_color group-hover:bg-primary_color/20'
-                        }`}>
-                          <IconComponent className="w-6 h-6" />
+      <div className="w-full px-4 md:px-8 py-8 md:py-10">
+        <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-0">
+          <div className=" -primary_color/10 overflow-hidden">
+            <div className="p-6 md:p-8">
+              <AnimatePresence mode="wait">
+                {selectedServiceDetails ? (
+                  <motion.div
+                    key={selectedServiceDetails.id}
+                    initial={{ opacity: 0, y: 18 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -18 }}
+                    transition={{ duration: 0.28 }}
+                    className="space-y-6"
+                  >
+                    <div className="relative overflow-hidden  -primary_color/10 bg-primary_color/5">
+                      <div className="absolute inset-0 bg-gradient-to-t from-primary_color/70 via-primary_color/20 to-transparent z-10" />
+                      <img
+                        src={selectedServiceDetails.image}
+                        alt={selectedServiceDetails.name}
+                        className="h-72 w-full object-cover"
+                      />
+                      <div className="absolute inset-x-0 bottom-0 z-20 p-6 md:p-8">
+                        <div className="flex items-center gap-4">
+                          <div className="flex h-14 w-14 items-center justify-center bg-white/85 backdrop-blur-md  -white/40">
+                            {React.createElement(selectedServiceDetails.icon, {
+                              className: 'w-7 h-7 text-primary_color'
+                            })}
+                          </div>
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.2em] text-white/80">Selected Service</p>
+                            <h2 className="text-2xl md:text-3xl font-semibold text-white">
+                              {selectedServiceDetails.name}
+                            </h2>
+                          </div>
                         </div>
-                        <span className={`font-semibold text-center text-sm transition-colors ${
-                          isSelected ? 'text-primary_color' : 'text-gray-700 group-hover:text-primary_color'
-                        }`}>
-                          {service.name}
-                        </span>
-                        {isSelected && (
-                          <CheckCircle className="w-5 h-5 text-primary_color absolute top-2 right-2" />
-                        )}
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Service Details Display */}
-            <AnimatePresence mode="wait">
-              {selectedServiceDetails ? (
-                <motion.div
-                  key={selectedServiceDetails.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
-                  className="space-y-6"
-                >
-                  {/* Service Image */}
-                  <div className="relative rounded-2xl overflow-hidden shadow-xl border border-primary_color/20 group">
-                    <div className="absolute inset-0 bg-gradient-to-t from-primary_color/40 to-transparent z-10"></div>
-                    <img
-                      src={selectedServiceDetails.image}
-                      alt={selectedServiceDetails.name}
-                      className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 p-6 z-20">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-12 h-12 rounded-xl bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg">
-                          {React.createElement(selectedServiceDetails.icon, {
-                            className: 'w-6 h-6 text-primary_color'
-                          })}
-                        </div>
-                        <h3 className="text-2xl font-bold text-white drop-shadow-lg">
-                          {selectedServiceDetails.name}
-                        </h3>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Service Description */}
-                  <div className="bg-white/60 backdrop-blur-sm rounded-xl p-6 border border-primary_color/10 shadow-sm">
-                    <p className="text-gray-700 leading-relaxed mb-6">
-                      {selectedServiceDetails.description}
+                    <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+                      <div className=" -primary_color/10 bg-primary_color/5 p-6">
+                        <p className="text-sm uppercase tracking-[0.22em] text-primary_color/70 mb-4">Overview</p>
+                        <p className="text-gray-700 leading-8">
+                          {selectedServiceDetails.description}
+                        </p>
+                      </div>
+
+                      <div className=" -primary_color/10 bg-white p-6">
+                        <div className="flex items-center gap-2 text-primary_color mb-4">
+                          <ArrowRight className="w-4 h-4 text-primary_color" />
+                          <h3 className="text-lg font-semibold">What&apos;s Included</h3>
+                        </div>
+
+                        <div className="space-y-3">
+                          {selectedServiceDetails.features.map((feature, idx) => (
+                            <motion.div
+                              key={idx}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: idx * 0.08 }}
+                              className="flex items-start gap-3  -primary_color/10 bg-primary_color/5 px-4 py-3"
+                            >
+                              <CheckCircle className="mt-0.5 w-4 h-4 flex-shrink-0 text-primary_color" />
+                              <span className="text-sm text-gray-700">{feature}</span>
+                            </motion.div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex min-h-[420px] flex-col items-center justify-center  -dashed -primary_color/15 bg-primary_color/5 px-6 text-center"
+                  >
+                    <div className="mb-5 flex h-20 w-20 items-center justify-center bg-primary_color/12">
+                      <Home className="w-10 h-10 text-primary_color/70" />
+                    </div>
+                    <h2 className="text-2xl font-semibold text-primary_color">Pick a service to preview it</h2>
+                    <p className="mt-3 max-w-md text-sm md:text-base text-gray-500 leading-7">
+                      Use the selector on the right, then click any selected service to show its details here.
                     </p>
-
-                    <div className="space-y-3">
-                      <h4 className="font-bold text-primary_color text-lg mb-4 flex items-center gap-2">
-                        <ArrowRight className="w-5 h-5" />
-                        What's Included
-                      </h4>
-                      <div className="grid grid-cols-1 gap-3">
-                        {selectedServiceDetails.features.map((feature, idx) => (
-                          <motion.div
-                            key={idx}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: idx * 0.1 }}
-                            className="flex items-start gap-3 p-3 rounded-lg bg-white/50 hover:bg-white/70 transition-colors"
-                          >
-                            <CheckCircle className="w-5 h-5 text-primary_color mt-0.5 flex-shrink-0" />
-                            <span className="text-gray-700 text-sm">{feature}</span>
-                          </motion.div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex flex-col items-center justify-center py-16 text-center"
-                >
-                  <div className="w-24 h-24 rounded-full bg-primary_color/10 flex items-center justify-center mb-4">
-                    <Home className="w-12 h-12 text-primary_color/40" />
-                  </div>
-                  <p className="text-gray-500 text-lg font-medium">Select a service to view details</p>
-                  <p className="text-gray-400 text-sm mt-2">Choose from the options above to learn more</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
-        </div>
 
-        {/* Right Side - Contact Form */}
-        <div className="w-full lg:w-1/2 bg-gradient-to-br from-white via-white to-primary_color/5 p-6 md:p-8 lg:p-12 overflow-y-auto">
-          <div className="max-w-2xl mx-auto">
+          <div className=" -l-0 -primary_color/10 bg-gradient-to-br from-white/20 via-white to-primary_color/5 p-6 md:p-8">
             <div className="mb-8">
-              <h2 className="text-3xl font-bold text-primary_color mb-3 flex items-center gap-2">
-                <span className="w-1 h-8 bg-primary_color rounded-full"></span>
-                Get in Touch
+              <p className="text-sm uppercase tracking-[0.22em] text-primary_color/70 mb-3">Inquiry Form</p>
+              <h2 className="text-3xl font-semibold text-primary_color mb-3">
+                Tell us what you need
               </h2>
-              <p className="text-gray-600 leading-relaxed">
-                Fill out the form below and we'll get back to you about your selected services within 24 hours.
+              <p className="text-gray-600 leading-7">
+                Share your details and we&apos;ll follow up with the right team about your selected services.
               </p>
             </div>
 
-            {/* Selected Services Display */}
-            {selectedServices.length > 0 && (
-              <div className="mb-6 p-5 bg-primary_color/10 rounded-xl border border-primary_color/20 backdrop-blur-sm">
-                <p className="text-sm font-semibold text-primary_color mb-3 flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4" />
-                  Selected Services ({selectedServices.length})
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedServices.map(serviceId => {
-                    const service = services.find(s => s.id === serviceId)
-                    return (
-                      <span
-                        key={serviceId}
-                        className="px-4 py-2 bg-primary_color text-white rounded-full text-xs font-medium shadow-sm flex items-center gap-2"
-                      >
-                        {service?.name}
-                      </span>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+            <div className="mb-6  -primary_color/10 bg-white p-5">
+              <label htmlFor="service-select" className="block text-sm font-medium text-primary_color mb-3">
+                Select a service
+              </label>
+              <select
+                id="service-select"
+                value={servicePickerValue}
+                onChange={(e) => handleServiceSelect(e.target.value)}
+                className="w-full  -primary_color/15 bg-white px-4 py-4 text-sm text-primary_color outline-none transition focus:-primary_color focus:ring-2 focus:ring-primary_color/20"
+              >
+                <option value="" className="text-gray-500">
+                  Choose a service
+                </option>
+                {services.map(service => (
+                  <option
+                    key={service.id}
+                    value={service.id}
+                    disabled={selectedServices.includes(service.id)}
+                    className="text-primary_color"
+                  >
+                    {service.name}
+                  </option>
+                ))}
+              </select>
 
-            {/* Contact Form */}
-            <form onSubmit={handleSubmit} className="space-y-6">
+              <p className="text-sm font-medium text-primary_color mb-3">
+                Selected Services {selectedServices.length > 0 ? `(${selectedServices.length})` : ''}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {selectedServices.length > 0 ? (
+                  selectedServices.map(serviceId => {
+                    const service = services.find(item => item.id === serviceId)
+                    const IconComponent = service?.icon
+                    const isActive = activeServiceId === serviceId
+
+                    return (
+                      <div
+                        key={serviceId}
+                        className={`inline-flex items-center gap-2  px-3 py-2 transition ${
+                          isActive
+                            ? '-primary_color/30 bg-primary_color/10 text-primary_color'
+                            : '-primary_color/10 bg-primary_color/5 text-gray-700'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setActiveServiceId(serviceId)}
+                          className="inline-flex items-center gap-2 text-sm font-medium"
+                        >
+                          {IconComponent && <IconComponent className="w-4 h-4" />}
+                          <span>{service?.name}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveService(serviceId)}
+                          className="inline-flex h-6 w-6 items-center justify-center bg-primary_color/10 text-primary_color transition hover:bg-red-500/10 hover:text-red-500"
+                          aria-label={`Remove ${service?.name}`}
+                          title="Remove service"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <span className="text-sm text-gray-500">Choose at least one service to continue.</span>
+                )}
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <label htmlFor="name" className="block text-sm font-semibold text-primary_color flex items-center gap-2">
-                  <User className="w-4 h-4" />
-                  Full Name <span className="text-red-500">*</span>
+                <label htmlFor="name" className="block text-sm font-medium text-primary_color flex items-center gap-2">
+                  <User className="w-4 h-4 text-primary_color" />
+                  Full Name <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="text"
@@ -347,15 +384,15 @@ const AllServicesPage = () => {
                   value={formData.name}
                   onChange={handleInputChange}
                   required
-                  className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary_color focus:border-primary_color transition-all bg-white/80 backdrop-blur-sm placeholder:text-gray-400"
+                  className="w-full  -primary_color/15 bg-white px-4 py-3.5 text-primary_color outline-none transition placeholder:text-gray-400 focus:-primary_color focus:ring-2 focus:ring-primary_color/20"
                   placeholder="John Doe"
                 />
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="email" className="block text-sm font-semibold text-primary_color flex items-center gap-2">
-                  <Mail className="w-4 h-4" />
-                  Email Address <span className="text-red-500">*</span>
+                <label htmlFor="email" className="block text-sm font-medium text-primary_color flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-primary_color" />
+                  Email Address <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="email"
@@ -364,15 +401,15 @@ const AllServicesPage = () => {
                   value={formData.email}
                   onChange={handleInputChange}
                   required
-                  className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary_color focus:border-primary_color transition-all bg-white/80 backdrop-blur-sm placeholder:text-gray-400"
+                  className="w-full  -primary_color/15 bg-white px-4 py-3.5 text-primary_color outline-none transition placeholder:text-gray-400 focus:-primary_color focus:ring-2 focus:ring-primary_color/20"
                   placeholder="john@example.com"
                 />
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="phone" className="block text-sm font-semibold text-primary_color flex items-center gap-2">
-                  <Phone className="w-4 h-4" />
-                  Phone Number <span className="text-red-500">*</span>
+                <label htmlFor="phone" className="block text-sm font-medium text-primary_color flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-primary_color" />
+                  Phone Number <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="tel"
@@ -381,14 +418,14 @@ const AllServicesPage = () => {
                   value={formData.phone}
                   onChange={handleInputChange}
                   required
-                  className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary_color focus:border-primary_color transition-all bg-white/80 backdrop-blur-sm placeholder:text-gray-400"
+                  className="w-full  -primary_color/15 bg-white px-4 py-3.5 text-primary_color outline-none transition placeholder:text-gray-400 focus:-primary_color focus:ring-2 focus:ring-primary_color/20"
                   placeholder="+1 (555) 123-4567"
                 />
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="message" className="block text-sm font-semibold text-primary_color">
-                  Message <span className="text-gray-400 text-xs font-normal">(Optional)</span>
+                <label htmlFor="message" className="block text-sm font-medium text-primary_color">
+                  Message <span className="text-gray-400 text-xs">(Optional)</span>
                 </label>
                 <textarea
                   id="message"
@@ -396,19 +433,19 @@ const AllServicesPage = () => {
                   value={formData.message}
                   onChange={handleInputChange}
                   rows={5}
-                  className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary_color focus:border-primary_color transition-all resize-y bg-white/80 backdrop-blur-sm placeholder:text-gray-400"
-                  placeholder="Tell us more about your requirements, timeline, or any specific questions..."
+                  className="w-full  -primary_color/15 bg-white px-4 py-3.5 text-primary_color outline-none transition resize-y placeholder:text-gray-400 focus:-primary_color focus:ring-2 focus:ring-primary_color/20"
+                  placeholder="Tell us more about your requirements, preferred timeline, or any specific details."
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading || selectedServices.length === 0}
-                className="w-full bg-primary_color text-white py-4 px-6 rounded-xl hover:bg-primary_color/90 focus:outline-none focus:ring-2 focus:ring-primary_color focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
+                className="flex w-full items-center justify-center gap-2 bg-primary_color px-6 py-4 font-semibold text-white transition hover:translate-y-[-1px] hover:bg-primary_color/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? (
                   <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                    <div className="h-5 w-5 animate-spin -2 -white -t-transparent" />
                     <span>Submitting...</span>
                   </>
                 ) : (
@@ -419,7 +456,7 @@ const AllServicesPage = () => {
                 )}
               </button>
 
-              <p className="text-xs text-gray-500 text-center mt-4">
+              <p className="text-center text-xs text-gray-500">
                 By submitting this form, you agree to our privacy policy and terms of service.
               </p>
             </form>

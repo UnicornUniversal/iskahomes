@@ -13,6 +13,7 @@ import {
   Legend
 } from 'chart.js'
 import { TrendingUp, Clock, Target } from 'lucide-react'
+import { analyticsClasses, analyticsPalette, baseChartOptions, formatNumber, formatPercent } from './analyticsTheme'
 
 ChartJS.register(
   CategoryScale,
@@ -27,9 +28,8 @@ ChartJS.register(
 export default function LeadLifecycle({ data }) {
   if (!data || !data.statusDistribution) {
     return (
-      <div className="default_bg rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Lead Lifecycle Analysis</h3>
-        <div className="text-center text-gray-500 py-8">No lifecycle data available</div>
+      <div className={analyticsClasses.section}>
+        <div className={analyticsClasses.empty}>No lifecycle data available yet.</div>
       </div>
     )
   }
@@ -42,20 +42,20 @@ export default function LeadLifecycle({ data }) {
   )
   const statusValues = Object.values(statusDistribution)
   const statusColors = {
-    new: 'rgba(59, 130, 246, 0.8)',
-    contacted: 'rgba(16, 185, 129, 0.8)',
-    scheduled: 'rgba(245, 158, 11, 0.8)',
-    responded: 'rgba(139, 92, 246, 0.8)',
-    closed: 'rgba(34, 197, 94, 0.8)',
-    cold_lead: 'rgba(156, 163, 175, 0.8)',
-    abandoned: 'rgba(239, 68, 68, 0.8)'
+    new: analyticsPalette.secondary,
+    contacted: analyticsPalette.primary,
+    scheduled: analyticsPalette.amber,
+    responded: analyticsPalette.violet,
+    closed: analyticsPalette.emerald,
+    cold_lead: analyticsPalette.slate,
+    abandoned: analyticsPalette.rose
   }
 
   const statusChartData = {
     labels: statusLabels,
     datasets: [{
       data: statusValues,
-      backgroundColor: Object.keys(statusDistribution).map(s => statusColors[s] || 'rgba(156, 163, 175, 0.8)'),
+      backgroundColor: Object.keys(statusDistribution).map(s => statusColors[s] || analyticsPalette.slate),
       borderWidth: 2,
       borderColor: '#fff'
     }]
@@ -79,14 +79,14 @@ export default function LeadLifecycle({ data }) {
       label: 'Conversion Rate (%)',
       data: funnelValues,
       backgroundColor: [
-        'rgba(59, 130, 246, 0.8)',
-        'rgba(16, 185, 129, 0.8)',
-        'rgba(34, 197, 94, 0.8)'
+        analyticsPalette.secondary,
+        analyticsPalette.primary,
+        analyticsPalette.emerald
       ],
       borderColor: [
-        'rgb(59, 130, 246)',
-        'rgb(16, 185, 129)',
-        'rgb(34, 197, 94)'
+        analyticsPalette.secondary,
+        analyticsPalette.primary,
+        analyticsPalette.emerald
       ],
       borderWidth: 1
     }]
@@ -100,21 +100,28 @@ export default function LeadLifecycle({ data }) {
   const lost = (statusDistribution.abandoned || 0) + (statusDistribution.cold_lead || 0)
 
   return (
-    <div className="default_bg rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold mb-4">Lead Lifecycle & Funnel Analysis</h3>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Status Distribution */}
+    <div className={analyticsClasses.section}>
+      <div className="space-y-3">
+        <span className={analyticsClasses.eyebrow}>Lifecycle Health</span>
         <div>
-          <h4 className="text-md font-semibold mb-3">Status Distribution</h4>
-          <div className="h-64">
+          <h3 className={analyticsClasses.title}>Lead Lifecycle & Funnel</h3>
+          <p className={analyticsClasses.subtitle}>
+            A cleaner view of where leads sit in the pipeline and how well they move from one stage to the next.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className={analyticsClasses.subPanel}>
+          <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Status Distribution</h4>
+          <div className="mt-4 h-72">
             <Doughnut
               data={statusChartData}
               options={{
-                responsive: true,
-                maintainAspectRatio: false,
+                ...baseChartOptions({ legendPosition: 'bottom' }),
                 plugins: {
                   legend: {
+                    ...baseChartOptions({ legendPosition: 'bottom' }).plugins.legend,
                     position: 'bottom'
                   }
                 }
@@ -123,27 +130,21 @@ export default function LeadLifecycle({ data }) {
           </div>
         </div>
 
-        {/* Funnel Conversion Rates */}
-        <div>
-          <h4 className="text-md font-semibold mb-3">Funnel Conversion Rates</h4>
-          <div className="h-64">
+        <div className={analyticsClasses.subPanel}>
+          <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Funnel Conversion</h4>
+          <div className="mt-4 h-72">
             <Bar
               data={funnelChartData}
               options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: {
-                    display: false
-                  }
-                },
+                ...baseChartOptions({ showLegend: false, yMax: 100, yTitle: 'Conversion Rate (%)' }),
                 scales: {
+                  ...baseChartOptions({ showLegend: false, yMax: 100, yTitle: 'Conversion Rate (%)' }).scales,
                   y: {
-                    beginAtZero: true,
-                    max: 100,
+                    ...baseChartOptions({ showLegend: false, yMax: 100, yTitle: 'Conversion Rate (%)' }).scales.y,
                     ticks: {
-                      callback: function(value) {
-                        return value + '%'
+                      color: analyticsPalette.slate,
+                      callback(value) {
+                        return `${value}%`
                       }
                     }
                   }
@@ -155,55 +156,54 @@ export default function LeadLifecycle({ data }) {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-        <div className="border border-gray-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Target className="w-5 h-5 text-blue-600" />
-            <span className="text-sm text-gray-600">Total Leads</span>
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className={analyticsClasses.compactCard}>
+          <div className="mb-3 flex items-center gap-2 text-slate-500">
+            <Target className="h-4 w-4 text-teal-600" />
+            <span className="text-sm font-medium">Total Leads</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{totalLeads}</p>
+          <p className="text-3xl font-semibold tracking-tight text-primary_color">{formatNumber(totalLeads)}</p>
         </div>
 
-        <div className="border border-gray-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-5 h-5 text-green-600" />
-            <span className="text-sm text-gray-600">In Progress</span>
+        <div className={analyticsClasses.compactCard}>
+          <div className="mb-3 flex items-center gap-2 text-slate-500">
+            <TrendingUp className="h-4 w-4 text-sky-600" />
+            <span className="text-sm font-medium">In Progress</span>
           </div>
-          <p className="text-2xl font-bold text-green-600">{inProgress}</p>
+          <p className="text-3xl font-semibold tracking-tight text-primary_color">{formatNumber(inProgress)}</p>
         </div>
 
-        <div className="border border-gray-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Target className="w-5 h-5 text-purple-600" />
-            <span className="text-sm text-gray-600">Closed</span>
+        <div className={analyticsClasses.compactCard}>
+          <div className="mb-3 flex items-center gap-2 text-slate-500">
+            <Target className="h-4 w-4 text-emerald-600" />
+            <span className="text-sm font-medium">Closed</span>
           </div>
-          <p className="text-2xl font-bold text-purple-600">{closed}</p>
+          <p className="text-3xl font-semibold tracking-tight text-primary_color">{formatNumber(closed)}</p>
         </div>
 
-        <div className="border border-gray-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Clock className="w-5 h-5 text-orange-600" />
-            <span className="text-sm text-gray-600">Avg Time to Close</span>
+        <div className={analyticsClasses.compactCard}>
+          <div className="mb-3 flex items-center gap-2 text-slate-500">
+            <Clock className="h-4 w-4 text-amber-600" />
+            <span className="text-sm font-medium">Avg Time to Close</span>
           </div>
-          <p className="text-2xl font-bold text-orange-600">
+          <p className="text-3xl font-semibold tracking-tight text-primary_color">
             {avgTimeToConversion ? `${avgTimeToConversion.toFixed(1)} days` : 'N/A'}
           </p>
         </div>
       </div>
 
-      {/* Detailed Status Breakdown */}
       <div className="mt-6">
-        <h4 className="text-md font-semibold mb-3">Status Breakdown</h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Detailed Status Breakdown</h4>
+        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
           {Object.entries(statusDistribution).map(([status, count]) => {
             const percentage = totalLeads > 0 ? ((count / totalLeads) * 100).toFixed(1) : 0
             return (
-              <div key={status} className="border border-gray-200 rounded-lg p-3">
-                <p className="text-sm text-gray-600 capitalize">
+              <div key={status} className={analyticsClasses.compactCard}>
+                <p className="text-sm font-medium capitalize text-primary_color/70">
                   {status.replace('_', ' ')}
                 </p>
-                <p className="text-xl font-bold text-gray-900">{count}</p>
-                <p className="text-xs text-gray-500">{percentage}%</p>
+                <p className="mt-3 text-2xl font-semibold tracking-tight text-primary_color">{formatNumber(count)}</p>
+                <p className="mt-1 text-xs text-primary_color/70">{formatPercent(percentage)}</p>
               </div>
             )
           })}
