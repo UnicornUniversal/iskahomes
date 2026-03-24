@@ -10,9 +10,11 @@ import Layout1 from "./layout/Layout1";
 import HomeCategories from "./components/general/HomeCategories";
 import Nav from "./components/Nav";
 import WhyIskaHomes from "./components/general/WhyIskaHomes";
+import Footer from "./components/Footer";
+
 export default function Home() {
   return (
-   <div className=" max-w-[1500px] mx-auto w-full h-full flex flex-col items-center justify-center" >
+   <div className=" max-w-[1500px] mx-auto w-full h-full flex flex-col items-center justify-center relative" >
    <Nav />
    <Layout1>
 
@@ -35,6 +37,7 @@ export default function Home() {
       </div>
       </Layout1>
 
+      <Footer />
       {/* <PostHogDebug /> */}
    </div>
   );

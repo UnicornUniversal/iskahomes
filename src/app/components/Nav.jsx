@@ -79,7 +79,7 @@ const handleLogout = () => {
       <div
         className={`${
           show_nav ? "block pt-20" : "hidden"
-        } md:flex py-[2em] md:py-4 px-4  items-center md:justify-between md:gap-0 md:p-2 md:px-8 md:shadow-lg md:bg-white/90 md:backdrop-blur-lg w-[90%] md:w-full h-screen md:h-auto max-h-screen md:min-h-[30px] overflow-y-auto md:overflow-visible bg-white/90 shadow-xl backdrop-blur-lg`}
+        } md:flex py-[2em] md:py-4 px-4  items-center md:justify-between md:gap-0 md:p-2 md:px-8 md:shadow-lg md:bg-white/20 md:backdrop-blur-lg w-[90%] md:w-full h-screen md:h-auto max-h-screen md:min-h-[30px] overflow-y-auto md:overflow-visible bg-white/20 shadow-xl backdrop-blur-lg`}
       >
         {/* Logo (left) */}
         <Link href="/">
