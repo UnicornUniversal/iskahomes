@@ -50,7 +50,7 @@ const DevelopmentHeaders = () => {
   return (
     <div className="w-full mb-8 ">
       <div className="container mx-auto ">
-        <h5 className=" font-medium mb-6 text-left">
+        <h5 className="heading_title font-medium mb-6 text-left">
           Featured Developers
         </h5>
       </div>
@@ -59,11 +59,16 @@ const DevelopmentHeaders = () => {
         modules={[Navigation, Pagination, Autoplay]}
         spaceBetween={0}
         slidesPerView={1}
-        navigation
+        navigation={{ enabled: false }}
         pagination={{ clickable: true }}
         autoplay={{
           delay: 4000,
           disableOnInteraction: false,
+        }}
+        breakpoints={{
+          768: {
+            navigation: { enabled: true }
+          }
         }}
         className="featured-developers-swiper w-full"
       >
@@ -152,8 +157,8 @@ const DevelopmentHeaders = () => {
 
           return (
             <SwiperSlide key={developer.id}>
-              <Link href={`/home/allDevelopers/${developer.slug}`}>
-                <div className="relative h-96 w-full overflow-hidden hover:scale-105 transition-transform duration-300 cursor-pointer">
+              <Link href={`/home/allDevelopers/${developer.slug}`} className="block">
+                <div className="relative h-[420px] md:h-96 w-full overflow-hidden cursor-pointer">
                   <img
                     src={coverImageUrl}
                     alt={developer.name}
@@ -163,23 +168,23 @@ const DevelopmentHeaders = () => {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-transparent"></div>
                   
                   {/* Content */}
-                  <div className="absolute bottom-0 left-0 right-0 p-8">
-                    <div className="flex items-end gap-6">
+                  <div className="absolute bottom-0 left-0 right-0 p-4 md:p-8">
+                    <div className="flex flex-col md:flex-row md:items-end gap-4 md:gap-6">
                       {/* Profile Image */}
                       <div className="flex-shrink-0">
                         {profileImageUrl ? (
                           <img
                             src={profileImageUrl}
                             alt={developer.name}
-                            className="w-24 h-24 rounded-md object-cover border-4 border-white/50 shadow-lg"
+                            className="w-20 h-20 md:w-24 md:h-24 rounded-md object-cover border-4 border-white/50 shadow-lg"
                             onError={(e) => {
                               console.error('Profile image failed to load:', profileImageUrl)
                               e.target.style.display = 'none'
                             }}
                           />
                         ) : (
-                          <div className="w-24 h-24 rounded-full border-4 border-white/50 shadow-lg bg-white/20 flex items-center justify-center">
-                            <span className="text-white text-2xl font-bold">
+                          <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-white/50 shadow-lg bg-white/20 flex items-center justify-center">
+                            <span className="text-white text-xl md:text-2xl font-bold">
                               {developer.name?.charAt(0)?.toUpperCase() || 'D'}
                             </span>
                           </div>
@@ -188,9 +193,13 @@ const DevelopmentHeaders = () => {
                       
                       {/* Developer Info */}
                       <div className="flex-1 text-white">
-                        <h3 className="text-3xl !text-white ">{developer.name}</h3>
-                        <p className="text-lg opacity-90 !text-white ">{location}</p>
-                        <div className="flex items-center gap-6 text-sm">
+                        <h3 className="text-2xl md:text-3xl !text-white leading-tight">
+                          {developer.name}
+                        </h3>
+                        <p className="text-base md:text-lg opacity-90 !text-white mt-1">
+                          {location}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm mt-3">
                           <div>
                             <span className="opacity-75">Total Units: </span>
                             <span className="font-semibold">{developer.total_units || 0}</span>

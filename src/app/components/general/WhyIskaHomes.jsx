@@ -1,199 +1,238 @@
 'use client'
 
-import React from 'react'
-import { Home, Search, Shield, TrendingUp, Users, CheckCircle } from 'lucide-react'
+import React, { useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { useRouter } from 'next/navigation'
+import { ArrowRight } from 'lucide-react'
+
+const userGroups = [
+  {
+    id: 'property-seeker',
+    label: 'Property Seeker',
+    title: 'Search smarter and move with confidence.',
+    description: 'Property seekers can discover verified homes, compare options across locations, and keep everything they need for a smooth property journey in one place.',
+    image: 'https://images.unsplash.com/photo-1600585154526-990dced4db0d?q=80&w=1200&auto=format&fit=crop',
+    features: [
+      'Verified Listings',
+      'Saved Properties',
+      'Smart Search',
+      'Property Alerts',
+      'Direct Messaging',
+      'Viewing Requests'
+    ]
+  },
+  {
+    id: 'developer',
+    label: 'Developer',
+    title: 'Showcase projects and convert serious interest.',
+    description: 'Developers get a focused space to present projects beautifully, manage exposure, and capture leads from people actively searching for premium property opportunities.',
+    image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=1200&auto=format&fit=crop',
+    features: [
+      'Property Management',
+      'Property Listings',
+      'Advanced Analytics',
+      'Leads Management',
+      'Reminders',
+      'Client Management'
+    ]
+  },
+  {
+    id: 'agency',
+    label: 'Agency',
+    title: 'Manage your brand and listings from one place.',
+    description: 'Agencies can maintain a polished presence, coordinate listings across teams, and respond to leads through a platform built for structured property operations.',
+    image: 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?q=80&w=1200&auto=format&fit=crop',
+    features: [
+      'Agency Profile',
+      'Team Oversight',
+      'Property Listings',
+      'Lead Tracking',
+      'Appointments',
+      'Sales Insights'
+    ]
+  },
+  {
+    id: 'agent',
+    label: 'Agent',
+    title: 'Build trust, generate leads, and stay discoverable.',
+    description: 'Agents can present active listings, strengthen credibility, and stay visible to property seekers looking for informed guidance and fast responses.',
+    image: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=1200&auto=format&fit=crop',
+    features: [
+      'Client Management',
+      'Lead Follow-Up',
+      'Property Listings',
+      'Appointments',
+      'Messages',
+      'Performance Tracking'
+    ]
+  }
+]
 
 const WhyIskaHomes = () => {
-  const whyIskaFeatures = [
-    {
-      icon: Search,
-      title: 'Comprehensive Search',
-      description: 'Find exactly what you\'re looking for with our advanced filters and search tools'
-    },
-    {
-      icon: Shield,
-      title: 'Verified Listings',
-      description: 'All properties are verified to ensure authenticity and quality'
-    },
-    {
-      icon: TrendingUp,
-      title: 'Market Insights',
-      description: 'Get real-time market data and trends to make informed decisions'
-    },
-    {
-      icon: Users,
-      title: 'Expert Network',
-      description: 'Connect with verified agents and developers you can trust'
-    },
-    {
-      icon: CheckCircle,
-      title: 'Easy Process',
-      description: 'Streamlined experience from search to closing'
-    },
-    {
-      icon: Home,
-      title: 'Wide Selection',
-      description: 'Thousands of properties across different categories and locations'
-    }
-  ]
+  const [activeUserId, setActiveUserId] = useState(userGroups[0].id)
+  const router = useRouter()
 
-  const userTypes = [
-    {
-      type: 'Property Seeker',
-      title: 'Find Your Dream Home',
-      description: 'Browse thousands of verified properties and find the perfect match for your needs.',
-      benefits: [
-        'Access to thousands of properties',
-        'Advanced search filters',
-        'Save favorite listings',
-        'Book property viewings',
-        'Get notifications for new matches',
-        'Connect with verified agents'
-      ],
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-        </svg>
-      ),
-      color: 'from-blue-500 to-cyan-500'
-    },
-    {
-      type: 'Real Estate Agent',
-      title: 'Grow Your Business',
-      description: 'Manage property listings, connect with clients, and track your performance all in one place.',
-      benefits: [
-        'List unlimited properties',
-        'Manage client relationships',
-        'Track listing performance',
-        'Access to marketing tools',
-        'Lead management system',
-        'Appointment scheduling'
-      ],
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-        </svg>
-      ),
-      color: 'from-purple-500 to-pink-500'
-    },
-    {
-      type: 'Real Estate Developer',
-      title: 'Showcase Your Projects',
-      description: 'Display your developments, manage units, and connect with potential buyers and investors.',
-      benefits: [
-        'Showcase multiple projects',
-        'Detailed project analytics',
-        'Lead management system',
-        'Unit management tools',
-        'Investor connections',
-        'Performance tracking'
-      ],
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-        </svg>
-      ),
-      color: 'from-orange-500 to-red-500'
-    }
-  ]
+  const activeUser = useMemo(
+    () => userGroups.find(user => user.id === activeUserId) || userGroups[0],
+    [activeUserId]
+  )
 
   return (
-    <div className="w-full py-16 px-4 md:px-8">
-      {/* Why Iska Homes Section */}
-      <div className="mb-20">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-bold text-primary_color mb-4">
-            Why Iska Homes?
-          </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Your trusted partner in finding the perfect property. We make real estate simple, transparent, and accessible.
-          </p>
-        </div>
+    <section className="w-full px-4 md:px-8 py-20 md:py-24">
+      <motion.div
+        initial={{ opacity: 0, y: 28 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.2 }}
+        transition={{ duration: 0.6, ease: 'easeOut' }}
+        className="border-t border-primary_color/25 pt-10"
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.5, ease: 'easeOut', delay: 0.04 }}
+          className="grid grid-cols-1 lg:grid-cols-[1.35fr_0.65fr] gap-12 items-start border-b border-primary_color/25 pb-10"
+        >
+          <div>
+            <h2 className="heading_title">
+              Who does
+              <br />
+              Iska Homes serve?
+            </h2>
+          </div>
+          {/* <div className="max-w-sm lg:justify-self-end pt-2">
+            <div className="w-3 h-10 bg-primary_color mb-4" />
+            <p className="text-sm md:text-base text-primary_color/80 leading-8">
+              Explore how Iska Homes is built for property seekers, developers, agencies, and agents through a tailored experience for each user type.
+            </p>
+          </div> */}
+        </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-          {whyIskaFeatures.map((feature, index) => {
-            const IconComponent = feature.icon
-            return (
-              <div
-                key={index}
-                className="p-6 rounded-xl bg-white/50 backdrop-blur-sm border border-white/20 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
-              >
-                <div className="w-12 h-12 rounded-lg bg-primary_color/10 flex items-center justify-center mb-4">
-                  <IconComponent className="w-6 h-6 text-primary_color" />
-                </div>
-                <h3 className="text-xl font-semibold text-primary_color mb-2">
-                  {feature.title}
-                </h3>
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  {feature.description}
-                </p>
+        <div className="grid grid-cols-1 lg:grid-cols-[0.42fr_0.68fr_0.9fr] gap-12 lg:gap-0 pt-12">
+          <motion.div
+            initial={{ opacity: 0, x: -18 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, amount: 0.25 }}
+            transition={{ duration: 0.45, ease: 'easeOut', delay: 0.08 }}
+            className="lg:border-r lg:border-primary_color/25 lg:pr-10"
+          >
+            <div className="space-y-3">
+              {userGroups.map((user) => {
+                const isActive = user.id === activeUserId
+
+                return (
+                  <motion.button
+                    key={user.id}
+                    type="button"
+                    onClick={() => setActiveUserId(user.id)}
+                    whileHover={{ x: 6 }}
+                    whileTap={{ scale: 0.985 }}
+                    transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+                    className={`flex items-center gap-4 text-left text-md md:text-[1.5em] leading-tight transition-colors ${
+                      isActive ? 'text-primary_color' : 'text-primary_color/50 hover:text-primary_color/80'
+                    }`}
+                  >
+                    <motion.span
+                      layout
+                      transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+                      className={`w-[8px] h-8 transition-colors ${isActive ? 'bg-primary_color' : 'bg-transparent'}`}
+                    />
+                    <motion.span
+                      animate={{ letterSpacing: isActive ? '-0.02em' : '0em' }}
+                      transition={{ duration: 0.25, ease: 'easeOut' }}
+                    >
+                      {user.label}
+                    </motion.span>
+                  </motion.button>
+                )
+              })}
+            </div>
+          </motion.div>
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`${activeUser.id}-details`}
+              initial={{ opacity: 0, y: 28, x: 20, filter: 'blur(8px)' }}
+              animate={{ opacity: 1, y: 0, x: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -16, x: -20, filter: 'blur(8px)' }}
+              transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+              className="lg:border-r lg:border-primary_color/25 lg:px-10 pt-2"
+            >
+              <div className="max-w-xl">
+                <motion.p
+                  initial={{ opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.38, ease: 'easeOut', delay: 0.06 }}
+                  className="text-2xl md:text-[3.1rem] leading-[1.02] tracking-[-0.03em] text-primary_color mb-6"
+                >
+                  {activeUser.title}
+                </motion.p>
+                <motion.p
+                  initial={{ opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: 'easeOut', delay: 0.11 }}
+                  className="text-lg md:text-[1.08rem] text-primary_color/82 leading-9 max-w-lg mb-12"
+                >
+                  {activeUser.description}
+                </motion.p>
+
+                <motion.button
+                  type="button"
+                  onClick={() => router.push('/home/signup')}
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  whileHover={{ x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ duration: 0.32, ease: 'easeOut', delay: 0.16 }}
+                  className="inline-flex items-center gap-4 border border-primary_color rounded-full px-4 py-2 text-primary_color transition-colors hover:bg-primary_color hover:text-white"
+                >
+                  <span className="text-[1rem] md:text-[1rem] leading-none">Get Started</span>
+                  <span className="flex items-center justify-center w-11 h-11 rounded-full border border-current">
+                    <ArrowRight className="w-6 h-6" />
+                  </span>
+                </motion.button>
               </div>
-            )
-          })}
-        </div>
-      </div>
+            </motion.div>
 
-      {/* Who is Iska for Section */}
-      <div>
-        <div className="text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-bold text-primary_color mb-4">
-            Who is Iska for?
-          </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Whether you're looking for a home, managing properties, or building developments, Iska Homes has something for you.
-          </p>
-        </div>
+            <motion.div
+              key={`${activeUser.id}-visuals`}
+              initial={{ opacity: 0, y: 30, x: 24, filter: 'blur(8px)' }}
+              animate={{ opacity: 1, y: 0, x: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -18, x: -20, filter: 'blur(8px)' }}
+              transition={{ duration: 0.46, ease: [0.22, 1, 0.36, 1], delay: 0.04 }}
+              className="pt-1 lg:pl-10"
+            >
+              <motion.img
+                key={activeUser.image}
+                src={activeUser.image}
+                alt={activeUser.label}
+                initial={{ scale: 1.08, opacity: 0.65 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+                className="w-full h-[280px] md:h-[300px] object-cover mb-8"
+              />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
-          {userTypes.map((user, index) => {
-            const IconComponent = user.icon
-            return (
-              <div
-                key={index}
-                className="group relative overflow-hidden rounded-2xl bg-white/50 backdrop-blur-sm border border-white/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-2"
-              >
-                {/* Gradient Accent */}
-                <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${user.color}`} />
-                
-                <div className="p-8">
-                  {/* Icon */}
-                  <div className={`w-16 h-16 rounded-xl bg-gradient-to-r ${user.color} flex items-center justify-center mb-6 text-white group-hover:scale-110 transition-transform duration-300`}>
-                    {IconComponent}
-                  </div>
-
-                  {/* Content */}
-                  <div className="mb-6">
-                    <span className="text-sm font-medium text-primary_color/60 uppercase tracking-wide mb-2 block">
-                      {user.type}
-                    </span>
-                    <h3 className="text-2xl font-bold text-primary_color mb-3">
-                      {user.title}
-                    </h3>
-                    <p className="text-gray-600 leading-relaxed">
-                      {user.description}
-                    </p>
-                  </div>
-
-                  {/* Benefits List */}
-                  <div className="space-y-3">
-                    {user.benefits.map((benefit, idx) => (
-                      <div key={idx} className="flex items-start gap-3">
-                        <div className="w-5 h-5 rounded-full bg-primary_color/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <CheckCircle className="w-3 h-3 text-primary_color" />
-                        </div>
-                        <span className="text-sm text-gray-700 leading-relaxed">
-                          {benefit}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+              <div>
+                <h4 className=" mb-5">Features</h4>
+                <div className="flex flex-wrap gap-4">
+                  {activeUser.features.map((feature, index) => (
+                    <motion.div
+                      key={feature}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.24, ease: 'easeOut', delay: 0.06 + index * 0.04 }}
+                      className="border border-primary_color/60 rounded-xl bg-white px-5 py-3 text-primary_color"
+                    >
+                      <p className="text-sm md:text-[0.8em] leading-6 whitespace-nowrap">{feature}</p>
+                    </motion.div>
+                  ))}
                 </div>
               </div>
-            )
-          })}
+            </motion.div>
+          </AnimatePresence>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </section>
   )
 }
 

@@ -28,7 +28,7 @@ const Nav = () => {
   const { user, loading, logout } = useAuth();
 
     const nav_options = [
-    { nav_name: "Home", nav_icon: FaHome, nav_link: "/home" },
+    { nav_name: "Home", nav_icon: FaHome, nav_link: "/" },
    
     { nav_name: "All Services", nav_icon: FaCogs, nav_link: "/home/allServices", sub_menu:[
       {"sub_link_name":"Virtual Tour", "sub_link_link":"/home/allServices"  },
@@ -82,7 +82,7 @@ const handleLogout = () => {
         } md:flex py-[2em] md:py-4 px-4  items-center md:justify-between md:gap-0 md:p-2 md:px-8 md:shadow-lg md:bg-white/90 md:backdrop-blur-lg w-[90%] md:w-full h-screen md:h-auto max-h-screen md:min-h-[30px] overflow-y-auto md:overflow-visible bg-white/90 shadow-xl backdrop-blur-lg`}
       >
         {/* Logo (left) */}
-        <Link href="/home">
+        <Link href="/">
         <img
           src="/iska-dark.png"
           alt="Company Logo"

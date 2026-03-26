@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination } from 'swiper/modules';
-import HeaderSearch from './HeaderSearch';
 import Link from 'next/link';
 import 'swiper/css';
 import 'swiper/css/autoplay';
@@ -280,7 +279,7 @@ const Header = () => {
   }, [])
 
   return (
-    <section className='w-full  px-4 py-8 sm:px-6 lg:px-10 lg:py-14'>
+    <section className='w-full   py-8 sm:px-6 lg:px-10 lg:py-14'>
       <div className='mx-auto flex w-full max-w-[1400px] flex-col items-start justify-between gap-8 lg:flex-row lg:items-center'>
         {/* left side */}
         <motion.div
@@ -290,21 +289,22 @@ const Header = () => {
           animate="visible"
         >
           <motion.h1
-            className={`${playfairDisplay.className} text-primary_color text-[2.4rem] leading-[1.18] sm:text-[3rem] md:text-[3.6rem] lg:text-[4.8rem]`}
+            className={`${playfairDisplay.className} text-primary_color w-full text-center md:text-left text-[3rem]  leading-[1.18] sm:text-[3rem] md:text-[5rem] lg:text-[5.5rem]`}
             variants={titleVariants}
           >
             <motion.span
               className="block"
               variants={titleVariants}
             >
-              Your Realty Quest
+              Your Realty Quest Concludes Here
             </motion.span>
-            <motion.span
+
+            {/* <motion.span
               variants={titleVariants}
-              className="ml-[1em] block"
+              className="md:ml-[1em] block"
             >
               Concludes Here
-            </motion.span>
+            </motion.span> */}
           
            
           </motion.h1>
@@ -332,10 +332,6 @@ const Header = () => {
             </svg>
           </motion.div>
 
-          <motion.div variants={itemVariants} className='w-full max-w-[680px]'>
-            <HeaderSearch />
-          </motion.div>
-
           <div className='flex flex-wrap items-center gap-3 sm:gap-4'>
             <motion.div variants={itemVariants}>
               <Link href="/home/signup">
@@ -345,6 +341,11 @@ const Header = () => {
             <motion.div variants={itemVariants}>
               <Link href="/home/exploreProperties">
                 <button className="secondary_button">Explore Properties</button>
+              </Link>
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <Link href="/home/exploreDevelopments">
+                <button className="secondary_button">Explore Developments</button>
               </Link>
             </motion.div>
           </div>

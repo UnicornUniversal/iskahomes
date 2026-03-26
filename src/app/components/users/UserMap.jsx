@@ -1,14 +1,6 @@
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef } from 'react'
-import dynamic from 'next/dynamic'
-
-// Dynamically import the map components to avoid SSR issues
-const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false })
-const TileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLayer), { ssr: false })
-const Marker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), { ssr: false })
-const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ssr: false })
-const ZoomControl = dynamic(() => import('react-leaflet').then(mod => mod.ZoomControl), { ssr: false })
 
 // Helper to resolve coordinates from a listing
 const resolveCoords = (listing) => {
@@ -22,6 +14,30 @@ const resolveCoords = (listing) => {
     return { lat: parseFloat(listing.location.latitude), lng: parseFloat(listing.location.longitude) };
   }
   
+  return null;
+};
+
+const getListingPreviewImage = (listing) => {
+  if (Array.isArray(listing.projectImages) && listing.projectImages.length > 0) {
+    return listing.projectImages[0];
+  }
+
+  if (listing.media?.albums && Array.isArray(listing.media.albums) && listing.media.albums.length > 0) {
+    for (const album of listing.media.albums) {
+      if (album?.images && Array.isArray(album.images) && album.images.length > 0) {
+        return album.images[0].url;
+      }
+    }
+  }
+
+  if (listing.media?.mediaFiles && Array.isArray(listing.media.mediaFiles) && listing.media.mediaFiles.length > 0) {
+    return listing.media.mediaFiles[0].url;
+  }
+
+  if (listing.media?.banner?.url) {
+    return listing.media.banner.url;
+  }
+
   return null;
 };
 
@@ -263,22 +279,6 @@ const UserMap = ({ filters = {} }) => {
     return list;
   }, [listings]);
 
-  // Component to update map view when center/zoom changes
-  // This must be a child of MapContainer to use useMap hook
-  const MapUpdater = ({ center, zoom }) => {
-    const { useMap } = require('react-leaflet');
-    const map = useMap();
-    
-    useEffect(() => {
-      mapRef.current = map;
-      if (center && zoom) {
-        map.setView(center, zoom);
-      }
-    }, [map, center, zoom]);
-    
-    return null;
-  };
-
   // Don't render anything on server side
   if (!isClient) {
     return (
@@ -291,25 +291,76 @@ const UserMap = ({ filters = {} }) => {
     );
   }
 
+  const { MapContainer, TileLayer, Marker, Popup, useMap } = require('react-leaflet');
+
+  // Component to update map view when center/zoom changes
+  // This must be a child of MapContainer to use useMap hook
+  const MapUpdater = ({ center, zoom }) => {
+    const map = useMap();
+    
+    useEffect(() => {
+      mapRef.current = map;
+      if (center && zoom) {
+        map.setView(center, zoom);
+      }
+    }, [map, center, zoom]);
+    
+    return null;
+  };
+
   return (
     <>
       {/* Custom CSS to position zoom controls away from filter panel */}
       <style jsx global>{`
-        .leaflet-top.leaflet-right {
+        .leaflet-top.leaflet-left {
           top: 20px !important;
+          left: auto !important;
           right: 20px !important;
         }
         .leaflet-control-zoom {
           margin-top: 0 !important;
-          margin-right: 0 !important;
+          margin-left: 0 !important;
           border: 2px solid rgba(0,0,0,0.2) !important;
           border-radius: 4px !important;
         }
         /* On desktop, ensure zoom controls don't overlap with filter panel */
         @media (min-width: 1024px) {
-          .leaflet-top.leaflet-right {
+          .leaflet-top.leaflet-left {
             right: 20px !important;
           }
+        }
+
+        .listing-map-popup .leaflet-popup-content-wrapper {
+          background: white !important;
+          color: var(--color-primary_color) !important;
+          border-radius: 16px !important;
+          padding: 0 !important;
+          box-shadow: 0 18px 50px rgba(23, 99, 124, 0.18) !important;
+          overflow: hidden;
+        }
+
+        .listing-map-popup .leaflet-popup-content {
+          margin: 0 !important;
+          width: 260px !important;
+        }
+
+        .listing-map-popup .leaflet-popup-tip {
+          background: white !important;
+        }
+
+        .listing-map-popup .leaflet-popup-close-button {
+          color: var(--color-primary_color) !important;
+          background: white !important;
+          border-radius: 9999px !important;
+          width: 28px !important;
+          height: 28px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          padding: 0 !important;
+          top: 10px !important;
+          right: 10px !important;
+          box-shadow: 0 8px 20px rgba(23, 99, 124, 0.15) !important;
         }
       `}</style>
       <div className='w-full h-[100vh] rounded-xl overflow-hidden border border-primary_color/10 relative'>
@@ -326,7 +377,7 @@ const UserMap = ({ filters = {} }) => {
           zoom={mapZoom} 
           style={{ height: '100%', width: '100%' }} 
           scrollWheelZoom
-          zoomControl={false}
+          zoomControl
           key={`${mapCenter[0]}-${mapCenter[1]}-${mapZoom}`}
         >
           <TileLayer
@@ -335,18 +386,27 @@ const UserMap = ({ filters = {} }) => {
           />
           <MapUpdater center={mapCenter} zoom={mapZoom} />
           
-          {/* Custom zoom controls positioned to avoid filter overlay - moved to top right, away from left filter panel */}
-          <ZoomControl position="topright" />
         {markers.map(m => (
           <Marker key={m.key} position={[m.position.lat, m.position.lng]}>
-            <Popup>
-              <div className='text-sm min-w-[200px]'>
-                <p className='font-semibold text-primary_color mb-1'>{m.title}</p>
-                <p className='text-primary_color/70 mb-2'>{m.subtitle}</p>
-                <div className='flex gap-2'>
+            <Popup className="listing-map-popup">
+              <div className='overflow-hidden'>
+                {getListingPreviewImage(m.listing) ? (
+                  <img
+                    src={getListingPreviewImage(m.listing)}
+                    alt={m.title}
+                    className='w-full h-50 object-cover'
+                  />
+                ) : null}
+                <div className='p-2.5 '>
+                  <p className='text-primary_color text-base font-semibold leading-0'>
+                    {m.title}
+                  </p>
+                  <p className='text-primary_color/80 text-sm leading-0'>
+                    {m.subtitle || 'Location not specified'}
+                  </p>
                   <a
                     href={`/home/property/${m.listing.listingType}/${m.listing.slug}/${m.listing.id}`}
-                    className='bg-primary_color text-white px-3 py-1 rounded text-xs hover:bg-blue-700 transition-colors'
+                    className='inline-flex w-fit items-center justify-center bg-primary_color !text-white px-4 py-1.5 rounded-full text-xs font-semibold transition-opacity hover:opacity-90'
                     target='_blank'
                     rel='noopener noreferrer'
                   >

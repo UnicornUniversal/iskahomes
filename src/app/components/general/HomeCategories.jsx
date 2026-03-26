@@ -88,23 +88,23 @@ const HomeCategories = () => {
   }
 
   return (
-    <div className="w-full mt-[3em] shadow-lg shadow-primary_color/20  py-8 px-4  md:p-[2em]">
+    <div className="w-full mt-[3em]  py-8 px-4  md:p-[2em]">
      
-     <h3 className=" text-[3em]  border-b-2 border-primary_color pb-4  text-primary_color mb-6">
+     <h3 className="heading_title pb-4 mb-6">
             Explore our Property Types
           </h3>
-      <div className="md:mt-[5em]  flex flex-col md:grid md:grid-cols-3 gap-8 md:gap-12">
+      <div className="  flex flex-col md:grid md:grid-cols-3 gap-8 md:gap-12">
         {/* Left Side - Property Types Stack */}
-        <div className="w-full md:col-span-1">
+        <div className="w-full flex flex-col justify-between md:col-span-1">
          
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap gap-3 md:flex-col md:gap-2">
             {propertyTypes.map((type) => (
               <button
                 key={type.id}
                 onClick={() => handleTypeClick(type)}
-                className={`text-left text-[1.3em] py-3 transition-all duration-300 ${
+                className={`text-left text-[0.95em] md:text-[1em] transition-all duration-300 ${
                   selectedType?.id === type.id
-                    ? 'text-primary_color text-[2em] font-semibold border-b-2 border-primary_color'
+                    ? 'text-primary_color text-[1.05em] md:text-[1.5em] font-semibold border-primary_color'
                     : 'text-primary_color/40 hover:text-primary_color'
                 }`}
               >
@@ -112,10 +112,16 @@ const HomeCategories = () => {
               </button>
             ))}
           </div>
+          <p className="text-primary_color/80 border-l-[10px] border-primary_color pl-4 max-w-lg text-[0.8em] leading-7">
+            {selectedType?.description || 'Explore this property type and discover listings that match its unique characteristics and lifestyle appeal.'}
+          </p>
+     
         </div>
 
         {/* Right Side - Listings Swiper */}
-        <div className="w-full md:col-span-2">
+        <div className="w-full  md:col-span-2 md:mt-[6em]">
+     
+        <br/>
           {loadingListings ? (
             <div className="w-full py-12 flex items-center justify-center">
               <div className="text-center">

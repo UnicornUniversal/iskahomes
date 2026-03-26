@@ -10,6 +10,7 @@ import Layout1 from "./layout/Layout1";
 import HomeCategories from "./components/general/HomeCategories";
 import Nav from "./components/Nav";
 import WhyIskaHomes from "./components/general/WhyIskaHomes";
+import MeetDevelopers from "./components/general/MeetDevelopers";
 export default function Home() {
   return (
    <div className=" max-w-[1500px] mx-auto w-full h-full flex flex-col items-center justify-center" >
@@ -18,13 +19,15 @@ export default function Home() {
 
       <Header />
       {/* <Banner /> */}
-      {/* <DevelopmentHeaders /> */}
+    
 
       <div className="flex flex-col md:flex-row gap-4   w-full  mt-[3em]">
   
   <div className="w-full h-full flex flex-col gap-4">
   <HomeProperties />
   <HomeCategories />
+  <MeetDevelopers />
+    <DevelopmentHeaders />
   <WhyIskaHomes/>
   </div>
 {/*       

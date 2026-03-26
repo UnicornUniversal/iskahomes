@@ -1,6 +1,20 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
+const parseArrayField = (value) => {
+  if (!value) return []
+  if (Array.isArray(value)) return value
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -8,54 +22,129 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit')) || 12
     const search = searchParams.get('search') || ''
     const status = searchParams.get('status') || ''
-    const city = searchParams.get('city') || ''
-    const country = searchParams.get('country') || ''
-    const purpose = searchParams.get('purpose') || ''
-    const type = searchParams.get('type') || ''
+    const location = searchParams.get('location') || ''
+    const locationType = searchParams.get('location_type') || ''
+    const developerId = searchParams.get('developer_id') || ''
+    const developerName = searchParams.get('developer_name') || ''
+    const selectedTypes = (searchParams.get('type') || searchParams.get('types') || '')
+      .split(',')
+      .map(value => value.trim())
+      .filter(Boolean)
+    const selectedSubtypes = (searchParams.get('subtype') || searchParams.get('subtypes') || '')
+      .split(',')
+      .map(value => value.trim())
+      .filter(Boolean)
 
     console.log('🔍 Public API - Fetching developments with filters:', {
-      page, limit, search, status, city, country, purpose, type
+      page, limit, search, status, location, locationType, developerId, developerName, selectedTypes, selectedSubtypes
     })
 
-    let query = supabase
+    let matchedDeveloperIds = []
+
+    if (developerName && !developerId) {
+      const { data: matchingDevelopers, error: developerMatchError } = await supabase
+        .from('developers')
+        .select('developer_id')
+        .ilike('name', `%${developerName}%`)
+        .in('account_status', ['active', 'approved'])
+
+      if (developerMatchError) {
+        console.error('❌ Error matching developers by name:', developerMatchError)
+        return NextResponse.json(
+          { error: 'Failed to match developer filter' },
+          { status: 500 }
+        )
+      }
+
+      matchedDeveloperIds = (matchingDevelopers || [])
+        .map(developer => developer.developer_id)
+        .filter(Boolean)
+
+      if (matchedDeveloperIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: {
+            developments: [],
+            pagination: {
+              page,
+              limit,
+              total: 0,
+              pages: 0
+            }
+          }
+        })
+      }
+    }
+
+    const applyFilters = (query) => {
+      let nextQuery = query
+
+      if (search) {
+        nextQuery = nextQuery.or(`title.ilike.%${search}%,description.ilike.%${search}%,city.ilike.%${search}%,state.ilike.%${search}%,country.ilike.%${search}%,full_address.ilike.%${search}%`)
+      }
+
+      if (status) {
+        nextQuery = nextQuery.eq('status', status)
+      }
+
+      if (location) {
+        if (['country', 'state', 'city', 'town'].includes(locationType)) {
+          nextQuery = nextQuery.ilike(locationType, `%${location}%`)
+        } else {
+          nextQuery = nextQuery.or(
+            `country.ilike.%${location}%,state.ilike.%${location}%,city.ilike.%${location}%,town.ilike.%${location}%,full_address.ilike.%${location}%`
+          )
+        }
+      }
+
+      if (developerId) {
+        nextQuery = nextQuery.eq('developer_id', developerId)
+      } else if (matchedDeveloperIds.length > 0) {
+        nextQuery = nextQuery.in('developer_id', matchedDeveloperIds)
+      }
+
+      if (selectedTypes.length === 1) {
+        nextQuery = nextQuery.filter('types', 'cs', JSON.stringify([selectedTypes[0]]))
+      } else if (selectedTypes.length > 1) {
+        nextQuery = nextQuery.or(
+          selectedTypes
+            .map(typeId => `types.cs.${JSON.stringify([typeId])}`)
+            .join(',')
+        )
+      }
+
+      if (selectedSubtypes.length === 1) {
+        nextQuery = nextQuery.filter('unit_types->database', 'cs', JSON.stringify([{ id: selectedSubtypes[0] }]))
+      }
+
+      return nextQuery
+    }
+
+    let query = applyFilters(
+      supabase
       .from('developments')
       .select('*')
       .eq('development_status', 'active')
       .order('created_at', { ascending: false })
-
-    // Apply search filter
-    if (search) {
-      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%,city.ilike.%${search}%`)
-    }
-
-    // Apply status filter
-    if (status) {
-      query = query.eq('status', status)
-    }
-
-    // Apply location filters
-    if (city) {
-      query = query.eq('city', city)
-    }
-    if (country) {
-      query = query.eq('country', country)
-    }
-
-    // Apply purpose filter (if it's an array field)
-    if (purpose) {
-      query = query.contains('purposes', [purpose])
-    }
-
-    // Apply type filter (if it's an array field)
-    if (type) {
-      query = query.contains('types', [type])
-    }
+    )
 
     // Get total count for pagination
-    const { count } = await supabase
-      .from('developments')
-      .select('*', { count: 'exact', head: true })
-      .eq('development_status', 'active')
+    const countQuery = applyFilters(
+      supabase
+        .from('developments')
+        .select('*', { count: 'exact', head: true })
+        .eq('development_status', 'active')
+    )
+
+    const { count, error: countError } = await countQuery
+
+    if (countError) {
+      console.error('❌ Error counting developments:', countError)
+      return NextResponse.json(
+        { error: 'Failed to count developments' },
+        { status: 500 }
+      )
+    }
 
     // Apply pagination
     const from = (page - 1) * limit
@@ -73,54 +162,53 @@ export async function GET(request) {
     }
 
     // Fetch developer information and resolve property types for each development
-    const developmentsWithDevelopers = await Promise.all(
-      (developments || []).map(async (development) => {
-        // Fetch developer
-        const { data: developer } = await supabase
-          .from('developers')
-          .select('id, name, slug, profile_image, verified')
-          .eq('developer_id', development.developer_id)
-          .single()
+    const normalizedDevelopments = (developments || []).map(development => ({
+      ...development,
+      purposes: parseArrayField(development.purposes),
+      types: parseArrayField(development.types),
+      categories: parseArrayField(development.categories)
+    }))
 
-        // Fetch property types for purposes
-        let purposesWithNames = []
-        if (development.purposes && development.purposes.length > 0) {
-          const { data: purposeTypes } = await supabase
-            .from('property_purposes')
-            .select('id, name')
-            .in('id', development.purposes)
-          purposesWithNames = purposeTypes || []
-        }
+    const developerIds = [...new Set(normalizedDevelopments.map(item => item.developer_id).filter(Boolean))]
+    const purposeIds = [...new Set(normalizedDevelopments.flatMap(item => item.purposes))]
+    const typeIds = [...new Set(normalizedDevelopments.flatMap(item => item.types))]
+    const categoryIds = [...new Set(normalizedDevelopments.flatMap(item => item.categories))]
 
-        // Fetch property types for types
-        let typesWithNames = []
-        if (development.types && development.types.length > 0) {
-          const { data: typeTypes } = await supabase
-            .from('property_types')
-            .select('id, name')
-            .in('id', development.types)
-          typesWithNames = typeTypes || []
-        }
+    const [
+      developersResult,
+      purposesResult,
+      typesResult,
+      categoriesResult
+    ] = await Promise.all([
+      developerIds.length > 0
+        ? supabase
+            .from('developers')
+            .select('id, developer_id, name, slug, profile_image, verified')
+            .in('developer_id', developerIds)
+        : Promise.resolve({ data: [], error: null }),
+      purposeIds.length > 0
+        ? supabase.from('property_purposes').select('id, name').in('id', purposeIds)
+        : Promise.resolve({ data: [], error: null }),
+      typeIds.length > 0
+        ? supabase.from('property_types').select('id, name').in('id', typeIds)
+        : Promise.resolve({ data: [], error: null }),
+      categoryIds.length > 0
+        ? supabase.from('property_categories').select('id, name').in('id', categoryIds)
+        : Promise.resolve({ data: [], error: null })
+    ])
 
-        // Fetch property types for categories
-        let categoriesWithNames = []
-        if (development.categories && development.categories.length > 0) {
-          const { data: categoryTypes } = await supabase
-            .from('property_categories')
-            .select('id, name')
-            .in('id', development.categories)
-          categoriesWithNames = categoryTypes || []
-        }
+    const developerMap = new Map((developersResult.data || []).map(item => [item.developer_id, item]))
+    const purposeMap = new Map((purposesResult.data || []).map(item => [item.id, item]))
+    const typeMap = new Map((typesResult.data || []).map(item => [item.id, item]))
+    const categoryMap = new Map((categoriesResult.data || []).map(item => [item.id, item]))
 
-        return {
-          ...development,
-          developers: developer || null,
-          purposes: purposesWithNames,
-          types: typesWithNames,
-          categories: categoriesWithNames
-        }
-      })
-    )
+    const developmentsWithDevelopers = normalizedDevelopments.map(development => ({
+      ...development,
+      developers: developerMap.get(development.developer_id) || null,
+      purposes: development.purposes.map(id => purposeMap.get(id)).filter(Boolean),
+      types: development.types.map(id => typeMap.get(id)).filter(Boolean),
+      categories: development.categories.map(id => categoryMap.get(id)).filter(Boolean)
+    }))
 
     console.log('✅ Successfully fetched developments:', developmentsWithDevelopers?.length || 0)
 

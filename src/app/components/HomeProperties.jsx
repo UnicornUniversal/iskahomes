@@ -131,7 +131,7 @@ const HomeProperties = () => {
             style={{ opacity: heroOpacity }}
           >
             <motion.h2
-              className={`${playfairDisplay.className} text-center max-w-5xl text-[2em] md:text-[3.2em] w-full text-primary_color leading-[1.2]`}
+              className={`${playfairDisplay.className} text-center max-w-5xl text-[2.5em] md:text-[3.2em] w-full text-primary_color leading-[1.2]`}
             >
               {heroHeadingElements.map((element, index) => {
                 if (element.type === 'break') {
@@ -201,7 +201,7 @@ const HomeProperties = () => {
           </div> */}
 
           {/* Properties List */}
-          <div ref={listingSectionRef} className="relative z-20 mt-[8vh]">
+          <div ref={listingSectionRef} className="relative backdrop-blur-sm z-20 mt-[8vh]">
             <ListingList listings={listings} loading={loading} error={error} />
           </div>
       </div>

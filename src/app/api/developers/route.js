@@ -17,6 +17,7 @@ export async function GET(request) {
     let query = supabase
       .from('developers')
       .select(`
+        developer_id,
         name,
         slug,
         cover_image,
