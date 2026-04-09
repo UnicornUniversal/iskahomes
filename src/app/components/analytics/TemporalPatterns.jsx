@@ -14,6 +14,7 @@ import {
   Legend
 } from 'chart.js'
 import { Calendar, Clock } from 'lucide-react'
+import { DateRangePicker } from '@/app/components/ui/date-range-picker'
 import { analyticsClasses, analyticsPalette, baseChartOptions, formatNumber, formatPercent } from './analyticsTheme'
 
 ChartJS.register(
@@ -27,16 +28,11 @@ ChartJS.register(
   Legend
 )
 
-export default function TemporalPatterns({ data }) {
-  if (!data || !data.dayOfWeekPerformance || !data.hourOfDayPerformance) {
-    return (
-      <div className={analyticsClasses.section}>
-        <div className={analyticsClasses.empty}>No temporal data available yet.</div>
-      </div>
-    )
-  }
+export default function TemporalPatterns({ data, dateRange, onDateRangeChange, loading = false }) {
+  const hasData = Boolean(data?.dayOfWeekPerformance && data?.hourOfDayPerformance)
 
-  const { dayOfWeekPerformance, hourOfDayPerformance } = data
+  const dayOfWeekPerformance = data?.dayOfWeekPerformance || []
+  const hourOfDayPerformance = data?.hourOfDayPerformance || []
 
   // Day of week chart
   const dayChartData = {
@@ -100,97 +96,134 @@ export default function TemporalPatterns({ data }) {
   return (
     <div className={analyticsClasses.section}>
       <div className="space-y-3">
-        <span className={analyticsClasses.eyebrow}>Timing Insights</span>
-        <div>
-          <h3 className={analyticsClasses.title}>Temporal Patterns & Timing</h3>
-          <p className={analyticsClasses.subtitle}>
-            See when leads arrive and when conversion efficiency is strongest so follow-up windows are easier to spot.
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <div className={analyticsClasses.subPanel}>
-          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
-            <Calendar className="h-4 w-4 text-sky-600" />
-            Day of Week Performance
-          </h4>
-          <div className="h-80">
-            <Bar
-              data={dayChartData}
-              options={baseChartOptions({ yTitle: 'Lead Count' })}
-            />
-          </div>
-        </div>
-
-        <div className={analyticsClasses.subPanel}>
-          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
-            <Clock className="h-4 w-4 text-teal-600" />
-            Hour of Day Performance
-          </h4>
-          <div className="h-80">
-            <Line
-              data={hourChartData}
-              options={baseChartOptions({
-                yTitle: 'Lead Count',
-                secondaryAxis: {
-                  title: 'Conversion Rate (%)',
-                  max: 100
-                }
-              })}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="rounded-3xl border border-sky-100 bg-sky-50/70 p-5">
-          <h5 className="text-sm font-semibold uppercase tracking-[0.16em] text-sky-700">Best Performing Day</h5>
-          <p className="mt-3 text-2xl font-semibold tracking-tight text-primary_color">{bestDay?.day || 'N/A'}</p>
-          <div className="mt-3 space-y-1">
-            <p className="text-sm text-primary_color/70">
-              <span className="font-medium text-primary_color">{formatNumber(bestDay?.total || 0)}</span> total leads
-            </p>
-            <p className="text-sm text-primary_color/70">
-              <span className="font-medium text-primary_color">
-                {formatPercent(bestDay?.conversionRate || 0)}
-              </span>{' '}
-              conversion rate
-            </p>
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-teal-100 bg-teal-50/70 p-5">
-          <h5 className="text-sm font-semibold uppercase tracking-[0.16em] text-teal-700">Best Performing Hour</h5>
-          <p className="mt-3 text-2xl font-semibold tracking-tight text-primary_color">
-            {bestHour ? (bestHour.hour === 0 ? '12 AM' : bestHour.hour < 12 ? `${bestHour.hour} AM` : bestHour.hour === 12 ? '12 PM' : `${bestHour.hour - 12} PM`) : 'N/A'}
-          </p>
-          <div className="mt-3 space-y-1">
-            <p className="text-sm text-primary_color/70">
-              <span className="font-medium text-primary_color">{formatNumber(bestHour?.total || 0)}</span> total leads
-            </p>
-            <p className="text-sm text-primary_color/70">
-              <span className="font-medium text-primary_color">
-                {formatPercent(bestHour?.conversionRate || 0)}
-              </span>{' '}
-              conversion rate
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Day of Week Breakdown</h4>
-        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
-          {dayOfWeekPerformance.map(day => (
-            <div key={day.day} className={`${analyticsClasses.compactCard} text-center`}>
-              <p className="text-sm font-semibold text-primary_color">{day.day.substring(0, 3)}</p>
-              <p className="mt-2 text-2xl font-semibold tracking-tight text-primary_color">{formatNumber(day.total)}</p>
-              <p className="mt-1 text-xs text-primary_color/70">{formatPercent(day.conversionRate)}</p>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="space-y-3">
+            <span className={analyticsClasses.eyebrow}>Timing Insights</span>
+            <div>
+              <h3 className={analyticsClasses.title}>Temporal Patterns & Timing</h3>
+              <p className={analyticsClasses.subtitle}>
+                See when leads arrive and when conversion efficiency is strongest so follow-up windows are easier to spot.
+              </p>
             </div>
-          ))}
+          </div>
+
+          <div className="flex w-full flex-col gap-2 sm:w-auto">
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-primary_color/70">
+              Date Range
+            </span>
+            <div className="flex w-full items-center gap-2 sm:w-auto">
+              <DateRangePicker
+                startDate={dateRange?.dateFrom || ''}
+                endDate={dateRange?.dateTo || ''}
+                onChange={(nextRange) => {
+                  if (!onDateRangeChange) return
+
+                  onDateRangeChange({
+                    dateFrom: nextRange.startDate,
+                    dateTo: nextRange.endDate
+                  })
+                }}
+                className="w-full sm:w-[280px]"
+              />
+              {loading && (
+                <span className="text-xs font-medium text-primary_color/60 whitespace-nowrap">
+                  Updating...
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
+
+      {!hasData ? (
+        <div className={`${analyticsClasses.empty} mt-6`}>No temporal data available for this date range yet.</div>
+      ) : (
+        <>
+
+          <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <div className={analyticsClasses.subPanel}>
+              <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <Calendar className="h-4 w-4 text-sky-600" />
+                Day of Week Performance
+              </h4>
+              <div className="h-80">
+                <Bar
+                  data={dayChartData}
+                  options={baseChartOptions({ yTitle: 'Lead Count' })}
+                />
+              </div>
+            </div>
+
+            <div className={analyticsClasses.subPanel}>
+              <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <Clock className="h-4 w-4 text-teal-600" />
+                Hour of Day Performance
+              </h4>
+              <div className="h-80">
+                <Line
+                  data={hourChartData}
+                  options={baseChartOptions({
+                    yTitle: 'Lead Count',
+                    secondaryAxis: {
+                      title: 'Conversion Rate (%)',
+                      max: 100
+                    }
+                  })}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-3xl border border-sky-100 bg-sky-50/70 p-5">
+              <h5 className="text-sm font-semibold uppercase tracking-[0.16em] text-sky-700">Best Performing Day</h5>
+              <p className="mt-3 text-2xl font-semibold tracking-tight text-primary_color">{bestDay?.day || 'N/A'}</p>
+              <div className="mt-3 space-y-1">
+                <p className="text-sm text-primary_color/70">
+                  <span className="font-medium text-primary_color">{formatNumber(bestDay?.total || 0)}</span> total leads
+                </p>
+                <p className="text-sm text-primary_color/70">
+                  <span className="font-medium text-primary_color">
+                    {formatPercent(bestDay?.conversionRate || 0)}
+                  </span>{' '}
+                  conversion rate
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-teal-100 bg-teal-50/70 p-5">
+              <h5 className="text-sm font-semibold uppercase tracking-[0.16em] text-teal-700">Best Performing Hour</h5>
+              <p className="mt-3 text-2xl font-semibold tracking-tight text-primary_color">
+                {bestHour ? (bestHour.hour === 0 ? '12 AM' : bestHour.hour < 12 ? `${bestHour.hour} AM` : bestHour.hour === 12 ? '12 PM' : `${bestHour.hour - 12} PM`) : 'N/A'}
+              </p>
+              <div className="mt-3 space-y-1">
+                <p className="text-sm text-primary_color/70">
+                  <span className="font-medium text-primary_color">{formatNumber(bestHour?.total || 0)}</span> total leads
+                </p>
+                <p className="text-sm text-primary_color/70">
+                  <span className="font-medium text-primary_color">
+                    {formatPercent(bestHour?.conversionRate || 0)}
+                  </span>{' '}
+                  conversion rate
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Day of Week Breakdown</h4>
+            <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+              {dayOfWeekPerformance.map(day => (
+                <div key={day.day} className={`${analyticsClasses.compactCard} text-center`}>
+                  <p className="text-sm font-semibold text-primary_color">{day.day.substring(0, 3)}</p>
+                  <p className="mt-2 text-2xl font-semibold tracking-tight text-primary_color">{formatNumber(day.total)}</p>
+                  <p className="mt-1 text-xs text-primary_color/70">{formatPercent(day.conversionRate)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

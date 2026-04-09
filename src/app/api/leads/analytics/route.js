@@ -6,13 +6,67 @@ function isUUID(str) {
   return uuidRegex.test(str)
 }
 
+function formatDateInput(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function getThisWeekRange() {
+  const today = new Date()
+  const dayOfWeek = today.getDay()
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+
+  const start = new Date(today)
+  start.setDate(today.getDate() + diffToMonday)
+  start.setHours(0, 0, 0, 0)
+
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+  end.setHours(0, 0, 0, 0)
+
+  return {
+    dateFrom: formatDateInput(start),
+    dateTo: formatDateInput(end)
+  }
+}
+
+function normalizeDateRange(dateFrom, dateTo) {
+  let normalizedFrom = dateFrom || ''
+  let normalizedTo = dateTo || ''
+
+  if (!normalizedFrom && !normalizedTo) {
+    const thisWeek = getThisWeekRange()
+    normalizedFrom = thisWeek.dateFrom
+    normalizedTo = thisWeek.dateTo
+  } else if (!normalizedFrom) {
+    normalizedFrom = normalizedTo
+  } else if (!normalizedTo) {
+    normalizedTo = normalizedFrom
+  }
+
+  if (normalizedFrom > normalizedTo) {
+    return {
+      dateFrom: normalizedTo,
+      dateTo: normalizedFrom
+    }
+  }
+
+  return {
+    dateFrom: normalizedFrom,
+    dateTo: normalizedTo
+  }
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const listerId = searchParams.get('lister_id')
     const listerType = searchParams.get('lister_type') || 'developer'
-    const dateFrom = searchParams.get('date_from')
-    const dateTo = searchParams.get('date_to')
+    const rawDateFrom = searchParams.get('date_from')
+    const rawDateTo = searchParams.get('date_to')
+    const { dateFrom, dateTo } = normalizeDateRange(rawDateFrom, rawDateTo)
 
     if (!listerId) {
       return NextResponse.json(
@@ -48,10 +102,10 @@ export async function GET(request) {
       .eq('lister_type', listerType)
 
     if (dateFrom) {
-      dateFilter = dateFilter.gte('first_action_date', dateFrom)
+      dateFilter = dateFilter.gte('first_action_date', `${dateFrom}T00:00:00.000Z`)
     }
     if (dateTo) {
-      dateFilter = dateFilter.lte('first_action_date', dateTo)
+      dateFilter = dateFilter.lte('first_action_date', `${dateTo}T23:59:59.999Z`)
     }
 
     const { data: allLeads, error: leadsError } = await dateFilter
@@ -68,14 +122,86 @@ export async function GET(request) {
       return NextResponse.json({
         success: true,
         data: {
-          channelPerformance: {},
-          lifecycleAnalysis: {},
-          temporalPatterns: {},
-          contextAnalysis: {},
-          engagementAnalysis: {},
-          predictiveMetrics: {},
+          channelPerformance: {
+            phone: { total: 0, closed: 0, conversionRate: 0, avgLeadScore: 0, highValueLeads: 0, highValuePercentage: 0 },
+            whatsapp: { total: 0, closed: 0, conversionRate: 0, avgLeadScore: 0, highValueLeads: 0, highValuePercentage: 0 },
+            direct_message: { total: 0, closed: 0, conversionRate: 0, avgLeadScore: 0, highValueLeads: 0, highValuePercentage: 0 },
+            email: { total: 0, closed: 0, conversionRate: 0, avgLeadScore: 0, highValueLeads: 0, highValuePercentage: 0 },
+            appointment: { total: 0, closed: 0, conversionRate: 0, avgLeadScore: 0, highValueLeads: 0, highValuePercentage: 0 }
+          },
+          lifecycleAnalysis: {
+            statusDistribution: {
+              new: 0,
+              contacted: 0,
+              scheduled: 0,
+              responded: 0,
+              closed: 0,
+              cold_lead: 0,
+              abandoned: 0
+            },
+            statusTransitions: {},
+            funnelConversionRates: {
+              newToContacted: 0,
+              contactedToScheduled: 0,
+              scheduledToClosed: 0
+            },
+            avgTimeToConversion: 0
+          },
+          temporalPatterns: {
+            dayOfWeekPerformance: [
+              { day: 'Sunday', total: 0, closed: 0, conversionRate: 0 },
+              { day: 'Monday', total: 0, closed: 0, conversionRate: 0 },
+              { day: 'Tuesday', total: 0, closed: 0, conversionRate: 0 },
+              { day: 'Wednesday', total: 0, closed: 0, conversionRate: 0 },
+              { day: 'Thursday', total: 0, closed: 0, conversionRate: 0 },
+              { day: 'Friday', total: 0, closed: 0, conversionRate: 0 },
+              { day: 'Saturday', total: 0, closed: 0, conversionRate: 0 }
+            ],
+            hourOfDayPerformance: Array.from({ length: 24 }, (_, hour) => ({
+              hour,
+              total: 0,
+              closed: 0,
+              conversionRate: 0
+            }))
+          },
+          contextAnalysis: {
+            listing: { total: 0, closed: 0, conversionRate: 0, avgLeadScore: 0 },
+            development: { total: 0, closed: 0, conversionRate: 0, avgLeadScore: 0 },
+            profile: { total: 0, closed: 0, conversionRate: 0, avgLeadScore: 0 }
+          },
+          engagementAnalysis: {
+            singleAction: { total: 0, closed: 0, conversionRate: 0 },
+            multiAction: { total: 0, closed: 0, conversionRate: 0 },
+            highEngagement: { total: 0, closed: 0, conversionRate: 0 }
+          },
+          predictiveMetrics: {
+            totalLeads: 0,
+            totalClosed: 0,
+            overallConversionRate: 0,
+            avgLeadScore: 0,
+            pipelineHealth: {
+              new: 0,
+              inProgress: 0,
+              closed: 0,
+              lost: 0
+            }
+          },
           comparativeAnalysis: {},
-          operationalEfficiency: {}
+          operationalEfficiency: {
+            avgResponseTime: 0,
+            avgTimeToConversion: 0,
+            abandonmentRate: 0,
+            coldLeadRate: 0,
+            responseTimeDistribution: {
+              under1Hour: 0,
+              under24Hours: 0,
+              over24Hours: 0
+            }
+          },
+        appliedDateRange: {
+          dateFrom,
+          dateTo
+        }
         }
       })
     }
@@ -431,6 +557,10 @@ export async function GET(request) {
             under24Hours: responseTimes.filter(t => t < 24).length,
             over24Hours: responseTimes.filter(t => t >= 24).length
           }
+        },
+        appliedDateRange: {
+          dateFrom,
+          dateTo
         }
       }
     })

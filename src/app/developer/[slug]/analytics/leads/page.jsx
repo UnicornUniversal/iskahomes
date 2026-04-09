@@ -17,12 +17,39 @@ import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { BarChart3, MessageCircle, Phone, Calendar, TrendingUp, Loader2, UserX } from 'lucide-react'
 
+const formatDateInput = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const getThisWeekRange = () => {
+  const today = new Date()
+  const dayOfWeek = today.getDay()
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+
+  const start = new Date(today)
+  start.setDate(today.getDate() + diffToMonday)
+  start.setHours(0, 0, 0, 0)
+
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+  end.setHours(0, 0, 0, 0)
+
+  return {
+    dateFrom: formatDateInput(start),
+    dateTo: formatDateInput(end)
+  }
+}
+
 const LeadAnalytics = () => {
   const params = useParams()
   const { user } = useAuth()
   const listerId = user?.profile?.developer_id || params.slug
   const [analyticsData, setAnalyticsData] = useState(null)
   const [loadingAnalytics, setLoadingAnalytics] = useState(true)
+  const [temporalDateRange, setTemporalDateRange] = useState(() => getThisWeekRange())
 
   // Fetch comprehensive analytics data
   useEffect(() => {
@@ -46,7 +73,14 @@ const LeadAnalytics = () => {
           }
         }
         
-        const response = await fetch(`/api/leads/analytics?lister_id=${resolvedListerId}&lister_type=developer`)
+        const params = new URLSearchParams({
+          lister_id: resolvedListerId,
+          lister_type: 'developer',
+          date_from: temporalDateRange.dateFrom,
+          date_to: temporalDateRange.dateTo
+        })
+
+        const response = await fetch(`/api/leads/analytics?${params.toString()}`)
         const result = await response.json()
         
         if (result.success) {
@@ -60,7 +94,7 @@ const LeadAnalytics = () => {
     }
 
     fetchAnalytics()
-  }, [listerId])
+  }, [listerId, temporalDateRange.dateFrom, temporalDateRange.dateTo, user])
 
   // Extract leads data directly from user profile
   const getTotalLeadsData = () => {
@@ -245,7 +279,15 @@ const LeadAnalytics = () => {
           <div className="mt-8 space-y-8">
             <ChannelPerformance data={analyticsData.channelPerformance} />
             <LeadLifecycle data={analyticsData.lifecycleAnalysis} />
-            <TemporalPatterns data={analyticsData.temporalPatterns} />
+            <TemporalPatterns
+              data={analyticsData.temporalPatterns}
+              dateRange={{
+                ...temporalDateRange,
+                defaultWeekRange: getThisWeekRange()
+              }}
+              onDateRangeChange={setTemporalDateRange}
+              loading={loadingAnalytics}
+            />
             <ContextAnalysis data={analyticsData.contextAnalysis} />
             <EngagementAnalysis data={analyticsData.engagementAnalysis} />
             <PredictiveMetrics data={analyticsData.predictiveMetrics} />

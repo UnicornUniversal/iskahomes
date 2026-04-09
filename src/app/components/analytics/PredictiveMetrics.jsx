@@ -28,7 +28,13 @@ export default function PredictiveMetrics({ data }) {
     )
   }
 
-  const { totalLeads, totalClosed, overallConversionRate, avgLeadScore, pipelineHealth } = data
+  const {
+    totalLeads = 0,
+    totalClosed = 0,
+    overallConversionRate = 0,
+    avgLeadScore = 0,
+    pipelineHealth = {}
+  } = data
 
   // Pipeline health chart
   const pipelineLabels = ['New', 'In Progress', 'Closed', 'Lost']
