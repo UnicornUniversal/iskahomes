@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useRef, useEffect } from 'react'
-import { Download, FileSpreadsheet, FileText, ChevronDown } from 'lucide-react'
+import { Download, FileSpreadsheet, FileText, ChevronDown, Printer } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const ExportDropdown = ({ onExport, disabled = false, className }) => {
@@ -64,6 +64,14 @@ const ExportDropdown = ({ onExport, disabled = false, className }) => {
             >
               <FileSpreadsheet className="w-4 h-4" />
               <span>Export as Excel</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExport('pdf')}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary_color hover:text-white transition-colors"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Export as PDF</span>
             </button>
           </div>
         </div>

@@ -114,7 +114,7 @@ const LatestAppointments = () => {
         </div>
       ) : (
         <>
-          <div className="flex flex-col gap-4">
+          <div className="summary_height flex flex-col gap-4">
             {appointments.map((appointment) => (
               <AppointmentCard key={appointment.id} appointment={appointment} />
             ))}

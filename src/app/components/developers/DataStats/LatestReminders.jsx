@@ -140,7 +140,7 @@ const LatestReminders = ({ limit = 10 }) => {
           {error}
         </div>
       ) : reminders.length > 0 ? (
-        <div className="flex flex-col gap-4">
+        <div className="summary_height flex flex-col gap-4">
           {reminders.map((reminder) => (
             <div key={reminder.id} className="bg-white/30 rounded-lg p-4 border border-gray-100/50">
               {/* Note */}

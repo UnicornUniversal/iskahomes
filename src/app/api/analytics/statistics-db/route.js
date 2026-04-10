@@ -148,6 +148,20 @@ export async function GET(request) {
           const date = new Date(dateStr)
           label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
         }
+      } else if (groupBy === 'week') {
+        // ISO week bucket (Monday start): 91–365 day ranges use this; must match groupBy from range logic
+        dateStr = row.date
+        const d = new Date(`${dateStr}T12:00:00`)
+        const day = d.getDay()
+        const mondayOffset = day === 0 ? -6 : 1 - day
+        const weekStart = new Date(d.getFullYear(), d.getMonth(), d.getDate() + mondayOffset)
+        key = weekStart.toISOString().split('T')[0]
+        dateStr = key
+        if (!aggregatedTotal[key]) {
+          const weekEnd = new Date(weekStart)
+          weekEnd.setDate(weekStart.getDate() + 6)
+          label = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+        }
       } else if (groupBy === 'month') {
         // Group by month for year (sum all days for the month)
         dateStr = row.date

@@ -22,6 +22,7 @@ import DevelopmentsBySale from '@/app/components/analytics/DevelopmentsBySale'
 import SalesTrendChart from '@/app/components/analytics/SalesTrendChart'
 import SalesByLocation from '@/app/components/analytics/SalesByLocation'
 import { formatCurrency } from '@/lib/utils'
+import SoldListings from '@/app/components/analytics/SoldListings'
 
 const SalesAnalytics = () => {
   const params = useParams()
@@ -188,6 +189,9 @@ const SalesAnalytics = () => {
             />
           </div>
         )}
+
+        {/* Sold Properties */}
+        <SoldListings listerId={params.slug} currency={currency} />
 
         {/* Sales Trend Chart */}
         <div className="mb-8">

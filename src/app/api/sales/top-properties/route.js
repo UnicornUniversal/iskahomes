@@ -39,6 +39,9 @@ export async function GET(request) {
     const userId = searchParams.get('user_id')
     const slug = searchParams.get('slug')
     const limit = parseInt(searchParams.get('limit')) || 10
+    const page = Math.max(parseInt(searchParams.get('page')) || 1, 1)
+    const saleType = searchParams.get('sale_type')
+    const offset = (page - 1) * limit
 
     if (!userId && !slug) {
       return NextResponse.json(
@@ -125,12 +128,18 @@ export async function GET(request) {
     }
 
     // Fetch sales
-    const { data: sales, error: salesError } = await supabaseAdmin
+    let salesQuery = supabaseAdmin
       .from('sales_listings')
-      .select('id, listing_id, sale_price, currency, sale_type, sale_date, sale_timestamp')
+      .select('id, listing_id, user_id, sale_price, currency, sale_type, sale_date, sale_timestamp, sale_source, buyer_name, notes, asv, asv_breakdown')
       .eq('user_id', finalUserId)
+
+    if (saleType) {
+      salesQuery = salesQuery.eq('sale_type', saleType)
+    }
+
+    const { data: sales, error: salesError } = await salesQuery
       .order('sale_price', { ascending: false })
-      .limit(limit)
+      .range(offset, offset + limit - 1)
 
     if (salesError) {
       console.error('Error fetching top properties:', salesError)
@@ -144,9 +153,24 @@ export async function GET(request) {
       return NextResponse.json({
         success: true,
         data: [],
-        total: 0
+        total: 0,
+        page,
+        limit,
+        hasNextPage: false
       })
     }
+
+    // Get total count for pagination
+    let countQuery = supabaseAdmin
+      .from('sales_listings')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', finalUserId)
+
+    if (saleType) {
+      countQuery = countQuery.eq('sale_type', saleType)
+    }
+
+    const { count: totalCount } = await countQuery
 
     // Fetch listings separately with location data
     const listingIds = sales.map(s => s.listing_id).filter(Boolean)
@@ -223,14 +247,23 @@ export async function GET(request) {
         daysOnMarket: daysOnMarket,
         saleType: sale.sale_type,
         image: getFirstImage(listing?.media),
-        location: location
+        location: location,
+        saleSource: sale.sale_source || null,
+        buyerName: sale.buyer_name || null,
+        notes: sale.notes || null,
+        asv: typeof sale.asv === 'number' ? sale.asv : null,
+        asvBreakdown: Array.isArray(sale.asv_breakdown) ? sale.asv_breakdown : [],
+        soldBy: sale.user_id === finalUserId ? 'You' : (sale.user_id || 'N/A')
       }
     }) || []
 
     return NextResponse.json({
       success: true,
       data: topProperties,
-      total: topProperties.length
+      total: totalCount ?? topProperties.length,
+      page,
+      limit,
+      hasNextPage: (totalCount ?? topProperties.length) > (page * limit)
     })
 
   } catch (error) {

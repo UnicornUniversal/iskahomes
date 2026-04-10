@@ -72,7 +72,7 @@ const LatestEngagements = ({ limit = 10 }) => {
           <div className="w-8 h-8 rounded-lg bg-primary_color/10 flex items-center justify-center">
             <Bell className="w-4 h-4 text-primary_color" />
           </div>
-          <h3 className="text-base font-bold text-primary_color">Latest Engagements</h3>
+          <h3 className="text-base font-bold text-primary_color">Latest Client Engagements</h3>
         </div>
         {engagements.length > 0 && (
           <span className="text-sm text-primary_color">{engagements.length}</span>
@@ -87,7 +87,8 @@ const LatestEngagements = ({ limit = 10 }) => {
         <div className="text-center py-12 text-sm text-primary_color">{error}</div>
       ) : engagements.length > 0 ? (
         <div className="flex flex-col gap-4">
-          {engagements.map((eng) => (
+          <div className="summary_height flex flex-col gap-4">
+            {engagements.map((eng) => (
             <Link
               key={eng.id}
               href={developerSlug ? `/developer/${developerSlug}/clientManagement/${eng.clientId}` : '#'}
@@ -113,7 +114,8 @@ const LatestEngagements = ({ limit = 10 }) => {
                 </div>
               </div>
             </Link>
-          ))}
+            ))}
+          </div>
 
           {developerSlug && (
             <div className="mt-4 pt-4 border-t border-gray-100">

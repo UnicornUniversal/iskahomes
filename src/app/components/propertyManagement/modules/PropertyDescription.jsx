@@ -71,6 +71,65 @@ const PropertyDescription = ({ formData, updateFormData, isEditMode, accountType
     setPendingStatus(null)
   }
 
+  const resolveListingPrice = () => {
+    const parseMaybeJsonObject = (value) => {
+      if (!value) return {}
+      if (typeof value === 'object') return value
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value)
+          return parsed && typeof parsed === 'object' ? parsed : {}
+        } catch {
+          return {}
+        }
+      }
+      return {}
+    }
+
+    const pricing = parseMaybeJsonObject(formData?.pricing)
+    const estimatedRevenueObj = parseMaybeJsonObject(formData?.estimated_revenue)
+    const globalPriceObj = parseMaybeJsonObject(formData?.global_price)
+
+    const directEstimatedRevenueCandidates = [
+      Number(estimatedRevenueObj?.estimated_revenue),
+      Number(globalPriceObj?.estimated_revenue),
+      Number(pricing?.estimated_revenue)
+    ]
+
+    for (const candidate of directEstimatedRevenueCandidates) {
+      if (Number.isFinite(candidate) && candidate > 0) return candidate
+    }
+
+    // Recalculate estimated revenue when explicit estimated_revenue is not available.
+    const unitPrice = Number(pricing?.price ?? formData?.price ?? estimatedRevenueObj?.price ?? globalPriceObj?.price)
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) return 0
+
+    const duration = String(pricing?.duration || formData?.duration || '').toLowerCase()
+    const time = Number(pricing?.time ?? formData?.time ?? 1)
+    const timeSpan = String(pricing?.time_span || formData?.time_span || '').toLowerCase()
+
+    const safeTime = Number.isFinite(time) && time > 0 ? time : 1
+
+    // Convert chosen time span to months baseline.
+    let totalMonths = safeTime
+    if (timeSpan === 'year' || timeSpan === 'years') totalMonths = safeTime * 12
+    else if (timeSpan === 'week' || timeSpan === 'weeks') totalMonths = safeTime / 4
+    else if (timeSpan === 'day' || timeSpan === 'days') totalMonths = safeTime / 30
+
+    // Convert unit price to monthly equivalent, then multiply by totalMonths.
+    let monthlyPrice = unitPrice
+    if (duration === 'yearly') monthlyPrice = unitPrice / 12
+    else if (duration === 'quarterly') monthlyPrice = unitPrice / 3
+    else if (duration === 'weekly') monthlyPrice = unitPrice * 4
+    else if (duration === 'daily') monthlyPrice = unitPrice * 30
+    // monthly/default stays as-is
+
+    const recalculatedEstimatedRevenue = monthlyPrice * totalMonths
+    return Number.isFinite(recalculatedEstimatedRevenue) && recalculatedEstimatedRevenue > 0
+      ? Number(recalculatedEstimatedRevenue.toFixed(2))
+      : unitPrice
+  }
+
   return (
     <div className="p-4 sm:p-6 ">
       <div className="mb-4 sm:mb-6">
@@ -155,6 +214,13 @@ const PropertyDescription = ({ formData, updateFormData, isEditMode, accountType
         saleType={pendingStatus?.toLowerCase() === 'rented out' ? 'rented' : 'sold'}
         isLoading={false}
         useClientSelector={accountType === 'developer'}
+        listingPrice={resolveListingPrice()}
+        listingCurrency={
+          formData?.pricing?.currency ||
+          formData?.currency ||
+          formData?.estimated_revenue?.currency ||
+          'GHS'
+        }
       />
     </div>
   )

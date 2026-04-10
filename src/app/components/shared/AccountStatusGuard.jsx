@@ -11,6 +11,8 @@ const hasStatusValue = (value) => normalizeStatus(value).length > 0
 const getStatusFromProfile = (profile) =>
   profile?.admin_status || profile?.status || profile?.account_status || profile?.agent_status || ''
 
+const isObjectWithValues = (obj) => !!obj && typeof obj === 'object' && Object.keys(obj).length > 0
+
 export default function AccountStatusGuard({ children, entityType }) {
   const { user, loading } = useAuth()
   const [adminStatus, setAdminStatus] = useState('')
@@ -77,6 +79,84 @@ export default function AccountStatusGuard({ children, entityType }) {
       return null
     }
 
+    const fetchTeamMemberContext = async () => {
+      const authUserId = user?.id
+      const teamMemberId = user?.profile?.team_member_id || user?.profile?.id
+
+      let member = null
+
+      if (teamMemberId) {
+        const { data } = await supabase
+          .from('organization_team_members')
+          .select('id, status, organization_type, organization_id')
+          .eq('id', teamMemberId)
+          .eq('status', 'active')
+          .maybeSingle()
+        member = data
+      }
+
+      // Fallback: JWT/profile may not carry team_member_id; RLS may differ on id vs user_id.
+      if (!member && authUserId) {
+        let q = supabase
+          .from('organization_team_members')
+          .select('id, status, organization_type, organization_id')
+          .eq('user_id', authUserId)
+          .eq('status', 'active')
+
+        if (entityType === 'developer' || entityType === 'agency') {
+          q = q.eq('organization_type', entityType)
+        }
+
+        const { data: rows } = await q.limit(1)
+        member = rows?.[0] || null
+      }
+
+      if (!member) return { member: null, organization: null }
+
+      // Check both possible PK variants for resilience across schemas.
+      if (member.organization_type === 'developer') {
+        const byId = await supabase
+          .from('developers')
+          .select('admin_status, status')
+          .eq('id', member.organization_id)
+          .maybeSingle()
+
+        if (isObjectWithValues(byId?.data)) {
+          return { member, organization: byId.data }
+        }
+
+        const byDeveloperId = await supabase
+          .from('developers')
+          .select('admin_status, status')
+          .eq('developer_id', member.organization_id)
+          .maybeSingle()
+
+        return { member, organization: byDeveloperId?.data || null }
+      }
+
+      if (member.organization_type === 'agency') {
+        const byId = await supabase
+          .from('agencies')
+          .select('admin_status, status, account_status')
+          .eq('id', member.organization_id)
+          .maybeSingle()
+
+        if (isObjectWithValues(byId?.data)) {
+          return { member, organization: byId.data }
+        }
+
+        const byAgencyId = await supabase
+          .from('agencies')
+          .select('admin_status, status, account_status')
+          .eq('agency_id', member.organization_id)
+          .maybeSingle()
+
+        return { member, organization: byAgencyId?.data || null }
+      }
+
+      return { member, organization: null }
+    }
+
     const resolveAdminStatus = async () => {
       if (isMounted) {
         setStatusLoading(true)
@@ -92,10 +172,49 @@ export default function AccountStatusGuard({ children, entityType }) {
         return
       }
 
-      const currentUserType = user?.user_type
+      const currentUserType = normalizeStatus(user?.user_type)
       const profileStatus = getStatusFromProfile(user?.profile)
 
-      if (currentUserType === entityType) {
+      // Invited / org team users MUST run before the primary-account branch.
+      // Otherwise a wrong/missing user_type can make us treat profile.id as developers.id and get empty status → UNKNOWN.
+      const isTeamMemberSession =
+        currentUserType === 'team_member' || Boolean(user?.profile?.team_member_id)
+
+      if (isTeamMemberSession) {
+        try {
+          const { member, organization } = await fetchTeamMemberContext()
+
+          if (member && member.organization_type && normalizeStatus(member.organization_type) !== normalizeStatus(entityType)) {
+            if (isMounted) {
+              setAdminStatus('')
+              setStatusLoading(false)
+            }
+            return
+          }
+
+          const memberStatus = getStatusFromProfile(member)
+          const orgStatus = getStatusFromProfile(organization)
+
+          const resolvedStatus = hasStatusValue(orgStatus)
+            ? orgStatus
+            : hasStatusValue(memberStatus)
+              ? memberStatus
+              : 'active'
+
+          if (isMounted) setAdminStatus(resolvedStatus)
+        } catch (error) {
+          if (isMounted) {
+            setAdminStatus('active')
+          }
+        } finally {
+          if (isMounted) {
+            setStatusLoading(false)
+          }
+        }
+        return
+      }
+
+      if (currentUserType === normalizeStatus(entityType)) {
         if (hasStatusValue(profileStatus)) {
           if (isMounted) {
             setAdminStatus(profileStatus)
@@ -106,47 +225,15 @@ export default function AccountStatusGuard({ children, entityType }) {
 
         try {
           const data = await fetchEntityStatus()
+          const fromDb = getStatusFromProfile(data)
+          // Many org rows use null/legacy status; treat as active so the dashboard is usable.
+          const resolved = hasStatusValue(fromDb) ? fromDb : 'active'
           if (isMounted) {
-            setAdminStatus(getStatusFromProfile(data))
+            setAdminStatus(resolved)
           }
         } catch (error) {
           if (isMounted) {
-            setAdminStatus('')
-          }
-        } finally {
-          if (isMounted) {
-            setStatusLoading(false)
-          }
-        }
-        return
-      }
-
-      if (currentUserType === 'team_member' && user?.profile?.organization_type === entityType) {
-        try {
-          let data = null
-
-          if (entityType === 'developer') {
-            const response = await supabase
-              .from('developers')
-              .select('admin_status, status')
-              .eq('id', user?.profile?.organization_id)
-              .maybeSingle()
-            data = response.data
-          } else if (entityType === 'agency') {
-            const response = await supabase
-              .from('agencies')
-              .select('admin_status, status, account_status')
-              .eq('id', user?.profile?.organization_id)
-              .maybeSingle()
-            data = response.data
-          }
-
-          if (isMounted) {
-            setAdminStatus(getStatusFromProfile(data))
-          }
-        } catch (error) {
-          if (isMounted) {
-            setAdminStatus('')
+            setAdminStatus('active')
           }
         } finally {
           if (isMounted) {
@@ -157,7 +244,8 @@ export default function AccountStatusGuard({ children, entityType }) {
       }
 
       if (isMounted) {
-        setAdminStatus(profileStatus)
+        const fallback = hasStatusValue(profileStatus) ? profileStatus : 'active'
+        setAdminStatus(fallback)
         setStatusLoading(false)
       }
     }

@@ -166,6 +166,8 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType = 'developer' 
             time_span: data.pricing?.time_span || 'months',
             estimated_revenue: data.pricing?.estimated_revenue || ''
           },
+          estimated_revenue: data.estimated_revenue || '',
+          global_price: data.global_price || '',
           media: {
             video: data.media?.video || null,
             youtubeUrl: data.media?.youtubeUrl || '',

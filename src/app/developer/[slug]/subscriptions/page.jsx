@@ -28,10 +28,20 @@ import {
 } from 'react-icons/fi'
 import { useAuth } from '@/contexts/AuthContext'
 
+const EXCLUDED_FEATURE_VALUES = new Set([
+  'x',
+  'excluded',
+  'not included',
+  'none',
+  'n/a',
+  'na',
+  'false',
+  '0'
+])
+
 export const SubscriptionsManager = () => {
   const { user } = useAuth()
   const [selectedPlan, setSelectedPlan] = useState(null)
-  const [billingCycle, setBillingCycle] = useState('monthly')
   const [currency, setCurrency] = useState('GHS') // GHS or USD
   const [activeTab, setActiveTab] = useState('plans')
   const [showChangePlanModal, setShowChangePlanModal] = useState(false)
@@ -273,6 +283,30 @@ export const SubscriptionsManager = () => {
     }
   }, [fetchAllData])
 
+  const isFeatureExcluded = (value) => {
+    if (value == null) return false
+    const normalized = String(value).trim().toLowerCase()
+    return EXCLUDED_FEATURE_VALUES.has(normalized)
+  }
+
+  const getFeatureDisplay = (feature) => {
+    if (typeof feature === 'object' && feature?.feature_name) {
+      const value = feature.feature_value == null ? '' : String(feature.feature_value).trim()
+      return {
+        name: feature.feature_name,
+        value,
+        included: !isFeatureExcluded(value)
+      }
+    }
+
+    const text = typeof feature === 'string' ? feature.trim() : ''
+    return {
+      name: text,
+      value: '',
+      included: !isFeatureExcluded(text)
+    }
+  }
+
   // Map database packages to component format
   const subscriptionPlans = (packages || []).map((pkg, index) => {
     // Get monthly price based on currency
@@ -294,15 +328,9 @@ export const SubscriptionsManager = () => {
       total: totalPrice
     }
 
-    // Map features from objects to display strings
-    const features = (pkg.features || []).map(feature => {
-      if (typeof feature === 'object' && feature.feature_name) {
-        return feature.feature_value 
-          ? `${feature.feature_name}: ${feature.feature_value}`
-          : feature.feature_name
-      }
-      return typeof feature === 'string' ? feature : ''
-    }).filter(f => f)
+    const features = (pkg.features || [])
+      .map(getFeatureDisplay)
+      .filter((feature) => feature.name)
 
     // Icon mapping based on package name or index
     const iconMap = {
@@ -323,24 +351,6 @@ export const SubscriptionsManager = () => {
       }
     }
 
-    // Color mapping
-    const colorMap = {
-      'basic': 'from-blue-500 to-blue-600',
-      'standard': 'from-green-500 to-green-600',
-      'premium': 'from-primary_color to-blue-600',
-      'pro': 'from-primary_color to-blue-600',
-      'professional': 'from-primary_color to-blue-600',
-      'enterprise': 'from-purple-500 to-purple-600'
-    }
-    
-    let color = 'from-blue-500 to-blue-600'
-    for (const [key, colorValue] of Object.entries(colorMap)) {
-      if (packageNameLower.includes(key)) {
-        color = colorValue
-        break
-      }
-    }
-
     return {
       id: pkg.id,
       name: pkg.name,
@@ -356,7 +366,6 @@ export const SubscriptionsManager = () => {
       local_price: parseFloat(pkg.local_currency_price || 0),
       international_price: parseFloat(pkg.international_currency_price || 0),
       icon: IconComponent,
-      color: color,
       popular: index === 1 || packageNameLower.includes('pro') || packageNameLower.includes('premium') // Mark second or pro/premium as popular
     }
   })
@@ -369,16 +378,16 @@ export const SubscriptionsManager = () => {
   const getStatusBadgeColor = (status) => {
     switch (status) {
       case 'active':
-        return 'bg-green-100 text-green-800'
+        return 'border border-primary_color/20 bg-primary_color/10 text-primary_color'
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800'
+        return 'border border-amber-200 bg-amber-50 text-amber-700'
       case 'grace_period':
-        return 'bg-orange-100 text-orange-800'
+        return 'border border-amber-200 bg-amber-50 text-amber-700'
       case 'expired':
       case 'cancelled':
-        return 'bg-red-100 text-red-800'
+        return 'border border-red-200 bg-red-50 text-red-700'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'border border-primary_color/20 bg-primary_color/10 text-primary_color/80'
     }
   }
 
@@ -680,9 +689,9 @@ export const SubscriptionsManager = () => {
 
   const getRequestStatusBadge = (status) => {
     const statusConfig = {
-      pending: { color: 'bg-yellow-100 text-yellow-800', text: 'Pending' },
-      approved: { color: 'bg-green-100 text-green-800', text: 'Approved' },
-      rejected: { color: 'bg-red-100 text-red-800', text: 'Rejected' }
+      pending: { color: 'border border-amber-200 bg-amber-50 text-amber-700', text: 'Pending' },
+      approved: { color: 'border border-primary_color/20 bg-primary_color/10 text-primary_color', text: 'Approved' },
+      rejected: { color: 'border border-red-200 bg-red-50 text-red-700', text: 'Rejected' }
     }
     const config = statusConfig[status] || statusConfig.pending
     return (
@@ -771,16 +780,16 @@ export const SubscriptionsManager = () => {
   
 
       
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-6 text-primary_color">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Subscription Management</h1>
-          <p className="text-gray-600">Manage your subscription plan, billing, and usage</p>
+        <div className="mb-8 rounded-3xl border border-primary_color/10 bg-white/80 p-6 shadow-sm backdrop-blur-sm">
+          <h1 className="mb-2 text-3xl font-semibold text-primary_color">Subscription Management</h1>
+          <p className="text-sm text-primary_color/70">Manage your subscription plan, billing, and usage</p>
         </div>
 
         {/* Tab Navigation */}
         <div className="mb-8">
-          <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+          <div className="flex flex-wrap gap-2 rounded-2xl border border-primary_color/10 bg-white/80 p-2 shadow-sm backdrop-blur-sm">
             {[
               { id: 'plans', label: 'Manage Subscriptions', icon: FiStar },
               { id: 'requests', label: 'Requests', icon: FiClock },
@@ -792,10 +801,10 @@ export const SubscriptionsManager = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 ${
                     activeTab === tab.id
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
+                      ? 'bg-primary_color text-white shadow-sm'
+                      : 'text-primary_color/70 hover:bg-primary_color/5 hover:text-primary_color'
                   }`}
                 >
                   <IconComponent className="w-4 h-4" />
@@ -810,18 +819,18 @@ export const SubscriptionsManager = () => {
         {loading ? (
           <div className="text-center py-12 mb-8">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary_color"></div>
-            <p className="mt-4 text-gray-600">Loading subscription data...</p>
+            <p className="mt-4 text-primary_color/70">Loading subscription data...</p>
           </div>
         ) : currentSubscription ? (
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-8">
+          <div className="mb-8 rounded-3xl border border-primary_color/10 bg-white/80 p-6 shadow-sm backdrop-blur-sm">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Current Subscription</h2>
+              <h2 className="text-xl font-semibold text-primary_color">Current Subscription</h2>
               <div className="flex items-center gap-2">
                 <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${getStatusBadgeColor(currentSubscription.status)}`}>
                   {currentSubscription.status.replace('_', ' ')}
                 </span>
                 {currentSubscription.auto_renew && (
-                  <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                  <span className="rounded-full border border-primary_color/20 bg-primary_color/10 px-3 py-1 text-sm font-medium text-primary_color">
                     Auto-renewal ON
                   </span>
                 )}
@@ -830,22 +839,22 @@ export const SubscriptionsManager = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-r from-primary_color to-blue-600 rounded-xl flex items-center justify-center">
-                  <FiCreditCard className="w-6 h-6 text-white" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary_color/10 text-primary_color">
+                  <FiCreditCard className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Current Plan</p>
-                  <p className="font-semibold text-gray-900">{getCurrentPlan()?.name || currentSubscription.subscriptions_package?.name || 'No Plan'}</p>
+                  <p className="text-sm text-primary_color/70">Current Plan</p>
+                  <p className="font-semibold text-primary_color">{getCurrentPlan()?.name || currentSubscription.subscriptions_package?.name || 'No Plan'}</p>
                 </div>
               </div>
               
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                  <FiCalendar className="w-6 h-6 text-white" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary_color/10 text-primary_color">
+                  <FiCalendar className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">End Date</p>
-                  <p className="font-semibold text-gray-900">
+                  <p className="text-sm text-primary_color/70">End Date</p>
+                  <p className="font-semibold text-primary_color">
                     {(() => {
                       // Check if it's a Free plan
                       const packageName = currentSubscription.subscriptions_package?.name || getCurrentPlan()?.name || ''
@@ -865,43 +874,43 @@ export const SubscriptionsManager = () => {
               </div>
               
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                  <FiDollarSign className="w-6 h-6 text-white" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary_color/10 text-primary_color">
+                  <FiDollarSign className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Amount</p>
-                  <p className="font-semibold text-gray-900">
+                  <p className="text-sm text-primary_color/70">Amount</p>
+                  <p className="font-semibold text-primary_color">
                     {currentSubscription.currency} {currentSubscription.amount?.toLocaleString() || '0'}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                  <FiShield className="w-6 h-6 text-white" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary_color/10 text-primary_color">
+                  <FiShield className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Payment Method</p>
-                  <p className="font-semibold text-gray-900 text-sm">{formatPaymentMethod(billingInfo)}</p>
+                  <p className="text-sm text-primary_color/70">Payment Method</p>
+                  <p className="text-sm font-semibold text-primary_color">{formatPaymentMethod(billingInfo)}</p>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                  <FiGrid className="w-6 h-6 text-white" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary_color/10 text-primary_color">
+                  <FiGrid className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Active Addons</p>
-                  <p className="font-semibold text-gray-900">{addonSubscriptions.length}</p>
+                  <p className="text-sm text-primary_color/70">Active Addons</p>
+                  <p className="font-semibold text-primary_color">{addonSubscriptions.length}</p>
                 </div>
               </div>
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 text-center mb-8">
+          <div className="mb-8 rounded-3xl border border-primary_color/10 bg-white/80 p-6 text-center shadow-sm backdrop-blur-sm">
             <FiAlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Active Subscription</h3>
-            <p className="text-gray-600 mb-6">Select a subscription plan to get started.</p>
+            <h3 className="mb-2 text-xl font-semibold text-primary_color">No Active Subscription</h3>
+            <p className="mb-6 text-primary_color/70">Select a subscription plan to get started.</p>
             <button
               onClick={() => setActiveTab('plans')}
               className="bg-primary_color text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -915,14 +924,14 @@ export const SubscriptionsManager = () => {
         {activeTab === 'requests' && (
           <div className="space-y-8">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-gray-900">Subscription Requests</h2>
+              <h2 className="text-xl font-semibold text-primary_color">Subscription Requests</h2>
             </div>
 
             {subscriptionRequests.length === 0 ? (
-              <div className="bg-white rounded-2xl p-12 shadow-sm border border-gray-100 text-center">
+              <div className="rounded-2xl border border-primary_color/10 bg-white/80 p-12 text-center shadow-sm backdrop-blur-sm">
                 <FiClock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Requests</h3>
-                <p className="text-gray-600">You haven't submitted any subscription requests yet.</p>
+                <h3 className="mb-2 text-xl font-semibold text-primary_color">No Requests</h3>
+                <p className="text-primary_color/70">You haven't submitted any subscription requests yet.</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -936,11 +945,11 @@ export const SubscriptionsManager = () => {
                     : (packageData?.total_amount_usd || (monthlyPrice * (packageData?.ideal_duration || 1)))
 
                   return (
-                    <div key={request.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <div key={request.id} className="rounded-2xl border border-primary_color/10 bg-white/80 p-6 shadow-sm backdrop-blur-sm">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-3">
-                            <h3 className="text-lg font-semibold text-gray-900">
+                            <h3 className="text-lg font-semibold text-primary_color">
                               {packageData?.name || 'Unknown Package'}
                             </h3>
                             {getRequestStatusBadge(request.status)}
@@ -948,20 +957,20 @@ export const SubscriptionsManager = () => {
                           
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                             <div>
-                              <p className="text-sm text-gray-600">Amount</p>
-                              <p className="font-semibold text-gray-900">
+                              <p className="text-sm text-primary_color/70">Amount</p>
+                              <p className="font-semibold text-primary_color">
                                 {request.currency} {parseFloat(request.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </p>
                             </div>
                             <div>
-                              <p className="text-sm text-gray-600">Payment Method</p>
-                              <p className="font-semibold text-gray-900 capitalize">
+                              <p className="text-sm text-primary_color/70">Payment Method</p>
+                              <p className="font-semibold capitalize text-primary_color">
                                 {request.payment_method?.replace('_', ' ') || 'N/A'}
                               </p>
                             </div>
                             <div>
-                              <p className="text-sm text-gray-600">Requested At</p>
-                              <p className="font-semibold text-gray-900">
+                              <p className="text-sm text-primary_color/70">Requested At</p>
+                              <p className="font-semibold text-primary_color">
                                 {request.requested_at 
                                   ? new Date(request.requested_at).toLocaleDateString()
                                   : 'N/A'}
@@ -971,7 +980,7 @@ export const SubscriptionsManager = () => {
 
                           {request.status === 'pending' && (
                             <div className="mt-4 pt-4 border-t border-gray-200">
-                              <p className="text-sm text-gray-600 mb-2">
+                              <p className="mb-2 text-sm text-primary_color/70">
                                 Your request is pending admin approval. Please submit payment proof if you haven't already.
                               </p>
                               <button
@@ -1017,7 +1026,7 @@ export const SubscriptionsManager = () => {
               <div className="flex items-center gap-3 mb-6">
                 <button
                   onClick={handleUpgradeSubscription}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary_color text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="flex items-center gap-2 rounded-xl bg-primary_color px-4 py-2 text-white transition-colors hover:opacity-90"
                 >
                   <FiTrendingUp className="w-4 h-4" />
                   Upgrade Plan
@@ -1025,7 +1034,7 @@ export const SubscriptionsManager = () => {
                 {currentSubscription.status === 'active' && (
                   <button
                     onClick={handleCancelSubscription}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-red-700 transition-colors hover:bg-red-100"
                   >
                     <FiX className="w-4 h-4" />
                     Cancel Subscription
@@ -1035,39 +1044,15 @@ export const SubscriptionsManager = () => {
             )}
 
             <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-              <h2 className="text-xl font-semibold text-gray-900">Available Plans</h2>
+              <h2 className="text-xl font-semibold text-primary_color">Available Plans</h2>
               
               <div className="flex items-center gap-4">
                 {/* Currency Display (Auto-determined from primary location) */}
-                <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-4 py-2">
-                  <span className="text-sm font-medium text-gray-700">
-                    Currency: <span className="font-semibold text-gray-900">{currency}</span>
+                <div className="flex items-center gap-2 rounded-xl border border-primary_color/10 bg-white/80 px-4 py-2 shadow-sm backdrop-blur-sm">
+                  <span className="text-sm font-medium text-primary_color/70">
+                    Currency: <span className="font-semibold text-primary_color">{currency}</span>
                   </span>
-                  <span className="text-xs text-gray-500">(Based on primary location)</span>
-                </div>
-
-                {/* Billing Toggle */}
-                <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
-                  <button
-                    onClick={() => setBillingCycle('monthly')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                      billingCycle === 'monthly'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    Monthly
-                  </button>
-                  <button
-                    onClick={() => setBillingCycle('yearly')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                      billingCycle === 'yearly'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    Yearly
-                  </button>
+                  <span className="text-xs text-primary_color/50">(Based on primary location)</span>
                 </div>
               </div>
             </div>
@@ -1075,14 +1060,14 @@ export const SubscriptionsManager = () => {
             {loading ? (
               <div className="text-center py-12">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary_color"></div>
-                <p className="mt-4 text-gray-600">Loading plans...</p>
+                <p className="mt-4 text-primary_color/70">Loading plans...</p>
               </div>
             ) : subscriptionPlans.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-600">No subscription plans available at the moment.</p>
+                <p className="text-primary_color/70">No subscription plans available at the moment.</p>
               </div>
             ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 items-start lg:grid-cols-3 gap-6">
               {subscriptionPlans.map((plan) => {
                 const IconComponent = plan.icon
                 const isCurrentPlan = currentSubscription?.package_id === plan.id
@@ -1091,14 +1076,18 @@ export const SubscriptionsManager = () => {
                 return (
                   <div
                     key={plan.id}
-                    className={`relative bg-white rounded-2xl p-6 shadow-sm border-2 transition-all duration-200 ${
-                      isSelected ? 'border-primary_color shadow-lg' : 'border-gray-100'
+                    className={`relative self-start rounded-3xl border p-6 shadow-sm backdrop-blur-sm transition-all duration-200 ${
+                      isCurrentPlan
+                        ? 'border-primary_color/20 bg-white/90'
+                        : 'bg-white/30'
+                    } ${
+                      isSelected ? 'border-primary_color shadow-md' : 'border-primary_color/10'
                     } ${isCurrentPlan ? 'ring-2 ring-primary_color/20' : ''}`}
                   >
                     {/* Popular Badge */}
                     {plan.popular && (
                       <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                        <span className="bg-primary_color text-white px-4 py-1 rounded-full text-sm font-medium">
+                        <span className="rounded-full bg-primary_color px-4 py-1 text-sm font-medium text-white">
                           Most Popular
                         </span>
                       </div>
@@ -1107,7 +1096,7 @@ export const SubscriptionsManager = () => {
                     {/* Current Plan Badge */}
                     {isCurrentPlan && (
                       <div className="absolute top-4 right-4">
-                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                        <span className="rounded-full border border-primary_color/20 bg-primary_color/10 px-2 py-1 text-xs font-medium text-primary_color">
                           Current Plan
                         </span>
                       </div>
@@ -1115,38 +1104,50 @@ export const SubscriptionsManager = () => {
 
                     {/* Plan Header */}
                     <div className="text-center mb-6">
-                      <div className={`w-16 h-16 bg-gradient-to-r ${plan.color} rounded-xl flex items-center justify-center mx-auto mb-4`}>
-                        <IconComponent className="w-8 h-8 text-white" />
+                      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-primary_color/10 bg-primary_color/10 text-primary_color">
+                        <IconComponent className="w-8 h-8" />
                       </div>
-                      <h3 className="text-xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-                      <p className="text-gray-600 text-sm mb-4">{plan.description}</p>
+                      <h3 className="text-xl font-bold text-primary_color mb-2">{plan.name}</h3>
+                      <p className="text-sm text-primary_color/70 mb-4">{plan.description}</p>
                       
                       <div className="mb-4">
-                        <span className="text-4xl font-bold text-gray-900">
+                        <span className="text-4xl font-bold text-primary_color">
                           {currency === 'GHS' ? 'GHS' : 'USD'} {
                             plan.monthly_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                           }
                         </span>
-                        <span className="text-gray-600">
+                        <span className="text-primary_color/70">
                           /month
                         </span>
                         {plan.ideal_duration > 1 && (
-                          <div className="text-gray-600 text-sm mt-1">
+                          <div className="mt-1 text-sm text-primary_color/70">
                             {plan.monthly_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} × {plan.ideal_duration} months = {currency === 'GHS' ? 'GHS' : 'USD'} {plan.total_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
                         )}
                         {plan.display_text && (
-                          <p className="text-sm text-gray-500 mt-1">{plan.display_text}</p>
+                          <p className="mt-1 text-sm text-primary_color/60">{plan.display_text}</p>
                         )}
                       </div>
                     </div>
 
                     {/* Features */}
                     <div className="space-y-3 mb-6">
-                      {plan.features.map((feature, index) => (
-                        <div key={index} className="flex items-center gap-3">
-                          <FiCheck className="w-5 h-5 text-green-500 flex-shrink-0" />
-                          <span className="text-sm text-gray-700">{feature}</span>
+                      {plan.features.filter((feature) => feature.included).map((feature, index) => (
+                        <div
+                          key={index}
+                          className="flex items-start gap-3 rounded-2xl border border-primary_color/10 bg-primary_color/[0.03] px-3 py-2"
+                        >
+                          <FiCheck className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary_color" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-primary_color">
+                              {feature.name}
+                            </p>
+                            {feature.value && (
+                              <p className="text-xs text-primary_color/70">
+                                {feature.value}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1160,8 +1161,8 @@ export const SubscriptionsManager = () => {
                       }}
                       className={`w-full py-3 px-4 rounded-xl font-medium transition-all duration-200 ${
                         isCurrentPlan
-                          ? 'bg-gray-100 text-gray-600 cursor-not-allowed'
-                          : 'bg-primary_color text-white hover:bg-blue-700'
+                          ? 'bg-primary_color/10 text-primary_color/60 cursor-not-allowed'
+                          : 'bg-primary_color text-white hover:opacity-90'
                       }`}
                       disabled={isCurrentPlan || submitting}
                     >
@@ -1180,12 +1181,12 @@ export const SubscriptionsManager = () => {
         {activeTab === 'billing' && (
           <div className="space-y-8">
             {/* Billing Information */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div className="rounded-2xl border border-primary_color/10 bg-white/80 p-6 shadow-sm backdrop-blur-sm">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">Billing Information</h2>
+                <h2 className="text-xl font-semibold text-primary_color">Billing Information</h2>
                 <button 
                   onClick={() => setShowBillingForm(!showBillingForm)}
-                  className="flex items-center gap-2 text-primary_color hover:text-blue-700 font-medium"
+                  className="flex items-center gap-2 font-medium text-primary_color hover:opacity-80"
                 >
                   <FiEdit className="w-4 h-4" />
                   {showBillingForm ? 'Cancel' : 'Update'}
@@ -1197,10 +1198,10 @@ export const SubscriptionsManager = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Personal Information */}
                 <div className="space-y-4">
-                      <h3 className="font-medium text-gray-900 mb-3">Contact Information</h3>
+                      <h3 className="mb-3 font-medium text-primary_color">Contact Information</h3>
                   
                   <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Billing Email</label>
+                        <label className="mb-1 block text-sm font-medium text-primary_color/80">Billing Email</label>
                     <input 
                           type="email" 
                           value={billingFormData.billing_email}
@@ -1211,7 +1212,7 @@ export const SubscriptionsManager = () => {
                   </div>
                   
                   <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Billing Phone</label>
+                        <label className="mb-1 block text-sm font-medium text-primary_color/80">Billing Phone</label>
                     <input 
                           type="tel" 
                           value={billingFormData.billing_phone}
@@ -1222,7 +1223,7 @@ export const SubscriptionsManager = () => {
                   </div>
                   
                   <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Billing Address</label>
+                        <label className="mb-1 block text-sm font-medium text-primary_color/80">Billing Address</label>
                         <textarea 
                           value={billingFormData.billing_address}
                           onChange={(e) => setBillingFormData({...billingFormData, billing_address: e.target.value})}
@@ -1235,10 +1236,10 @@ export const SubscriptionsManager = () => {
 
                 {/* Payment Methods */}
                 <div className="space-y-4">
-                      <h3 className="font-medium text-gray-900 mb-3">Payment Method</h3>
+                      <h3 className="mb-3 font-medium text-primary_color">Payment Method</h3>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Payment Method</label>
+                        <label className="mb-2 block text-sm font-medium text-primary_color/80">Preferred Payment Method</label>
                         <select
                           value={billingFormData.preferred_payment_method}
                           onChange={(e) => setBillingFormData({...billingFormData, preferred_payment_method: e.target.value})}
@@ -1254,7 +1255,7 @@ export const SubscriptionsManager = () => {
                       {billingFormData.preferred_payment_method === 'mobile_money' && (
                         <div className="border border-gray-200 rounded-lg p-4 space-y-3">
                       <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Provider</label>
+                            <label className="mb-1 block text-sm font-medium text-primary_color/80">Provider</label>
                             <select
                               value={billingFormData.mobile_money_provider}
                               onChange={(e) => setBillingFormData({...billingFormData, mobile_money_provider: e.target.value})}
@@ -1268,7 +1269,7 @@ export const SubscriptionsManager = () => {
                     </div>
                     
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
+                        <label className="mb-1 block text-sm font-medium text-primary_color/80">Mobile Number</label>
                         <input 
                           type="tel" 
                               value={billingFormData.mobile_money_number}
@@ -1279,7 +1280,7 @@ export const SubscriptionsManager = () => {
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Account Name</label>
+                        <label className="mb-1 block text-sm font-medium text-primary_color/80">Account Name</label>
                         <input 
                           type="text" 
                               value={billingFormData.mobile_money_account_name}
@@ -1294,7 +1295,7 @@ export const SubscriptionsManager = () => {
                       {billingFormData.preferred_payment_method === 'bank_transfer' && (
                         <div className="border border-gray-200 rounded-lg p-4 space-y-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>
+                        <label className="mb-1 block text-sm font-medium text-primary_color/80">Bank Name</label>
                         <input 
                           type="text" 
                               value={billingFormData.bank_name}
@@ -1305,7 +1306,7 @@ export const SubscriptionsManager = () => {
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
+                        <label className="mb-1 block text-sm font-medium text-primary_color/80">Account Number</label>
                         <input 
                           type="text" 
                               value={billingFormData.bank_account_number}
@@ -1316,7 +1317,7 @@ export const SubscriptionsManager = () => {
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Account Holder Name</label>
+                        <label className="mb-1 block text-sm font-medium text-primary_color/80">Account Holder Name</label>
                         <input 
                           type="text" 
                               value={billingFormData.bank_account_name}
@@ -1327,7 +1328,7 @@ export const SubscriptionsManager = () => {
                       </div>
 
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Branch (Optional)</label>
+                            <label className="mb-1 block text-sm font-medium text-primary_color/80">Branch (Optional)</label>
                             <input 
                               type="text" 
                               value={billingFormData.bank_branch}
@@ -1344,7 +1345,7 @@ export const SubscriptionsManager = () => {
                   <div className="flex justify-end gap-3">
                     <button 
                       onClick={() => setShowBillingForm(false)}
-                      className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                      className="rounded-lg border border-primary_color/20 px-6 py-2 text-primary_color hover:bg-primary_color/5 transition-colors"
                     >
                       Cancel
                     </button>
@@ -1364,29 +1365,29 @@ export const SubscriptionsManager = () => {
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                          <h3 className="font-medium text-gray-900 mb-3">Contact Information</h3>
+                          <h3 className="mb-3 font-medium text-primary_color">Contact Information</h3>
                           <div className="space-y-2 text-sm">
-                            <p><span className="text-gray-600">Email:</span> <span className="font-medium">{billingInfo.billing_email || 'Not set'}</span></p>
-                            <p><span className="text-gray-600">Phone:</span> <span className="font-medium">{billingInfo.billing_phone || 'Not set'}</span></p>
-                            <p><span className="text-gray-600">Address:</span> <span className="font-medium">{billingInfo.billing_address || 'Not set'}</span></p>
+                            <p><span className="text-primary_color/70">Email:</span> <span className="font-medium text-primary_color">{billingInfo.billing_email || 'Not set'}</span></p>
+                            <p><span className="text-primary_color/70">Phone:</span> <span className="font-medium text-primary_color">{billingInfo.billing_phone || 'Not set'}</span></p>
+                            <p><span className="text-primary_color/70">Address:</span> <span className="font-medium text-primary_color">{billingInfo.billing_address || 'Not set'}</span></p>
                           </div>
                         </div>
                         <div>
-                          <h3 className="font-medium text-gray-900 mb-3">Payment Method</h3>
+                          <h3 className="mb-3 font-medium text-primary_color">Payment Method</h3>
                           <div className="space-y-2 text-sm">
-                            <p><span className="text-gray-600">Method:</span> <span className="font-medium capitalize">{billingInfo.preferred_payment_method?.replace('_', ' ') || 'Not set'}</span></p>
+                            <p><span className="text-primary_color/70">Method:</span> <span className="font-medium capitalize text-primary_color">{billingInfo.preferred_payment_method?.replace('_', ' ') || 'Not set'}</span></p>
                             {billingInfo.preferred_payment_method === 'mobile_money' && (
                               <>
-                                <p><span className="text-gray-600">Provider:</span> <span className="font-medium uppercase">{billingInfo.mobile_money_provider || 'N/A'}</span></p>
-                                <p><span className="text-gray-600">Number:</span> <span className="font-medium">{billingInfo.mobile_money_number || 'N/A'}</span></p>
-                                <p><span className="text-gray-600">Account Name:</span> <span className="font-medium">{billingInfo.mobile_money_account_name || 'N/A'}</span></p>
+                                <p><span className="text-primary_color/70">Provider:</span> <span className="font-medium uppercase text-primary_color">{billingInfo.mobile_money_provider || 'N/A'}</span></p>
+                                <p><span className="text-primary_color/70">Number:</span> <span className="font-medium text-primary_color">{billingInfo.mobile_money_number || 'N/A'}</span></p>
+                                <p><span className="text-primary_color/70">Account Name:</span> <span className="font-medium text-primary_color">{billingInfo.mobile_money_account_name || 'N/A'}</span></p>
                               </>
                             )}
                             {billingInfo.preferred_payment_method === 'bank_transfer' && (
                               <>
-                                <p><span className="text-gray-600">Bank:</span> <span className="font-medium">{billingInfo.bank_name || 'N/A'}</span></p>
-                                <p><span className="text-gray-600">Account:</span> <span className="font-medium">{billingInfo.bank_account_number || 'N/A'}</span></p>
-                                <p><span className="text-gray-600">Account Name:</span> <span className="font-medium">{billingInfo.bank_account_name || 'N/A'}</span></p>
+                                <p><span className="text-primary_color/70">Bank:</span> <span className="font-medium text-primary_color">{billingInfo.bank_name || 'N/A'}</span></p>
+                                <p><span className="text-primary_color/70">Account:</span> <span className="font-medium text-primary_color">{billingInfo.bank_account_number || 'N/A'}</span></p>
+                                <p><span className="text-primary_color/70">Account Name:</span> <span className="font-medium text-primary_color">{billingInfo.bank_account_name || 'N/A'}</span></p>
                               </>
                             )}
                           </div>
@@ -1394,7 +1395,7 @@ export const SubscriptionsManager = () => {
                       </div>
                     </>
                   ) : (
-                    <div className="text-center py-8 text-gray-600">
+                    <div className="text-center py-8 text-primary_color/70">
                       <FiCreditCard className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                       <p>No billing information set. Click "Update" to add your billing details.</p>
                     </div>
@@ -1404,12 +1405,12 @@ export const SubscriptionsManager = () => {
             </div>
 
             {/* Billing History */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div className="rounded-2xl border border-primary_color/10 bg-white/80 p-6 shadow-sm backdrop-blur-sm">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">Billing History</h2>
+                <h2 className="text-xl font-semibold text-primary_color">Billing History</h2>
                 <button 
                   onClick={handleDownloadAll}
-                  className="flex items-center gap-2 text-primary_color hover:text-blue-700 font-medium"
+                  className="flex items-center gap-2 font-medium text-primary_color hover:opacity-80"
                 >
                   <FiDownload className="w-4 h-4" />
                   Download All
@@ -1418,7 +1419,7 @@ export const SubscriptionsManager = () => {
 
               <div className="space-y-4">
                 {invoices.length === 0 ? (
-                  <div className="text-center py-8 text-gray-600">
+                  <div className="text-center py-8 text-primary_color/70">
                     <FiCreditCard className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                     <p>No invoices yet</p>
                   </div>
@@ -1430,19 +1431,19 @@ export const SubscriptionsManager = () => {
                         <FiCreditCard className="w-5 h-5 text-primary_color" />
                       </div>
                       <div>
-                          <p className="font-medium text-gray-900">
+                          <p className="font-medium text-primary_color">
                             {invoice.subscriptions?.subscriptions_package?.name || 'Subscription'} - {invoice.invoice_number}
                           </p>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-primary_color/70">
                             {new Date(invoice.invoice_date).toLocaleDateString()}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-primary_color/50">
                             {invoice.payment_method ? invoice.payment_method.replace('_', ' ').toUpperCase() : 'Pending'}
                           </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
-                        <span className="font-semibold text-gray-900">
+                        <span className="font-semibold text-primary_color">
                           {invoice.currency} {invoice.total_amount?.toLocaleString() || '0'}
                         </span>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${
@@ -1472,12 +1473,12 @@ export const SubscriptionsManager = () => {
         {/* History Tab */}
         {activeTab === 'history' && (
           <div className="space-y-8">
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Subscription History</h2>
+            <div className="rounded-2xl border border-primary_color/10 bg-white/80 p-6 shadow-sm backdrop-blur-sm">
+              <h2 className="mb-6 text-xl font-semibold text-primary_color">Subscription History</h2>
               
               <div className="space-y-4">
                 {subscriptionHistory.length === 0 ? (
-                  <div className="text-center py-8 text-gray-600">
+                  <div className="text-center py-8 text-primary_color/70">
                     <FiClock className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                     <p>No subscription history yet</p>
                   </div>
@@ -1488,15 +1489,15 @@ export const SubscriptionsManager = () => {
                       <FiRefreshCw className="w-5 h-5 text-primary_color" />
                     </div>
                     <div className="flex-1">
-                        <p className="font-medium text-gray-900">{formatEventType(event.event_type)}</p>
-                      <p className="text-sm text-gray-600">
+                        <p className="font-medium text-primary_color">{formatEventType(event.event_type)}</p>
+                      <p className="text-sm text-primary_color/70">
                           {event.from_package?.name || event.from_status || 'N/A'} → {event.to_package?.name || event.to_status || 'N/A'}
                       </p>
                         {event.reason && (
-                      <p className="text-xs text-gray-500">{event.reason}</p>
+                      <p className="text-xs text-primary_color/50">{event.reason}</p>
                         )}
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-primary_color/50">
                         {new Date(event.event_date).toLocaleDateString()}
                     </div>
                   </div>
@@ -1510,18 +1511,18 @@ export const SubscriptionsManager = () => {
         {/* Change Plan Modal */}
         {showChangePlanModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+            <div className="mx-4 w-full max-w-md rounded-2xl bg-white/90 p-6 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900">Change Subscription Plan</h3>
+                <h3 className="text-xl font-semibold text-primary_color">Change Subscription Plan</h3>
                 <button 
                   onClick={() => setShowChangePlanModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-primary_color/50 hover:text-primary_color"
                 >
                   <FiX className="w-6 h-6" />
                 </button>
               </div>
               
-              <p className="text-gray-600 mb-6">
+              <p className="mb-6 text-primary_color/70">
                 Select a new plan to upgrade or downgrade your subscription.
               </p>
               
@@ -1538,8 +1539,8 @@ export const SubscriptionsManager = () => {
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="font-medium text-gray-900">{plan.name}</h4>
-                        <p className="text-sm text-gray-600">
+                        <h4 className="font-medium text-primary_color">{plan.name}</h4>
+                        <p className="text-sm text-primary_color/70">
                           {currency === 'GHS' ? 'GHS' : 'USD'} {
                             plan.monthly_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                           }
@@ -1562,7 +1563,7 @@ export const SubscriptionsManager = () => {
               <div className="flex gap-3">
                 <button 
                   onClick={() => setShowChangePlanModal(false)}
-                  className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex-1 rounded-lg border border-primary_color/20 px-4 py-2 text-primary_color hover:bg-primary_color/5 transition-colors"
                 >
                   Cancel
                 </button>
@@ -1581,12 +1582,12 @@ export const SubscriptionsManager = () => {
         {/* Billing Settings Modal */}
         {showBillingSettingsModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+            <div className="mx-4 w-full max-w-md rounded-2xl bg-white/90 p-6 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900">Billing Settings</h3>
+                <h3 className="text-xl font-semibold text-primary_color">Billing Settings</h3>
                 <button 
                   onClick={() => setShowBillingSettingsModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-primary_color/50 hover:text-primary_color"
                 >
                   <FiX className="w-6 h-6" />
                 </button>
@@ -1595,8 +1596,8 @@ export const SubscriptionsManager = () => {
               <div className="space-y-4 mb-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-medium text-gray-900">Auto-renewal</h4>
-                    <p className="text-sm text-gray-600">Automatically renew subscription</p>
+                    <h4 className="font-medium text-primary_color">Auto-renewal</h4>
+                    <p className="text-sm text-primary_color/70">Automatically renew subscription</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input 
@@ -1611,8 +1612,8 @@ export const SubscriptionsManager = () => {
                 
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-medium text-gray-900">Email Notifications</h4>
-                    <p className="text-sm text-gray-600">Receive billing notifications</p>
+                    <h4 className="font-medium text-primary_color">Email Notifications</h4>
+                    <p className="text-sm text-primary_color/70">Receive billing notifications</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input 
@@ -1628,7 +1629,7 @@ export const SubscriptionsManager = () => {
               <div className="flex gap-3">
                 <button 
                   onClick={() => setShowBillingSettingsModal(false)}
-                  className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex-1 rounded-lg border border-primary_color/20 px-4 py-2 text-primary_color hover:bg-primary_color/5 transition-colors"
                 >
                   Cancel
                 </button>
@@ -1649,27 +1650,27 @@ export const SubscriptionsManager = () => {
         {/* Cancel Subscription Modal */}
         {showCancelModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+            <div className="mx-4 w-full max-w-md rounded-2xl bg-white/90 p-6 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900">Cancel Subscription</h3>
+                <h3 className="text-xl font-semibold text-primary_color">Cancel Subscription</h3>
                 <button 
                   onClick={() => {
                     setShowCancelModal(false)
                     setCancellationReason('')
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-primary_color/50 hover:text-primary_color"
                 >
                   <FiX className="w-6 h-6" />
                 </button>
               </div>
               
               <div className="mb-6">
-                <p className="text-gray-600 mb-4">
+                <p className="mb-4 text-primary_color/70">
                   Are you sure you want to cancel your subscription? Your subscription will be moved to the free plan after admin approval.
                 </p>
                 
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="mb-2 block text-sm font-medium text-primary_color/80">
                     Reason for Cancellation (Optional)
                   </label>
                   <textarea
@@ -1688,7 +1689,7 @@ export const SubscriptionsManager = () => {
                     setShowCancelModal(false)
                     setCancellationReason('')
                   }}
-                  className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex-1 rounded-lg border border-primary_color/20 px-4 py-2 text-primary_color hover:bg-primary_color/5 transition-colors"
                   disabled={submitting}
                 >
                   Keep Subscription
@@ -1708,25 +1709,25 @@ export const SubscriptionsManager = () => {
         {/* Payment Method Selection Modal */}
         {showPaymentMethodModal && selectedPackageForPayment && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+            <div className="mx-4 w-full max-w-md rounded-2xl bg-white/90 p-6 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900">Select Payment Method</h3>
+                <h3 className="text-xl font-semibold text-primary_color">Select Payment Method</h3>
                 <button 
                   onClick={() => {
                     setShowPaymentMethodModal(false)
                     setSelectedPackageForPayment(null)
                     setSelectedPaymentMethod(null)
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-primary_color/50 hover:text-primary_color"
                 >
                   <FiX className="w-6 h-6" />
                 </button>
               </div>
               
               <div className="mb-6">
-                <p className="text-gray-600 mb-2">Package Selected:</p>
-                <p className="font-semibold text-gray-900">{selectedPackageForPayment.name}</p>
-                <p className="text-sm text-gray-600">
+                <p className="mb-2 text-primary_color/70">Package Selected:</p>
+                <p className="font-semibold text-primary_color">{selectedPackageForPayment.name}</p>
+                <p className="text-sm text-primary_color/70">
                   {(() => {
                     const monthlyPrice = currency === 'GHS' 
                       ? parseFloat(selectedPackageForPayment.local_currency_price || 0)
@@ -1750,7 +1751,7 @@ export const SubscriptionsManager = () => {
                 </p>
               </div>
 
-              <p className="text-gray-600 mb-6">
+              <p className="mb-6 text-primary_color/70">
                 Choose how you would like to pay for this subscription.
               </p>
               
@@ -1777,8 +1778,8 @@ export const SubscriptionsManager = () => {
                         <FiCreditCard className="w-6 h-6 text-green-600" />
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900">Manual Payment</h4>
-                        <p className="text-sm text-gray-600">Pay via mobile money or bank transfer</p>
+                        <h4 className="font-semibold text-primary_color">Manual Payment</h4>
+                        <p className="text-sm text-primary_color/70">Pay via mobile money or bank transfer</p>
                       </div>
                     </div>
                   </div>
@@ -1807,10 +1808,10 @@ export const SubscriptionsManager = () => {
                         <FiCreditCard className="w-6 h-6 text-blue-600" />
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900">Online Payment</h4>
-                        <p className="text-sm text-gray-600">Pay instantly with card (Coming Soon)</p>
+                        <h4 className="font-semibold text-primary_color">Online Payment</h4>
+                        <p className="text-sm text-primary_color/70">Pay instantly with card (Coming Soon)</p>
                       </div>
-                      <span className="px-2 py-1 bg-gray-200 text-gray-600 rounded text-xs">Soon</span>
+                      <span className="rounded bg-primary_color/10 px-2 py-1 text-xs text-primary_color/70">Soon</span>
                     </div>
                   </div>
                 </label>
@@ -1823,7 +1824,7 @@ export const SubscriptionsManager = () => {
                     setSelectedPackageForPayment(null)
                     setSelectedPaymentMethod(null)
                   }}
-                  className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex-1 rounded-lg border border-primary_color/20 px-4 py-2 text-primary_color hover:bg-primary_color/5 transition-colors"
                 >
                   Cancel
                 </button>

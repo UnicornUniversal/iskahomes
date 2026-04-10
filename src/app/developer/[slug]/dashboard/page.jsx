@@ -18,10 +18,12 @@ import RecentMessages from '@/app/components/developers/DataStats/RecentMessages
 import RecentSales from '@/app/components/developers/DataStats/RecentSales'
 import PopularListings from '@/app/components/developers/DataStats/PopularListings'
 import LatestReminders from '@/app/components/developers/DataStats/LatestReminders'
+import RecentActivities from '@/app/components/developers/DataStats/RecentActivities'
 import { formatCurrency } from '@/lib/utils'
 import Notifications from '@/app/components/general/Notifications'    
 import SimpleServices from '@/app/components/general/SimpleServices'
 import { supabase } from '@/lib/supabase'
+import ReportGenerator from '@/app/components/developers/ReportGenerator'
 const page = () => {
   const { user, loading: authLoading } = useAuth()
   const [localUserData, setLocalUserData] = useState(null)
@@ -113,6 +115,25 @@ const page = () => {
     }
     return []
   }
+
+  const mergeStatsWithNames = (primaryStats, fallbackStats) => {
+    const primary = parseStatsArray(primaryStats)
+    const fallback = parseStatsArray(fallbackStats)
+
+    if (primary.length === 0) return fallback
+
+    const fallbackByCategoryId = new Map(
+      fallback.map((item) => [String(item?.category_id ?? ''), item?.name]).filter(([id]) => id)
+    )
+
+    return primary.map((item) => {
+      const directName = item?.name
+      if (directName && String(directName).trim()) return item
+
+      const fallbackName = fallbackByCategoryId.get(String(item?.category_id ?? ''))
+      return fallbackName ? { ...item, name: fallbackName } : item
+    })
+  }
   
   // Get values directly from user profile (for other metrics)
   const totalUnits = profileData?.total_units ?? 0
@@ -120,9 +141,18 @@ const page = () => {
   const totalRevenue = profileData?.total_revenue ?? 0
   const totalViews = profileData?.total_views ?? 0
   const totalImpressions = profileData?.total_impressions ?? 0
-  const propertyPurposesStats = parseStatsArray(profileData?.property_purposes_stats)
-  const propertyTypesStats = parseStatsArray(profileData?.property_types_stats)
-  const propertySubtypesStats = parseStatsArray(profileData?.property_subtypes_stats)
+  const propertyPurposesStats = mergeStatsWithNames(
+    profileData?.property_purposes_stats,
+    user?.profile?.property_purposes_stats
+  )
+  const propertyTypesStats = mergeStatsWithNames(
+    profileData?.property_types_stats,
+    user?.profile?.property_types_stats
+  )
+  const propertySubtypesStats = mergeStatsWithNames(
+    profileData?.property_subtypes_stats,
+    user?.profile?.property_subtypes_stats
+  )
 
   if (authLoading) {
     return (
@@ -175,9 +205,10 @@ const page = () => {
         />
         </div>
    
-
+        <ReportGenerator />
 
 <div className='w-full flex items-start   gap-4'>
+{/* Generate monthyl report card */}
 
 
 
@@ -201,9 +232,12 @@ const page = () => {
           </div>
           <LatestLeads />  
 
-          <div className='grid grid-cols-1 lg:grid-cols-2 gap-4'>
+          <div className='grid grid-cols-1 lg:grid-cols-3 gap-4'>
+          <RecentActivities limit={10} />
+          <LatestServiceCharge currency={currency} />
             <LatestEngagements />
-            <LatestServiceCharge />
+      
+           
           </div>
 
         <div className='w-full flex justify-between gap-4 flex-col md:grid lg:grid-cols-3 gap-4'>
@@ -234,6 +268,8 @@ const page = () => {
   
          <PropertiesByType statsData={propertyTypesStats} totalUnits={totalUnits} />
          <PropertiesBySubType statsData={propertySubtypesStats} totalUnits={totalUnits} />
+   
+   
      </div>
 
 

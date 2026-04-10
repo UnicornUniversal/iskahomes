@@ -32,6 +32,7 @@
     "leaflet": "^1.9.4",
     "lucide-react": "^0.525.0",
     "next": "^16.0.10",
+    "pdf-lib": "^1.17.1",
     "posthog-js": "^1.275.1",
     "posthog-node": "^5.21.2",
     "react": "^19.0.0",

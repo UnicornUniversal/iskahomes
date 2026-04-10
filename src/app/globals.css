@@ -419,6 +419,35 @@ html::-webkit-scrollbar:vertical {
   @apply bg-white rounded-sm shadow-xl p-2 text-primary_color shadow-sm;
 }
 
+.summary_height {
+  max-height: 250px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.2rem;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(23, 99, 124, 0.45) transparent;
+  -ms-overflow-style: auto !important;
+}
+
+.summary_height::-webkit-scrollbar {
+  display: block !important;
+  width: 6px;
+  height: 6px;
+}
+
+.summary_height::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.summary_height::-webkit-scrollbar-thumb {
+  background: rgba(23, 99, 124, 0.45);
+  border-radius: 999px;
+}
+
+.summary_height::-webkit-scrollbar-thumb:hover {
+  background: rgba(23, 99, 124, 0.7);
+}
+
 /* Message bubble animations - only for messaging app */
 @keyframes slideIn {
   from {

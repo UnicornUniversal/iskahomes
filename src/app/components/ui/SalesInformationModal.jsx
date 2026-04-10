@@ -9,7 +9,9 @@ const SalesInformationModal = ({
   onConfirm, 
   saleType = 'sold', // 'sold' or 'rented'
   isLoading = false,
-  useClientSelector = false 
+  useClientSelector = false,
+  listingPrice = 0,
+  listingCurrency = 'GHS'
 }) => {
   const [buyerName, setBuyerName] = useState('')
   const [selectedClient, setSelectedClient] = useState(null)
@@ -19,6 +21,8 @@ const SalesInformationModal = ({
   const [salesSource, setSalesSource] = useState('Iska Homes')
   const [otherSource, setOtherSource] = useState('')
   const [notes, setNotes] = useState('')
+  const [asv, setAsv] = useState('')
+  const [asvBreakdown, setAsvBreakdown] = useState([])
 
   useEffect(() => {
     if (!isOpen || !useClientSelector) return
@@ -34,6 +38,32 @@ const SalesInformationModal = ({
 
   if (!isOpen) return null
 
+  const numericListingPrice = Number(listingPrice) || 0
+
+  const parseCurrencyInput = (value) => {
+    if (value === null || value === undefined) return null
+    const cleaned = String(value).replace(/,/g, '').trim()
+    if (!cleaned) return null
+    const parsed = Number(cleaned)
+    if (!Number.isFinite(parsed)) return null
+    return Math.max(parsed, 0)
+  }
+
+  const normalizedBreakdown = asvBreakdown
+    .map(item => ({
+      name: (item?.name || '').trim(),
+      value: parseCurrencyInput(item?.value)
+    }))
+    .filter(item => item.name && item.value !== null)
+
+  const totalDeductions = normalizedBreakdown.reduce((sum, item) => sum + item.value, 0)
+  const calculatedAsv = Math.max(numericListingPrice - totalDeductions, 0)
+  const manualAsv = parseCurrencyInput(asv)
+  const hasManualAsv = manualAsv !== null
+  const finalAsv = hasManualAsv
+    ? manualAsv
+    : (normalizedBreakdown.length > 0 ? calculatedAsv : null)
+
   const clientsFiltered = clientSearch.trim()
     ? clients.filter(c => (c.name || '').toLowerCase().includes(clientSearch.toLowerCase()))
     : clients.slice(0, 8)
@@ -46,7 +76,9 @@ const SalesInformationModal = ({
       buyer_name: buyer,
       client_id: useClientSelector && selectedClient ? selectedClient.id : null,
       sale_source: finalSalesSource || 'Iska Homes',
-      notes: notes.trim() || null
+      notes: notes.trim() || null,
+      asv: saleType === 'sold' ? finalAsv : null,
+      asv_breakdown: saleType === 'sold' ? normalizedBreakdown : []
     })
   }
 
@@ -55,7 +87,9 @@ const SalesInformationModal = ({
       buyer_name: null,
       client_id: null,
       sale_source: 'Iska Homes',
-      notes: null
+      notes: null,
+      asv: null,
+      asv_breakdown: []
     })
   }
 
@@ -67,12 +101,28 @@ const SalesInformationModal = ({
     setSalesSource('Iska Homes')
     setOtherSource('')
     setNotes('')
+    setAsv('')
+    setAsvBreakdown([])
     onClose()
+  }
+
+  const addBreakdownItem = () => {
+    setAsvBreakdown(prev => [...prev, { name: '', value: '' }])
+  }
+
+  const updateBreakdownItem = (index, field, value) => {
+    setAsvBreakdown(prev => prev.map((item, i) => (
+      i === index ? { ...item, [field]: value } : item
+    )))
+  }
+
+  const removeBreakdownItem = (index) => {
+    setAsvBreakdown(prev => prev.filter((_, i) => i !== index))
   }
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full transform transition-all duration-300 ease-out max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full transform transition-all duration-300 ease-out max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="p-6 pb-4">
           <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full">
@@ -196,6 +246,98 @@ const SalesInformationModal = ({
                 className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
+
+            {saleType === 'sold' && (
+              <>
+                <div className="rounded-md border border-gray-200 p-3 bg-gray-50">
+                  <p className="text-xs text-gray-700">
+                    Estimated revenue: <span className="font-semibold">{numericListingPrice.toLocaleString()} {listingCurrency}</span>
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    You can set ASV directly or add deduction breakdowns.
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="asv" className="block text-sm font-medium text-gray-700 mb-2">
+                    ASV (Actual Sales Value) <span className="text-gray-400 text-xs">(Optional)</span>
+                  </label>
+                  <Input
+                    id="asv"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={asv}
+                    onChange={(e) => setAsv(e.target.value)}
+                    placeholder="Enter actual sales value"
+                    className="w-full"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">
+                      ASV Breakdown <span className="text-gray-400 text-xs">(Optional)</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={addBreakdownItem}
+                      className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-100"
+                    >
+                      Add Breakdown
+                    </button>
+                  </div>
+
+                  {asvBreakdown.map((item, index) => (
+                    <div key={`asv-breakdown-${index}`} className="space-y-1">
+                      {index === 0 && (
+                        <div className="grid grid-cols-12 gap-2">
+                          <p className="col-span-7 text-xs font-medium text-gray-600">Name</p>
+                          <p className="col-span-4 text-xs font-medium text-gray-600">Amount ({listingCurrency})</p>
+                          <span className="col-span-1" />
+                        </div>
+                      )}
+                      <div className="grid grid-cols-12 gap-2">
+                        <input
+                          type="text"
+                          value={item.name}
+                          onChange={(e) => updateBreakdownItem(index, 'name', e.target.value)}
+                          placeholder="Name"
+                          className="col-span-7 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.value}
+                          onChange={(e) => updateBreakdownItem(index, 'value', e.target.value)}
+                          placeholder="Value"
+                          className="col-span-4 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeBreakdownItem(index)}
+                          className="col-span-1 text-red-600 hover:text-red-700 text-sm"
+                          aria-label="Remove breakdown"
+                        >
+                          x
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {normalizedBreakdown.length > 0 && (
+                    <div className="text-xs text-gray-700 space-y-1">
+                      <p>Total deductions: <span className="font-semibold">{totalDeductions.toLocaleString()} {listingCurrency}</span></p>
+                      <p>Calculated ASV: <span className="font-semibold">{calculatedAsv.toLocaleString()} {listingCurrency}</span></p>
+                      {hasManualAsv && (
+                        <p>Final ASV (manual override): <span className="font-semibold">{manualAsv.toLocaleString()} {listingCurrency}</span></p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Action buttons */}

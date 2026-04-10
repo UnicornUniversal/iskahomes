@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sample — Developer Intelligence Report | Iska Homes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --primary: #17637C;
+      --primary-rgb: 23, 99, 124;
+      --secondary: #F68B1F;
+      --secondary-rgb: 246, 139, 31;
+      --accent-border: #E0B29A;
+      --green: #15D842;
+      --red: #9D2C2C;
+      --surface: #ffffff;
+      --text: #17637C;
+      --text-soft: rgba(23, 99, 124, 0.72);
+      --border: rgba(23, 99, 124, 0.14);
+      --shadow: 0 8px 32px rgba(23, 99, 124, 0.1);
+      --shadow-lg: 0 24px 60px -42px rgba(15, 23, 42, 0.22);
+      --radius: 20px;
+      --radius-sm: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Poppins', system-ui, sans-serif;
+      color: var(--text);
+      background: linear-gradient(180deg, rgba(23, 99, 124, 0.12) 0%, rgba(255, 255, 255, 0.45) 50%, rgba(246, 139, 31, 0.07) 100%);
+      background-attachment: fixed;
+      line-height: 1.42;
+      font-size: 10.5pt;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .preview-hint {
+      text-align: center;
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.9);
+      border-bottom: 2px solid var(--secondary);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--primary);
+    }
+    .pages { max-width: 210mm; margin: 0 auto; padding: 20px 12px 40px; }
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto 24px;
+      padding: 16mm 14mm 22mm;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      border-radius: 6px;
+      position: relative;
+      page-break-after: always;
+      overflow: hidden;
+    }
+    .page::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+    }
+    .page-footer {
+      position: absolute;
+      bottom: 11mm;
+      left: 14mm;
+      right: 14mm;
+      display: flex;
+      justify-content: space-between;
+      font-size: 7.5pt;
+      color: var(--text-soft);
+      border-top: 1px solid var(--border);
+      padding-top: 6px;
+    }
+    .brand-mark { font-weight: 700; color: var(--primary); letter-spacing: 0.08em; font-size: 7.5pt; }
+
+    /* Glass / dashboard panels (default_bg2 + secondary_bg feel) */
+    .glass {
+      background: rgba(255, 255, 255, 0.38);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+    }
+    .eyebrow {
+      display: inline-block;
+      font-size: 0.62rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--primary);
+      background: rgba(255, 255, 255, 0.35);
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 8px;
+      border: 1px solid var(--border);
+    }
+    h2.section-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    h2.section-title .accent {
+      width: 4px;
+      height: 20px;
+      background: var(--secondary);
+      border-radius: 2px;
+    }
+    .section-lead {
+      font-size: 0.75rem;
+      color: var(--text-soft);
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+
+    /* DataCard-style (developer dashboard) */
+    .dash-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    @media (max-width: 900px) { .dash-row { grid-template-columns: repeat(2, 1fr); } }
+    .dash-card {
+      position: relative;
+      border: 1px solid var(--accent-border);
+      padding: 12px 12px 14px;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.55);
+      box-shadow: 0 2px 8px rgba(67, 97, 190, 0.06);
+    }
+    .dash-card .icon-ring {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 2px solid var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.55rem;
+      font-weight: 800;
+      color: var(--primary);
+    }
+    .dash-card .t { font-size: 0.68rem; font-weight: 600; color: var(--primary); padding-right: 28px; }
+    .dash-card .v { font-size: 1.35rem; font-weight: 800; color: var(--primary); margin-top: 6px; }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    @media (max-width: 720px) { .kpi-grid { grid-template-columns: 1fr; } }
+    .kpi-card {
+      background: linear-gradient(145deg, rgba(var(--primary-rgb), 0.07), rgba(255,255,255,0.92));
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      position: relative;
+    }
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+    }
+    .kpi-label { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-soft); }
+    .kpi-value { font-size: 1.15rem; font-weight: 800; color: var(--primary); margin: 4px 0 2px; }
+    .kpi-meta { font-size: 0.65rem; color: var(--text-soft); }
+
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    @media (max-width: 720px) { .row-2 { grid-template-columns: 1fr; } }
+    .panel {
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.5);
+      border: 1px solid var(--border);
+    }
+    .panel-title {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--primary);
+      margin-bottom: 8px;
+    }
+    .chart-wrap { position: relative; height: 175px; }
+    .chart-wrap.sm { height: 150px; }
+    .chart-wrap.tall { height: 200px; }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.68rem;
+    }
+    table.data-table th {
+      text-align: left;
+      padding: 6px 5px;
+      background: rgba(var(--primary-rgb), 0.1);
+      color: var(--primary);
+      font-weight: 700;
+      border-bottom: 2px solid var(--primary);
+    }
+    table.data-table td {
+      padding: 5px 5px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    table.data-table tr:nth-child(even) td { background: rgba(var(--primary-rgb), 0.03); }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .tag {
+      display: inline-block;
+      font-size: 0.58rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(var(--secondary-rgb), 0.2);
+      color: #a86a0f;
+    }
+    .tag.ok { background: rgba(21, 216, 66, 0.18); color: #0d7a28; }
+    .tag.bad { background: rgba(157, 44, 44, 0.15); color: var(--red); }
+
+    /* Cover */
+    .cover-inner { display: flex; flex-direction: column; min-height: calc(297mm - 34mm - 20mm); justify-content: space-between; }
+    .cover-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .cover-logo { display: flex; align-items: center; gap: 10px; }
+    .cover-logo-badge {
+      width: 52px; height: 52px; border-radius: 14px;
+      background: linear-gradient(135deg, var(--primary), #1a8aad);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 1rem;
+      box-shadow: 0 4px 14px rgba(var(--primary-rgb), 0.35);
+    }
+    .cover-org { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--text-soft); font-weight: 600; }
+    .cover-org-name { font-size: 1rem; font-weight: 700; color: var(--primary); }
+    .cover-date-pill {
+      background: rgba(var(--secondary-rgb), 0.16);
+      color: #c4700a;
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .cover-title { font-size: 2rem; font-weight: 800; line-height: 1.08; color: var(--primary); margin-top: 6mm; }
+    .cover-sub { margin-top: 10px; font-size: 0.88rem; color: var(--text-soft); max-width: 92%; }
+    .cover-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 7mm; }
+    .mini-stat {
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.65);
+    }
+    .mini-stat-label { font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-soft); }
+    .mini-stat-value { font-size: 1.05rem; font-weight: 800; color: var(--primary); margin-top: 3px; }
+    .mini-stat-delta { font-size: 0.62rem; color: var(--green); font-weight: 600; margin-top: 2px; }
+
+    /* TOC */
+    .toc-title { font-size: 1.45rem; font-weight: 800; color: var(--primary); }
+    .toc-sub { font-size: 0.78rem; color: var(--text-soft); margin: 6px 0 16px; }
+    .toc-item { display: flex; align-items: baseline; gap: 6px; margin-bottom: 9px; font-size: 0.78rem; }
+    .toc-item a { color: var(--primary); text-decoration: none; font-weight: 600; }
+    .toc-dots { flex: 1; border-bottom: 1px dotted var(--border); min-width: 8px; margin: 0 4px; position: relative; top: -3px; }
+    .toc-page { font-weight: 800; color: var(--secondary); min-width: 1.4em; text-align: right; }
+
+    .insight {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      border-left: 4px solid var(--secondary);
+      background: rgba(var(--secondary-rgb), 0.1);
+      font-size: 0.7rem;
+    }
+    .insight strong { color: var(--primary); }
+
+    .progress-bar {
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(var(--primary-rgb), 0.1);
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .progress-bar > i {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+    }
+
+    @media print {
+      .preview-hint { display: none; }
+      body { background: #fff; }
+      .pages { padding: 0; max-width: none; }
+      .page { margin: 0; box-shadow: none; border-radius: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-hint">
+    Design preview — dummy data aligned to developer dashboard &amp; analytics (leads, sales, properties by location, service charge lifecycle).
+    Open: <code>/reports/sample-developer-report.html</code>
+  </div>
+
+  <div class="pages">
+    <!-- 1 Cover -->
+    <section class="page" id="p1">
+      <div class="cover-inner">
+        <div>
+          <div class="cover-top">
+            <div class="cover-logo">
+              <div class="cover-logo-badge">IH</div>
+              <div>
+                <div class="cover-org">Developer intelligence</div>
+                <div class="cover-org-name">Iska Heights Development Co.</div>
+              </div>
+            </div>
+            <div class="cover-date-pill">Reporting period · 1 Mar — 31 Mar 2026</div>
+          </div>
+          <h1 class="cover-title">Performance, pipeline &amp; portfolio report</h1>
+          <p class="cover-sub">
+            Mirrors your dashboard and analytics modules: listing &amp; profile reach, lead sources and actions,
+            inventory by location and taxonomy, sales attribution to team members, service-charge collection vs arrears,
+            and operational KPIs. Figures are illustrative.
+          </p>
+          <div class="cover-metrics">
+            <div class="mini-stat"><div class="mini-stat-label">Total revenue (period)</div><div class="mini-stat-value">GHS 4.82M</div><div class="mini-stat-delta">+18.4% MoM</div></div>
+            <div class="mini-stat"><div class="mini-stat-label">Units sold</div><div class="mini-stat-value">14</div><div class="mini-stat-delta">+2 vs Feb</div></div>
+            <div class="mini-stat"><div class="mini-stat-label">New leads</div><div class="mini-stat-value">284</div><div class="mini-stat-delta">+12.1%</div></div>
+            <div class="mini-stat"><div class="mini-stat-label">SC collection rate</div><div class="mini-stat-value">91.2%</div><div class="mini-stat-delta">+3.0 pts</div></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:0.72rem;color:var(--text-soft);">
+          <div><strong style="color:var(--primary);">Prepared for</strong><br/>Director of Sales &amp; Operations</div>
+          <div style="text-align:right;"><strong style="color:var(--primary);">Generated</strong><br/>10 Apr 2026 · v1.1 sample</div>
+        </div>
+      </div>
+      <div class="page-footer"><span class="brand-mark">ISKA HOMES</span><span>Page 1</span></div>
+    </section>
+
+    <!-- 2 Dashboard alignment -->
+    <section class="page" id="p2">
+      <span class="eyebrow">Dashboard parity</span>
+      <h2 class="section-title"><span class="accent"></span> Overview · same KPIs as home dashboard</h2>
+      <p class="section-lead">Five headline metrics match <code>DataCard</code> tiles: units, views, impressions, revenue, developments.</p>
+      <div class="dash-row">
+        <div class="dash-card"><div class="icon-ring">U</div><div class="t">Total units</div><div class="v">428</div></div>
+        <div class="dash-card"><div class="icon-ring">V</div><div class="t">Total views</div><div class="v">18.4k</div></div>
+        <div class="dash-card"><div class="icon-ring">I</div><div class="t">Impressions</div><div class="v">240k</div></div>
+        <div class="dash-card"><div class="icon-ring">₵</div><div class="t">Total revenue (YTD)</div><div class="v">GHS 12.6M</div></div>
+        <div class="dash-card"><div class="icon-ring">D</div><div class="t">Developments</div><div class="v">12</div></div>
+      </div>
+      <div class="glass" style="padding:12px;margin-bottom:10px;">
+        <div class="panel-title" style="margin-bottom:6px;">Listing vs profile visibility (period)</div>
+        <div class="row-2" style="margin-bottom:0;">
+          <div>
+            <table class="data-table">
+              <thead><tr><th>Source</th><th class="num">Views</th><th class="num">Share</th></tr></thead>
+              <tbody>
+                <tr><td>Listing detail</td><td class="num">11,240</td><td class="num">61%</td></tr>
+                <tr><td>Developer profile</td><td class="num">4,820</td><td class="num">26%</td></tr>
+                <tr><td>Search &amp; discovery</td><td class="num">2,340</td><td class="num">13%</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="panel" style="border:none;background:transparent;padding:0;">
+            <div class="chart-wrap sm"><canvas id="chViewsSplit"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="panel glass">
+          <div class="panel-title">Property purposes (inventory)</div>
+          <div class="chart-wrap sm"><canvas id="chPurposeInv"></canvas></div>
+        </div>
+        <div class="panel glass">
+          <div class="panel-title">Impression channels</div>
+          <div class="chart-wrap sm"><canvas id="chImpressionCh"></canvas></div>
+        </div>
+      </div>
+      <div class="page-footer"><span class="brand-mark">ISKA HOMES</span><span>Page 2</span></div>
+    </section>
+
+    <!-- 3 Executive -->
+    <section class="page" id="p3">
+      <span class="eyebrow">Executive</span>
+      <h2 class="section-title"><span class="accent"></span> Summary metrics &amp; revenue</h2>
+      <p class="section-lead">Cross-module health: pipeline, collections, inventory velocity, and marketing efficiency.</p>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Lead → sale conversion</div><div class="kpi-value">14.2%</div><div class="kpi-meta">Median cycle 23 days</div></div>
+        <div class="kpi-card"><div class="kpi-label">Absorption (units / mo)</div><div class="kpi-value">14</div><div class="kpi-meta">vs 11 prior month</div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg. discount vs list</div><div class="kpi-value">4.1%</div><div class="kpi-meta">Within policy</div></div>
+        <div class="kpi-card"><div class="kpi-label">Marketing CPL</div><div class="kpi-value">GHS 186</div><div class="kpi-meta">Blended channels</div></div>
+        <div class="kpi-card"><div class="kpi-label">Pipeline value</div><div class="kpi-value">GHS 8.9M</div><div class="kpi-meta">Reserved + qualified</div></div>
+        <div class="kpi-card"><div class="kpi-label">NPS (buyers)</div><div class="kpi-value">+42</div><div class="kpi-meta">n = 38 responses</div></div>
+      </div>
+      <div class="row-2">
+        <div class="panel glass"><div class="panel-title">Revenue vs collections (GHS ’000)</div><div class="chart-wrap tall"><canvas id="chRevenue"></canvas></div></div>
+        <div class="panel glass"><div class="panel-title">Lead funnel (volume)</div><div class="chart-wrap tall"><canvas id="chFunnel"></canvas></div></div>
+      </div>
+      <div class="page-footer"><span class="brand-mark">ISKA HOMES</span><span>Page 3</span></div>
+    </section>
+
+    <!-- 4 TOC -->
+    <section class="page" id="p4">
+      <h1 class="toc-title">Table of contents</h1>
+      <p class="toc-sub">Page numbers are fixed for this sample; live export will compute TOC after layout.</p>
+      <div class="toc-item"><a href="#p1">Cover</a><span class="toc-dots"></span><span class="toc-page">1</span></div>
+      <div class="toc-item"><a href="#p2">Dashboard alignment</a><span class="toc-dots"></span><span class="toc-page">2</span></div>
+      <div class="toc-item"><a href="#p3">Executive summary</a><span class="toc-dots"></span><span class="toc-page">3</span></div>
+      <div class="toc-item"><a href="#p4">Table of contents</a><span class="toc-dots"></span><span class="toc-page">4</span></div>
+      <div class="toc-item"><a href="#p5">Leads · overview &amp; profile breakdown</a><span class="toc-dots"></span><span class="toc-page">5</span></div>
+      <div class="toc-item"><a href="#p6">Leads · actions &amp; engagement</a><span class="toc-dots"></span><span class="toc-page">6</span></div>
+      <div class="toc-item"><a href="#p7">Leads · channels, context &amp; assignment</a><span class="toc-dots"></span><span class="toc-page">7</span></div>
+      <div class="toc-item"><a href="#p8">Properties · by location &amp; office</a><span class="toc-dots"></span><span class="toc-page">8</span></div>
+      <div class="toc-item"><a href="#p9">Properties · taxonomy &amp; status</a><span class="toc-dots"></span><span class="toc-page">9</span></div>
+      <div class="toc-item"><a href="#p10">Properties · top performers</a><span class="toc-dots"></span><span class="toc-page">10</span></div>
+      <div class="toc-item"><a href="#p11">Sales · overview &amp; trend</a><span class="toc-dots"></span><span class="toc-page">11</span></div>
+      <div class="toc-item"><a href="#p12">Sales · by location &amp; attribution</a><span class="toc-dots"></span><span class="toc-page">12</span></div>
+      <div class="toc-item"><a href="#p13">Sales · developments &amp; taxonomy</a><span class="toc-dots"></span><span class="toc-page">13</span></div>
+      <div class="toc-item"><a href="#p14">Service charge · collection lifecycle</a><span class="toc-dots"></span><span class="toc-page">14</span></div>
+      <div class="toc-item"><a href="#p15">Service charge · aging &amp; risk</a><span class="toc-dots"></span><span class="toc-page">15</span></div>
+      <div class="toc-item"><a href="#p16">Appointments, ops &amp; team</a><span class="toc-dots"></span><span class="toc-page">16</span></div>
+      <div class="page-footer"><span class="brand-mark">ISKA HOMES</span><span>Page 4</span></div>
+    </section>
+
+    <!-- 5 Leads overview -->
+    <section class="page" id="p5">
+      <span class="eyebrow">Leads analytics</span>
+      <h2 class="section-title"><span class="accent"></span> Overview · matches leads dashboard cards</h2>
+      <p class="section-lead">Hybrid lead totals (unique + anonymous), conversion, and channel buckets from <code>leads_breakdown</code> / profile stats.</p>
+      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);">
+        <div class="kpi-card"><div class="kpi-label">Total leads (individuals)</div><div class="kpi-value">412</div><div class="kpi-meta">Unique 318 + anon 94</div></div>
+        <div class="kpi-card"><div class="kpi-label">Conversion rate</div><div class="kpi-value">14.2%</div><div class="kpi-meta">Closed / captured</div></div>
+        <div class="kpi-card"><div class="kpi-label">Phone leads</div><div class="kpi-value">68</div><div class="kpi-meta">Tap-to-call</div></div>
+        <div class="kpi-card"><div class="kpi-label">Message leads</div><div class="kpi-value">153</div><div class="kpi-meta">WhatsApp 112 · DM 41</div></div>
+        <div class="kpi-card"><div class="kpi-label">Appointment leads</div><div class="kpi-value">41</div><div class="kpi-meta">Booked from listing/profile</div></div>
+        <div class="kpi-card"><div class="kpi-label">Email leads</div><div class="kpi-value">38</div><div class="kpi-meta">Forms &amp; inquiries</div></div>
+      </div>
+      <table class="data-table" style="margin-bottom:10px;">
+        <thead><tr><th>Breakdown</th><th class="num">Count</th><th class="num">% of total</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td>Profile context</td><td class="num">96</td><td class="num">23%</td><td>Brand-level interest</td></tr>
+          <tr><td>Listing context</td><td class="num">198</td><td class="num">48%</td><td>Unit-specific</td></tr>
+          <tr><td>Development context</td><td class="num">118</td><td class="num">29%</td><td>Project pages</td></tr>
+        </tbody>
+      </table>
+      <div class="panel glass"><div class="panel-title">Lifecycle status distribution</div><div class="chart-wrap"><canvas id="chLeadStatus"></canvas></div></div>
+      <div class="page-footer"><span class="brand-mark">ISKA HOMES</span><span>Page 5</span></div>
+    </section>
+
+    <!-- 6 Lead actions -->
+    <section class="page" id="p6">
+      <h2 class="section-title"><span class="accent"></span> Lead actions · first-touch &amp; multi-touch</h2>
+      <p class="section-lead">Action-level counts (what prospects did) — analogous to <code>lead_actions</code> aggregation in analytics.</p>
+      <div class="row-2">
+        <div class="panel glass"><div class="panel-title">Actions by type (period)</div><div class="chart-wrap tall"><canvas id="chLeadActions"></canvas></div></div>
+        <div class="panel glass"><div class="panel-title">Engagement depth</div><div class="chart-wrap tall"><canvas id="chEngageDepth"></canvas></div></div>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Action</th><th class="num">Events</th><th class="num">Unique leads</th><th class="num">→ Appt %</th><th class="num">→ Close %</th></tr></thead>
+        <tbody>
+          <tr><td><span class="tag">lead_phone</span> Phone tap</td><td class="num">412</td><td class="num">68</td><td class="num">18%</td><td class="num">11%</td></tr>
+          <tr><td><span class="tag">lead_message</span> WhatsApp</td><td class="num">896</td><td class="num">112</td><td class="num">24%</td><td class="num">15%</td></tr>
+          <tr><td><span class="tag">lead_message</span> In-app DM</td><td class="num">210</td><td class="num">41</td><td class="num">12%</td><td class="num">7%</td></tr>
+          <tr><td><span class="tag">lead_email</span> Email</td><td class="num">154</td><td class="num">38</td><td class="num">21%</td><td class="num">9%</td></tr>
+          <tr><td><span class="tag">lead_appointment</span> Booked slot</td><td class="num">103</td><td class="num">41</td><td class="num">—</td><td class="num">34%</td></tr>
+          <tr><td>Save listing</td><td class="num">612</td><td class="num">186</td><td class="num">14%</td><td class="num">6%</td></tr>
+        </tbody>
+      </table>
+      <div class="page-footer"><span class="brand-mark">ISKA HOMES</span><span>Page 6</span></div>
+    </section>
+
+    <!-- 7 Channels + assignment -->
+    <section class="page" id="p7">
+      <h2 class="section-title"><span class="accent"></span> Channels, context &amp; lead owner</h2>
+      <div class="row-2">
+        <div class="panel glass"><div class="panel-title">Channel performance (analytics API shape)</div><div class="chart-wrap tall"><canvas id="chChannels"></canvas></div></div>
+        <div class="panel glass"><div class="panel-title">Context: listing / development / profile</div><div class="chart-wrap tall"><canvas id="chContext"></canvas></div></div>
+      </div>
+      <table class="data-table" style="margin-top:8px;">
+        <thead><tr><th>Channel</th><th class="num">Leads</th><th class="num">Closed</th><th class="num">Conv %</th><th class="num">Avg score</th><th class="num">High-value %</th></tr></thead>
+        <tbody>
+          <tr><td>WhatsApp</td><td class="num">112</td><td class="num">24</td><td class="num">21.4</td><td class="num">58</td><td class="num">34%</td></tr>
+          <tr><td>Phone</td><td class="num">68</td><td class="num">9</td><td class="num">13.2</td><td class="num">44</td><td class="num">18%</td></tr>
+          <tr><td>Appointment</td><td class="num">41</td><td class="num">14</td><td class="num">34.1</td><td class="num">71</td><td class="num">52%</td></tr>
+          <tr><td>Email</td><td class="num">38</td><td class="num">5</td><td class="num">13.2</td><td class="num">39</td><td class="num">11%</td></tr>
+          <tr><td>Direct message</td><td class="num">25</td><td class="num">3</td><td class="num">12.0</td><td class="num">36</td><td class="num">8%</td></tr>
+        </tbody>
+      </table>
+      <p class="section-lead" style="margin-top:8px;">Assignment mirrors CRM ownership (sample names).</p>
+      <table class="data-table">
+        <thead><tr><th>Lead owner</th><th class="num">New</th><th class="num">Active</th><th class="num">Closed</th><th class="num">Avg response</th></tr></thead>
+        <tbody>
+          <tr><td>Ama Serwaa · Sales</td><td class="num">42</td><td class="num">28</td><td class="num">11</td><td class="num">2.1 h</td></tr>
+          <tr><td>Kwesi Owusu · Sales</td><td class="num">38</td><td class="num">31</td><td class="num">9</td><td class="num">3.8 h</td></tr>
+          <tr><td>Yasmine Boateng · Inside sales</td><td class="num">29</td><td class="num">22</td><td class="num">7</td><td class="num">1.4 h</td></tr>
+          <tr><td>Unassigned / pool</td><td class="num">24</td><td class="num">18</td><td class="num">4</td><td class="num">6.2 h</td></tr>
+        </tbody>
+      </table>
+      <div class="page-footer"><span class="brand-mark">ISKA HOMES</span><span>Page 7</span></div>
+    </section>
+
+    <!-- 8 Properties by location -->
+    <section class="page" id="p8">
+      <span class="eyebrow">Portfolio</span>
+      <h2 class="section-title"><span class="accent"></span> Properties by location &amp; company offices</h2>
+      <p class="section-lead">Tied to <code>company_locations</code> and listing geo — units, sales, and lead interest per region / office.</p>
+      <table class="data-table" style="margin-bottom:10px;">
+        <thead>
+          <tr>
+            <th>Location / office</th><th>Region</th><th class="num">Listings</th><th class="num">Units</th><th class="num">Sold (YTD)</th><th class="num">Leads</th><th class="num">Rev (GHS M)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>HQ · Airport City</td><td>Greater Accra</td><td class="num">62</td><td class="num">184</td><td class="num">28</td><td class="num">142</td><td class="num">3.8</td></tr>
+          <tr><td>Sales centre · Tema</td><td>Greater Accra</td><td class="num">38</td><td class="num">96</td><td class="num">14</td><td class="num">58</td><td class="num">1.6</td></tr>
+          <tr><td>Regional · Kumasi</td><td>Ashanti</td><td class="num">24</td><td class="num">72</td><td class="num">9</td><td class="num">31</td><td class="num">0.9</td></tr>
+          <tr><td>Regional · Takoradi</td><td>Western</td><td class="num">18</td><td class="num">48</td><td class="num">6</td><td class="num">22</td><td class="num">0.5</td></tr>
+          <tr><td>Online / unassigned geo</td><td>—</td><td class="num">14</td><td class="num">28</td><td class="num">3</td><td class="num">31</td><td class="num">0.2</td></tr>
+        </tbody>
+      </table>
+      <div class="panel glass"><div class="panel-title">Revenue by city (GHS ’000)</div><div class="chart-wrap tall"><canvas id="chPropLocation"></canvas></div></div>
+      <div class="insight"><strong>Sample insight:</strong> Tema centre converts walk-ins at 1.8× HQ phone leads; consider staffing Saturday slots.</div>
+      <div class="page-footer"><span class="brand-mark">ISKA HOMES</span><span>Page 8</span></div>
+    </section>
+
+    <!-- 9 Taxonomy -->
+    <section class="page" id="p9">
+      <h2 class="section-title"><span class="accent"></span> Purpose · type · subtype · listing status</h2>
+      <p class="section-lead">Same slices as <code>PropertiesByCategories</code>, <code>PropertiesByType</code>, <code>PropertiesBySubType</code>, <code>PropertiesByStatus</code>.</p>
+      <div class="row-2">
+        <div class="panel glass"><div class="panel-title">By purpose</div><div class="chart-wrap sm"><canvas id="chPurposes"></canvas></div></div>
+        <div class="panel glass"><div class="panel-title">By type</div><div class="chart-wrap sm"><canvas id="chTypes"></canvas></div></div>
+      </div>
+      <div class="row-2">
+        <div class="panel glass"><div class="panel-title">By subtype</div><div class="chart-wrap sm"><canvas id="chSubtypes"></canvas></div></div>
+        <div class="panel glass"><div class="panel-title">Listing workflow status</div><div class="chart-wrap sm"><canvas id="chListStatus"></canvas></div></div>
+      </div>
+      <div class="page-footer"><span class="brand-mark">ISKA HOMES</span><span>Page 9</span></div>
+    </section>
+
+    <!-- 10 Top properties -->
+    <section class="page" id="p10">
+      <h2 class="section-title"><span class="accent"></span> Top performing properties</h2>
+      <p class="section-lead">By lead volume and by saves — analogous to popular listings / engagement widgets.</p>
+      <div class="row-2">
+        <div>
+          <div class="panel-title">By lead actions (period)</div>
+          <table class="data-table">
+            <thead><tr><th>Listing</th><th>Development</th><th class="num">Leads</th><th class="num">Appts</th><th class="num">Score</th></tr></thead>
+            <tbody>
+              <tr><td>Skyline PH-12</td><td>Iska Ridge</td><td class="num">38</td><td class="num">12</td><td class="num">78</td></tr>
+              <tr><td>Harbour TH-B2</td><td>Harbour View</td><td class="num">31</td><td class="num">9</td><td class="num">71</td></tr>
+              <tr><td>Cedar 3BR-A</td><td>Cedar Courts</td><td class="num">26</td><td class="num">7</td><td class="num">64</td></tr>
+              <tr><td>Eastline TH-04</td><td>Eastline</td><td class="num">22</td><td class="num">5</td><td class="num">59</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <div class="panel-title">By saves &amp; impressions</div>
+          <table class="data-table">
+            <thead><tr><th>Listing</th><th class="num">Saves</th><th class="num">Impr.</th><th class="num">CTR %</th></tr></thead>
+            <tbody>
+              <tr><td>Skyline PH-12</td><td class="num">156</td><td class="num">42.1k</td><td class="num">3.2</td></tr>
+              <tr><td>Harbour TH-B2</td><td class="num">124</td><td class="num">31.4k</td><td class="num">2.8</td></tr>
+              <tr><td>Cedar 3BR-A</td><td class="num">98</td><td class="num">28.0k</td><td class="num">2.4</td></tr>
+              <tr><td>Eastline TH-04</td><td class="num">87</td><td class="num">19.2k</td><td class="num">2.1</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel glass" style="margin-top:10px;"><div class="panel-title">Developments · share of period revenue</div><div class="chart-wrap sm"><canvas id="chDevShare"></canvas></div></div>
+      <div class="page-footer"><span class="brand-mark">ISKA HOMES</span><span>Page 10</span></div>
+    </section>
+
+    <!-- 11 Sales overview -->
+    <section class="page" id="p11">
+      <span class="eyebrow">Sales analytics</span>
+      <h2 class="section-title"><span class="accent"></span> Overview · matches sales dashboard</h2>
+      <div class="dash-row">
+        <div class="dash-card"><div class="icon-ring">₵</div><div class="t">Total revenue</div><div class="v">GHS 4.82M</div></div>
+        <div class="dash-card"><div class="icon-ring">U</div><div class="t">Units sold</div><div class="v">14</div></div>
+        <div class="dash-card"><div class="icon-ring">E</div><div class="t">Expected revenue</div><div class="v">GHS 1.1M</div></div>
+        <div class="dash-card"><div class="icon-ring">⏱</div><div class="t">Avg sales time</div><div class="v">38d</div></div>
+        <div class="dash-card"><div class="icon-ring">%</div><div class="t">Leads → sales</div><div class="v">4.9%</div></div>
+      </div>
+      <div class="panel glass"><div class="panel-title">Sales trend · units &amp; average ticket</div><div class="chart-wrap tall"><canvas id="chSalesCombo"></canvas></div></div>
+      <div class="page-footer"><span class="brand-mark">ISKA HOMES</span><span>Page 11</span></div>
+    </section>
+
+    <!-- 12 Sales location + closed by -->
+    <section class="page" id="p12">
+      <h2 class="section-title"><span class="accent"></span> Sales by location &amp; closed by (team)</h2>
+      <div class="row-2">
+        <div class="panel glass"><div class="panel-title">Revenue by city</div><div class="chart-wrap tall"><canvas id="chSalesLocation"></canvas></div></div>
+        <div class="panel glass"><div class="panel-title">By sale purpose</div><div class="chart-wrap tall"><canvas id="chSalesPurpose"></canvas></div></div>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Property</th><th class="num">Sale price</th><th>Type</th><th>Date</th><th class="num">DOM</th>
+            <th>Closed by</th><th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Skyline A · 4BR</td><td class="num">GHS 1,240,000</td><td>Cash</td><td>18 Mar 2026</td><td class="num">19</td><td>Ama Serwaa</td><td>Sales exec</td></tr>
+          <tr><td>Harbour B2 · 3BR</td><td class="num">GHS 890,000</td><td>Mortgage</td><td>12 Mar 2026</td><td class="num">31</td><td>Kwesi Owusu</td><td>Sales exec</td></tr>
+          <tr><td>Cedar TH-07</td><td class="num">GHS 675,000</td><td>Plan</td><td>05 Mar 2026</td><td class="num">14</td><td>Yasmine Boateng</td><td>Inside sales</td></tr>
+          <tr><td>Eastline PH-12</td><td class="num">GHS 1,050,000</td><td>Cash</td><td>28 Feb 2026</td><td class="num">42</td><td>Ama Serwaa</td><td>Sales exec</td></tr>
+          <tr><td>Iska Ridge TH-03</td><td class="num">GHS 720,000</td><td>Mortgage</td><td>22 Feb 2026</td><td class="num">27</td><td>Kwesi Owusu</td><td>Sales exec</td></tr>
+        </tbody>
+      </table>
+      <div class="page-footer"><span class="brand-mark">ISKA HOMES</span><span>Page 12</span></div>
+    </section>
+
+    <!-- 13 Developments + taxonomy sales -->
+    <section class="page" id="p13">
+      <h2 class="section-title"><span class="accent"></span> Developments by sale · taxonomy</h2>
+      <table class="data-table" style="margin-bottom:10px;">
+        <thead><tr><th>Development</th><th class="num">Units sold</th><th class="num">Revenue (GHS M)</th><th class="num">Avg price</th><th class="num">Share %</th></tr></thead>
+        <tbody>
+          <tr><td>Iska Ridge</td><td class="num">6</td><td class="num">2.1</td><td class="num">350k</td><td class="num">44%</td></tr>
+          <tr><td>Harbour View</td><td class="num">4</td><td class="num">1.4</td><td class="num">350k</td><td class="num">29%</td></tr>
+          <tr><td>Cedar Courts</td><td class="num">2</td><td class="num">0.78</td><td class="num">390k</td><td class="num">16%</td></tr>
+          <tr><td>Eastline Terraces</td><td class="num">2</td><td class="num">0.54</td><td class="num">270k</td><td class="num">11%</td></tr>
+        </tbody>
+      </table>
+      <div class="row-2">
+        <div class="panel glass"><div class="panel-title">Sales by property type</div><div class="chart-wrap"><canvas id="chSalesType"></canvas></div></div>
+        <div class="panel glass"><div class="panel-title">Sales by category</div><div class="chart-wrap"><canvas id="chSalesCategory"></canvas></div></div>
+      </div>
+      <div class="page-footer"><span class="brand-mark">ISKA HOMES</span><span>Page 13</span></div>
+    </section>
+
+    <!-- 14 Service charge lifecycle -->
+    <section class="page" id="p14">
+      <span class="eyebrow">Service charge</span>
+      <h2 class="section-title"><span class="accent"></span> Collection lifecycle · within selected range</h2>
+      <p class="section-lead">Billed vs collected in period, amounts moved out of receivables (waivers, reversals, write-offs), and open buckets.</p>
+      <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);">
+        <div class="kpi-card"><div class="kpi-label">Billed (period)</div><div class="kpi-value">GHS 340k</div><div class="kpi-meta">All cycles opening in range</div></div>
+        <div class="kpi-card"><div class="kpi-label">Collected in range</div><div class="kpi-value">GHS 312k</div><div class="kpi-meta">Payments posted ≤ end date</div></div>
+        <div class="kpi-card"><div class="kpi-label">Collection rate</div><div class="kpi-value">91.2%</div><div class="kpi-meta">Collected ÷ billed</div></div>
+        <div class="kpi-card"><div class="kpi-label">Active client accounts</div><div class="kpi-value">186</div><div class="kpi-meta">With SC schedule</div></div>
+      </div>
+      <table class="data-table" style="margin-bottom:10px;">
+        <thead><tr><th>Bucket</th><th class="num">Cycles</th><th class="num">Amount (GHS)</th><th>Definition (sample)</th></tr></thead>
+        <tbody>
+          <tr><td><span class="tag ok">Collected</span> Paid in period</td><td class="num">104</td><td class="num">312,400</td><td><code>paid_at</code> within range</td></tr>
+          <tr><td><span class="tag">Scheduled</span> Not yet due</td><td class="num">38</td><td class="num">48,200</td><td>Due date &gt; range end</td></tr>
+          <tr><td><span class="tag">Outstanding</span> Due, unpaid</td><td class="num">22</td><td class="num">18,600</td><td>Current &amp; 1–30d</td></tr>
+          <tr><td><span class="tag bad">Overdue</span> &gt; 30d past due</td><td class="num">14</td><td class="num">28,050</td><td>Escalation queue</td></tr>
+          <tr><td><span class="tag bad">Removed / adjusted</span></td><td class="num">6</td><td class="num">9,800</td><td>Waivers, reversals, write-offs in range</td></tr>
+        </tbody>
+      </table>
+      <div class="panel glass"><div class="panel-title">Cash in vs adjustments (GHS ’000)</div><div class="chart-wrap"><canvas id="chSCWaterfall"></canvas></div></div>
+      <p class="section-lead" style="margin-top:8px;">Collection efficiency</p>
+      <div style="max-width:420px;">
+        <div style="font-size:0.68rem;font-weight:700;color:var(--text-soft);">Target 90% · actual 91.2%</div>
+        <div class="progress-bar"><i style="width:91.2%;"></i></div>
+      </div>
+      <div class="page-footer"><span class="brand-mark">ISKA HOMES</span><span>Page 14</span></div>
+    </section>
+
+    <!-- 15 SC aging -->
+    <section class="page" id="p15">
+      <h2 class="section-title"><span class="accent"></span> Aging · concentration · next actions</h2>
+      <table class="data-table" style="margin-bottom:10px;">
+        <thead><tr><th>Aging</th><th class="num">Accounts</th><th class="num">Balance (GHS)</th><th class="num">% of AR</th></tr></thead>
+        <tbody>
+          <tr><td>Current</td><td class="num">142</td><td class="num">12,400</td><td class="num">28%</td></tr>
+          <tr><td>1–30 days</td><td class="num">18</td><td class="num">6,200</td><td class="num">14%</td></tr>
+          <tr><td>31–60 days</td><td class="num">9</td><td class="num">8,900</td><td class="num">20%</td></tr>
+          <tr><td>61–90 days</td><td class="num">5</td><td class="num">7,550</td><td class="num">17%</td></tr>
+          <tr><td>90+ days</td><td class="num">4</td><td class="num">9,200</td><td class="num">21%</td></tr>
+        </tbody>
+      </table>
+      <div class="row-2">
+        <div class="panel glass"><div class="panel-title">AR aging distribution</div><div class="chart-wrap tall"><canvas id="chSCAging"></canvas></div></div>
+        <div>
+          <div class="panel-title">Largest exposures</div>
+          <table class="data-table">
+            <thead><tr><th>Client</th><th>Unit</th><th class="num">Overdue</th><th class="num">Days</th></tr></thead>
+            <tbody>
+              <tr><td>Ridge Holdings Ltd</td><td>Skyline PH-02</td><td class="num">GHS 8,900</td><td class="num">41</td></tr>
+              <tr><td>A. Owusu</td><td>Cedar TH-12</td><td class="num">GHS 4,200</td><td class="num">24</td></tr>
+              <tr><td>K. Mensah</td><td>Harbour B1</td><td class="num">GHS 3,150</td><td class="num">18</td></tr>
+            </tbody>
+          </table>
+          <div class="insight" style="margin-top:10px;"><strong>Playbook:</strong> Legal notice template for 90+ bucket; payment plan for 31–60; SMS drip for due-soon.</div>
+        </div>
+      </div>
+      <div class="page-footer"><span class="brand-mark">ISKA HOMES</span><span>Page 15</span></div>
+    </section>
+
+    <!-- 16 Appointments + ops -->
+    <section class="page" id="p16">
+      <span class="eyebrow">Operations</span>
+      <h2 class="section-title"><span class="accent"></span> Appointments · engagement · team</h2>
+      <div class="row-2">
+        <div class="panel glass"><div class="panel-title">Appointments booked (weekly)</div><div class="chart-wrap"><canvas id="chAppts"></canvas></div></div>
+        <div class="panel glass"><div class="panel-title">Engagement index</div><div class="chart-wrap"><canvas id="chEngageRadar"></canvas></div></div>
+      </div>
+      <table class="data-table" style="margin-bottom:10px;">
+        <thead><tr><th>Operational KPI</th><th class="num">Value</th><th>Benchmark</th></tr></thead>
+        <tbody>
+          <tr><td>Avg. lead response time</td><td class="num">3.2 h</td><td>&lt; 4 h</td></tr>
+          <tr><td>Appointment show-up rate</td><td class="num">78%</td><td>80%</td></tr>
+          <tr><td>Cold lead rate</td><td class="num">8.4%</td><td>&lt; 10%</td></tr>
+          <tr><td>Abandonment rate</td><td class="num">5.1%</td><td>&lt; 7%</td></tr>
+        </tbody>
+      </table>
+      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);">
+        <div class="kpi-card"><div class="kpi-label">Active team</div><div class="kpi-value">24</div><div class="kpi-meta">Sales 8 · Ops 5 · Fin 4</div></div>
+        <div class="kpi-card"><div class="kpi-label">Open CRM tasks</div><div class="kpi-value">47</div><div class="kpi-meta">SLA risk: 6</div></div>
+        <div class="kpi-card"><div class="kpi-label">Training hrs (period)</div><div class="kpi-value">86</div><div class="kpi-meta">Compliance + product</div></div>
+      </div>
+      <p class="section-lead" style="margin-top:10px;font-size:0.68rem;">Live report will source metrics from <code>/api/leads/analytics</code>, <code>/api/sales/*</code>, <code>/api/developers/profile/analytics</code>, listings stats, and <code>client_service_charges</code> with your selected date range.</p>
+      <div class="page-footer"><span class="brand-mark">ISKA HOMES</span><span>Page 16</span></div>
+    </section>
+  </div>
+
+  <script>
+(function () {
+  const P = '#17637C', S = '#F68B1F', Pr = 'rgba(23,99,124,0.35)', Sr = 'rgba(246,139,31,0.45)';
+  Chart.defaults.font.family = "'Poppins',sans-serif";
+  Chart.defaults.color = P;
+
+  const common = { responsive: true, maintainAspectRatio: false };
+
+  new Chart(document.getElementById('chViewsSplit'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Listing', 'Profile', 'Search'],
+      datasets: [{ data: [61, 26, 13], backgroundColor: [P, '#8B5CF6', Sr], borderWidth: 0 }]
+    },
+    options: { ...common, plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, font: { size: 9 } } } } }
+  });
+
+  new Chart(document.getElementById('chPurposeInv'), {
+    type: 'bar',
+    data: {
+      labels: ['Residential', 'Commercial', 'Mixed'],
+      datasets: [{ label: 'Units', data: [312, 68, 48], backgroundColor: P }]
+    },
+    options: { ...common, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: 'rgba(23,99,124,0.08)' } } } }
+  });
+
+  new Chart(document.getElementById('chImpressionCh'), {
+    type: 'polarArea',
+    data: {
+      labels: ['Website', 'Social', 'Share', 'Saved'],
+      datasets: [{ data: [41, 38, 12, 9], backgroundColor: [Pr, Sr, 'rgba(23,99,124,0.55)', 'rgba(246,139,31,0.3)'] }]
+    },
+    options: { ...common, plugins: { legend: { position: 'right', labels: { font: { size: 9 } } } }, scales: { r: { grid: { color: 'rgba(23,99,124,0.12)' } } } }
+  });
+
+  new Chart(document.getElementById('chRevenue'), {
+    type: 'line',
+    data: {
+      labels: ['Oct','Nov','Dec','Jan','Feb','Mar'],
+      datasets: [
+        { label: "Revenue (GHS k)", data: [320,380,410,395,450,482], borderColor: P, backgroundColor: 'rgba(23,99,124,0.12)', fill: true, tension: 0.35 },
+        { label: "Collected (GHS k)", data: [300,360,400,388,430,455], borderColor: S, backgroundColor: 'rgba(246,139,31,0.1)', fill: true, tension: 0.35 }
+      ]
+    },
+    options: { ...common, plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, font: { size: 9 } } } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: 'rgba(23,99,124,0.08)' } } } }
+  });
+
+  new Chart(document.getElementById('chFunnel'), {
+    type: 'bar',
+    data: {
+      labels: ['New','Contacted','Scheduled','Responded','Closed'],
+      datasets: [{ data: [284,198,96,74,62], backgroundColor: [P, Pr, 'rgba(23,99,124,0.5)', Sr, S] }]
+    },
+    options: { ...common, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true }, y: { grid: { display: false } } } }
+  });
+
+  new Chart(document.getElementById('chLeadStatus'), {
+    type: 'bar',
+    data: {
+      labels: ['New','Contacted','Sched.','Responded','Closed','Cold','Abandoned'],
+      datasets: [{ data: [86,74,52,48,62,28,18], backgroundColor: P }]
+    },
+    options: { ...common, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 8 } } }, y: { beginAtZero: true, grid: { color: 'rgba(23,99,124,0.08)' } } } }
+  });
+
+  new Chart(document.getElementById('chLeadActions'), {
+    type: 'bar',
+    data: {
+      labels: ['Phone','WhatsApp','DM','Email','Appt','Save'],
+      datasets: [{ data: [412,896,210,154,103,612], backgroundColor: [P,S,Pr,Sr,P,'rgba(23,99,124,0.5)'] }]
+    },
+    options: { ...common, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 8 } } }, y: { beginAtZero: true, grid: { color: 'rgba(23,99,124,0.08)' } } } }
+  });
+
+  new Chart(document.getElementById('chEngageDepth'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Single action','2 actions','3+ (high)'],
+      datasets: [{ data: [118, 96, 198], backgroundColor: [Pr, Sr, P], borderWidth: 0 }]
+    },
+    options: { ...common, plugins: { legend: { position: 'bottom', labels: { font: { size: 9 } } } } }
+  });
+
+  new Chart(document.getElementById('chChannels'), {
+    type: 'doughnut',
+    data: {
+      labels: ['WhatsApp','Phone','Appt','Email','DM'],
+      datasets: [{ data: [112,68,41,38,25], backgroundColor: [P,Pr,S,Sr,'rgba(23,99,124,0.4)'], borderWidth: 0 }]
+    },
+    options: { ...common, plugins: { legend: { position: 'right', labels: { boxWidth: 8, font: { size: 8 } } } } }
+  });
+
+  new Chart(document.getElementById('chContext'), {
+    type: 'bar',
+    data: {
+      labels: ['Listing','Development','Profile'],
+      datasets: [
+        { label: 'Leads', data: [198,118,96], backgroundColor: P },
+        { label: 'Closed', data: [28,18,16], backgroundColor: S }
+      ]
+    },
+    options: { ...common, plugins: { legend: { position: 'bottom', labels: { font: { size: 9 } } } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: 'rgba(23,99,124,0.08)' } } } }
+  });
+
+  new Chart(document.getElementById('chPropLocation'), {
+    type: 'bar',
+    data: {
+      labels: ['Accra HQ','Tema','Kumasi','Takoradi','Other'],
+      datasets: [{ label: "GHS '000", data: [3800, 1600, 900, 500, 200], backgroundColor: [P, Sr, Pr, S, 'rgba(23,99,124,0.35)'] }]
+    },
+    options: { ...common, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: 'rgba(23,99,124,0.08)' } }, y: { grid: { display: false } } } }
+  });
+
+  new Chart(document.getElementById('chPurposes'), {
+    type: 'pie',
+    data: { labels: ['Sale','Rent','Short stay'], datasets: [{ data: [312, 88, 28], backgroundColor: [P, Sr, Pr] }] },
+    options: { ...common, plugins: { legend: { position: 'bottom', labels: { font: { size: 8 } } } } }
+  });
+
+  new Chart(document.getElementById('chTypes'), {
+    type: 'doughnut',
+    data: { labels: ['Apt','TH','Detached','Land','Comm.'], datasets: [{ data: [168,92,74,54,40], backgroundColor: [P, Sr, Pr, S, 'rgba(23,99,124,0.45)'], borderWidth: 0 }] },
+    options: { ...common, plugins: { legend: { position: 'right', labels: { boxWidth: 8, font: { size: 8 } } } } }
+  });
+
+  new Chart(document.getElementById('chSubtypes'), {
+    type: 'bar',
+    data: { labels: ['2BR','3BR','4BR','Pent','Studio'], datasets: [{ data: [98,124,86,24,18], backgroundColor: P }] },
+    options: { ...common, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 8 } } }, y: { beginAtZero: true, grid: { color: 'rgba(23,99,124,0.08)' } } } }
+  });
+
+  new Chart(document.getElementById('chListStatus'), {
+    type: 'pie',
+    data: { labels: ['Published','Draft','Paused','Sold'], datasets: [{ data: [118,22,16,156], backgroundColor: [P, Pr, Sr, S] }] },
+    options: { ...common, plugins: { legend: { position: 'bottom', labels: { font: { size: 8 } } } } }
+  });
+
+  new Chart(document.getElementById('chDevShare'), {
+    type: 'doughnut',
+    data: { labels: ['Iska Ridge','Harbour','Cedar','Eastline'], datasets: [{ data: [44,29,16,11], backgroundColor: [P,Sr,Pr,S], borderWidth: 0 }] },
+    options: { ...common, plugins: { legend: { position: 'right', labels: { font: { size: 8 } } } } }
+  });
+
+  new Chart(document.getElementById('chSalesCombo'), {
+    type: 'bar',
+    data: {
+      labels: ['Oct','Nov','Dec','Jan','Feb','Mar'],
+      datasets: [
+        { type: 'bar', label: 'Units', data: [8,11,9,10,12,14], backgroundColor: Pr, yAxisID: 'y' },
+        { type: 'line', label: "Avg ticket (GHS k)", data: [820,780,810,795,850,880], borderColor: S, borderWidth: 2, tension: 0.3, yAxisID: 'y1' }
+      ]
+    },
+    options: {
+      ...common,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 9 } } } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { position: 'left', beginAtZero: true, grid: { color: 'rgba(23,99,124,0.08)' } },
+        y1: { position: 'right', grid: { display: false } }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('chSalesLocation'), {
+    type: 'bar',
+    data: { labels: ['Accra','Tema','Kumasi','Takoradi'], datasets: [{ data: [2.8,1.1,0.62,0.3], backgroundColor: [P,Sr,Pr,S] }] },
+    options: { ...common, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true }, y: { grid: { display: false } } } }
+  });
+
+  new Chart(document.getElementById('chSalesPurpose'), {
+    type: 'bar',
+    data: { labels: ['Primary home','Investment','Relocation'], datasets: [{ data: [58, 28, 14], backgroundColor: [P, Sr, Pr] }] },
+    options: { ...common, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 8 } } }, y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' }, grid: { color: 'rgba(23,99,124,0.08)' } } } }
+  });
+
+  new Chart(document.getElementById('chSalesType'), {
+    type: 'bar',
+    data: { labels: ['Apt','TH','Detached'], datasets: [{ data: [6,5,3], backgroundColor: P }] },
+    options: { ...common, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: 'rgba(23,99,124,0.08)' } } } }
+  });
+
+  new Chart(document.getElementById('chSalesCategory'), {
+    type: 'polarArea',
+    data: { labels: ['Luxury','Mid','Starter'], datasets: [{ data: [3,8,3], backgroundColor: [Sr, P, Pr] }] },
+    options: { ...common, plugins: { legend: { position: 'bottom', labels: { font: { size: 9 } } } }, scales: { r: { grid: { color: 'rgba(23,99,124,0.12)' } } } }
+  });
+
+  new Chart(document.getElementById('chSCWaterfall'), {
+    type: 'bar',
+    data: {
+      labels: ['Billed','Collected','Outstanding','Overdue','Adjusted out'],
+      datasets: [{ data: [340, -312, 18.6, 28.1, -9.8], backgroundColor: [P, S, Pr, '#9D2C2C', Sr] }]
+    },
+    options: { ...common, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 8 } } }, y: { grid: { color: 'rgba(23,99,124,0.08)' } } } }
+  });
+
+  new Chart(document.getElementById('chSCAging'), {
+    type: 'bar',
+    data: {
+      labels: ['Current','1–30','31–60','61–90','90+'],
+      datasets: [{ label: 'GHS k', data: [12.4, 6.2, 8.9, 7.55, 9.2], backgroundColor: [P, Pr, Sr, S, '#9D2C2C'] }]
+    },
+    options: { ...common, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 8 } } }, y: { beginAtZero: true, grid: { color: 'rgba(23,99,124,0.08)' } } } }
+  });
+
+  new Chart(document.getElementById('chAppts'), {
+    type: 'line',
+    data: {
+      labels: ['W1','W2','W3','W4'],
+      datasets: [{ data: [14,18,12,20], borderColor: P, backgroundColor: 'rgba(23,99,124,0.12)', fill: true, tension: 0.35 }]
+    },
+    options: { ...common, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: 'rgba(23,99,124,0.08)' } } } }
+  });
+
+  new Chart(document.getElementById('chEngageRadar'), {
+    type: 'radar',
+    data: {
+      labels: ['Views','Saves','Shares','Msgs','Appts'],
+      datasets: [{ data: [88,72,54,63,76], borderColor: S, backgroundColor: 'rgba(246,139,31,0.22)' }]
+    },
+    options: { ...common, plugins: { legend: { display: false } }, scales: { r: { beginAtZero: true, grid: { color: 'rgba(23,99,124,0.12)' } } } }
+  });
+})();
+  </script>
+</body>
+</html>

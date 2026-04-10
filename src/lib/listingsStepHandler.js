@@ -1081,9 +1081,43 @@ async function createSalesListingEntry(listingId, userId, listingData, saleType,
       primaryCurrency = 'GHS' // Default fallback
     }
     
-    const estimatedRevenue = listingData.estimated_revenue || {}
-    const salePrice = estimatedRevenue.estimated_revenue || estimatedRevenue.price || 0
+    const parseMaybeJsonObject = (value) => {
+      if (!value) return {}
+      if (typeof value === 'object') return value
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value)
+          return parsed && typeof parsed === 'object' ? parsed : {}
+        } catch {
+          return {}
+        }
+      }
+      return {}
+    }
+
+    const estimatedRevenue = parseMaybeJsonObject(listingData.estimated_revenue)
+    const pricingData = parseMaybeJsonObject(listingData.pricing)
+    const resolveSaleBaseValue = () => {
+      const candidates = [
+        estimatedRevenue?.estimated_revenue,
+        estimatedRevenue?.price,
+        pricingData?.estimated_revenue,
+        pricingData?.price,
+        listingData?.price
+      ]
+      for (const candidate of candidates) {
+        const value = Number(candidate)
+        if (Number.isFinite(value) && value > 0) return value
+      }
+      return 0
+    }
+    let salePrice = resolveSaleBaseValue()
     
+    const manualAsvValue = Number(salesInfo.asv)
+    if ((!salePrice || salePrice <= 0) && Number.isFinite(manualAsvValue) && manualAsvValue > 0) {
+      salePrice = manualAsvValue
+    }
+
     if (!salePrice || salePrice <= 0) {
       console.error('No sale price available for sales_listings entry')
       return { error: 'No sale price available for this listing.' }
@@ -1098,6 +1132,26 @@ async function createSalesListingEntry(listingId, userId, listingData, saleType,
       commissionAmount = (salePrice * percentage) / 100
     }
 
+    const normalizeAsvBreakdown = (rawBreakdown) => {
+      if (!Array.isArray(rawBreakdown)) return []
+      return rawBreakdown
+        .map((item) => {
+          const name = typeof item?.name === 'string' ? item.name.trim() : ''
+          const value = Number(item?.value)
+          if (!name || !Number.isFinite(value) || value < 0) return null
+          return { name, value: Number(value.toFixed(2)) }
+        })
+        .filter(Boolean)
+    }
+
+    const safeAsvBreakdown = normalizeAsvBreakdown(salesInfo.asv_breakdown)
+    const manualAsv = Number(salesInfo.asv)
+    const deductions = safeAsvBreakdown.reduce((sum, item) => sum + item.value, 0)
+    const computedAsv = Math.max(Number(salePrice || 0) - deductions, 0)
+    const safeAsv = Number.isFinite(manualAsv) && manualAsv >= 0
+      ? Number(manualAsv.toFixed(2))
+      : (safeAsvBreakdown.length > 0 ? Number(computedAsv.toFixed(2)) : null)
+
     const salesEntry = {
       listing_id: listingId,
       user_id: userId || null,
@@ -1109,6 +1163,8 @@ async function createSalesListingEntry(listingId, userId, listingData, saleType,
       sale_source: salesInfo.sale_source || 'Iska Homes',
       buyer_name: salesInfo.buyer_name || null,
       notes: salesInfo.notes || null,
+      asv: safeAsv,
+      asv_breakdown: safeAsvBreakdown,
       commission_rate: commissionRate,
       commission_amount: commissionAmount ? parseFloat(commissionAmount.toFixed(2)) : null
     }
@@ -2056,12 +2112,67 @@ export async function handleStepUpdate(request, params, isNewListing) {
             .maybeSingle()
           
           if (existingSale) {
+            const salesInfo = stepData.sales_info || {}
+            const safeAsvBreakdown = Array.isArray(salesInfo.asv_breakdown)
+              ? salesInfo.asv_breakdown
+                  .map((item) => {
+                    const name = typeof item?.name === 'string' ? item.name.trim() : ''
+                    const value = Number(item?.value)
+                    if (!name || !Number.isFinite(value) || value < 0) return null
+                    return { name, value: Number(value.toFixed(2)) }
+                  })
+                  .filter(Boolean)
+              : []
+            const manualAsv = Number(salesInfo.asv)
+            const parseMaybeJsonObject = (value) => {
+              if (!value) return {}
+              if (typeof value === 'object') return value
+              if (typeof value === 'string') {
+                try {
+                  const parsed = JSON.parse(value)
+                  return parsed && typeof parsed === 'object' ? parsed : {}
+                } catch {
+                  return {}
+                }
+              }
+              return {}
+            }
+
+            const latestEstimatedRevenue = parseMaybeJsonObject(latestListing.estimated_revenue)
+            const existingEstimatedRevenue = parseMaybeJsonObject(existingListing.estimated_revenue)
+            const estimatedRevenue = Object.keys(latestEstimatedRevenue).length > 0 ? latestEstimatedRevenue : existingEstimatedRevenue
+            const latestPricingData = parseMaybeJsonObject(latestListing.pricing)
+            const existingPricingData = parseMaybeJsonObject(existingListing.pricing)
+            const pricingData = Object.keys(latestPricingData).length > 0 ? latestPricingData : existingPricingData
+            const salePrice = (() => {
+              const candidates = [
+                estimatedRevenue?.estimated_revenue,
+                estimatedRevenue?.price,
+                pricingData?.estimated_revenue,
+                pricingData?.price,
+                latestListing?.price,
+                existingListing?.price
+              ]
+              for (const candidate of candidates) {
+                const value = Number(candidate)
+                if (Number.isFinite(value) && value > 0) return value
+              }
+              return 0
+            })()
+            const deductions = safeAsvBreakdown.reduce((sum, item) => sum + item.value, 0)
+            const fallbackAsv = Math.max(salePrice - deductions, 0)
+            const safeAsv = Number.isFinite(manualAsv) && manualAsv >= 0
+              ? Number(manualAsv.toFixed(2))
+              : (safeAsvBreakdown.length > 0 ? Number(fallbackAsv.toFixed(2)) : existingSale.asv)
+
             // Just update the sale_type from 'rented' to 'sold'
             // No revenue recalculation needed since both account for the same thing
             await supabaseAdmin
               .from('sales_listings')
               .update({
                 sale_type: 'sold',
+                asv: safeAsv,
+                asv_breakdown: safeAsvBreakdown.length > 0 ? safeAsvBreakdown : existingSale.asv_breakdown,
                 updated_at: new Date().toISOString()
               })
               .eq('id', existingSale.id)

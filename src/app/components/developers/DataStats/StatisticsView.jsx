@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Line } from 'react-chartjs-2'
 import {
@@ -15,6 +15,13 @@ import {
 import { Loader2 } from 'lucide-react'
 import { DateRangePicker } from '@/app/components/ui/date-range-picker'
 import { ExportDropdown } from '@/app/components/ui/export-dropdown'
+import {
+  mergeStatisticsRows,
+  buildStatisticsExportHtml,
+  openPrintableHtmlDocument,
+  getExportTimestampLabel,
+  csvEscape,
+} from '@/lib/developerExportDocuments'
 
 // Register ChartJS components
 ChartJS.register(
@@ -429,6 +436,29 @@ const StatisticsView = ({ userId: propUserId = null, accountType: propAccountTyp
   const totalListingViews = summary.totalListingViews || 0
   const totalProfileViews = summary.totalProfileViews || 0
 
+  const mergedStatisticsRows = useMemo(
+    () => mergeStatisticsRows(listingViewsData, profileViewsData, viewsData),
+    [listingViewsData, profileViewsData, viewsData]
+  )
+
+  const organizationName =
+    user?.profile?.name ||
+    user?.profile?.organization_name ||
+    'Developer account'
+
+  const formatRangeDate = (iso) => {
+    if (!iso) return ''
+    try {
+      return new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    } catch {
+      return iso
+    }
+  }
+
   // Get period label for headings
   const getPeriodLabel = () => {
     switch (selectedPeriod) {
@@ -462,46 +492,67 @@ const StatisticsView = ({ userId: propUserId = null, accountType: propAccountTyp
             <ExportDropdown
               onExport={async (format) => {
                 if (!dateRange.startDate || !dateRange.endDate || exporting) return
-                
+                if (mergedStatisticsRows.length === 0) return
+
                 setExporting(true)
                 try {
                   const exportData = [
-                    ['Date', 'Listing Views', 'Profile Views', 'Total Views'],
-                    ...viewsData.map((item, index) => {
-                      const listingItem = listingViewsData[index] || { value: 0 }
-                      const profileItem = profileViewsData[index] || { value: 0 }
-                      return [
-                        item.label || '',
-                        listingItem.value || 0,
-                        profileItem.value || 0,
-                        item.value || 0
-                      ]
-                    })
+                    ['Period', 'Listing Views', 'Profile Views', 'Total Views'],
+                    ...mergedStatisticsRows.map((row) => [
+                      row.label,
+                      row.listing,
+                      row.profile,
+                      row.total,
+                    ]),
                   ]
-                  
+
+                  const safeOrg = organizationName.replace(/[^\w\s-]/g, '').trim().slice(0, 40) || 'statistics'
+
                   if (format === 'csv') {
-                    const csvContent = exportData.map(row => row.join(',')).join('\n')
+                    const csvContent = exportData.map((row) => row.map(csvEscape).join(',')).join('\n')
                     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
                     const link = document.createElement('a')
                     const url = URL.createObjectURL(blob)
                     link.setAttribute('href', url)
-                    link.setAttribute('download', `statistics-${dateRange.startDate}-to-${dateRange.endDate}.csv`)
+                    link.setAttribute(
+                      'download',
+                      `${safeOrg}-views-${dateRange.startDate}-to-${dateRange.endDate}.csv`
+                    )
                     link.style.visibility = 'hidden'
                     document.body.appendChild(link)
                     link.click()
                     document.body.removeChild(link)
+                    URL.revokeObjectURL(url)
                   } else if (format === 'excel') {
                     const BOM = '\uFEFF'
-                    const excelContent = BOM + exportData.map(row => row.join('\t')).join('\n')
+                    const excelContent = BOM + exportData.map((row) => row.join('\t')).join('\n')
                     const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' })
                     const link = document.createElement('a')
                     const url = URL.createObjectURL(blob)
                     link.setAttribute('href', url)
-                    link.setAttribute('download', `statistics-${dateRange.startDate}-to-${dateRange.endDate}.xls`)
+                    link.setAttribute(
+                      'download',
+                      `${safeOrg}-views-${dateRange.startDate}-to-${dateRange.endDate}.xls`
+                    )
                     link.style.visibility = 'hidden'
                     document.body.appendChild(link)
                     link.click()
                     document.body.removeChild(link)
+                    URL.revokeObjectURL(url)
+                  } else if (format === 'pdf') {
+                    const dateRangeLabel = `${formatRangeDate(dateRange.startDate)} – ${formatRangeDate(dateRange.endDate)}`
+                    const html = buildStatisticsExportHtml({
+                      organizationName,
+                      dateRangeLabel,
+                      generatedAtLabel: getExportTimestampLabel(),
+                      summary: {
+                        totalViews,
+                        totalListingViews,
+                        totalProfileViews,
+                      },
+                      rows: mergedStatisticsRows,
+                    })
+                    openPrintableHtmlDocument(html, `${organizationName} — Statistics`)
                   }
                 } catch (error) {
                   console.error('Error exporting data:', error)
@@ -510,7 +561,12 @@ const StatisticsView = ({ userId: propUserId = null, accountType: propAccountTyp
                   setExporting(false)
                 }
               }}
-              disabled={exporting || !dateRange.startDate || !dateRange.endDate || (listingViewsData.length === 0 && profileViewsData.length === 0)}
+              disabled={
+                exporting ||
+                !dateRange.startDate ||
+                !dateRange.endDate ||
+                mergedStatisticsRows.length === 0
+              }
             />
           </div>
         </div>

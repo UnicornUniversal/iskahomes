@@ -5,13 +5,21 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Loader2, CreditCard, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { formatCurrency } from '@/lib/utils'
+import { ExportDropdown } from '@/app/components/ui/export-dropdown'
+import {
+  buildServiceChargesExportHtml,
+  openPrintableHtmlDocument,
+  getExportTimestampLabel,
+  csvEscape,
+} from '@/lib/developerExportDocuments'
 
-const LatestServiceCharge = ({ limit = 10 }) => {
+const LatestServiceCharge = ({ limit = 10, currency: currencyProp }) => {
   const { user, developerToken } = useAuth()
   const token = () => developerToken || (typeof window !== 'undefined' ? localStorage.getItem('developer_token') : null)
   const [charges, setCharges] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     if (!user?.id || !token()) {
@@ -82,21 +90,103 @@ const LatestServiceCharge = ({ limit = 10 }) => {
     )
   }
 
-  const currency = 'GHS' // Default; could be derived from user profile
+  const currency = currencyProp || 'GHS'
   const developerSlug = user?.profile?.slug || user?.profile?.id || user?.profile?.organization_slug
+  const organizationName =
+    user?.profile?.name ||
+    user?.profile?.organization_name ||
+    'Developer account'
+
+  const handleExport = async (format) => {
+    if (!charges.length || exporting) return
+    setExporting(true)
+    try {
+      const exportRows = [
+        [
+          'Amount',
+          'Currency',
+          'Status',
+          'Property',
+          'Client',
+          'Period start',
+          'Period end',
+          'Next due',
+        ],
+        ...charges.map((c) => [
+          c.amount,
+          currency,
+          c.isOverdue ? 'Overdue' : c.isDueSoon ? 'Due soon' : c.status || 'Pending',
+          c.unitName && c.unitName !== '—' ? c.unitName : '—',
+          c.clientName || '—',
+          c.periodStart || '',
+          c.periodEnd || '',
+          c.nextDueDate || '',
+        ]),
+      ]
+
+      const safeOrg = organizationName.replace(/[^\w\s-]/g, '').trim().slice(0, 40) || 'service-charges'
+
+      if (format === 'csv') {
+        const csvContent = exportRows.map((row) => row.map(csvEscape).join(',')).join('\n')
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const link = document.createElement('a')
+        const url = URL.createObjectURL(blob)
+        link.href = url
+        link.download = `${safeOrg}-service-charges.csv`
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+      } else if (format === 'excel') {
+        const BOM = '\uFEFF'
+        const excelContent = BOM + exportRows.map((row) => row.join('\t')).join('\n')
+        const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+        const link = document.createElement('a')
+        const url = URL.createObjectURL(blob)
+        link.href = url
+        link.download = `${safeOrg}-service-charges.xls`
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+      } else if (format === 'pdf') {
+        const html = buildServiceChargesExportHtml({
+          organizationName,
+          generatedAtLabel: getExportTimestampLabel(),
+          currency,
+          charges,
+        })
+        openPrintableHtmlDocument(html, `${organizationName} — Service charges`)
+      }
+    } catch (err) {
+      console.error('Service charge export failed:', err)
+      alert('Failed to export. Please try again.')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div className="border border-gray-200 rounded-lg p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary_color/10 flex items-center justify-center">
             <CreditCard className="w-4 h-4 text-primary_color" />
           </div>
           <h3 className="text-base font-bold text-primary_color">Latest Service Charges</h3>
         </div>
-        {charges.length > 0 && (
-          <span className="text-sm text-primary_color">{charges.length}</span>
-        )}
+        <div className="flex items-center gap-3">
+          {charges.length > 0 && (
+            <span className="text-sm text-primary_color tabular-nums">{charges.length}</span>
+          )}
+          <ExportDropdown
+            onExport={handleExport}
+            disabled={exporting || loading || !!error || charges.length === 0}
+            className="shrink-0"
+          />
+        </div>
       </div>
 
       {loading ? (
@@ -107,7 +197,8 @@ const LatestServiceCharge = ({ limit = 10 }) => {
         <div className="text-center py-12 text-sm text-primary_color">{error}</div>
       ) : charges.length > 0 ? (
         <div className="flex flex-col gap-4">
-          {charges.map((charge) => (
+          <div className="summary_height flex flex-col gap-4">
+            {charges.map((charge) => (
             <Link
               key={charge.id}
               href={developerSlug ? `/developer/${developerSlug}/clientManagement/${charge.clientId}` : '#'}
@@ -143,7 +234,8 @@ const LatestServiceCharge = ({ limit = 10 }) => {
                 </div>
               </div>
             </Link>
-          ))}
+            ))}
+          </div>
 
           {developerSlug && (
             <div className="mt-4 pt-4 border-t border-gray-100">

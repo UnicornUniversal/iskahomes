@@ -99,7 +99,7 @@ const RecentMessages = ({ userId: propUserId = null, accountType: propAccountTyp
         </div>
       ) : (
         <div className="flex flex-col flex-1">
-          <div className="space-y-3">
+          <div className="summary_height space-y-3">
             {messages.map((message) => (
               <Link
                 key={message.id}
