@@ -113,13 +113,8 @@ const AllAgents = () => {
   return (
     <Layout1>
       <div className="min-h-screen relative overflow-hidden font-sans">
-         {/* Abstract Background Shapes */}
-         <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-            <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-primary_color/5 rounded-full blur-3xl"></div>
-            <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-secondary_color/5 rounded-full blur-3xl"></div>
-         </div>
 
-        <div className="relative z-10 pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-8xl mx-auto">
+        <div className="relative z-10 pb-20 px-4 sm:px-6 lg:px-8 max-w-8xl mx-auto">
           <GeneralHeader
             headingOne="Discover"
             headingTwo="Agents"

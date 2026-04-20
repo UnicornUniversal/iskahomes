@@ -35,6 +35,11 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "Iska Homes",
   description: "Your Dream Property Awaits You",
+  icons: {
+    icon: "/ISKA Logo.png",
+    shortcut: "/ISKA Logo.png",
+    apple: "/ISKA Logo.png",
+  },
 };
 
 export default function RootLayout({ children }) {

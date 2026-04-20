@@ -139,9 +139,6 @@ const AllAgencies = () => {
   return (
     <Layout1>
       <div className="min-h-screen relative overflow-hidden">
-        {/* Background Element - utilizing the global gradient class if available or a custom one */}
-        <div className="fixed inset-0 pointer-events-none z-[-1] ocean-sunset_main_bg opacity-30"></div>
-        <div className="fixed inset-0 pointer-events-none z-[-2] bg-white/80"></div>
 
         <GeneralHeader
           headingOne="Discover"

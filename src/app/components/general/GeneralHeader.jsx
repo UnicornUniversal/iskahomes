@@ -14,18 +14,13 @@ const GeneralHeader = ({
   className = ''
 }) => {
   return (
-    <section className={`w-full  px-4 sm:px-6 lg:px-8 pt-8  ${className}`}>
-      <div className=" mx-auto">
-        {/* Tier 1: First heading + top-right icon */}
-        <div className="flex md:justify-between justify-start items-start flex-wrap">
-          <h2 className="text-5xl sm:text-4xl md:text-[10em]  font-semibold text-primary_color tracking-tight">
-            {headingOne}
+    <section className={`w-full ${className}`} style={{ position: 'relative' }}>
+      <div className="px-4 sm:px-6 lg:px-8 mx-auto" style={{ paddingTop: '60px', paddingBottom: '0' }}>
+        {/* Tier 1: Heading */}
+        <div className="flex justify-start items-start flex-wrap">
+          <h2 style={{ fontSize: 'clamp(2.4rem, 5vw, 4rem)' }} className="font-medium text-primary_color tracking-tight">
+            {headingOne} {headingTwo}
           </h2>
-
-     
-           <h2 className="text-5xl self-end sm:text-4xl md:text-[10em]  font-semibold text-primary_color tracking-tight">
-              {headingTwo}
-            </h2>
        
           {/* {topRightIcon != null ? (
             topRightIcon

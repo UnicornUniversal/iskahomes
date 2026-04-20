@@ -155,7 +155,7 @@ const AllDevelopersPage = () => {
     <>
     <Nav />
     <Layout1>
-      <div className="min-h-screen">
+      <div className="min-h-screen relative overflow-hidden">
       <GeneralHeader
         headingOne="Discover"
         headingTwo="Developers"

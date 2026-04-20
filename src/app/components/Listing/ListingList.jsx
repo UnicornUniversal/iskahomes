@@ -1,9 +1,58 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { motion, LayoutGroup } from 'framer-motion'
 import SecondaryListingCard from './SecondaryListingCard'
 
-const ListingList = ({ listings = [], loading = false, error = null }) => {
+// Fisher-Yates shuffle (returns new array)
+function shuffleArray(arr) {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+const ListingList = ({
+  listings = [],
+  loading = false,
+  error = null,
+  col1Y,
+  col2Y,
+  col3Y,
+  col1Opacity,
+  col2Opacity,
+  col3Opacity,
+  shuffleActive = false,
+}) => {
+  // Shuffled order — holds array of listing ids/indices in display order
+  const [displayOrder, setDisplayOrder] = useState([])
+  const [hovered, setHovered] = useState(false)
+  const intervalRef = useRef(null)
+
+  // Initialise display order when listings arrive
+  useEffect(() => {
+    if (listings.length > 0) {
+      setDisplayOrder(listings.map((_, i) => i))
+    }
+  }, [listings])
+
+  // Shuffle every 3s when active and not hovered
+  useEffect(() => {
+    if (shuffleActive && !hovered && listings.length > 0) {
+      intervalRef.current = setInterval(() => {
+        setDisplayOrder((prev) => shuffleArray(prev))
+      }, 3000)
+    } else if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [shuffleActive, hovered, listings.length])
+
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -42,15 +91,66 @@ const ListingList = ({ listings = [], loading = false, error = null }) => {
     )
   }
 
+  // Build ordered list from displayOrder
+  const ordered = displayOrder.length === listings.length
+    ? displayOrder.map((i) => listings[i])
+    : listings
+
+  // Round-robin distribute into 3 columns — always even, no gaps
+  const colItems = [[], [], []]
+  ordered.forEach((listing, i) => {
+    colItems[i % 3].push(listing)
+  })
+
+  const columns = [
+    { items: colItems[0], y: col1Y, opacity: col1Opacity },
+    { items: colItems[1], y: col2Y, opacity: col2Opacity },
+    { items: colItems[2], y: col3Y, opacity: col3Opacity },
+  ]
+
   return (
     <div className="w-full">
-      <div className="grid grid-cols-1 md:grid-cols-2 items-center justify-center lg:grid-cols-3 xl:grid-cols-4 gap-5 ">
-        {listings.map((listing, index) => (
-          <div key={listing.id || index} className={index % 2 === 0 ? ' md:mt-[10em]' : ' mt-0'}>
-            <SecondaryListingCard listing={listing} />
-          </div>
-        ))}
-      </div>
+      <LayoutGroup>
+        <div
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '20px',
+            alignItems: 'start',
+          }}
+        >
+          {columns.map((col, colIdx) => (
+            <motion.div
+              key={colIdx}
+              style={{
+                y: col.y,
+                opacity: col.opacity,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px',
+              }}
+            >
+              {col.items.map((listing) => (
+                <motion.div
+                  key={listing.id}
+                  layout
+                  transition={{
+                    layout: { type: 'spring', stiffness: 120, damping: 20, mass: 0.8 }
+                  }}
+                  style={{ aspectRatio: '16 / 10' }}
+                >
+                  <SecondaryListingCard
+                    listing={listing}
+                    overlay
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
+          ))}
+        </div>
+      </LayoutGroup>
     </div>
   )
 }
