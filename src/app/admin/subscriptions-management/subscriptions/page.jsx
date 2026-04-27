@@ -547,7 +547,7 @@ const SubscriptionsPage = () => {
     if (!endDate) return ''
     const end = new Date(endDate)
     const graceEnd = new Date(end)
-    graceEnd.setDate(graceEnd.getDate() + 7)
+    graceEnd.setDate(graceEnd.getDate() + 14)
     return graceEnd.toISOString().split('T')[0]
   }
 

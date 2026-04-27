@@ -2,6 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Navigation, Pagination } from 'swiper/modules'
 import { User } from 'lucide-react'
@@ -9,7 +10,7 @@ import 'swiper/css'
 import 'swiper/css/navigation'
 import 'swiper/css/pagination'
 
-const AgentsSwiper = ({ agents = [] }) => {
+const AgentsSwiper = ({ agents = [], leadAttributionContext = 'profile' }) => {
   if (!agents || agents.length === 0) {
     return null
   }
@@ -41,7 +42,7 @@ const AgentsSwiper = ({ agents = [] }) => {
         {agents.map((agent) => (
           <SwiperSlide key={agent.id}>
             <Link 
-              href={`/home/allAgents/${agent.slug}`} 
+              href={withWebsiteLeadAttribution(`/home/allAgents/${agent.slug}`, leadAttributionContext)} 
               className="bg-white rounded-xl p-4 flex flex-col items-center gap-4 hover:shadow-lg transition-all border border-gray-100 group h-full"
             >
               <div className="w-20 h-20 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border-2 border-gray-200 group-hover:border-primary_color transition-colors">

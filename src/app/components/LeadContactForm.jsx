@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useId } from 'react'
 import { toast } from 'react-toastify'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -9,6 +9,7 @@ import { FaMapMarkerAlt, FaPhone, FaEnvelope, FaCheckCircle, FaVideo, FaUserFrie
 import { FaWhatsapp } from 'react-icons/fa6'
 import { HiOutlineCalendar, HiOutlineClock } from 'react-icons/hi'
 import CustomDropdown from '@/app/components/propertyManagement/modules/CustomDropdown'
+import { resolveLeadAttributionFromSearchString } from '@/lib/leadAttributionResolve'
 
 /**
  * LeadContactForm - Universal contact form for leads
@@ -41,12 +42,19 @@ const LeadContactForm = ({
   development,
   profile
 }) => {
-  const { user, propertySeekerToken } = useAuth()
+  const { user, propertySeekerToken, loading: authLoading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const analytics = useAnalytics()
-  // Read share_medium from URL for lead attribution (lead_source) - set when link was shared via WhatsApp, copy, etc.
-  const leadSourceFromUrl = searchParams?.get('share_medium') || null
+  const urlLeadAttribution = useMemo(() => {
+    const qs = searchParams?.toString?.() ?? ''
+    return resolveLeadAttributionFromSearchString(qs ? `?${qs}` : '')
+  }, [searchParams])
+  // Unique per instance: property page mounts 2+ LeadContactForms; duplicate id="appointment-form" breaks form= submit
+  const formUid = useId().replace(/:/g, '')
+  const appointmentFormId = `lead-appointment-${formUid}`
+  const messageFormId = `lead-message-${formUid}`
+
   const [activeTab, setActiveTab] = useState('appointment')
   const [mode, setMode] = useState('in-person')
   const [loading, setLoading] = useState(false)
@@ -65,6 +73,15 @@ const LeadContactForm = ({
     date: '', time: '', name: '', email: '', phone: '', message: ''
   })
   const [messageData, setMessageData] = useState({ message: '' })
+
+  const FIELD_REQUIRED_MSG = 'Field Required!'
+  const [appointmentFieldErrors, setAppointmentFieldErrors] = useState({
+    date: '',
+    time: '',
+    name: '',
+    email: '',
+    emailInvalid: '',
+  })
 
   useEffect(() => {
     if (user && user.user_type === 'property_seeker' && user.profile) {
@@ -227,8 +244,6 @@ const LeadContactForm = ({
     development_id: contextType === 'development' ? (developmentId || development?.id) : null,
     profileId: contextType === 'profile' ? (profileId || profile?.id || developer?.developer_id) : null,
     profile_id: contextType === 'profile' ? (profileId || profile?.id || developer?.developer_id) : null,
-    // Lead attribution: share_medium from URL (whatsapp, copy_link, facebook, etc.) - defaults to 'website' if direct visit
-    lead_source: leadSourceFromUrl || 'website',
     // CRITICAL: Pass listing so useAnalytics getListerContext extracts user_id + account_type for agents
     ...(listing && { listing }),
     // For profile context: pass lister_id/lister_type so agent/agency leads are attributed correctly
@@ -239,11 +254,28 @@ const LeadContactForm = ({
       agency_id: profile.agency_id
     }),
     developerId: developer?.developer_id,
-    ...extra
+    ...extra,
+    // Lead attribution after ...extra so undefined keys do not wipe URL-resolved values
+    lead_source: extra.lead_source ?? urlLeadAttribution.lead_source,
+    lead_source_context: extra.lead_source_context ?? urlLeadAttribution.lead_source_context,
   })
 
   // Handlers
-  const handleAppointmentInputChange = (e) => setAppointmentData(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  const handleAppointmentInputChange = (e) => {
+    const fieldName = e.target.name
+    setAppointmentData(prev => ({ ...prev, [fieldName]: e.target.value }))
+    setAppointmentFieldErrors(prev => {
+      const next = { ...prev }
+      if (fieldName === 'date') next.date = ''
+      if (fieldName === 'time') next.time = ''
+      if (fieldName === 'name') next.name = ''
+      if (fieldName === 'email') {
+        next.email = ''
+        next.emailInvalid = ''
+      }
+      return next
+    })
+  }
   const handleMessageInputChange = (e) => setMessageData({ message: e.target.value })
   
   const handlePhoneClick = async (e) => {
@@ -316,19 +348,37 @@ const LeadContactForm = ({
       return
     }
     
-    // Validate required fields
-    if (!appointmentData.date || !appointmentData.time || !appointmentData.name || !appointmentData.email) {
-      toast.error("Please fill in all required fields")
-      return
-    }
-    
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(appointmentData.email)) {
-      toast.error("Please enter a valid email address")
+    const d = (appointmentData.date || '').trim()
+    const t = (appointmentData.time || '').trim()
+    const n = (appointmentData.name || '').trim()
+    const em = (appointmentData.email || '').trim()
+
+    const nextErrors = {
+      date: '',
+      time: '',
+      name: '',
+      email: '',
+      emailInvalid: '',
+    }
+    if (!d) nextErrors.date = FIELD_REQUIRED_MSG
+    if (!t) nextErrors.time = FIELD_REQUIRED_MSG
+    if (!n) nextErrors.name = FIELD_REQUIRED_MSG
+    if (!em) nextErrors.email = FIELD_REQUIRED_MSG
+    else if (!emailRegex.test(em)) nextErrors.emailInvalid = 'Invalid email.'
+
+    const hasErrors =
+      nextErrors.date ||
+      nextErrors.time ||
+      nextErrors.name ||
+      nextErrors.email ||
+      nextErrors.emailInvalid
+    setAppointmentFieldErrors(nextErrors)
+    if (hasErrors) {
+      toast.error('Please complete the required fields (see red hints above).', { autoClose: 3500 })
       return
     }
-    
+
     setLoading(true)
     
     const listingId = contextType === 'listing' ? (propertyId || listing?.id) : null
@@ -352,11 +402,11 @@ const LeadContactForm = ({
             account_id: accountId,
             listing_id: listingId,
             seeker_id: user.id,
-            appointment_date: appointmentData.date,
-            appointment_time: appointmentData.time,
-            client_name: appointmentData.name,
-            client_email: appointmentData.email,
-            client_phone: appointmentData.phone || null,
+            appointment_date: d,
+            appointment_time: t,
+            client_name: n,
+            client_email: em,
+            client_phone: (appointmentData.phone || '').trim() || null,
             notes: appointmentData.message || null,
             appointment_type: appointmentType,
           }),
@@ -370,6 +420,7 @@ const LeadContactForm = ({
         
         setLoading(false)
         toast.update(toastId, { type: 'success', render: "Appointment request sent!", autoClose: 3000, isLoading: false })
+        setAppointmentFieldErrors({ date: '', time: '', name: '', email: '', emailInvalid: '' })
         analytics.trackAppointmentClick(getAnalyticsContext({ appointmentType: mode === 'video' ? 'virtual' : 'viewing' })).catch(() => {})
       } catch (error) {
         setLoading(false)
@@ -377,11 +428,29 @@ const LeadContactForm = ({
       }
       return
     }
-    
-    // Profile/development context: show toast immediately, track lead in background
+
     setLoading(false)
-    toast.success("Appointment request sent!")
-    analytics.trackAppointmentClick(getAnalyticsContext({ appointmentType: mode === 'video' ? 'virtual' : 'viewing' })).catch(err => console.error('Analytics error:', err))
+
+    // Listing page but booking API was skipped — tell the user why (never fake success here)
+    if (contextType === 'listing' && listingId) {
+      if (!token) {
+        toast.error('Your session expired. Please log in again to book.')
+        router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'))
+        return
+      }
+      if (accountId === 'unknown') {
+        toast.error('We could not load the host for this listing. Refresh the page or contact support.')
+        return
+      }
+      if (!['developer', 'agent', 'agency'].includes(accountType)) {
+        toast.error('This listing cannot accept online bookings yet.')
+        return
+      }
+    }
+
+    // Profile/development context: optimistic UX only — no persisted appointment API yet
+    setAppointmentFieldErrors({ date: '', time: '', name: '', email: '', emailInvalid: '' })
+    toast.success('Appointment request sent!')
   }
   
   const handleMessageSubmit = async (e) => {
@@ -595,7 +664,7 @@ const LeadContactForm = ({
           </div>
         )}
         {activeTab === 'appointment' ? (
-          <form onSubmit={handleAppointmentSubmit} className="space-y-4" id="appointment-form">
+          <form noValidate onSubmit={handleAppointmentSubmit} className="space-y-4" id={appointmentFormId}>
             <h2 className="text-base font-bold text-primary_color mb-1">
               Schedule a tour with us!
             </h2>
@@ -617,7 +686,9 @@ const LeadContactForm = ({
             {/* Date & Time Row */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-primary_color">Date</label>
+                <label className="text-xs font-semibold text-primary_color">
+                  Date<span className="text-red-600 ml-0.5" aria-hidden>*</span>
+                </label>
                 <div className="relative">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-primary_color/50">
                     <HiOutlineCalendar className="w-4 h-4" />
@@ -629,13 +700,21 @@ const LeadContactForm = ({
                     min={new Date().toISOString().split('T')[0]}
                     value={appointmentData.date}
                     onChange={handleAppointmentInputChange}
-                    className="w-full bg-gray-50 text-sm text-primary_color font-medium rounded-lg border border-gray-200 pl-10 pr-3 py-2.5 focus:ring-2 focus:ring-primary_color/20 focus:border-primary_color focus:bg-white transition-all outline-none"
+                    aria-invalid={!!appointmentFieldErrors.date}
+                    className={`w-full bg-gray-50 text-sm text-primary_color font-medium rounded-lg border pl-10 pr-3 py-2.5 focus:ring-2 focus:ring-primary_color/20 focus:border-primary_color focus:bg-white transition-all outline-none ${
+                      appointmentFieldErrors.date ? 'border-red-500 ring-1 ring-red-200' : 'border-gray-200'
+                    }`}
                   />
                 </div>
+                {appointmentFieldErrors.date && (
+                  <p className="text-red-600 mt-0.5 text-[10px] leading-tight">{appointmentFieldErrors.date}</p>
+                )}
               </div>
               
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-primary_color">Time</label>
+                <label className="text-xs font-semibold text-primary_color">
+                  Time<span className="text-red-600 ml-0.5" aria-hidden>*</span>
+                </label>
                 <div className="relative">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-primary_color/50">
                     <HiOutlineClock className="w-4 h-4" />
@@ -646,28 +725,53 @@ const LeadContactForm = ({
                     required
                     value={appointmentData.time}
                     onChange={handleAppointmentInputChange}
-                    className="w-full bg-gray-50 text-sm text-primary_color font-medium rounded-lg border border-gray-200 pl-10 pr-3 py-2.5 focus:ring-2 focus:ring-primary_color/20 focus:border-primary_color focus:bg-white transition-all outline-none"
+                    aria-invalid={!!appointmentFieldErrors.time}
+                    className={`w-full bg-gray-50 text-sm text-primary_color font-medium rounded-lg border pl-10 pr-3 py-2.5 focus:ring-2 focus:ring-primary_color/20 focus:border-primary_color focus:bg-white transition-all outline-none ${
+                      appointmentFieldErrors.time ? 'border-red-500 ring-1 ring-red-200' : 'border-gray-200'
+                    }`}
                   />
                 </div>
+                {appointmentFieldErrors.time && (
+                  <p className="text-red-600 mt-0.5 text-[10px] leading-tight">{appointmentFieldErrors.time}</p>
+                )}
               </div>
             </div>
 
             {/* Inputs */}
-            {['name', 'email', 'phone'].map((field) => (
-              <div key={field} className="space-y-1.5">
-                <label className="text-xs font-semibold text-primary_color capitalize">{field}</label>
-                <input
-                  type={field === 'email' ? 'email' : field === 'phone' ? 'tel' : 'text'}
-                  name={field}
-                  required={field !== 'phone'}
-                  value={appointmentData[field]}
-                  onChange={handleAppointmentInputChange}
-                  placeholder={`Enter your ${field}`}
-                  minLength={field === 'name' ? 2 : undefined}
-                  className="w-full bg-gray-50 text-sm text-primary_color font-medium rounded-lg border border-gray-200 px-3 py-2.5 focus:ring-2 focus:ring-primary_color/20 focus:border-primary_color focus:bg-white transition-all outline-none placeholder-gray-400"
-                />
-              </div>
-            ))}
+            {['name', 'email', 'phone'].map((field) => {
+              const fieldErr =
+                field === 'email'
+                  ? appointmentFieldErrors.email || appointmentFieldErrors.emailInvalid
+                  : appointmentFieldErrors[field]
+              return (
+                <div key={field} className="space-y-1.5">
+                  <label className="text-xs font-semibold text-primary_color capitalize">
+                    {field}
+                    {field !== 'phone' && (
+                      <span className="text-red-600 ml-0.5" aria-hidden>
+                        *
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type={field === 'email' ? 'email' : field === 'phone' ? 'tel' : 'text'}
+                    name={field}
+                    required={field !== 'phone'}
+                    value={appointmentData[field]}
+                    onChange={handleAppointmentInputChange}
+                    placeholder={`Enter your ${field}`}
+                    minLength={field === 'name' ? 2 : undefined}
+                    aria-invalid={!!fieldErr}
+                    className={`w-full bg-gray-50 text-sm text-primary_color font-medium rounded-lg border px-3 py-2.5 focus:ring-2 focus:ring-primary_color/20 focus:border-primary_color focus:bg-white transition-all outline-none placeholder-gray-400 ${
+                      fieldErr ? 'border-red-500 ring-1 ring-red-200' : 'border-gray-200'
+                    }`}
+                  />
+                  {fieldErr && (
+                    <p className="text-red-600 mt-0.5 text-[10px] leading-tight">{fieldErr}</p>
+                  )}
+                </div>
+              )
+            })}
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-primary_color">Notes</label>
@@ -682,13 +786,15 @@ const LeadContactForm = ({
             </div>
           </form>
         ) : (
-          <form onSubmit={handleMessageSubmit} className="space-y-4" id="message-form">
+          <form noValidate onSubmit={handleMessageSubmit} className="space-y-4" id={messageFormId}>
             <h2 className="text-base font-bold text-primary_color mb-1">
               Send us a message
             </h2>
             
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-primary_color">Your Message</label>
+              <label className="text-xs font-semibold text-primary_color">
+                Your Message<span className="text-red-600 ml-0.5" aria-hidden>*</span>
+              </label>
               <textarea
                 name="message"
                 rows={5}
@@ -707,12 +813,29 @@ const LeadContactForm = ({
       {/* --- STICKY FOOTER BUTTON --- */}
       <div className="sticky bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 flex-shrink-0">
         <button
-          type="submit"
-          onClick={activeTab === 'appointment' ? handleAppointmentSubmit : handleMessageSubmit}
-          disabled={loading || sendingMessage || !user || user.user_type !== 'property_seeker'}
+          type="button"
+          disabled={loading || sendingMessage || authLoading}
+          title={
+            authLoading
+              ? 'Checking session…'
+              : !user
+                ? 'Log in as a property seeker to continue'
+                : user.user_type !== 'property_seeker'
+                  ? 'Only property seekers can use this form'
+                  : undefined
+          }
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            if (authLoading) return
+            if (activeTab === 'appointment') void handleAppointmentSubmit(e)
+            else void handleMessageSubmit(e)
+          }}
           className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg shadow-md shadow-orange-500/20 transform active:scale-[0.98] transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
         >
-          {loading || sendingMessage ? (
+          {authLoading ? (
+            <span className="text-sm font-medium">Checking session…</span>
+          ) : loading || sendingMessage ? (
             <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
           ) : (
             <>

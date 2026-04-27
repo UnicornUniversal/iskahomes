@@ -30,7 +30,9 @@ import {
   Users
 } from 'lucide-react'
 import LeadContactForm from '@/app/components/LeadContactForm'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 import Nav from '@/app/components/Nav'
+import ShareModal from '@/app/components/ui/ShareModal'
 import { toast } from 'react-toastify'
 
 const AgentProfile = () => {
@@ -41,6 +43,7 @@ const AgentProfile = () => {
   const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [showShareModal, setShowShareModal] = useState(false)
 
   useEffect(() => {
     if (slug) {
@@ -175,12 +178,21 @@ const AgentProfile = () => {
 
                     {/* Agent Details - Text */}
                     <div className="flex-1 text-white mb-2">
-                         <div className="flex items-center gap-3 mb-2">
-                             <h1 className="text-4xl md:text-5xl text-white tracking-tight">{agent.name}</h1>
+                         <div className="flex items-start justify-between gap-3 mb-2">
+                             <h1 className="text-4xl md:text-5xl text-white tracking-tight pr-2">{agent.name}</h1>
+                             <button
+                               type="button"
+                               onClick={() => setShowShareModal(true)}
+                               className="shrink-0 w-11 h-11 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 flex items-center justify-center transition-colors"
+                               title="Share profile"
+                               aria-label="Share agent profile"
+                             >
+                               <Share2 className="w-5 h-5 text-white" />
+                             </button>
                          </div>
                          
                          {agency && (
-                             <Link href={`/home/allAgencies/${agency.slug}`} className="group flex items-center gap-3 mb-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full w-fit border border-white/20 hover:bg-white/20 transition-all">
+                             <Link href={withWebsiteLeadAttribution(`/home/allAgencies/${agency.slug}`, 'profile')} className="group flex items-center gap-3 mb-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full w-fit border border-white/20 hover:bg-white/20 transition-all">
                                  {agencyImage ? (
                                     <img src={agencyImage} alt={agency.name} className="w-6 h-6 rounded-full object-cover" />
                                  ) : (
@@ -269,7 +281,7 @@ const AgentProfile = () => {
                                     const availableFrom = listing.available_from ? new Date(listing.available_from).toLocaleDateString() : 'Now';
 
                                     return (
-                                    <Link href={`/home/property/${listing.listing_type || 'for-sale'}/${listing.slug}/${listing.id}`} key={listing.id}>
+                                    <Link href={withWebsiteLeadAttribution(`/home/property/${listing.listing_type || 'for-sale'}/${listing.slug}/${listing.id}`, 'profile')} key={listing.id}>
                                          <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer group h-full flex flex-col">
                                              {/* Image Section - Matching ListingCard height */}
                                              <div className="relative h-64 w-full overflow-hidden">
@@ -385,6 +397,13 @@ const AgentProfile = () => {
                 </div>
             </div>
         </div>
+
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        property={agent}
+        propertyType="agent"
+      />
     </div>
   )
 }

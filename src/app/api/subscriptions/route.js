@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { gracePeriodEndFromEndDate } from '@/lib/subscriptionGracePolicy'
 
 const ACTIVE_SUBSCRIPTION_STATUSES = ['pending', 'active', 'grace_period']
 const VALID_SUBSCRIPTION_TYPES = ['package', 'addon']
@@ -360,9 +361,8 @@ export async function POST(request) {
     const endDate = new Date(startDate)
     endDate.setMonth(endDate.getMonth() + durationMonths)
     
-    // Calculate grace period end date (end_date + 7 days)
-    const gracePeriodEndDate = new Date(endDate)
-    gracePeriodEndDate.setDate(gracePeriodEndDate.getDate() + 7)
+    // Calculate grace period end date (end_date + GRACE_PERIOD_DAYS)
+    const gracePeriodEndDate = gracePeriodEndFromEndDate(endDate)
 
     let subscriptionId
     let subscriptionData

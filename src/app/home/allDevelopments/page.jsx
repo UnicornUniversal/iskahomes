@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, Building2, Check, Filter, MapPin, X } from 'lucide-react'
 import Nav from '@/app/components/Nav'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 import FeaturedDevelopments from '@/app/components/general/FeaturedDevelopments'
 import GeneralHeader from '@/app/components/general/GeneralHeader'
 
@@ -620,7 +621,7 @@ const AllDevelopmentsPage = () => {
                     const developerImageUrl = getImageUrl(development.developers?.profile_image)
 
                     return (
-                      <Link key={development.id} href={`/home/allDevelopments/${development.slug}`}>
+                      <Link key={development.id} href={withWebsiteLeadAttribution(`/home/allDevelopments/${development.slug}`, 'development')}>
                         <div className="group cursor-pointer h-full">
                           <div className="relative overflow-hidden rounded-xl border border-slate-200 hover:shadow-xl transition-all duration-300 h-full flex flex-col">
                             {bannerUrl ? (

@@ -49,6 +49,7 @@ import ListingList from '@/app/components/Listing/ListingList'
 import { getAmenityIcon, getAmenityName, getAmenityById } from '@/lib/StaticData'
 import { getSpecificationDataByTypeName, getSpecificationDataByTypeId, getFieldDataByKey } from '@/app/components/Data/StaticData'
 import { toast } from 'react-toastify'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 
 const PropertyDetailPage = () => {
   const params = useParams()
@@ -788,6 +789,10 @@ const PropertyDetailPage = () => {
                                 src={plan.url}
                                 alt={`Floor plan ${index + 1}`}
                                 className="w-full h-full object-contain"
+                                onError={(e) => {
+                                  if (e.currentTarget.src.includes('bg.jpg')) return
+                                  e.currentTarget.src = '/bg.jpg'
+                                }}
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -803,6 +808,10 @@ const PropertyDetailPage = () => {
                           src={floorPlan.url}
                           alt="Floor plan"
                           className="w-full h-full object-contain"
+                          onError={(e) => {
+                            if (e.currentTarget.src.includes('bg.jpg')) return
+                            e.currentTarget.src = '/bg.jpg'
+                          }}
                         />
                       </div>
                     ) : null}
@@ -973,28 +982,26 @@ const PropertyDetailPage = () => {
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                      {amenities.general?.map((amenity, index) => {
                        const amenityData = getAmenityById(amenity)
-                       const IconComponent = amenityData?.icon
-                       const amenityName = getAmenityName(amenity)
+                       const IconComponent = amenityData?.icon || CheckCircle
+                       const amenityName = getAmenityName(amenity) || 'Amenity'
                        return (
-                         <div key={index} className="flex items-center p-4 text-left gap-2">
-                           {IconComponent && <IconComponent className="box_holder w-10 h-10" />}
-                          
-                             <p className="">{amenityName}</p>
-                          
+                         <div key={`amenity-gen-${String(amenity)}-${index}`} className="flex items-center p-4 text-left gap-2">
+                           <IconComponent className="box_holder w-10 h-10 flex-shrink-0" aria-hidden />
+                           <p className="">{amenityName}</p>
                          </div>
                        )
                      })}
                     {amenities.database?.map((amenity, index) => (
-                      <div key={index} className="flex p-4 text-left gap-2">
-                        <CheckCircle className="box_holder w-10 h-10" />
+                      <div key={`amenity-db-${amenity?.id ?? index}-${index}`} className="flex p-4 text-left gap-2">
+                        <CheckCircle className="box_holder w-10 h-10 flex-shrink-0" aria-hidden />
                         <div className="flex flex-col items-start">
                           <p className="text-lg font-semibold text-[0.7em] mb-1">Custom Amenity</p>
                         </div>
                       </div>
                     ))}
                     {amenities.custom?.map((amenity, index) => (
-                      <div key={index} className="flex p-4 text-left gap-2">
-                        <Star className="box_holder w-10 h-10" />
+                      <div key={`amenity-custom-${String(amenity)}-${index}`} className="flex p-4 text-left gap-2">
+                        <Star className="box_holder w-10 h-10 flex-shrink-0" aria-hidden />
                         <div className="flex flex-col items-start">
                           <p className="text-lg font-semibold text-[0.7em] mb-1">{amenity}</p>
                         </div>
@@ -1166,11 +1173,11 @@ const PropertyDetailPage = () => {
             {relatedListings && relatedListings.length > 0 && (
               <div className=" rounded-2xl  ">
                 <h3 className="text-2xl font-semibold mb-6 -900">More from {developers?.name}</h3>
-                <ListingList listings={relatedListings.slice(0, 6)} />
+                <ListingList listings={relatedListings.slice(0, 6)} leadAttributionContext="recommendations" />
                 {relatedListings.length > 6 && (
                   <div className="text-center mt-6">
                     <Link
-                      href={`/home/allDevelopers/${developers?.slug}`}
+                      href={developers?.slug ? withWebsiteLeadAttribution(`/home/allDevelopers/${developers.slug}`, 'profile') : '#'}
                       className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
                     >
                       View All Properties ({relatedListings.length})

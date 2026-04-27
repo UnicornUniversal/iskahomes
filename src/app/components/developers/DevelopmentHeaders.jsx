@@ -7,6 +7,7 @@ import 'swiper/css'
 import 'swiper/css/navigation'
 import 'swiper/css/pagination'
 import Link from 'next/link'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 
 const DevelopmentHeaders = () => {
   const [featuredDevelopers, setFeaturedDevelopers] = useState([])
@@ -157,7 +158,7 @@ const DevelopmentHeaders = () => {
 
           return (
             <SwiperSlide key={developer.id}>
-              <Link href={`/home/allDevelopers/${developer.slug}`} className="block">
+              <Link href={withWebsiteLeadAttribution(`/home/allDevelopers/${developer.slug}`, 'featured')} className="block">
                 <div className="relative h-[420px] md:h-96 w-full overflow-hidden cursor-pointer">
                   <img
                     src={coverImageUrl}

@@ -6,6 +6,7 @@ import { queueEvent } from '@/lib/analyticsBatcher'
 import { useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { getAnonymousId } from '@/lib/anonymousId'
+import { resolveLeadAttributionFromSearchString } from '@/lib/leadAttributionResolve'
 
 export function useAnalytics() {
   const posthog = usePostHog()
@@ -73,12 +74,22 @@ export function useAnalytics() {
   const getSeekerContext = useCallback((additionalContext = {}) => {
     const isPropertySeeker = user?.user_type === 'property_seeker'
     
-    // Get lead_source from URL (share_medium param) - e.g. ?share_medium=whatsapp
-    let leadSource = additionalContext.lead_source || additionalContext.leadSource
+    let leadSource = 'website'
+    let leadSourceContext = null
     if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location?.search || '')
-      const shareMedium = params.get('share_medium') || params.get('utm_source')
-      if (shareMedium) leadSource = shareMedium
+      const r = resolveLeadAttributionFromSearchString(window.location?.search || '')
+      leadSource = r.lead_source
+      leadSourceContext = r.lead_source_context
+    }
+    if (additionalContext.lead_source != null || additionalContext.leadSource != null) {
+      leadSource = additionalContext.lead_source ?? additionalContext.leadSource
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(additionalContext, 'lead_source_context') ||
+      Object.prototype.hasOwnProperty.call(additionalContext, 'leadSourceContext')
+    ) {
+      leadSourceContext =
+        additionalContext.lead_source_context ?? additionalContext.leadSourceContext ?? null
     }
     if (!leadSource) leadSource = 'website'
     
@@ -135,6 +146,8 @@ export function useAnalytics() {
       listing_type: listingType,
       lead_source: leadSource,
       leadSource: leadSource,
+      lead_source_context: leadSourceContext,
+      leadSourceContext,
       // User-specific properties - ALWAYS provide seeker_id (never null)
       seekerId: finalSeekerId,
       seeker_id: finalSeekerId, // Also set snake_case version
@@ -347,6 +360,8 @@ export function useAnalytics() {
       phone_number: seekerContext.phoneNumber, // Optional: store hashed or masked version
       seeker_id: seekerContext.seekerId, // Property seeker ID for logged-in users
       is_logged_in: seekerContext.is_logged_in,
+      lead_source: seekerContext.lead_source,
+      lead_source_context: seekerContext.lead_source_context,
       ...distinctContext,
       timestamp: nowIso()
     })
@@ -370,6 +385,7 @@ export function useAnalytics() {
             is_logged_in: seekerContext.is_logged_in,
             timestamp: nowIso(),
             lead_source: seekerContext.lead_source || 'website',
+            lead_source_context: seekerContext.lead_source_context ?? null,
             lead_origin: 'platform',
             ...distinctContext
           })
@@ -402,6 +418,8 @@ export function useAnalytics() {
       message_type: seekerContext.messageType, // 'direct_message', 'whatsapp', 'email'
       seeker_id: seekerContext.seekerId, // Property seeker ID for logged-in users
       is_logged_in: seekerContext.is_logged_in,
+      lead_source: seekerContext.lead_source,
+      lead_source_context: seekerContext.lead_source_context,
       ...distinctContext,
       timestamp: nowIso()
     })
@@ -424,6 +442,7 @@ export function useAnalytics() {
             is_logged_in: seekerContext.is_logged_in,
             timestamp: nowIso(),
             lead_source: seekerContext.lead_source || 'website',
+            lead_source_context: seekerContext.lead_source_context ?? null,
             lead_origin: 'platform',
             ...distinctContext
           })
@@ -456,6 +475,8 @@ export function useAnalytics() {
       appointment_type: seekerContext.appointmentType, // 'viewing', 'consultation', etc.
       seeker_id: seekerContext.seekerId, // Property seeker ID for logged-in users
       is_logged_in: seekerContext.is_logged_in,
+      lead_source: seekerContext.lead_source,
+      lead_source_context: seekerContext.lead_source_context,
       ...distinctContext,
       timestamp: nowIso()
     })
@@ -478,6 +499,7 @@ export function useAnalytics() {
             is_logged_in: seekerContext.is_logged_in,
             timestamp: nowIso(),
             lead_source: seekerContext.lead_source || 'website',
+            lead_source_context: seekerContext.lead_source_context ?? null,
             lead_origin: 'platform',
             ...distinctContext
           })
@@ -668,6 +690,8 @@ export function useAnalytics() {
       contact_method: context.contactMethod,
       seeker_id: seekerContext.seekerId,
       is_logged_in: seekerContext.is_logged_in,
+      lead_source: seekerContext.lead_source,
+      lead_source_context: seekerContext.lead_source_context,
       ...distinctContext,
       timestamp: nowIso()
     })
@@ -703,6 +727,9 @@ export function useAnalytics() {
             appointment_type: leadType === 'appointment' ? (context.appointmentType || 'viewing') : undefined,
             is_logged_in: seekerContext.is_logged_in,
             timestamp: nowIso(),
+            lead_source: seekerContext.lead_source || 'website',
+            lead_source_context: seekerContext.lead_source_context ?? null,
+            lead_origin: 'platform',
             ...distinctContext
           })
         })

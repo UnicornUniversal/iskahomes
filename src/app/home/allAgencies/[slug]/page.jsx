@@ -16,10 +16,13 @@ import {
   Instagram, 
   Linkedin, 
   Twitter,
-  Home
+  Home,
+  Share2
 } from 'lucide-react'
 import LeadContactForm from '@/app/components/LeadContactForm'
 import Nav from '@/app/components/Nav'
+import ShareModal from '@/app/components/ui/ShareModal'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 import DataRenderer from '@/app/components/developers/DataRenderer'
 import AgentsSwiper from '@/app/components/agency/AgentsSwiper'
 import { toast } from 'react-toastify'
@@ -32,6 +35,7 @@ const AgencyProfile = () => {
   const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [showShareModal, setShowShareModal] = useState(false)
 
   useEffect(() => {
     if (agencySlug) {
@@ -183,7 +187,15 @@ const AgencyProfile = () => {
                             </div>
                         </div>
 
-                         {/* Share Icon usually goes here */}
+                        <button
+                          type="button"
+                          onClick={() => setShowShareModal(true)}
+                          className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg border border-primary_color/20 text-primary_color hover:bg-primary_color/5 transition-colors"
+                          title="Share agency profile"
+                          aria-label="Share agency profile"
+                        >
+                          <Share2 className="w-5 h-5" />
+                        </button>
                     </div>
                  </div>
 
@@ -261,7 +273,7 @@ const AgencyProfile = () => {
                      {agents.length > 0 && (
                          <div>
                              <h2 className="font-light text-2xl mb-6 text-primary_color border-b pb-2">Our Agents</h2>
-                             <AgentsSwiper agents={agents} />
+                             <AgentsSwiper agents={agents} leadAttributionContext="profile" />
                          </div>
                      )}
 
@@ -337,7 +349,7 @@ const AgencyProfile = () => {
                                      return (
                                          <Link 
                                              key={listing.id || `listing-${index}`}
-                                             href={`/home/property/${listing.listing_type}/${listing.slug}/${listing.id}`}
+                                             href={withWebsiteLeadAttribution(`/home/property/${listing.listing_type}/${listing.slug}/${listing.id}`, 'profile')}
                                              className="group border border-gray-200 rounded-xl overflow-hidden hover:shadow-xl transition-all bg-white"
                                          >
                                              <div className="relative h-48 bg-gray-200 overflow-hidden">
@@ -403,6 +415,13 @@ const AgencyProfile = () => {
                 </div>
             </div>
         </div>
+
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        property={agency}
+        propertyType="agency"
+      />
     </div>
   )
 }

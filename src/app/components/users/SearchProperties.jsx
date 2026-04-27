@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import SecondaryListingCard from '../Listing/SecondaryListingCard';
 import ExplorePropertyCard from './ExplorePropertyCard';
 
-const SearchProperties = ({ filters = {} }) => {
+const SearchProperties = ({ filters = {}, leadAttributionContext = 'search' }) => {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -250,14 +250,14 @@ const SearchProperties = ({ filters = {} }) => {
             {/* Desktop - Vertical Cards (lg and above) */}
             <div className="hidden lg:grid grid-cols-1 gap-5">
             {listings.map((listing) => (
-              <SecondaryListingCard key={listing.id} listing={listing} />
+              <SecondaryListingCard key={listing.id} listing={listing} leadAttributionContext={leadAttributionContext} />
             ))}
           </div>
 
             {/* Mobile/Tablet - Horizontal Cards (below lg) */}
             <div className="lg:hidden flex flex-col gap-3">
               {listings.map((listing) => (
-                <ExplorePropertyCard key={listing.id} listing={listing} />
+                <ExplorePropertyCard key={listing.id} listing={listing} leadAttributionContext={leadAttributionContext} />
               ))}
             </div>
             

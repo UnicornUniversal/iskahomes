@@ -153,6 +153,7 @@ const HomeCategories = () => {
                   <SecondaryListingCard
                     listing={listing}
                     imageClasses="h-[220px] md:h-[240px]"
+                    leadAttributionContext="home"
                   />
                 </SwiperSlide>
               ))}

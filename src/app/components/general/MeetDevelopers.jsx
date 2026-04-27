@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 import { Building2, MapPin } from 'lucide-react'
 
 const parseImageUrl = (imageValue) => {
@@ -118,7 +119,7 @@ const MeetDevelopers = () => {
             return (
               <Link
                 key={developer.slug}
-                href={`/home/allDevelopers/${developer.slug}`}
+                href={withWebsiteLeadAttribution(`/home/allDevelopers/${developer.slug}`, 'featured')}
                 className="group block border border-primary_color/10 bg-white hover:border-primary_color/30 transition-colors"
               >
                 <div className="relative h-60 overflow-hidden bg-primary_color/5">

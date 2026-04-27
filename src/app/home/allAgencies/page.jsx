@@ -4,6 +4,7 @@ import Layout1 from '@/app/layout/Layout1'
 import GeneralHeader from '@/app/components/general/GeneralHeader'
 import { FiSearch, FiMapPin, FiCheckCircle, FiX } from 'react-icons/fi'
 import Link from 'next/link'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 
 const AllAgencies = () => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -227,7 +228,7 @@ const AllAgencies = () => {
             {filteredAgencies.map(agency => (
               <Link
                 key={agency.id}
-                href={`/home/allAgencies/${agency.slug}`}
+                href={withWebsiteLeadAttribution(`/home/allAgencies/${agency.slug}`, 'directory')}
                 className="group relative bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-primary_color/10 transition-all duration-500 transform hover:-translate-y-2 border border-gray-100"
               >
                 {/* Agency Cover/Image Area */}

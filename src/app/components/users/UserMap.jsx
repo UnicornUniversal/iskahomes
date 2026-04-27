@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef } from 'react'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 
 // Helper to resolve coordinates from a listing
 const resolveCoords = (listing) => {
@@ -55,7 +56,7 @@ const ghanaCityCoordinates = {
   'Tema': { lat: 5.7089, lng: -0.0057 }
 };
 
-const UserMap = ({ filters = {} }) => {
+const UserMap = ({ filters = {}, leadAttributionContext = 'search' }) => {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -405,7 +406,10 @@ const UserMap = ({ filters = {} }) => {
                     {m.subtitle || 'Location not specified'}
                   </p>
                   <a
-                    href={`/home/property/${m.listing.listingType}/${m.listing.slug}/${m.listing.id}`}
+                    href={withWebsiteLeadAttribution(
+                      `/home/property/${m.listing.listingType}/${m.listing.slug}/${m.listing.id}`,
+                      leadAttributionContext
+                    )}
                     className='inline-flex w-fit items-center justify-center bg-primary_color !text-white px-4 py-1.5 rounded-full text-xs font-semibold transition-opacity hover:opacity-90'
                     target='_blank'
                     rel='noopener noreferrer'

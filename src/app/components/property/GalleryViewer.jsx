@@ -1,6 +1,30 @@
 "use client"
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { FaImages, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+
+const IMAGE_FALLBACK_SRC = '/bg.jpg'
+
+function GallerySlideImage({ src, alt }) {
+  const [currentSrc, setCurrentSrc] = useState(() =>
+    typeof src === 'string' && src.length > 0 ? src : IMAGE_FALLBACK_SRC
+  )
+
+  useEffect(() => {
+    setCurrentSrc(typeof src === 'string' && src.length > 0 ? src : IMAGE_FALLBACK_SRC)
+  }, [src])
+
+  return (
+    <img
+      src={currentSrc}
+      alt={alt}
+      className="w-full h-full object-cover"
+      loading="lazy"
+      onError={() => {
+        if (currentSrc !== IMAGE_FALLBACK_SRC) setCurrentSrc(IMAGE_FALLBACK_SRC)
+      }}
+    />
+  )
+}
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Autoplay, Navigation, Pagination } from 'swiper/modules'
 import 'swiper/css'
@@ -46,11 +70,19 @@ const GalleryViewer = ({ media }) => {
   }, [media])
 
   const displayedImages = useMemo(() => {
-    if (selectedAlbum === 'all') {
-      return albums.flatMap(album => album.images)
-    }
-    const album = albums.find(a => a.id === selectedAlbum)
-    return album ? album.images : []
+    const raw =
+      selectedAlbum === 'all'
+        ? albums.flatMap(album => album.images)
+        : albums.find(a => a.id === selectedAlbum)?.images || []
+
+    const seen = new Set()
+    return raw.filter((img) => {
+      const url = typeof img?.url === 'string' ? img.url : typeof img === 'string' ? img : ''
+      const key = img?.id != null ? String(img.id) : url || JSON.stringify(img)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
   }, [selectedAlbum, albums])
 
   const handleAlbumChange = (albumId) => {
@@ -120,17 +152,17 @@ const GalleryViewer = ({ media }) => {
               }}
             >
               {displayedImages.map((image, index) => {
-                const imageSrc = image?.url || image
+                const imageSrc =
+                  typeof image?.url === 'string' ? image.url : typeof image === 'string' ? image : ''
+                const slideKey = `slide-${index}-${image?.id != null ? image.id : imageSrc.slice(-48)}`
                 return (
                   // Width is handled by Swiper/breakpoints. Height is handled by aspect ratio.
-                  <SwiperSlide key={image?.id || index}>
+                  <SwiperSlide key={slideKey}>
                     <div className="block w-full">
                       <div className="relative w-full aspect-square overflow-hidden  border border-gray-200 bg-gray-100">
-                        <img
+                        <GallerySlideImage
                           src={imageSrc}
                           alt={`Gallery ${index + 1}`}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
                         />
                       </div>
                     </div>
@@ -179,9 +211,9 @@ const GalleryViewer = ({ media }) => {
             </span>
           </button>
           
-          {albums.map((album) => (
+          {albums.map((album, albumIndex) => (
             <button
-              key={album.id}
+              key={`${album.id}-${album.name}-${albumIndex}`}
               onClick={() => handleAlbumChange(album.id)}
               className={`px-5 py-2.5 rounded-full font-medium text-sm transition-all flex items-center gap-2 border ${
                 selectedAlbum === album.id

@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'expired', 'cancelled', 'suspended', 'grace_period')),
   start_date TIMESTAMP WITH TIME ZONE,
   end_date TIMESTAMP WITH TIME ZONE NOT NULL,
-  grace_period_end_date TIMESTAMP WITH TIME ZONE NOT NULL, -- end_date + 7 days
+  grace_period_end_date TIMESTAMP WITH TIME ZONE NOT NULL, -- end_date + 14 days (see subscriptionGracePolicy.js)
   activated_at TIMESTAMP WITH TIME ZONE,
   cancelled_at TIMESTAMP WITH TIME ZONE,
   cancellation_reason TEXT,
@@ -275,8 +275,8 @@ CREATE TRIGGER update_billing_information_updated_at
 
 -- Subscriptions table comments
 COMMENT ON TABLE subscriptions IS 'Stores current active subscriptions for users (developers, agents, agencies)';
-COMMENT ON COLUMN subscriptions.status IS 'Subscription status: pending (awaiting payment), active (currently active), expired (past end_date and grace_period), cancelled (manually cancelled), suspended (admin suspended), grace_period (past end_date but within 7-day grace period)';
-COMMENT ON COLUMN subscriptions.grace_period_end_date IS 'Calculated as end_date + 7 days. User has access until this date even after end_date passes';
+COMMENT ON COLUMN subscriptions.status IS 'Subscription status: pending (awaiting payment), active (currently active), expired (past end_date and grace_period), cancelled (manually cancelled), suspended (admin suspended), grace_period (past end_date but within grace period)';
+COMMENT ON COLUMN subscriptions.grace_period_end_date IS 'Calculated as end_date + 14 days. User has access until this date even after end_date passes';
 COMMENT ON COLUMN subscriptions.auto_renew IS 'Whether subscription should auto-renew (currently false since payments are manual)';
 COMMENT ON COLUMN subscriptions.duration_months IS 'Actual subscription duration in months (e.g., 1, 3, 12)';
 COMMENT ON COLUMN subscriptions.subscriptions_type IS 'Subscription kind: package (main subscription) or addon (optional feature subscription)';

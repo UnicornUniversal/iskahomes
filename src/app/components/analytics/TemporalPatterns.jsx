@@ -28,7 +28,14 @@ ChartJS.register(
   Legend
 )
 
-export default function TemporalPatterns({ data, dateRange, onDateRangeChange, loading = false }) {
+export default function TemporalPatterns({
+  data,
+  dateRange,
+  onDateRangeChange,
+  loading = false,
+  /** When true, date picker is rendered elsewhere (e.g. page-level report period bar). */
+  hideDateRangeControl = false,
+}) {
   const hasData = Boolean(data?.dayOfWeekPerformance && data?.hourOfDayPerformance)
 
   const dayOfWeekPerformance = data?.dayOfWeekPerformance || []
@@ -107,31 +114,33 @@ export default function TemporalPatterns({ data, dateRange, onDateRangeChange, l
             </div>
           </div>
 
-          <div className="flex w-full flex-col gap-2 sm:w-auto">
-            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-primary_color/70">
-              Date Range
-            </span>
-            <div className="flex w-full items-center gap-2 sm:w-auto">
-              <DateRangePicker
-                startDate={dateRange?.dateFrom || ''}
-                endDate={dateRange?.dateTo || ''}
-                onChange={(nextRange) => {
-                  if (!onDateRangeChange) return
+          {!hideDateRangeControl && (
+            <div className="flex w-full flex-col gap-2 sm:w-auto">
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-primary_color/70">
+                Date Range
+              </span>
+              <div className="flex w-full items-center gap-2 sm:w-auto">
+                <DateRangePicker
+                  startDate={dateRange?.dateFrom || ''}
+                  endDate={dateRange?.dateTo || ''}
+                  onChange={(nextRange) => {
+                    if (!onDateRangeChange) return
 
-                  onDateRangeChange({
-                    dateFrom: nextRange.startDate,
-                    dateTo: nextRange.endDate
-                  })
-                }}
-                className="w-full sm:w-[280px]"
-              />
-              {loading && (
-                <span className="text-xs font-medium text-primary_color/60 whitespace-nowrap">
-                  Updating...
-                </span>
-              )}
+                    onDateRangeChange({
+                      dateFrom: nextRange.startDate,
+                      dateTo: nextRange.endDate
+                    })
+                  }}
+                  className="w-full sm:w-[280px]"
+                />
+                {loading && (
+                  <span className="text-xs font-medium text-primary_color/60 whitespace-nowrap">
+                    Updating...
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

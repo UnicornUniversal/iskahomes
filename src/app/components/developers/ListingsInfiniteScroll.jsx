@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import ListingList2 from '@/app/components/Listing/ListingList2'
 
-const ListingsInfiniteScroll = ({ developerId }) => {
+const ListingsInfiniteScroll = ({ developerId, leadAttributionContext = 'profile' }) => {
   const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
@@ -85,6 +85,7 @@ const ListingsInfiniteScroll = ({ developerId }) => {
         listings={listings} 
         loading={loading && listings.length === 0}
         error={error}
+        leadAttributionContext={leadAttributionContext}
       />
       
       {/* Loading trigger for infinite scroll */}

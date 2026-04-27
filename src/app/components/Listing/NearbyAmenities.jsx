@@ -38,6 +38,8 @@ const amenityTypes = {
   }
 }
 
+const AMENITY_IMAGE_FALLBACK = '/bg.jpg'
+
 // Individual amenity card component
 const AmenityCard = ({ amenity }) => {
   // Get image URL
@@ -47,18 +49,15 @@ const AmenityCard = ({ amenity }) => {
     <div className="  overflow-hidden h-full flex flex-col hover:border-gray-300 transition-colors duration-200">
       {/* Image Section */}
       <div className="relative h-52 w-full overflow-hidden bg-gray-50">
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={amenity.name || 'Amenity'}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              e.target.style.display = 'none'
-            }}
-          />
-        ) : (
-          <div className="w-full h-full bg-gray-100" />
-        )}
+        <img
+          src={imageUrl || AMENITY_IMAGE_FALLBACK}
+          alt={amenity.name || 'Amenity'}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            if (e.currentTarget.src.includes('bg.jpg')) return
+            e.currentTarget.src = AMENITY_IMAGE_FALLBACK
+          }}
+        />
         
         {/* Distance Badge */}
         {amenity.distance && (
@@ -198,7 +197,9 @@ const NearbyAmenities = ({ socialAmenities, city, state }) => {
                   className={`nearby-amenities-swiper-${category}`}
                 >
                   {amenities.map((amenity, index) => (
-                    <SwiperSlide key={amenity.id || `${category}-${index}`}>
+                    <SwiperSlide
+                      key={`${category}-${index}-${amenity?.id ?? amenity?.place_id ?? amenity?.name ?? 'place'}`}
+                    >
                       <AmenityCard amenity={amenity} />
                     </SwiperSlide>
                   ))}

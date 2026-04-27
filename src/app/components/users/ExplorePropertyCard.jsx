@@ -5,8 +5,9 @@ import Link from 'next/link'
 import { MapPin, Bed, Bath, Square } from 'lucide-react'
 import { useAnalytics } from '@/hooks/useAnalytics'
 import { getSpecificationDataByTypeId, getFieldDataByKey } from '@/app/components/Data/StaticData'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 
-const ExplorePropertyCard = ({ listing }) => {
+const ExplorePropertyCard = ({ listing, leadAttributionContext = null }) => {
   const { trackPropertyView, trackListingImpression } = useAnalytics()
 
   const {
@@ -147,9 +148,11 @@ const ExplorePropertyCard = ({ listing }) => {
 
   const specs = getSpecifications()
 
+  const analyticsSurface = leadAttributionContext || 'explore'
+
   const handleCardClick = () => {
     trackPropertyView(id, {
-      viewedFrom: 'explore',
+      viewedFrom: analyticsSurface,
       listingType: listing_type,
       listing: listing,
       propertyTitle: title,
@@ -158,7 +161,7 @@ const ExplorePropertyCard = ({ listing }) => {
     })
 
     trackListingImpression(id, {
-      viewedFrom: 'explore',
+      viewedFrom: analyticsSurface,
       listingType: listing_type,
       listing: listing,
       propertyTitle: title,
@@ -173,8 +176,13 @@ const ExplorePropertyCard = ({ listing }) => {
     return null
   }
 
+  const propertyPath = `/home/property/${listing_type}/${slug}/${id}`
+  const propertyHref = leadAttributionContext
+    ? withWebsiteLeadAttribution(propertyPath, leadAttributionContext)
+    : propertyPath
+
   return (
-    <Link href={`/home/property/${listing_type}/${slug}/${id}`} onClick={handleCardClick} className="block">
+    <Link href={propertyHref} onClick={handleCardClick} className="block">
       <div className="bg-white rounded-lg border border-primary_color/10 overflow-hidden hover:shadow-lg transition-shadow duration-300">
         <div className="flex flex-row gap-4 p-4">
           {/* Image Section - Left */}
