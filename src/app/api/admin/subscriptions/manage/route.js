@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { gracePeriodEndFromEndDate } from '@/lib/subscriptionGracePolicy'
 
 // POST - Create or update a subscription (admin only)
 export async function POST(request) {
@@ -93,13 +94,12 @@ export async function POST(request) {
       endDate.setMonth(endDate.getMonth() + duration)
     }
 
-    // Calculate grace period end date (end_date + 7 days)
+    // Calculate grace period end date (end_date + GRACE_PERIOD_DAYS)
     let gracePeriodEndDate
     if (grace_period_end_date) {
       gracePeriodEndDate = new Date(grace_period_end_date)
     } else {
-      gracePeriodEndDate = new Date(endDate)
-      gracePeriodEndDate.setDate(gracePeriodEndDate.getDate() + 7)
+      gracePeriodEndDate = gracePeriodEndFromEndDate(endDate)
     }
 
     // Determine currency and amount if not provided

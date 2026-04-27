@@ -1,9 +1,34 @@
 import { NextResponse } from 'next/server'
 // import { createClient } from '@supabase/supabase-js' // Commented out - using SendGrid instead of Supabase auth
-import { supabaseAdmin } from '@/lib/supabase'
+import { supabaseAdmin, findAuthUserByEmail } from '@/lib/supabase'
 import { sendVerificationEmail } from '@/lib/sendgrid' // Using SendGrid for email verification
 import { getDefaultRoles } from '@/lib/rolesAndPermissions'
 import crypto from 'crypto'
+
+const PROFILE_TABLE_ID_COLUMNS = {
+  developers: 'developer_id',
+  agencies: 'agency_id',
+  agents: 'user_id',
+  property_seekers: 'user_id',
+}
+
+/** True if this auth user or email appears in any account profile table. */
+async function hasLinkedProfile(userId, normalizedEmail) {
+  const tables = Object.keys(PROFILE_TABLE_ID_COLUMNS)
+  const checks = tables.flatMap((table) => {
+    const idCol = PROFILE_TABLE_ID_COLUMNS[table]
+    return [
+      supabaseAdmin.from(table).select('id').eq(idCol, userId).limit(1).maybeSingle(),
+      supabaseAdmin.from(table).select('id').ilike('email', normalizedEmail).limit(1).maybeSingle(),
+    ]
+  })
+  const results = await Promise.all(checks)
+  for (const { data, error } of results) {
+    if (error) return { linked: null, error }
+    if (data?.id) return { linked: true, error: null }
+  }
+  return { linked: false, error: null }
+}
 
 export async function POST(request) {
   try {
@@ -36,8 +61,8 @@ export async function POST(request) {
       )
     }
 
-    // Prevent sending emails when this account already exists
-    const { data: existingAuthUser, error: existingAuthUserError } = await supabaseAdmin.auth.admin.getUserByEmail(normalizedEmail)
+    // Auth user present + no profile row = incomplete prior signup; remove auth user so they can retry
+    const { user: existingAuthUser, error: existingAuthUserError } = await findAuthUserByEmail(normalizedEmail)
     if (existingAuthUserError) {
       console.error('❌ Failed to check existing auth user:', existingAuthUserError)
       return NextResponse.json(
@@ -45,14 +70,33 @@ export async function POST(request) {
         { status: 500 }
       )
     }
-    if (existingAuthUser?.user) {
-      return NextResponse.json(
-        { error: 'An account with this email already exists. Please sign in instead.' },
-        { status: 409 }
-      )
+    if (existingAuthUser) {
+      const { linked, error: linkCheckError } = await hasLinkedProfile(existingAuthUser.id, normalizedEmail)
+      if (linkCheckError) {
+        console.error('❌ Failed to check profile linkage for existing auth user:', linkCheckError)
+        return NextResponse.json(
+          { error: 'Unable to validate account details. Please try again.' },
+          { status: 500 }
+        )
+      }
+      if (linked) {
+        return NextResponse.json(
+          { error: 'An account with this email already exists. Please sign in instead.' },
+          { status: 409 }
+        )
+      }
+      const { error: deleteOrphanError } = await supabaseAdmin.auth.admin.deleteUser(existingAuthUser.id)
+      if (deleteOrphanError) {
+        console.error('❌ Failed to remove incomplete signup (orphan auth user):', deleteOrphanError)
+        return NextResponse.json(
+          { error: 'Unable to reset an incomplete signup for this email. Please try again or contact support.' },
+          { status: 500 }
+        )
+      }
+      console.log('🧹 Removed orphan auth user (no profile row); allowing signup to continue:', existingAuthUser.id)
     }
 
-    const profileTables = ['developers', 'agencies', 'agents', 'property_seekers']
+    const profileTables = Object.keys(PROFILE_TABLE_ID_COLUMNS)
     for (const table of profileTables) {
       const { data: existingProfile, error: existingProfileError } = await supabaseAdmin
         .from(table)

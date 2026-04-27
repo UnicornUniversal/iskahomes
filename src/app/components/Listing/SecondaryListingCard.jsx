@@ -6,8 +6,9 @@ import { MapPin, Bed, Bath, Square, Calendar, DollarSign, Users, Heart, Share2 }
 import { useAnalytics } from '@/hooks/useAnalytics'
 import { toast } from 'react-toastify'
 import { getSpecificationDataByTypeId, getFieldDataByKey } from '@/app/components/Data/StaticData'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 
-const SecondaryListingCard = ({ listing, imageClasses = null }) => {
+const SecondaryListingCard = ({ listing, imageClasses = null, leadAttributionContext = null }) => {
   const { trackPropertyView, trackListingImpression, trackSavedListing, trackShare } = useAnalytics()
 
   const {
@@ -160,11 +161,17 @@ const SecondaryListingCard = ({ listing, imageClasses = null }) => {
   }
 
   const specs = getSpecifications()
+  const analyticsSurface = leadAttributionContext || 'homepage'
+
+  const propertyPath = `/home/property/${listing_type}/${slug}/${id}`
+  const propertyHref = leadAttributionContext
+    ? withWebsiteLeadAttribution(propertyPath, leadAttributionContext)
+    : propertyPath
 
   // Analytics tracking functions
   const handleCardClick = () => {
     trackPropertyView(id, {
-      viewedFrom: 'homepage',
+      viewedFrom: analyticsSurface,
       listingType: listing_type,
       listing: listing, // Pass full listing object so lister_id can be extracted
       propertyTitle: title,
@@ -173,7 +180,7 @@ const SecondaryListingCard = ({ listing, imageClasses = null }) => {
     })
 
     trackListingImpression(id, {
-      viewedFrom: 'homepage',
+      viewedFrom: analyticsSurface,
       listingType: listing_type,
       listing: listing, // Pass full listing object so lister_id can be extracted
       propertyTitle: title,
@@ -188,7 +195,7 @@ const SecondaryListingCard = ({ listing, imageClasses = null }) => {
     
     // Track save action
     trackSavedListing(id, 'add', {
-      viewedFrom: 'homepage',
+      viewedFrom: analyticsSurface,
       listingType: listing_type,
       listing: listing // Pass full listing object so lister_id can be extracted
     })
@@ -203,13 +210,16 @@ const SecondaryListingCard = ({ listing, imageClasses = null }) => {
     // Track share action
     trackShare('listing', 'link', {
       listingId: id,
-      viewedFrom: 'homepage',
+      viewedFrom: analyticsSurface,
       listingType: listing_type,
       listing: listing // Pass full listing object so lister_id can be extracted
     })
     
-    // Copy link to clipboard
-    const url = `${window.location.origin}/home/property/${listing_type}/${slug}/${id}`
+    // Copy link to clipboard (include attribution when this card was placed with a context)
+    const path = leadAttributionContext
+      ? withWebsiteLeadAttribution(`/home/property/${listing_type}/${slug}/${id}`, leadAttributionContext)
+      : `/home/property/${listing_type}/${slug}/${id}`
+    const url = `${window.location.origin}${path.startsWith('/') ? path : `/${path}`}`
     navigator.clipboard.writeText(url)
     toast.success('Link copied to clipboard!')
   }
@@ -235,7 +245,7 @@ const SecondaryListingCard = ({ listing, imageClasses = null }) => {
   }
 
   return (
-    <Link href={`/home/property/${listing_type}/${slug}/${id}`} onClick={handleCardClick} className="block">
+    <Link href={propertyHref} onClick={handleCardClick} className="block">
       <div className="overflow-hidden transition-all mx-auto duration-300 transform hover:-translate-y-1 cursor-pointer group flex flex-col w-auto">
         {/* Image Section */}
         <div className={`relative overflow-hidden ${getImageClasses()}`}>

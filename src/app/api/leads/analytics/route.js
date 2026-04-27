@@ -101,11 +101,13 @@ export async function GET(request) {
       .eq('lister_id', finalListerId)
       .eq('lister_type', listerType)
 
+    // first_action_date is a DATE column — compare with YYYY-MM-DD only so rows are not
+    // dropped by timestamptz vs date coercion quirks in PostgREST.
     if (dateFrom) {
-      dateFilter = dateFilter.gte('first_action_date', `${dateFrom}T00:00:00.000Z`)
+      dateFilter = dateFilter.gte('first_action_date', dateFrom)
     }
     if (dateTo) {
-      dateFilter = dateFilter.lte('first_action_date', `${dateTo}T23:59:59.999Z`)
+      dateFilter = dateFilter.lte('first_action_date', dateTo)
     }
 
     const { data: allLeads, error: leadsError } = await dateFilter
@@ -223,6 +225,30 @@ export async function GET(request) {
       return null
     }
 
+    /** When lead_actions is missing/empty, infer channel from the denormalized last_action_type */
+    const getChannelFromLastActionType = (lastType) => {
+      const t = String(lastType || '')
+      if (t === 'lead_phone') return 'phone'
+      if (t === 'lead_appointment') return 'appointment'
+      if (t === 'lead_email') return 'email'
+      if (t === 'lead_message') return 'direct_message'
+      return null
+    }
+
+    const parseLeadActions = (raw) => {
+      if (Array.isArray(raw)) return raw
+      if (raw == null) return []
+      if (typeof raw === 'string') {
+        try {
+          const p = JSON.parse(raw)
+          return Array.isArray(p) ? p : []
+        } catch {
+          return []
+        }
+      }
+      return []
+    }
+
     // Process all leads
     const channelStats = {
       phone: { leads: [], total: 0, closed: 0, scores: [] },
@@ -310,17 +336,26 @@ export async function GET(request) {
 
       // Channel analysis from the full action history. This keeps WhatsApp and
       // email visible even when the first recorded action was a different channel.
-      const leadActions = Array.isArray(lead.lead_actions) ? lead.lead_actions : []
-      if (leadActions.length > 0) {
-        const channelsUsed = new Set()
+      const leadActions = parseLeadActions(lead.lead_actions)
+      const channelsUsed = new Set()
 
+      if (leadActions.length > 0) {
         leadActions.forEach(action => {
           const channel = getChannelFromAction(action)
           if (channel && channelStats[channel]) {
             channelsUsed.add(channel)
           }
         })
+      }
 
+      if (channelsUsed.size === 0) {
+        const fallback = getChannelFromLastActionType(lead.last_action_type)
+        if (fallback && channelStats[fallback]) {
+          channelsUsed.add(fallback)
+        }
+      }
+
+      if (channelsUsed.size > 0) {
         channelsUsed.forEach(channel => {
           channelStats[channel].leads.push(lead)
           channelStats[channel].total++

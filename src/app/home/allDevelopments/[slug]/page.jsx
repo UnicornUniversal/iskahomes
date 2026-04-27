@@ -11,7 +11,8 @@ import { useAnalytics } from '@/hooks/useAnalytics'
 import { useAuth } from '@/contexts/AuthContext'
 import ShareModal from '@/app/components/ui/ShareModal'
 import { toast } from 'react-toastify'
-import Nav from '@/app/components/Nav'  
+import Nav from '@/app/components/Nav'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 
 const DevelopmentPage = () => {
   const params = useParams()
@@ -395,7 +396,7 @@ const DevelopmentPage = () => {
                 {developer && (
                    <div>
                     <h4 className="text-xs uppercase tracking-widest text-gray-400 mb-2">Developer</h4>
-                    <Link href={`/home/allDevelopers/${developer.slug}`} className="text-lg font-medium text-primary_color hover:underline decoration-1 underline-offset-4">
+                    <Link href={withWebsiteLeadAttribution(`/home/allDevelopers/${developer.slug}`, 'development')} className="text-lg font-medium text-primary_color hover:underline decoration-1 underline-offset-4">
                       {developer.name}
                     </Link>
                   </div>
@@ -538,7 +539,7 @@ const DevelopmentPage = () => {
                     whileInView={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.1 }}
                  >
-                   <Link href={`/home/allDevelopments/${related.slug}`}>
+                   <Link href={withWebsiteLeadAttribution(`/home/allDevelopments/${related.slug}`, 'development')}>
                      <div className="group cursor-pointer">
                        <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 mb-6">
                          {related.banner ? (

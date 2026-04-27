@@ -11,7 +11,8 @@ import {
   Tooltip,
   Legend
 } from 'chart.js'
-import { Phone, MessageCircle, Mail, Calendar, TrendingUp, Award } from 'lucide-react'
+import { Phone, MessageCircle, Mail, Calendar, TrendingUp } from 'lucide-react'
+import { DateRangePicker } from '@/app/components/ui/date-range-picker'
 import { analyticsClasses, analyticsPalette, baseChartOptions, formatNumber, formatPercent } from './analyticsTheme'
 
 ChartJS.register(
@@ -67,40 +68,70 @@ const channelStyles = {
   }
 }
 
-export default function ChannelPerformance({ data }) {
-  if (!data || Object.keys(data).length === 0) {
-    return (
-      <div className={analyticsClasses.section}>
-        <div className={analyticsClasses.empty}>No channel data available yet.</div>
-      </div>
-    )
-  }
+const CHANNEL_ORDER = ['phone', 'whatsapp', 'direct_message', 'email', 'appointment']
 
-  const channels = Object.keys(data).filter(key => data[key].total > 0)
-  
-  if (channels.length === 0) {
-    return (
-      <div className={analyticsClasses.section}>
-        <div className={analyticsClasses.empty}>No channel data available yet.</div>
-      </div>
-    )
-  }
+const emptyChannelStats = () => ({
+  total: 0,
+  closed: 0,
+  conversionRate: 0,
+  avgLeadScore: 0,
+  highValueLeads: 0,
+  highValuePercentage: 0
+})
 
-  const totalTrackedLeads = channels.reduce((sum, channel) => sum + (data[channel]?.total || 0), 0)
+/** Always produce a full channel map so empty weeks still render zeros, not a blank section. */
+function normalizeChannelPerformance(raw) {
+  const out = {}
+  CHANNEL_ORDER.forEach((key) => {
+    const v = raw?.[key]
+    const base = emptyChannelStats()
+    if (v && typeof v === 'object') {
+      out[key] = {
+        total: Number(v.total) || 0,
+        closed: Number(v.closed) || 0,
+        conversionRate: Number(v.conversionRate) || 0,
+        avgLeadScore: Number(v.avgLeadScore) || 0,
+        highValueLeads: Number(v.highValueLeads) || 0,
+        highValuePercentage: Number(v.highValuePercentage) || 0
+      }
+    } else {
+      out[key] = { ...base }
+    }
+  })
+  return out
+}
+
+function formatRangeLabel(from, to) {
+  if (!from && !to) return null
+  if (from && to) return `${from} → ${to}`
+  return from || to || null
+}
+
+export default function ChannelPerformance({
+  data,
+  dateRange,
+  onDateRangeChange,
+  appliedDateRange,
+  loading = false
+}) {
+  const channelData = normalizeChannelPerformance(data)
+  const channels = CHANNEL_ORDER
+
+  const totalTrackedLeads = channels.reduce((sum, channel) => sum + (channelData[channel]?.total || 0), 0)
 
   const chartData = {
     labels: channels.map(ch => channelLabels[ch] || ch),
     datasets: [
       {
         label: 'Conversion Rate (%)',
-        data: channels.map(ch => data[ch].conversionRate),
+        data: channels.map(ch => channelData[ch].conversionRate),
         backgroundColor: channels.map(ch => channelStyles[ch]?.soft || analyticsPalette.secondarySoft),
         borderColor: channels.map(ch => channelStyles[ch]?.color || analyticsPalette.secondary),
         borderWidth: 1
       },
       {
         label: 'Avg Lead Score',
-        data: channels.map(ch => data[ch].avgLeadScore),
+        data: channels.map(ch => channelData[ch].avgLeadScore),
         backgroundColor: channels.map(ch => channelStyles[ch]?.color || analyticsPalette.primary),
         borderColor: channels.map(ch => channelStyles[ch]?.color || analyticsPalette.primary),
         borderWidth: 1,
@@ -117,10 +148,15 @@ export default function ChannelPerformance({ data }) {
     }
   })
 
-  // Sort channels by conversion rate
-  const sortedChannels = [...channels].sort((a, b) => 
-    data[b].conversionRate - data[a].conversionRate
+  const sortedChannels = [...channels].sort(
+    (a, b) =>
+      channelData[b].conversionRate - channelData[a].conversionRate ||
+      channelData[b].total - channelData[a].total
   )
+  const topChannelKey = sortedChannels.find((ch) => channelData[ch].total > 0)
+  const rangeLabel =
+    formatRangeLabel(appliedDateRange?.dateFrom, appliedDateRange?.dateTo) ||
+    formatRangeLabel(dateRange?.dateFrom, dateRange?.dateTo)
 
   return (
     <div className={analyticsClasses.section}>
@@ -132,24 +168,57 @@ export default function ChannelPerformance({ data }) {
             <p className={analyticsClasses.subtitle}>
               Performance is now derived from the full action history, so WhatsApp and email stay visible when those channels are used.
             </p>
+            {rangeLabel && (
+              <p className="mt-2 text-sm font-medium text-primary_color/80">
+                Reporting period: <span className="text-primary_color">{rangeLabel}</span>
+              </p>
+            )}
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className={analyticsClasses.subPanel}>
-            <p className={analyticsClasses.metricLabel}>Tracked Channel Touchpoints</p>
-            <p className="mt-2 text-3xl font-semibold tracking-tight text-primary_color">
-              {formatNumber(totalTrackedLeads)}
-            </p>
-          </div>
-          <div className={analyticsClasses.subPanel}>
-            <p className={analyticsClasses.metricLabel}>Top Converting Channel</p>
-            <p className="mt-2 text-2xl font-semibold tracking-tight text-primary_color">
-              {channelLabels[sortedChannels[0]] || sortedChannels[0]}
-            </p>
-            <p className="mt-2 text-xs text-slate-500">
-              {formatPercent(data[sortedChannels[0]]?.conversionRate || 0)} conversion rate
-            </p>
+        <div className="flex w-full flex-col gap-4 lg:w-auto lg:min-w-[300px]">
+          {onDateRangeChange && (
+            <div className="flex w-full flex-col gap-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-primary_color/70">
+                Date range
+              </span>
+              <div className="flex w-full flex-wrap items-center gap-2">
+                <DateRangePicker
+                  startDate={dateRange?.dateFrom || ''}
+                  endDate={dateRange?.dateTo || ''}
+                  onChange={(nextRange) => {
+                    onDateRangeChange({
+                      dateFrom: nextRange.startDate,
+                      dateTo: nextRange.endDate
+                    })
+                  }}
+                  className="w-full min-w-0 sm:w-[280px]"
+                />
+                {loading && (
+                  <span className="text-xs font-medium text-primary_color/60 whitespace-nowrap">Updating…</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className={analyticsClasses.subPanel}>
+              <p className={analyticsClasses.metricLabel}>Tracked channel touchpoints</p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight text-primary_color">
+                {formatNumber(totalTrackedLeads)}
+              </p>
+            </div>
+            <div className={analyticsClasses.subPanel}>
+              <p className={analyticsClasses.metricLabel}>Top converting channel</p>
+              <p className="mt-2 text-2xl font-semibold tracking-tight text-primary_color">
+                {topChannelKey ? channelLabels[topChannelKey] : '—'}
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                {topChannelKey
+                  ? `${formatPercent(channelData[topChannelKey].conversionRate)} conversion rate`
+                  : 'No leads in this period for any channel'}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -163,7 +232,7 @@ export default function ChannelPerformance({ data }) {
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {sortedChannels.map(channel => {
           const Icon = channelIcons[channel] || MessageCircle
-          const stats = data[channel]
+          const stats = channelData[channel]
           const channelShare = totalTrackedLeads > 0 ? (stats.total / totalTrackedLeads) * 100 : 0
           const style = channelStyles[channel] || channelStyles.direct_message
           

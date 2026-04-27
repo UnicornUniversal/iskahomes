@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { supabaseAdmin, findAuthUserByEmail } from '@/lib/supabase'
 import { createClient } from '@supabase/supabase-js'
 import { captureAuditEvent } from '@/lib/auditLogger'
 
@@ -42,17 +42,18 @@ export async function POST(request) {
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-    // Check if user already exists in auth.users
+    // Check if user already exists in auth.users (admin has no getUserByEmail in auth-js)
     let userId = null
     try {
-      const { data: existingUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserByEmail(teamMember.email)
-      
-      if (!getUserError && existingUser?.user) {
-        userId = existingUser.user.id
+      const { user: existingUser, error: getUserError } = await findAuthUserByEmail(teamMember.email)
+      if (getUserError) {
+        console.error('Failed to look up auth user by email:', getUserError)
+      } else if (existingUser) {
+        userId = existingUser.id
         console.log('User already exists in auth.users:', userId)
       }
     } catch (err) {
-      console.log('User does not exist, will create new account')
+      console.log('Auth user lookup failed, will try creating account:', err?.message)
     }
 
     // Create user account in Supabase Auth if doesn't exist

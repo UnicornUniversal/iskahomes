@@ -204,16 +204,16 @@ const ExplorePropertiesContent = () => {
         </div>
 
         {/* Center - Map */}
-        <UserMap filters={filters} />
+        <UserMap filters={filters} leadAttributionContext="explore" />
 
         {/* Desktop - Right side - Search Properties (lg and above) */}
         <div className='hidden lg:block absolute bg-white/20 backdrop-blur-sm z-1000 top-0 bottom-0 border border-primary_color/10 max-w-[500px] right-0 w-full h-screen overflow-hidden'>
-          <SearchProperties filters={filters} />
+          <SearchProperties filters={filters} leadAttributionContext="explore" />
         </div>
 
         {/* Mobile/Tablet - Bottom overlay Search Properties (50% height) */}
         <div className='lg:hidden absolute bottom-0 left-0 right-0 z-[999] bg-white/95 backdrop-blur-sm border-t border-primary_color/10' style={{ height: '50%' }}>
-          <SearchProperties filters={filters} />
+          <SearchProperties filters={filters} leadAttributionContext="explore" />
         </div>
       </div>
 

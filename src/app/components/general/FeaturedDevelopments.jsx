@@ -7,9 +7,10 @@ import 'swiper/css'
 import 'swiper/css/navigation'
 import 'swiper/css/pagination'
 import Link from 'next/link'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 import { Building2, MapPin, CheckCircle } from 'lucide-react'
 
-const FeaturedDevelopments = () => {
+const FeaturedDevelopments = ({ linkContext = 'featured' }) => {
   const [featuredDevelopments, setFeaturedDevelopments] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -138,7 +139,7 @@ const FeaturedDevelopments = () => {
 
           return (
             <SwiperSlide key={development.id}>
-              <Link href={`/home/allDevelopments/${development.slug}`}>
+              <Link href={withWebsiteLeadAttribution(`/home/allDevelopments/${development.slug}`, linkContext)}>
                 <div className="relative h-96 w-full overflow-hidden hover:scale-105 transition-transform duration-300 cursor-pointer">
                   <img
                     src={bannerImage}

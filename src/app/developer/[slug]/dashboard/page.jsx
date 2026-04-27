@@ -204,8 +204,8 @@ const page = () => {
           icon={Building2}
         />
         </div>
-   
-        <ReportGenerator />
+{/*    
+        <ReportGenerator /> */}
 
 <div className='w-full flex items-start   gap-4'>
 {/* Generate monthyl report card */}

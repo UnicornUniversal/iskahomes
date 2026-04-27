@@ -4,6 +4,7 @@ import Layout1 from '@/app/layout/Layout1'
 import GeneralHeader from '@/app/components/general/GeneralHeader'
 import { FiSearch, FiMapPin, FiCheckCircle, FiX, FiBriefcase, FiPhone, FiMail } from 'react-icons/fi'
 import Link from 'next/link'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 
 const AllAgents = () => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -219,7 +220,7 @@ const AllAgents = () => {
               {filteredAgents.map(agent => (
                 <Link
                   key={agent.id}
-                  href={`/home/allAgents/${agent.slug}`}
+                  href={withWebsiteLeadAttribution(`/home/allAgents/${agent.slug}`, 'directory')}
                   className="group relative bg-white rounded-[2rem] p-6 shadow-sm hover:shadow-2xl hover:shadow-primary_color/5 transition-all duration-500 border border-gray-100 flex flex-col h-full overflow-hidden"
                 >
                    {/* Top Agency Branding (if exits) */}

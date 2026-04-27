@@ -132,7 +132,7 @@ const AllDevelopersPage = () => {
   // Memoize developer cards
   const developerCards = useMemo(() => (
     developers.map((developer, index) => (
-      <DeveloperCard key={`${developer.id}-${index}`} developer={developer} index={index} />
+      <DeveloperCard key={`${developer.id}-${index}`} developer={developer} index={index} leadAttributionContext="directory" />
     ))
   ), [developers])
 

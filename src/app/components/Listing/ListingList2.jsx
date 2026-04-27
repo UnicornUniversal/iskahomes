@@ -4,7 +4,7 @@ import React from 'react'
 import SecondaryListingCard from './SecondaryListingCard'
 import { dynamic_images } from '@/app/components/Data/StaticData'
 
-const ListingList2 = ({ listings = [], loading = false, error = null }) => {
+const ListingList2 = ({ listings = [], loading = false, error = null, leadAttributionContext = null }) => {
   if (loading && listings.length === 0) {
     return (
       <div className="flex justify-center py-12">
@@ -66,6 +66,7 @@ const ListingList2 = ({ listings = [], loading = false, error = null }) => {
               <SecondaryListingCard 
                 listing={listing} 
                 imageClasses={`w-full ${imageHeightClasses}`}
+                leadAttributionContext={leadAttributionContext}
               />
             </div>
           )

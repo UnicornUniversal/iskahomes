@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { gracePeriodEndFromEndDate } from '@/lib/subscriptionGracePolicy'
 
 // GET - Fetch all subscription requests (admin only)
 export async function GET(request) {
@@ -234,8 +235,7 @@ export async function PUT(request) {
       const endDate = new Date(startDate)
       endDate.setMonth(endDate.getMonth() + durationMonths)
       
-      const gracePeriodEndDate = new Date(endDate)
-      gracePeriodEndDate.setDate(gracePeriodEndDate.getDate() + 7)
+      const gracePeriodEndDate = gracePeriodEndFromEndDate(endDate)
 
       // Check if user already has an active subscription
       let existingSubscriptionQuery = supabaseAdmin

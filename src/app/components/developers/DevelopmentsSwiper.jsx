@@ -8,8 +8,9 @@ import 'swiper/css/navigation'
 import { MapPin, Building2, Eye } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 
-const DevelopmentsSwiper = ({ developerId }) => {
+const DevelopmentsSwiper = ({ developerId, leadAttributionContext = 'profile' }) => {
   const [developments, setDevelopments] = useState([])
   const [loading, setLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
@@ -136,7 +137,7 @@ const DevelopmentsSwiper = ({ developerId }) => {
 
           return (
             <SwiperSlide key={development.id} style={{ width: 'auto' }}>
-              <Link href={`/home/allDevelopments/${development.slug}`} className="block">
+              <Link href={withWebsiteLeadAttribution(`/home/allDevelopments/${development.slug}`, leadAttributionContext)} className="block">
                 <div className="group cursor-pointer  overflow-hidden transition-all duration-300 ">
                   {/* Banner Image */}
                   <div className={`relative ${imageHeight} overflow-hidden`}>

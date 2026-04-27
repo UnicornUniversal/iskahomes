@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { resolveLeadAttributionFromParts } from '@/lib/leadAttributionResolve'
+import { incrementLeadSourceBreakdown } from '@/lib/leadSourceBreakdownAggregation'
+import { applyLeadSourceBreakdownHourlyBuckets } from '@/lib/applyLeadSourceBreakdownOnNewLead'
 import crypto from 'crypto'
 
 const LEAD_CLASSIFICATIONS = ['Premium', 'High Value', 'Standard']
@@ -28,7 +31,6 @@ export async function POST(request) {
       phone_number,
       is_logged_in = false,
       timestamp,
-      lead_source, // Share medium: whatsapp, copy_link, website, etc.
       lead_origin, // Where from: platform, their_website, etc. (default: platform for automated)
       lead_classification = 'Standard'
     } = body
@@ -121,6 +123,16 @@ export async function POST(request) {
     const actionDate = now.toISOString().split('T')[0] // YYYY-MM-DD
     const actionHour = now.getHours()
     const actionTimestamp = now.toISOString()
+
+    const { lead_source: finalLeadSource, lead_source_context: finalLeadSourceContext } =
+      resolveLeadAttributionFromParts({
+        share_medium: body.share_medium,
+        source: body.source,
+        utm_source: body.utm_source,
+        attribution_context: body.attribution_context,
+        lead_source: body.lead_source,
+        lead_source_context: body.lead_source_context,
+      })
 
     // Create action object
     const actionObj = {
@@ -225,7 +237,8 @@ export async function POST(request) {
         context_type: context_type,
         is_anonymous: is_anonymous, // Set is_anonymous based on is_logged_in
         lead_type: 'automated',
-        lead_source: lead_source || 'website',
+        lead_source: finalLeadSource,
+        lead_source_context: finalLeadSourceContext,
         lead_origin: lead_origin || 'platform',
         lead_classification,
         lead_actions: [actionObj],
@@ -266,13 +279,20 @@ export async function POST(request) {
       try {
         const { data: listing, error: listingError } = await supabaseAdmin
           .from('listings')
-          .select('id, user_id, account_type, total_leads, unique_leads, anonymous_leads')
+          .select('id, user_id, account_type, total_leads, unique_leads, anonymous_leads, listing_lead_source_breakdown')
           .eq('id', listing_id)
           .single()
 
         if (!listingError && listing) {
           const newTotalLeads = (listing.total_leads || 0) + 1
-          const updateData = { total_leads: newTotalLeads }
+          const updateData = {
+            total_leads: newTotalLeads,
+            listing_lead_source_breakdown: incrementLeadSourceBreakdown(
+              listing.listing_lead_source_breakdown,
+              finalLeadSource,
+              finalLeadSourceContext
+            ),
+          }
           
           // Increment unique_leads or anonymous_leads based on is_anonymous
           if (is_anonymous) {
@@ -339,7 +359,7 @@ export async function POST(request) {
         const tableName = lister_type === 'developer' ? 'developers' : lister_type === 'agency' ? 'agencies' : 'agents'
         const idField = lister_type === 'developer' ? 'developer_id' : lister_type === 'agency' ? 'agency_id' : 'agent_id'
 
-        const selectFields = `total_leads, total_appointments, unique_leads, anonymous_leads, total_unique_leads, total_anonymous_leads, leads_breakdown${lister_type === 'agent' ? ', agency_id' : ''}${lister_type === 'agency' ? ', agency_profile_leads, agency_appointments' : ''}`
+        const selectFields = `total_leads, total_appointments, unique_leads, anonymous_leads, total_unique_leads, total_anonymous_leads, leads_breakdown, lead_source_breakdown${lister_type === 'agent' ? ', agency_id' : ''}${lister_type === 'agency' ? ', agency_profile_leads, agency_appointments' : ''}`
         const { data: listerData, error: fetchError } = await supabaseAdmin
           .from(tableName)
           .select(selectFields)
@@ -395,6 +415,11 @@ export async function POST(request) {
           const updateData = {
             total_leads: currentTotalLeads,
             leads_breakdown: breakdown,
+            lead_source_breakdown: incrementLeadSourceBreakdown(
+              listerData.lead_source_breakdown,
+              finalLeadSource,
+              finalLeadSourceContext
+            ),
             updated_at: actionTimestamp
           }
 
@@ -451,7 +476,7 @@ export async function POST(request) {
             try {
               const { data: agencyData, error: agencyFetchError } = await supabaseAdmin
                 .from('agencies')
-                .select('total_leads, total_appointments, agents_total_leads, agents_total_appointments, leads_breakdown')
+                .select('total_leads, total_appointments, agents_total_leads, agents_total_appointments, leads_breakdown, lead_source_breakdown')
                 .eq('agency_id', listerData.agency_id)
                 .single()
 
@@ -508,6 +533,11 @@ export async function POST(request) {
                       agents_total_appointments: newAgentsTotalAppointments
                     }),
                     leads_breakdown: agencyBreakdownCopy,
+                    lead_source_breakdown: incrementLeadSourceBreakdown(
+                      agencyData.lead_source_breakdown,
+                      finalLeadSource,
+                      finalLeadSourceContext
+                    ),
                     updated_at: actionTimestamp
                   })
                   .eq('agency_id', listerData.agency_id)
@@ -591,6 +621,19 @@ export async function POST(request) {
         console.error('Exception updating development leads:', err)
         // Don't fail the request, just log the error
       }
+    }
+
+    if (!existingLead) {
+      await applyLeadSourceBreakdownHourlyBuckets(supabaseAdmin, {
+        lead_source: finalLeadSource,
+        lead_source_context: finalLeadSourceContext,
+        context_type,
+        listing_id,
+        lister_id,
+        lister_type,
+        date: actionDate,
+        hour: actionHour,
+      })
     }
 
     // Resolve developer_id for audit filtering (development leads)

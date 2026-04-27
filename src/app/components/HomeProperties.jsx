@@ -202,7 +202,7 @@ const HomeProperties = () => {
 
           {/* Properties List */}
           <div ref={listingSectionRef} className="relative backdrop-blur-sm z-20 mt-[8vh]">
-            <ListingList listings={listings} loading={loading} error={error} />
+            <ListingList listings={listings} loading={loading} error={error} leadAttributionContext="home" />
           </div>
       </div>
    

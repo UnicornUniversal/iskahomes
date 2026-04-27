@@ -31,5 +31,27 @@ export const supabaseAdmin = createClient(
   }
 )
 
+/** auth-js has no admin.getUserByEmail; locate user via paginated admin.listUsers. */
+export async function findAuthUserByEmail(email) {
+  const normalized = typeof email === 'string' ? email.trim().toLowerCase() : ''
+  if (!normalized) return { user: null, error: null }
+
+  const perPage = 1000
+  const maxPages = 50
+
+  for (let page = 1; page <= maxPages; page++) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage })
+    if (error) return { user: null, error }
+
+    const users = data?.users ?? []
+    const match = users.find((u) => (u.email || '').toLowerCase() === normalized)
+    if (match) return { user: match, error: null }
+
+    if (users.length < perPage) break
+  }
+
+  return { user: null, error: null }
+}
+
 // Export createClient for API routes
 export { createClient }

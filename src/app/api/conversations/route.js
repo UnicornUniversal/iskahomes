@@ -356,6 +356,10 @@ export async function POST(request) {
 
       if (msgError) {
         console.error('Error sending first message:', msgError);
+        return NextResponse.json(
+          { error: msgError.message || 'Failed to send message', conversationId },
+          { status: 500 }
+        );
       } else {
         // Automatically update lead status from "New" to "Contacted" when sending a message
         // Only update if the sender is a developer/agent/agency (lister) and receiver is a property_seeker

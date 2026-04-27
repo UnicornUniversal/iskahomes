@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import LeadsManagement from '@/app/components/analytics/LeadsManagement'
 import LeadsTrend from '@/app/components/analytics/LeadsTrend'
+import LeadSourceBreakdown from '@/app/components/analytics/LeadSourceBreakdown'
 import LeadsShare from '@/app/components/analytics/LeadsShare'
 import ChannelPerformance from '@/app/components/analytics/ChannelPerformance'
 import LeadLifecycle from '@/app/components/analytics/LeadLifecycle'
@@ -268,6 +269,8 @@ const LeadAnalytics = () => {
 
         <LeadsTrend listerId={listerId} listerType="developer" />
 
+        <LeadSourceBreakdown listerId={listerId} listerType="developer" />
+
         <LeadsShare totalLeadsData={totalLeadsData} />
 
         {loadingAnalytics ? (
@@ -277,7 +280,13 @@ const LeadAnalytics = () => {
           </div>
         ) : analyticsData ? (
           <div className="mt-8 space-y-8">
-            <ChannelPerformance data={analyticsData.channelPerformance} />
+            <ChannelPerformance
+              data={analyticsData.channelPerformance}
+              dateRange={temporalDateRange}
+              onDateRangeChange={setTemporalDateRange}
+              appliedDateRange={analyticsData.appliedDateRange}
+              loading={loadingAnalytics}
+            />
             <LeadLifecycle data={analyticsData.lifecycleAnalysis} />
             <TemporalPatterns
               data={analyticsData.temporalPatterns}
@@ -287,6 +296,7 @@ const LeadAnalytics = () => {
               }}
               onDateRangeChange={setTemporalDateRange}
               loading={loadingAnalytics}
+              hideDateRangeControl
             />
             <ContextAnalysis data={analyticsData.contextAnalysis} />
             <EngagementAnalysis data={analyticsData.engagementAnalysis} />

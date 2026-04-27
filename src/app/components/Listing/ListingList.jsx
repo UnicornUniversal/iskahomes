@@ -3,7 +3,7 @@
 import React from 'react'
 import SecondaryListingCard from './SecondaryListingCard'
 
-const ListingList = ({ listings = [], loading = false, error = null }) => {
+const ListingList = ({ listings = [], loading = false, error = null, leadAttributionContext = null }) => {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -47,7 +47,7 @@ const ListingList = ({ listings = [], loading = false, error = null }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 items-center justify-center lg:grid-cols-3 xl:grid-cols-4 gap-5 ">
         {listings.map((listing, index) => (
           <div key={listing.id || index} className={index % 2 === 0 ? ' md:mt-[10em]' : ' mt-0'}>
-            <SecondaryListingCard listing={listing} />
+            <SecondaryListingCard listing={listing} leadAttributionContext={leadAttributionContext} />
           </div>
         ))}
       </div>

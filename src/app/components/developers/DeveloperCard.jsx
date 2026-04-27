@@ -2,10 +2,11 @@
 
 import React from 'react'
 import Link from 'next/link'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 import { FiMapPin, FiHome, FiLayers } from 'react-icons/fi'
 import { dynamic_images } from '@/app/components/Data/StaticData'
 
-const DeveloperCard = ({ developer, index = 0 }) => {
+const DeveloperCard = ({ developer, index = 0, leadAttributionContext = null }) => {
   // Get dynamic image classes
   const configIndex = index % dynamic_images.length
   const imageClasses = dynamic_images[configIndex].imageClasses
@@ -73,8 +74,12 @@ const DeveloperCard = ({ developer, index = 0 }) => {
     location = 'Location not specified'
   }
 
+  const profileHref = leadAttributionContext
+    ? withWebsiteLeadAttribution(`/home/allDevelopers/${developer.slug}`, leadAttributionContext)
+    : `/home/allDevelopers/${developer.slug}`
+
   return (
-    <Link href={`/home/allDevelopers/${developer.slug}`} className="block">
+    <Link href={profileHref} className="block">
       <div className="overflow-hidden transition-all duration-300 transform hover:-translate-y-1 cursor-pointer group flex flex-col w-full">
         {/* Cover Image Section */}
         <div className={`relative overflow-hidden w-full ${getImageHeightClasses()}`}>
