@@ -10,7 +10,7 @@ const contactDetails = [
   },
   {
     icon: FaPhoneAlt,
-    value: '0302318132',
+    value: '0302318132 / 0303960971',
   },
   {
     icon: FaMapMarkerAlt,

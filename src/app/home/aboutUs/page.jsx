@@ -16,7 +16,7 @@ const playfairDisplay = Playfair_Display({
 
 const sideLinks = [
   { id: 'mission-vision', label: 'Mission and Vision?' },
-  { id: 'who-is-iska', label: 'Who is Iska Homes?' },
+  { id: 'who-is-iska', label: 'Who is ISKA Homes?' },
   { id: 'what-separates', label: 'What separates us?' },
 ]
 
@@ -111,7 +111,7 @@ const AboutUsPage = () => {
           </div>
 
           {/* Stats */}
-          <div style={{ display: 'flex', gap: 12, marginLeft: 'auto' }}>
+          <div className="grid grid-cols-3 gap-3" style={{ marginLeft: 'auto' }}>
             {[
               { label: 'VERIFIED LISTINGS', value: 'Trusted', icon: '✓' },
               { label: 'REAL-TIME DATA', value: 'Real-time', icon: '⚡' },
@@ -141,9 +141,9 @@ const AboutUsPage = () => {
       <div style={{ height: 1, background: '#e5e5e5', margin: '0 5%' }} />
 
       {/* ── Content area ─────────────────────────── */}
-      <div style={{ display: 'flex', gap: 0, padding: '40px 5%' }}>
+      <div className="flex flex-col lg:flex-row" style={{ gap: 0, padding: '40px 5%' }}>
         {/* Sidebar nav */}
-        <aside style={{ width: 220, flexShrink: 0, paddingRight: 40, position: 'sticky', top: 100, alignSelf: 'flex-start' }}>
+        <aside className="hidden lg:block" style={{ width: 220, flexShrink: 0, paddingRight: 40, position: 'sticky', top: 100, alignSelf: 'flex-start' }}>
           <nav style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {sideLinks.map((link) => (
               <button
@@ -188,7 +188,7 @@ const AboutUsPage = () => {
 
             <div style={{ width: 80, height: 3, background: 'linear-gradient(90deg, #17637C, #F68B1F)', margin: '20px 0' }} />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, fontSize: 13, lineHeight: 1.8, color: '#555', maxWidth: 700 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 24, fontSize: 13, lineHeight: 1.8, color: '#555', maxWidth: 700 }}>
               <p style={{ margin: 0 }}>
                 Our mission is to deliver exceptional real estate experiences by combining timeless design, superior craftsmanship, and innovative development practices.We are committed to setting industry standards through quality, trust, and attention to detail transforming prime locations into enduring spaces that reflect luxury, comfort, and long-term value for our clients.
               </p>
@@ -198,7 +198,7 @@ const AboutUsPage = () => {
             </div>
 
             {/* Mission images */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 32 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style={{ gap: 16, marginTop: 32 }}>
               <div style={{ borderRadius: 8, overflow: 'hidden' }}>
                 <img src="/aboutUsImages/Gym1.jpeg" alt="Modern gym facility" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
               </div>
@@ -227,7 +227,7 @@ const AboutUsPage = () => {
 
             <div style={{ width: 80, height: 3, background: 'linear-gradient(90deg, #17637C, #F68B1F)', margin: '20px 0' }} />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, fontSize: 13, lineHeight: 1.8, color: '#555', maxWidth: 700 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 24, fontSize: 13, lineHeight: 1.8, color: '#555', maxWidth: 700 }}>
               <p style={{ margin: 0 }}>
                 Our Vision is to shape the future of premium real estate by blending enduring excellence with modern innovation—creating timeless developments that evolve with changing lifestyles while maintaining the highest standards of design, quality, and value.
               </p>
@@ -237,7 +237,7 @@ const AboutUsPage = () => {
             </div>
 
             {/* Vision images */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 32 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style={{ gap: 16, marginTop: 32 }}>
               <div style={{ borderRadius: 8, overflow: 'hidden' }}>
                 <img src="/aboutUsImages/c3.jpeg" alt="Modern real estate development" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
               </div>
@@ -250,7 +250,7 @@ const AboutUsPage = () => {
             </div>
           </section>
 
-          {/* ── Who is Iska Homes ────────────────── */}
+          {/* ── Who is ISKA Homes ────────────────── */}
           <section
             id="who-is-iska"
             ref={(el) => { sectionRefs.current['who-is-iska'] = el }}
@@ -260,10 +260,10 @@ const AboutUsPage = () => {
               className={playfairDisplay.className}
               style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', fontWeight: 500, color: '#17637C', margin: 0 }}
             >
-              Who is Iska Homes?
+              Who is ISKA Homes?
             </h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, fontSize: 13, lineHeight: 1.8, color: '#555', maxWidth: 700, marginTop: 20 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 24, fontSize: 13, lineHeight: 1.8, color: '#555', maxWidth: 700, marginTop: 20 }}>
               <p style={{ margin: 0 }}>
                 We are the cutting edge of modern real estate marketing. We offer a robust digital property marketplace connecting buyers, renters, developers, and agents. Through verified listings, structured commissions, and data-led marketing tools, we make premium property discovery easier and more transparent.
               </p>
@@ -272,7 +272,7 @@ const AboutUsPage = () => {
               </p>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 32 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style={{ gap: 16, marginTop: 32 }}>
               <div style={{ borderRadius: 8, overflow: 'hidden' }}>
                 <img src="/aboutUsImages/Kitchen1.jpeg" alt="Modern kitchen interior" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
               </div>
@@ -298,7 +298,7 @@ const AboutUsPage = () => {
               What Separates Us?
             </h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, fontSize: 13, lineHeight: 1.8, color: '#555', maxWidth: 700, marginTop: 20 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 24, fontSize: 13, lineHeight: 1.8, color: '#555', maxWidth: 700, marginTop: 20 }}>
               <p style={{ margin: 0 }}>
                 Our advantage is built on a holistic ecosystem designed for maximum efficiency and impact. It begins with in-depth data collection that supports smarter strategy, then expands into lead generation systems that target and secure high-value opportunities.
               </p>
@@ -307,7 +307,7 @@ const AboutUsPage = () => {
               </p>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 32 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style={{ gap: 16, marginTop: 32 }}>
               <div style={{ borderRadius: 8, overflow: 'hidden' }}>
                 <img src="/aboutUsImages/land1.JPG" alt="Landscape view 1" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
               </div>
@@ -326,15 +326,17 @@ const AboutUsPage = () => {
       <section style={{
         position: 'relative', overflow: 'hidden',
         background: '#17637C', margin: '0 5%', borderRadius: 20,
-        display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: 420,
-      }}>
+        display: 'grid', minHeight: 420,
+      }}
+      className="!grid-cols-1 lg:!grid-cols-2"
+      >
         {/* Decorative circles */}
         <div style={{ position: 'absolute', top: 30, left: 30, width: 120, height: 120, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.12)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', top: 45, left: 45, width: 90, height: 90, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.08)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', top: 60, left: 60, width: 60, height: 60, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
 
         {/* Left — text content */}
-        <div style={{ padding: '56px 48px', display: 'flex', flexDirection: 'column', justifyContent: 'center', zIndex: 1 }}>
+        <div className="p-8 lg:p-14" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', zIndex: 1 }}>
           <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', display: 'inline-block' }} />
             Why Choose Us
@@ -352,7 +354,7 @@ const AboutUsPage = () => {
         </div>
 
         {/* Right — image */}
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 48px 40px 0' }}>
+        <div className="p-8 lg:pr-12 lg:pl-0 lg:py-10" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{
             width: '100%', maxWidth: 480, aspectRatio: '4/3', borderRadius: 16, overflow: 'hidden',
             boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
@@ -399,7 +401,7 @@ const AboutUsPage = () => {
         {/* Map */}
         <div style={{ marginTop: 40, borderRadius: 12, overflow: 'hidden', border: '1px solid #e5e5e5' }}>
           <iframe
-            title="Iska Homes Location"
+            title="ISKA Homes Location"
             src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d31766.632567482047!2d-0.16099!3d5.6500!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xfdf9c7ebaeabe93%3A0xd9e9a38c83e7f123!2sEast%20Legon%2C%20Accra%2C%20Ghana!5e0!3m2!1sen!2sgh!4v1700000000000!5m2!1sen!2sgh"
             style={{ width: '100%', height: 360, border: 'none', display: 'block' }}
             allowFullScreen=""

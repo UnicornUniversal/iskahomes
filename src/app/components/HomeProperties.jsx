@@ -1,11 +1,9 @@
 "use client"
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import ListingList from './Listing/ListingList'
-import Filter from './Filters/Filter'
-import LoadingSpinner from './ui/LoadingSpinner'
-import { motion, useScroll, useTransform, useMotionValueEvent } from 'framer-motion'
+import { motion, useScroll, useTransform } from 'framer-motion'
 import { Playfair_Display } from 'next/font/google'
+import { MapPin, Bed, Bath, Square } from 'lucide-react'
 
 const playfairDisplay = Playfair_Display({
   subsets: ['latin'],
@@ -48,9 +46,8 @@ const HomeProperties = () => {
   const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [galleryUpright, setGalleryUpright] = useState(false)
+  const [currentPage, setCurrentPage] = useState(0)
   const heroFadeRef = useRef(null)
-  const galleryScrollRef = useRef(null)
 
   // Fetch listings from API
   useEffect(() => {
@@ -100,48 +97,86 @@ const HomeProperties = () => {
   })
   const heroOpacity = useTransform(heroScrollProgress, [0, 0.5], [1, 0])
 
-  // 3D gallery scroll animations
-  const { scrollYProgress: galleryProgress } = useScroll({
-    target: galleryScrollRef,
-    offset: ['start end', 'end start']
-  })
+  // Pagination helpers
+  const totalPages = listings.length
+  const currentListing = listings[currentPage] || null
 
-  // Phase 1: Entry — rotateX 75° → 0° (progress 0 → 0.35)
-  const rotateX = useTransform(galleryProgress, [0, 0.35], [75, 0])
-  // Phase 2: Zoom settles — scale 1.2 → 1 (progress 0.2 → 0.45)
-  const scale = useTransform(galleryProgress, [0.2, 0.45], [1.2, 1])
-  // Opacity fade-in during entry
-  const galleryOpacity = useTransform(galleryProgress, [0, 0.15], [0, 1])
+  const goNextPage = useCallback(() => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages - 1))
+  }, [totalPages])
 
-  // Phase 3: Vertical pan — translate gallery upward to reveal all rows (0.45 → 1)
-  const galleryTranslateY = useTransform(galleryProgress, [0.45, 1], ['0%', '-55%'])
+  const goPrevPage = useCallback(() => {
+    setCurrentPage((prev) => Math.max(prev - 1, 0))
+  }, [])
 
-  // Column parallax — during Phase 3 pan (0.45 → 1) to add depth while browsing
-  const col1Y = useTransform(galleryProgress, [0.45, 1], ['-8%', '2%'])
-  const col2Y = useTransform(galleryProgress, [0.45, 1], ['12%', '3%'])
-  const col3Y = useTransform(galleryProgress, [0.45, 1], ['-8%', '2%'])
+  // Get all images for a listing from its media albums
+  const getListingImages = (listing) => {
+    if (!listing) return []
+    const images = []
+    if (listing.media?.albums && Array.isArray(listing.media.albums)) {
+      for (const album of listing.media.albums) {
+        if (album?.images && Array.isArray(album.images)) {
+          for (const img of album.images) {
+            images.push(img.url)
+          }
+        }
+      }
+    }
+    if (images.length === 0 && listing.media?.mediaFiles && Array.isArray(listing.media.mediaFiles)) {
+      for (const file of listing.media.mediaFiles) {
+        images.push(file.url)
+      }
+    }
+    if (images.length === 0 && listing.media?.banner?.url) {
+      images.push(listing.media.banner.url)
+    }
+    return images
+  }
 
-  // Per-column opacity fades — clear and visible, light fade-in only
-  const col1Opacity = useTransform(galleryProgress, [0.1, 0.3], [0.6, 1])
-  const col2Opacity = useTransform(galleryProgress, [0.12, 0.32], [0.6, 1])
-  const col3Opacity = useTransform(galleryProgress, [0.14, 0.34], [0.6, 1])
+  // Format price
+  const formatPrice = (listing) => {
+    const p = parseFloat(listing.price || 0)
+    const cur = listing.currency || 'GHS'
+    const pt = listing.price_type || 'sale'
+    const dur = listing.duration || null
+    let text = `${cur} ${p.toLocaleString()}`
+    if (pt === 'rent' || pt === 'lease') {
+      text += `/${dur || 'month'}`
+    }
+    return text
+  }
 
-  // Detect when gallery is upright — trigger card shuffle
-  useMotionValueEvent(galleryProgress, 'change', (v) => {
-    if (v >= 0.35 && !galleryUpright) setGalleryUpright(true)
-    if (v < 0.3 && galleryUpright) setGalleryUpright(false)
-  })
+  // Parse specs
+  const getSpecs = (listing) => {
+    if (!listing.specifications) return {}
+    try {
+      return typeof listing.specifications === 'string' ? JSON.parse(listing.specifications) : listing.specifications
+    } catch { return {} }
+  }
+
+  // Get listing type label
+  const getTypeLabel = (listing) => {
+    if (listing.listing_type) return listing.listing_type.charAt(0).toUpperCase() + listing.listing_type.slice(1)
+    if (listing.purpose_name) return listing.purpose_name
+    return 'Property'
+  }
+
+  // Get location string
+  const getLocation = (listing) => {
+    const parts = [listing.city, listing.state].filter(Boolean)
+    return parts.join(', ') || listing.country || ''
+  }
 
   return (
     <div className='w-full h-full relative'>
       {/* Hero section — fades out as you scroll */}
       <div ref={heroFadeRef} className="relative" style={{ minHeight: '100vh' }}>
         <motion.div
-          className="sticky top-[100px] z-0 flex flex-col items-center justify-center max-h-[1200px] w-full h-[70vh] min-h-[600px] px-4 transition-opacity duration-300"
+          className="sticky top-[100px] z-0 flex flex-col items-center justify-center max-h-[1200px] w-full h-[70vh] min-h-[400px] md:min-h-[600px] px-4 transition-opacity duration-300"
           style={{ opacity: heroOpacity }}
         >
           <motion.h2
-            className={`${playfairDisplay.className} text-center max-w-5xl text-[2.5em] md:text-[3.2em] w-full text-primary_color leading-[1.2]`}
+            className={`${playfairDisplay.className} text-center max-w-5xl text-[1.6em] sm:text-[2.2em] md:text-[3.2em] w-full text-primary_color leading-[1.2]`}
           >
             {heroHeadingElements.map((element, index) => {
               if (element.type === 'break') {
@@ -209,50 +244,205 @@ const HomeProperties = () => {
         </motion.div>
       </div>
 
-      {/* 3D Gallery scroll container — 350vh for 3-phase animation */}
-      <div
-        ref={galleryScrollRef}
-        style={{ height: '350vh', position: 'relative' }}
-      >
-        {/* Sticky inner — pins the gallery while scroll drives transforms */}
-        <div
-          style={{
-            position: 'sticky',
-            top: 0,
-            height: '100svh',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden',
-            perspective: '1000px',
-          }}
-        >
-          <motion.div
-            style={{
-              rotateX,
-              scale,
-              opacity: galleryOpacity,
-              y: galleryTranslateY,
-              transformOrigin: 'center center',
-              width: '100%',
-              maxWidth: 1400,
-              padding: '0 24px',
-            }}
-          >
-            <ListingList
-              listings={listings}
-              loading={loading}
-              error={error}
-              col1Y={col1Y}
-              col2Y={col2Y}
-              col3Y={col3Y}
-              col1Opacity={col1Opacity}
-              col2Opacity={col2Opacity}
-              col3Opacity={col3Opacity}
-              shuffleActive={galleryUpright}
-            />
-          </motion.div>
-        </div>
+      {/* ── Paginated Property Grid ──────────────── */}
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 24px 80px' }}>
+        {loading && (
+          <div className="flex justify-center py-16">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary_color" />
+          </div>
+        )}
+
+        {error && (
+          <div className="text-center py-12">
+            <p className="text-red-500">{error}</p>
+          </div>
+        )}
+
+        {!loading && !error && listings.length > 0 && (() => {
+          const images = getListingImages(currentListing)
+          const heroImg = images[0] || null
+          const thumb1 = images[1] || images[0] || null
+          const thumb2 = images[2] || images[0] || null
+          const specs = getSpecs(currentListing)
+          const priceText = formatPrice(currentListing)
+          const typeLabel = getTypeLabel(currentListing)
+          const location = getLocation(currentListing)
+
+          return (
+            <>
+              {/* Header row — page counter & arrows */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, marginBottom: 16 }}>
+                <span className="text-primary_color" style={{ fontSize: 15, fontWeight: 500 }}>
+                  {totalPages} {totalPages === 1 ? 'Page' : 'Pages'}
+                </span>
+                <button
+                  onClick={goPrevPage}
+                  disabled={currentPage === 0}
+                  className="text-primary_color disabled:opacity-30"
+                  style={{
+                    width: 36, height: 36, borderRadius: '50%', border: '1.5px solid currentColor',
+                    background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: currentPage === 0 ? 'default' : 'pointer', transition: 'opacity 0.2s',
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                </button>
+                <span className="text-primary_color" style={{ fontSize: 14, fontWeight: 500, minWidth: 36, textAlign: 'center' }}>
+                  {currentPage + 1}/{totalPages}
+                </span>
+                <button
+                  onClick={goNextPage}
+                  disabled={currentPage === totalPages - 1}
+                  className="text-primary_color disabled:opacity-30"
+                  style={{
+                    width: 36, height: 36, borderRadius: '50%', border: '1.5px solid currentColor',
+                    background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: currentPage === totalPages - 1 ? 'default' : 'pointer', transition: 'opacity 0.2s',
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                </button>
+              </div>
+
+              {/* Image grid */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Hero image */}
+                {heroImg && (
+                  <Link href={`/home/property/${currentListing.listing_type}/${currentListing.slug}/${currentListing.id}`}>
+                    <div
+                      style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', cursor: 'pointer' }}
+                      className="group"
+                    >
+                      <img
+                        src={heroImg}
+                        alt={currentListing.title || currentListing.name || 'Property'}
+                        style={{ width: '100%', height: 480, objectFit: 'cover', display: 'block', transition: 'transform 0.3s ease' }}
+                        className="group-hover:scale-[1.03]"
+                      />
+
+                      {/* Badges */}
+                      <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
+                        {currentListing.is_featured && (
+                          <span className="bg-yellow-500 text-white px-2 py-0.5 rounded-full text-[10px] font-medium">Featured</span>
+                        )}
+                        {currentListing.is_verified && (
+                          <span className="bg-green-500 text-white px-2 py-0.5 rounded-full text-[10px] font-medium">Verified</span>
+                        )}
+                        {currentListing.is_premium && (
+                          <span className="bg-purple-500 text-white px-2 py-0.5 rounded-full text-[10px] font-medium">Premium</span>
+                        )}
+                      </div>
+
+                      {/* Slide-up hover overlay */}
+                      <div
+                        className="absolute inset-x-0 bottom-0 z-10 translate-y-full opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-400 ease-out"
+                        style={{
+                          background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.45) 55%, transparent 100%)',
+                          padding: '48px 16px 16px',
+                        }}
+                      >
+                        {/* Price + purpose */}
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="text-white text-sm font-bold">{priceText}</span>
+                          {currentListing.purpose_name && (
+                            <span className="px-1.5 py-0.5 bg-white/20 backdrop-blur-sm text-white text-[10px] font-medium rounded-full">
+                              {currentListing.purpose_name}
+                            </span>
+                          )}
+                        </div>
+                        {/* Title */}
+                        <h6 className="text-white text-sm font-medium line-clamp-1 mb-1">
+                          {currentListing.title || currentListing.name}
+                        </h6>
+                        {/* Location */}
+                        <div className="flex items-center text-white/80 text-xs mb-1.5">
+                          <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
+                          <p className="line-clamp-1 m-0">{location || 'Ghana'}</p>
+                        </div>
+                        {/* Specs */}
+                        <div className="flex items-center gap-3 text-white/80 text-xs">
+                          {specs.bedrooms && (
+                            <div className="flex items-center gap-0.5"><Bed className="w-3 h-3" /><span>{specs.bedrooms}</span></div>
+                          )}
+                          {specs.bathrooms && (
+                            <div className="flex items-center gap-0.5"><Bath className="w-3 h-3" /><span>{specs.bathrooms}</span></div>
+                          )}
+                          {(specs.property_size || specs.size) && (
+                            <div className="flex items-center gap-0.5"><Square className="w-3 h-3" /><span>{specs.property_size || specs.size} sqft</span></div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                )}
+
+                {/* Two thumbnail images */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {[thumb1, thumb2].map((src, idx) => src && (
+                    <Link key={idx} href={`/home/property/${currentListing.listing_type}/${currentListing.slug}/${currentListing.id}`}>
+                      <div
+                        style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', cursor: 'pointer' }}
+                        className="group"
+                      >
+                        <img
+                          src={src}
+                          alt={`${currentListing.title || 'Property'} view ${idx + 2}`}
+                          style={{ width: '100%', height: 300, objectFit: 'cover', display: 'block', transition: 'transform 0.3s ease' }}
+                          className="group-hover:scale-[1.03]"
+                        />
+                        {/* Slide-up hover overlay */}
+                        <div
+                          className="absolute inset-x-0 bottom-0 z-10 translate-y-full opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-400 ease-out"
+                          style={{
+                            background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.45) 55%, transparent 100%)',
+                            padding: '48px 14px 14px',
+                          }}
+                        >
+                          {/* Price + purpose */}
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="text-white text-sm font-bold">{priceText}</span>
+                            {currentListing.purpose_name && (
+                              <span className="px-1.5 py-0.5 bg-white/20 backdrop-blur-sm text-white text-[10px] font-medium rounded-full">
+                                {currentListing.purpose_name}
+                              </span>
+                            )}
+                          </div>
+                          {/* Title */}
+                          <h6 className="text-white text-sm font-medium line-clamp-1 mb-1">
+                            {currentListing.title || currentListing.name}
+                          </h6>
+                          {/* Location */}
+                          <div className="flex items-center text-white/80 text-xs mb-1.5">
+                            <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
+                            <p className="line-clamp-1 m-0">{location || 'Ghana'}</p>
+                          </div>
+                          {/* Specs */}
+                          <div className="flex items-center gap-3 text-white/80 text-xs">
+                            {specs.bedrooms && (
+                              <div className="flex items-center gap-0.5"><Bed className="w-3 h-3" /><span>{specs.bedrooms}</span></div>
+                            )}
+                            {specs.bathrooms && (
+                              <div className="flex items-center gap-0.5"><Bath className="w-3 h-3" /><span>{specs.bathrooms}</span></div>
+                            )}
+                            {(specs.property_size || specs.size) && (
+                              <div className="flex items-center gap-0.5"><Square className="w-3 h-3" /><span>{specs.property_size || specs.size} sqft</span></div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </>
+          )
+        })()}
+
+        {!loading && !error && listings.length === 0 && (
+          <div className="text-center py-16 text-gray-400">
+            <p>No properties available yet.</p>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -22,17 +22,17 @@ const Footer = () => {
   return (
     <footer style={{ background: '#fff', borderTop: '1px solid rgba(23,99,124,0.08)' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '48px 24px 0' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 40 }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-7 lg:gap-10">
 
           {/* Brand column */}
           <div>
             <img
               src="/ISKA Logo.png"
-              alt="Iska Homes"
+              alt="ISKA Homes"
               style={{ height: 60, width: 'auto', marginBottom: 16 }}
             />
             <p style={{ fontSize: 13, lineHeight: 1.7, color: '#17637C', opacity: 0.8, maxWidth: 240 }}>
-              Your Reliable Access to Premium Real Estate - Discover, Invest, and Thrive with ISKA Homes.
+              Your Reliable Access to Premium Real Estate - Discover, Connect, and Close with ISKA Homes.
             </p>
           </div>
 
@@ -88,7 +88,7 @@ const Footer = () => {
                 Child Street, Spintex<br />No FHP 25
               </p>
               <p style={{ fontSize: 14, color: '#17637C', opacity: 0.7, margin: 0 }}>
-                0302318132
+                0302318132/0303960971
               </p>
               <p style={{ fontSize: 14, color: '#17637C', opacity: 0.7, margin: 0 }}>
                 info@iskaglobal.com
@@ -108,21 +108,7 @@ const Footer = () => {
         </div>
       </div>
 
-      {/* Responsive styles */}
-      <style jsx>{`
-        @media (max-width: 768px) {
-          footer > div > div:first-child {
-            grid-template-columns: 1fr 1fr !important;
-            gap: 32px !important;
-          }
-        }
-        @media (max-width: 480px) {
-          footer > div > div:first-child {
-            grid-template-columns: 1fr !important;
-            gap: 28px !important;
-          }
-        }
-      `}</style>
+
     </footer>
   )
 }

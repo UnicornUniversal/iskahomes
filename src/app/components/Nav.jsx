@@ -340,7 +340,7 @@ const Nav = () => {
           >
             <img
               src="/ISKA Logo.png"
-              alt="Iska Homes"
+              alt="ISKA Homes"
               style={{
                 height: scrolled ? 34 : 38,
                 width: "auto",
@@ -419,7 +419,7 @@ const Nav = () => {
         {/* Top bar */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px" }}>
           <Link href="/" onClick={closeMobile}>
-            <img src="/ISKA Logo.png" alt="Iska Homes" style={{ height: 36, width: "auto" }} />
+            <img src="/ISKA Logo.png" alt="ISKA Homes" style={{ height: 36, width: "auto" }} />
           </Link>
           <button
             onClick={() => setMobileOpen((v) => !v)}

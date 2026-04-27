@@ -288,10 +288,10 @@ const Header = () => {
 
             {/* Text content — positioned over left overlay */}
             <div
+              className="w-full md:w-[56%]"
               style={{
                 position: 'relative',
                 zIndex: 3,
-                width: '56%',
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
@@ -371,6 +371,7 @@ const Header = () => {
             {/* Listing info overlay — bottom right */}
             {currentProperty && (
               <div
+                className="hidden md:block"
                 style={{
                   position: 'absolute',
                   bottom: 40,
@@ -469,15 +470,15 @@ const Header = () => {
 
             {/* Centred image card */}
             <div
+              className="w-[88%] sm:w-[70%] md:w-[52%]"
               style={{
-                width: '52%',
                 maxWidth: 820,
                 flex: '1 1 0',
                 minHeight: 0,
                 position: 'relative',
                 overflow: 'hidden',
                 borderRadius: 5,
-              
+                aspectRatio: '16 / 10',
               }}
             >
               <AnimatePresence custom={slideDirection} mode="wait">
@@ -505,8 +506,8 @@ const Header = () => {
             {/* Caption row */}
             {currentProperty && (
               <div
+                className="w-[88%] sm:w-[70%] md:w-[52%]"
                 style={{
-                  width: '52%',
                   maxWidth: 820,
                   display: 'flex',
                   justifyContent: 'space-between',

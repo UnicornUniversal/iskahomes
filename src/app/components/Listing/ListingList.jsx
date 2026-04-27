@@ -102,6 +102,13 @@ const ListingList = ({
     colItems[i % 3].push(listing)
   })
 
+  // Uniform aspect ratio for all gallery cards
+  const aspectPatterns = [
+    ['3 / 2', '3 / 2'],
+    ['3 / 2', '3 / 2'],
+    ['3 / 2', '3 / 2'],
+  ]
+
   const columns = [
     { items: colItems[0], y: col1Y, opacity: col1Opacity },
     { items: colItems[1], y: col2Y, opacity: col2Opacity },
@@ -132,14 +139,14 @@ const ListingList = ({
                 gap: '20px',
               }}
             >
-              {col.items.map((listing) => (
+              {col.items.map((listing, idx) => (
                 <motion.div
                   key={listing.id}
                   layout
                   transition={{
                     layout: { type: 'spring', stiffness: 120, damping: 20, mass: 0.8 }
                   }}
-                  style={{ aspectRatio: '16 / 10' }}
+                  style={{ aspectRatio: aspectPatterns[colIdx][idx % 2] }}
                 >
                   <SecondaryListingCard
                     listing={listing}
