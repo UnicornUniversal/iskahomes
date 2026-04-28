@@ -394,7 +394,7 @@ const DeveloperNav = () => {
                 {/* ISKA Logo - first element, links to homepage (hidden when collapsed on desktop) */}
                 <div className={`mb-4 flex items-center justify-start pt-4 ${isCollapsed ? 'lg:hidden' : ''}`}>
                     <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
-                        <img src="/iska-dark.png" alt="ISKA Homes" className="w-[100px] max-w-[120px]" />
+                        <img src="/ISKA Logo.png" alt="ISKA Homes" className="w-[100px] max-w-[120px]" />
                     </Link>
                 </div>
 

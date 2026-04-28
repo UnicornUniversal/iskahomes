@@ -10,7 +10,7 @@ const contactDetails = [
   },
   {
     icon: FaPhoneAlt,
-    value: '0302318132',
+    value: '0302318132 / 0303960971',
   },
   {
     icon: FaMapMarkerAlt,
@@ -85,21 +85,18 @@ const ContactUsPage = () => {
   }
 
   return (
-    <div className="relative bg-[linear-gradient(180deg,_rgba(23,99,124,0.07)_0%,_rgba(255,255,255,0.05)_40%,_rgba(246,139,31,0.06)_100%)] text-slate-900">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(23,99,124,0.1),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(246,139,31,0.12),_transparent_26%)]" />
+    <div className="relative" style={{ background: 'linear-gradient(180deg, rgba(23,99,124,0.1) 19%, rgba(255,255,255,0.01) 100%)', minHeight: '100vh' }}>
 
-      <section className="relative mx-auto  px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-        <div className="mb-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#17637C]/15 bg-white/20 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[#17637C] backdrop-blur-sm">
-            <span className="h-2 w-2 rounded-full bg-[#F68B1F]" />
+      <section className="relative mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <h1
+            className="font-medium text-primary_color tracking-tight"
+            style={{ fontSize: 'clamp(2.4rem, 5vw, 4rem)', margin: 0, lineHeight: 1.1 }}
+          >
             Contact Us
-          </div>
-
-          <h1 className="mt-5 text-4xl font-semibold tracking-[-0.05em] text-[#17637C] sm:text-6xl lg:text-7xl">
-            Contact Iska Homes.
           </h1>
 
-          <p className="mt-5 text-base leading-8 text-slate-600 sm:text-lg">
+          <p className="mt-4 text-sm leading-7 text-slate-600 sm:text-base max-w-xl">
             Get in touch with ISKA Homes for property inquiries, partnerships, support,
             or any questions about our services.
           </p>

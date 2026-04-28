@@ -1,122 +1,59 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
+import { Playfair_Display } from 'next/font/google'
 import {
-  FaBolt,
   FaClock,
   FaEnvelope,
-  FaFingerprint,
-  FaHome,
   FaMapMarkerAlt,
   FaPhone,
 } from 'react-icons/fa'
 
-const sections = [
-  {
-    id: 'what-is-iska',
-    label: 'What is ISKA Homes?',
-    eyebrow: 'Who we are',
-    title: 'A premium real estate platform built for trust, speed, and clarity.',
-    quote: 'Your reliable access to premium realty.',
-    paragraphs: [
-      'We are the cutting edge of modern real estate marketing. We offer a robust digital property marketplace connecting buyers, renters, developers, and agents. Through verified listings, structured commissions, and data-led marketing tools, we make premium property discovery easier and more transparent.',
-      'Headquartered in Accra, ISKA Homes is powered by professionals across design, research, compliance, and real estate marketing. We verify neighborhood, residential, and commercial data so our users can act on real-time, relevant information with confidence.',
-    ],
-    images: [
-      { src: '/aboutUsImages/Kitchen1.jpeg', alt: 'Modern kitchen interior' },
-      { src: '/aboutUsImages/sitting1.jpeg', alt: 'Premium sitting area' },
-      { src: '/aboutUsImages/sitting2.jpeg', alt: 'Elegant living space' },
-    ],
-    highlights: ['Verified listings', 'Responsive digital experience', 'Data-led decision support'],
-  },
-  {
-    id: 'mission-vision',
-    label: 'Mission and Vision',
-    eyebrow: 'What drives us',
-    title: 'We are building a more secure and refined real estate experience.',
-    panels: [
-      {
-        heading: 'Our Mission',
-        body:
-          'Our mission at ISKA Homes is to provide homeseekers, developers, agencies, and agents with an optimum platform that ensures security, transparency, efficiency, and ease, tailored to their premium real estate needs.',
-        images: [
-          { src: '/aboutUsImages/Gym1.jpeg', alt: 'Modern gym facility' },
-          { src: '/aboutUsImages/c1.jpeg', alt: 'Modern property exterior' },
-          { src: '/aboutUsImages/c2.jpeg', alt: 'Premium real estate frontage' },
-        ],
-      },
-      {
-        heading: 'Our Vision',
-        body:
-          'Our vision is to be a global standard for premium digital real estate marketing, prioritizing secure and personalized solutions for every property partnership and client journey.',
-        images: [
-          { src: '/aboutUsImages/c3.jpeg', alt: 'Modern real estate development' },
-          { src: '/aboutUsImages/c4.jpeg', alt: 'Property facade detail' },
-          { src: '/aboutUsImages/R1.jpeg', alt: 'Premium interior finish' },
-        ],
-      },
-    ],
-    highlights: ['Security-first operations', 'Personalized solutions', 'Global-standard positioning'],
-  },
-  {
-    id: 'what-separates',
-    label: 'What Separates Us?',
-    eyebrow: 'Why it matters',
-    title: 'Our edge comes from combining market intelligence with execution.',
-    paragraphs: [
-      'Our advantage is built on a holistic ecosystem designed for maximum efficiency and impact. It begins with in-depth data collection that supports smarter strategy, then expands into lead generation systems that target and secure high-value opportunities.',
-      'We make clearer tracking possible through real-time insight, 360 service provision, and responsive compliance support. The result is a complete, accountable partnership designed for sustainable growth.',
-    ],
-    images: [
-      { src: '/aboutUsImages/land1.JPG', alt: 'Landscape view 1' },
-      { src: '/aboutUsImages/land2.JPG', alt: 'Landscape view 2' },
-      { src: '/aboutUsImages/hh.jpeg', alt: 'Featured property highlight' },
-    ],
-    highlights: ['Lead generation systems', '360 service provision', 'Responsive compliance team'],
-  },
-]
+const playfairDisplay = Playfair_Display({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+})
 
-const heroStats = [
-  { label: 'Verified listings', value: 'Trusted' },
-  { label: 'Market insight', value: 'Real-time' },
-  { label: 'Client experience', value: 'Premium' },
+const sideLinks = [
+  { id: 'mission-vision', label: 'Mission and Vision?' },
+  { id: 'who-is-iska', label: 'Who is ISKA Homes?' },
+  { id: 'what-separates', label: 'What separates us?' },
 ]
 
 const contactCards = [
   {
     icon: FaEnvelope,
     title: "We're always happy to help",
-    value: 'info@iskaglobal.com',
+    value: 'iskahomes@gmail.com',
   },
   {
     icon: FaPhone,
-    title: 'Our hotline number',
+    title: 'Our Hotline Number',
     value: '0302318132',
   },
   {
     icon: FaMapMarkerAlt,
-    title: 'Our address',
-    value: 'Child Street, Spintex No FHP 25',
+    title: 'Our Address',
+    value: 'Accra, Spintex child streeet',
   },
   {
     icon: FaClock,
-    title: 'Business hours',
-    value: 'Mon - Fri, 8am - 5pm',
+    title: 'Our Business Hours',
+    value: 'mon-fri 8am-5pm',
   },
 ]
 
-const signaturePoints = [
-  'Market knowledge that turns complexity into clarity.',
-  'A refined service culture shaped around trust and responsiveness.',
-  'Execution support that helps buyers, developers, and agents move with confidence.',
-]
-
-const iconSet = [FaFingerprint, FaHome, FaBolt]
-
 const AboutUsPage = () => {
-  const [activeSection, setActiveSection] = useState('what-is-iska')
+  const [activeSection, setActiveSection] = useState('mission-vision')
   const sectionRefs = useRef({})
 
+  const scrollToSection = (id) => {
+    setActiveSection(id)
+    const el = sectionRefs.current[id]
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  // Auto-update sidebar based on scroll position
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -126,349 +63,353 @@ const AboutUsPage = () => {
           }
         })
       },
-      {
-        root: null,
-        rootMargin: '-20% 0px -55% 0px',
-        threshold: 0.15,
-      }
+      { rootMargin: '-20% 0px -60% 0px', threshold: 0.1 }
     )
 
-    sections.forEach((section) => {
-      const element = sectionRefs.current[section.id]
-      if (element) observer.observe(element)
+    sideLinks.forEach((link) => {
+      const el = sectionRefs.current[link.id]
+      if (el) observer.observe(el)
     })
 
     return () => observer.disconnect()
   }, [])
 
-  const scrollToSection = (id) => {
-    setActiveSection(id)
-    const element = sectionRefs.current[id]
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-  }
-
-  const activeIconCount =
-    activeSection === 'what-is-iska' ? 3 : activeSection === 'mission-vision' ? 2 : 1
-
   return (
-    <div className="relative bg-[radial-gradient(circle_at_top_left,_rgba(246,139,31,0.18),_transparent_22%),radial-gradient(circle_at_top_right,_rgba(23,99,124,0.14),_transparent_28%),linear-gradient(180deg,_rgba(23,99,124,0.08)_0%,_rgba(255,255,255,0.06)_40%,_rgba(246,139,31,0.08)_100%)] text-slate-900">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.45)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.45)_1px,transparent_1px)] bg-[size:120px_120px] opacity-40" />
-      <div className="pointer-events-none absolute left-0 top-24 h-72 w-72 rounded-full bg-[#17637C]/10 blur-3xl" />
-      <div className="pointer-events-none absolute right-0 top-72 h-80 w-80 rounded-full bg-[#F68B1F]/10 blur-3xl" />
+    <div style={{ background: 'linear-gradient(180deg, rgba(23,99,124,0.1) 19%, rgba(255,255,255,0.01) 100%)', color: '#1a1a1a', minHeight: '100vh' }}>
+      {/* ── Hero ──────────────────────────────────── */}
+      <section style={{ position: 'relative', overflow: 'hidden', padding: '60px 5% 40px' }}>
+        {/* Blue gradient overlay — left corner only */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, width: '56%', height: '100%',
+          background: 'linear-gradient(to right, rgba(23,99,124,0.12) 0%, rgba(23,99,124,0.06) 40%, transparent 100%)',
+          pointerEvents: 'none', zIndex: 0,
+        }} />
+        <h1
+          className="font-medium text-primary_color tracking-tight"
+          style={{ fontSize: 'clamp(2.4rem, 5vw, 4rem)', margin: 0, lineHeight: 1.1, position: 'relative', zIndex: 1 }}
+        >
+          About Us
+        </h1>
 
-      <div className="relative mx-auto  px-4 pb-20 pt-8 sm:px-6 lg:px-8 lg:pt-12">
-        <section className="rounded-[2rem] border border-white/30 bg-white/20 px-6 py-8 shadow-[0_24px_80px_rgba(23,99,124,0.08)] backdrop-blur-xl sm:px-8 lg:px-10 lg:py-10">
-          <div className="flex flex-col gap-8">
-            <div className="w-full">
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#17637C]/20 bg-white/20 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[#17637C] shadow-sm backdrop-blur-md">
-                <span className="h-2 w-2 rounded-full bg-[#F68B1F]" />
-                About ISKA Homes
-              </div>
-
-              <h1 className="w-full max-w-none text-5xl font-semibold leading-[0.95] tracking-[-0.06em] text-[#17637C] sm:text-7xl lg:text-[7.5rem]">
-                Designed for premium property journeys.
-              </h1>
-            </div>
-
-            <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-              <div className="flex flex-wrap items-center gap-3">
-                {iconSet.map((Icon, index) => (
-                  <div
-                    key={index}
-                    className={`flex h-12 w-12 items-center justify-center rounded-2xl border transition-all duration-300 ${
-                      index < activeIconCount
-                        ? 'border-[#17637C]/15 bg-[#17637C] text-white shadow-[0_12px_30px_rgba(23,99,124,0.22)]'
-                        : 'border-[#17637C]/15 bg-white/20 text-[#17637C]/40'
-                    }`}
-                  >
-                    <Icon size={18} />
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid gap-5 lg:w-1/3 lg:min-w-[360px]">
-                <div className="rounded-[1.75rem] border border-[#17637C]/20 bg-[#17637C] p-5 text-white shadow-[0_20px_60px_rgba(23,99,124,0.22)]">
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 p-2">
-                      <img
-                        src="/aboutUsImages/onelogo.png"
-                        alt="ISKA Homes logo"
-                        className="h-full w-full object-contain"
-                      />
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/60">
-                        Premium real estate platform
-                      </p>
-                      <p className="mt-2 text-sm leading-7 text-white/85">
-                        Get to know the platform shaping verified listings, stronger visibility,
-                        and smarter real estate growth.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  {heroStats.map((stat) => (
-                    <div
-                      key={stat.label}
-                      className="rounded-[1.5rem] border border-white/30 bg-white/20 p-4 shadow-[0_16px_40px_rgba(23,99,124,0.05)] backdrop-blur-md"
-                    >
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        {stat.label}
-                      </p>
-                      <p className="mt-3 text-lg font-semibold text-[#17637C]">{stat.value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 32, alignItems: 'center', justifyContent: 'space-between', marginTop: 32, position: 'relative', zIndex: 1 }}>
+          {/* Platform badge */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 14,
+            background: '#17637C', borderRadius: 10, padding: '16px 24px', maxWidth: 360
+          }}>
+            <img
+              src="/aboutUsImages/onelogo.png"
+              alt="ISKA Homes logo"
+              style={{ width: 40, height: 40, objectFit: 'contain' }}
+            />
+            <div>
+              <p style={{ color: '#fff', fontSize: 14, fontWeight: 600, margin: 0 }}>Premium Real Estate Platform</p>
+              <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, margin: '4px 0 0', lineHeight: 1.5 }}>
+                Get to know the platform shaping listings, stronger viability and smarter real estate growth
+              </p>
             </div>
           </div>
-        </section>
 
-        <div className="mt-10 grid gap-8 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="lg:sticky lg:top-24 lg:self-start">
-            <div className="rounded-[1.75rem] border border-white/30 bg-white/20 p-5 shadow-[0_18px_60px_rgba(23,99,124,0.06)] backdrop-blur-xl">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Explore the page
-              </p>
-              <nav className="mt-5 space-y-3">
-                {sections.map((section, index) => {
-                  const isActive = activeSection === section.id
-
-                  return (
-                    <button
-                      key={section.id}
-                      type="button"
-                      onClick={() => scrollToSection(section.id)}
-                      className={`group flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-all duration-300 ${
-                        isActive
-                          ? 'border-[#17637C]/15 bg-[#17637C] text-white shadow-[0_14px_36px_rgba(23,99,124,0.2)]'
-                          : 'border-white/25 bg-white/15 text-[#17637C] hover:border-[#17637C]/20 hover:bg-white/20'
-                      }`}
-                    >
-                      <span
-                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-semibold ${
-                          isActive ? 'bg-white/15 text-white' : 'bg-[#17637C]/10 text-[#17637C]'
-                        }`}
-                      >
-                        0{index + 1}
-                      </span>
-                      <span className="text-sm font-medium">{section.label}</span>
-                    </button>
-                  )
-                })}
-              </nav>
-            </div>
-          </aside>
-
-          <main className="space-y-8">
-            {sections.map((section) => (
-              <section
-                key={section.id}
-                id={section.id}
-                ref={(element) => {
-                  sectionRefs.current[section.id] = element
-                }}
-                className="scroll-mt-24 rounded-[2rem] border border-white/30 bg-white/20 p-6 shadow-[0_24px_80px_rgba(23,99,124,0.06)] backdrop-blur-xl sm:p-8 lg:p-10"
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-3" style={{ marginLeft: 'auto' }}>
+            {[
+              { label: 'VERIFIED LISTINGS', value: 'Trusted', icon: '✓' },
+              { label: 'REAL-TIME DATA', value: 'Real-time', icon: '⚡' },
+              { label: 'PREMIUM SERVICE', value: 'Premium', icon: '★' },
+            ].map((stat) => (
+              <div key={stat.value} style={{
+                textAlign: 'center', background: 'rgba(23,99,124,0.05)',
+                borderRadius: 14, padding: '18px 26px', minWidth: 120,
+                border: '1px solid rgba(23,99,124,0.08)',
+                backdropFilter: 'blur(8px)',
+                transition: 'all 0.3s ease',
+                cursor: 'default',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(23,99,124,0.1)'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(23,99,124,0.12)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(23,99,124,0.05)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
               >
-                <div className="grid gap-8 xl:grid-cols-[minmax(0,1.1fr)_320px]">
-                  <div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-[#17637C]/10 bg-[#17637C]/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#17637C]">
-                      <span className="h-2 w-2 rounded-full bg-[#F68B1F]" />
-                      {section.eyebrow}
-                    </div>
-
-                    <h2 className="mt-5 max-w-3xl text-3xl font-semibold tracking-[-0.04em] text-[#17637C] sm:text-4xl">
-                      {section.title}
-                    </h2>
-
-                    {section.quote && (
-                      <p className="mt-4 text-base font-medium italic text-[#17637C]">
-                        "{section.quote}"
-                      </p>
-                    )}
-
-                    {section.paragraphs && (
-                      <div className="mt-6 space-y-4 text-[15px] leading-8 text-slate-600 sm:text-base">
-                        {section.paragraphs.map((paragraph) => (
-                          <p key={paragraph}>{paragraph}</p>
-                        ))}
-                      </div>
-                    )}
-
-                    {section.panels && (
-                      <div className="mt-8 space-y-6">
-                        {section.panels.map((panel) => (
-                          <div
-                            key={panel.heading}
-                            className="rounded-[1.75rem] border border-white/25 bg-white/15 p-5 backdrop-blur-md sm:p-6"
-                          >
-                            <h3 className="text-2xl font-semibold tracking-[-0.03em] text-[#17637C]">
-                              {panel.heading}
-                            </h3>
-                            <div className="mt-4 h-px w-20 bg-gradient-to-r from-[#17637C] to-[#F68B1F]" />
-                            <p className="mt-5 max-w-3xl text-[15px] leading-8 text-slate-600 sm:text-base">
-                              {panel.body}
-                            </p>
-
-                            <div className="mt-6 grid gap-4 md:grid-cols-3">
-                              {panel.images.map((image, index) => (
-                                <div
-                                  key={image.src}
-                                  className={`group relative overflow-hidden rounded-[1.5rem] ${
-                                    index === 0 ? 'md:col-span-2' : ''
-                                  }`}
-                                >
-                                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-transparent opacity-60" />
-                                  <img
-                                    src={image.src}
-                                    alt={image.alt}
-                                    className="h-64 w-full object-cover transition duration-700 group-hover:scale-105"
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="rounded-[1.75rem] border border-[#17637C]/20 bg-[#17637C] p-5 text-white">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/55">
-                        Section focus
-                      </p>
-                      <p className="mt-3 text-xl font-semibold tracking-[-0.03em]">
-                        {section.label}
-                      </p>
-                      <div className="mt-5 h-px w-full bg-white/10" />
-                      <div className="mt-5 space-y-3">
-                        {section.highlights.map((item) => (
-                          <div
-                            key={item}
-                            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/85"
-                          >
-                            {item}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {section.images && (
-                  <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {section.images.map((image, index) => (
-                      <div
-                        key={image.src}
-                        className={`group relative overflow-hidden rounded-[1.75rem] ${
-                          index === 0 ? 'sm:col-span-2 xl:col-span-1' : ''
-                        }`}
-                      >
-                        <div className="absolute inset-0 z-10 bg-gradient-to-t from-slate-950/45 via-transparent to-transparent" />
-                        <img
-                          src={image.src}
-                          alt={image.alt}
-                          className="h-72 w-full object-cover transition duration-700 group-hover:scale-105"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
+                <div style={{ fontSize: 18, marginBottom: 6 }}>{stat.icon}</div>
+                <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', color: '#aaa', margin: 0, textTransform: 'uppercase' }}>{stat.label}</p>
+                <p style={{ fontSize: 17, fontWeight: 700, color: '#17637C', margin: '8px 0 0' }}>{stat.value}</p>
+              </div>
             ))}
-          </main>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Divider ───────────────────────────────── */}
+      <div style={{ height: 1, background: '#e5e5e5', margin: '0 5%' }} />
+
+      {/* ── Content area ─────────────────────────── */}
+      <div className="flex flex-col lg:flex-row" style={{ gap: 0, padding: '40px 5%' }}>
+        {/* Sidebar nav */}
+        <aside className="hidden lg:block" style={{ width: 220, flexShrink: 0, paddingRight: 40, position: 'sticky', top: 100, alignSelf: 'flex-start' }}>
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {sideLinks.map((link) => (
+              <button
+                key={link.id}
+                onClick={() => scrollToSection(link.id)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
+                  fontSize: 14, padding: '6px 0',
+                  color: activeSection === link.id ? '#17637C' : '#888',
+                  fontWeight: activeSection === link.id ? 600 : 400,
+                  transition: 'color 0.2s',
+                }}
+              >
+                {link.label}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        {/* Main content */}
+        <main style={{ flex: 1, minWidth: 0 }}>
+
+          {/* ── Our Mission ────────────────────────── */}
+          <section
+            id="mission-vision"
+            ref={(el) => { sectionRefs.current['mission-vision'] = el }}
+            style={{ scrollMarginTop: 100 }}
+          >
+            <h2
+              className={playfairDisplay.className}
+              style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', fontWeight: 500, color: '#17637C', margin: 0 }}
+            >
+              Our Mission
+            </h2>
+
+            <p
+              className={playfairDisplay.className}
+              style={{ fontSize: 18, fontStyle: 'italic', color: '#17637C', margin: '20px 0 0', lineHeight: 1.6, maxWidth: 540 }}
+            >
+              &ldquo;Our mission at ISKA Homes is to provide homeseekers, developers, agencies, and agents with an optimum platform that ensures security, transparency, efficiency, and ease, tailored to their premium real estate needs.&rdquo;
+            </p>
+
+            <div style={{ width: 80, height: 3, background: 'linear-gradient(90deg, #17637C, #F68B1F)', margin: '20px 0' }} />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 24, fontSize: 13, lineHeight: 1.8, color: '#555', maxWidth: 700 }}>
+              <p style={{ margin: 0 }}>
+                Our mission is to deliver exceptional real estate experiences by combining timeless design, superior craftsmanship, and innovative development practices.We are committed to setting industry standards through quality, trust, and attention to detail transforming prime locations into enduring spaces that reflect luxury, comfort, and long-term value for our clients.
+              </p>
+              <p style={{ margin: 0 }}>
+                We build on a legacy of excellence by delivering premium real estate developments that stand the test of time. We strive to blend tradition with innovation—creating modern, high-quality spaces that meet evolving lifestyle needs while upholding the highest standards of design, integrity, and long-term value.
+              </p>
+            </div>
+
+            {/* Mission images */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style={{ gap: 16, marginTop: 32 }}>
+              <div style={{ borderRadius: 8, overflow: 'hidden' }}>
+                <img src="/aboutUsImages/Gym1.jpeg" alt="Modern gym facility" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+              </div>
+              <div style={{ borderRadius: 8, overflow: 'hidden' }}>
+                <img src="/aboutUsImages/c1.jpeg" alt="Modern property exterior" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+              </div>
+              <div style={{ borderRadius: 8, overflow: 'hidden' }}>
+                <img src="/aboutUsImages/c2.jpeg" alt="Premium real estate frontage" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+              </div>
+            </div>
+
+            {/* ── Our Vision ─────────────────────────── */}
+            <h2
+              className={playfairDisplay.className}
+              style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', fontWeight: 500, color: '#17637C', margin: '48px 0 0' }}
+            >
+              Our Vision
+            </h2>
+
+            <p
+              className={playfairDisplay.className}
+              style={{ fontSize: 18, fontStyle: 'italic', color: '#17637C', margin: '20px 0 0', lineHeight: 1.6, maxWidth: 540 }}
+            >
+              &ldquo;To become a leading premium real estate brand, recognized for transforming prime locations into iconic developments that redefine modern living, investment value, and architectural excellence.&rdquo;
+            </p>
+
+            <div style={{ width: 80, height: 3, background: 'linear-gradient(90deg, #17637C, #F68B1F)', margin: '20px 0' }} />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 24, fontSize: 13, lineHeight: 1.8, color: '#555', maxWidth: 700 }}>
+              <p style={{ margin: 0 }}>
+                Our Vision is to shape the future of premium real estate by blending enduring excellence with modern innovation—creating timeless developments that evolve with changing lifestyles while maintaining the highest standards of design, quality, and value.
+              </p>
+              <p style={{ margin: 0 }}>
+               build a lasting legacy in premium real estate—one that transcends generations by adapting to modern advancements while preserving excellence at its core, and continuing to set the benchmark for innovation, design, and enduring value in every development.
+              </p>
+            </div>
+
+            {/* Vision images */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style={{ gap: 16, marginTop: 32 }}>
+              <div style={{ borderRadius: 8, overflow: 'hidden' }}>
+                <img src="/aboutUsImages/c3.jpeg" alt="Modern real estate development" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+              </div>
+              <div style={{ borderRadius: 8, overflow: 'hidden' }}>
+                <img src="/aboutUsImages/c4.jpeg" alt="Property facade detail" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+              </div>
+              <div style={{ borderRadius: 8, overflow: 'hidden' }}>
+                <img src="/aboutUsImages/R1.jpeg" alt="Premium interior finish" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+              </div>
+            </div>
+          </section>
+
+          {/* ── Who is ISKA Homes ────────────────── */}
+          <section
+            id="who-is-iska"
+            ref={(el) => { sectionRefs.current['who-is-iska'] = el }}
+            style={{ scrollMarginTop: 100, marginTop: 64 }}
+          >
+            <h2
+              className={playfairDisplay.className}
+              style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', fontWeight: 500, color: '#17637C', margin: 0 }}
+            >
+              Who is ISKA Homes?
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 24, fontSize: 13, lineHeight: 1.8, color: '#555', maxWidth: 700, marginTop: 20 }}>
+              <p style={{ margin: 0 }}>
+                We are the cutting edge of modern real estate marketing. We offer a robust digital property marketplace connecting buyers, renters, developers, and agents. Through verified listings, structured commissions, and data-led marketing tools, we make premium property discovery easier and more transparent.
+              </p>
+              <p style={{ margin: 0 }}>
+                Headquartered in Accra, ISKA Homes is powered by professionals across design, research, compliance, and real estate marketing. We verify neighborhood, residential, and commercial data so our users can act on real-time, relevant information with confidence.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style={{ gap: 16, marginTop: 32 }}>
+              <div style={{ borderRadius: 8, overflow: 'hidden' }}>
+                <img src="/aboutUsImages/Kitchen1.jpeg" alt="Modern kitchen interior" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+              </div>
+              <div style={{ borderRadius: 8, overflow: 'hidden' }}>
+                <img src="/aboutUsImages/sitting1.jpeg" alt="Premium sitting area" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+              </div>
+              <div style={{ borderRadius: 8, overflow: 'hidden' }}>
+                <img src="/aboutUsImages/sitting2.jpeg" alt="Elegant living space" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+              </div>
+            </div>
+          </section>
+
+          {/* ── What Separates Us ─────────────────── */}
+          <section
+            id="what-separates"
+            ref={(el) => { sectionRefs.current['what-separates'] = el }}
+            style={{ scrollMarginTop: 100, marginTop: 64 }}
+          >
+            <h2
+              className={playfairDisplay.className}
+              style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', fontWeight: 500, color: '#17637C', margin: 0 }}
+            >
+              What Separates Us?
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 24, fontSize: 13, lineHeight: 1.8, color: '#555', maxWidth: 700, marginTop: 20 }}>
+              <p style={{ margin: 0 }}>
+                Our advantage is built on a holistic ecosystem designed for maximum efficiency and impact. It begins with in-depth data collection that supports smarter strategy, then expands into lead generation systems that target and secure high-value opportunities.
+              </p>
+              <p style={{ margin: 0 }}>
+                We make clearer tracking possible through real-time insight, 360 service provision, and responsive compliance support. The result is a complete, accountable partnership designed for sustainable growth.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style={{ gap: 16, marginTop: 32 }}>
+              <div style={{ borderRadius: 8, overflow: 'hidden' }}>
+                <img src="/aboutUsImages/land1.JPG" alt="Landscape view 1" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+              </div>
+              <div style={{ borderRadius: 8, overflow: 'hidden' }}>
+                <img src="/aboutUsImages/land2.JPG" alt="Landscape view 2" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+              </div>
+              <div style={{ borderRadius: 8, overflow: 'hidden' }}>
+                <img src="/aboutUsImages/hh.jpeg" alt="Featured property" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+
+      {/* ── Why Choose Us ────────────────────────── */}
+      <section style={{
+        position: 'relative', overflow: 'hidden',
+        background: '#17637C', margin: '0 5%', borderRadius: 20,
+        display: 'grid', minHeight: 420,
+      }}
+      className="!grid-cols-1 lg:!grid-cols-2"
+      >
+        {/* Decorative circles */}
+        <div style={{ position: 'absolute', top: 30, left: 30, width: 120, height: 120, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.12)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: 45, left: 45, width: 90, height: 90, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.08)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: 60, left: 60, width: 60, height: 60, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
+
+        {/* Left — text content */}
+        <div className="p-8 lg:p-14" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', zIndex: 1 }}>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', display: 'inline-block' }} />
+            Why Choose Us
+          </p>
+          <h2
+            className={playfairDisplay.className}
+            style={{ fontSize: 'clamp(2rem, 3.5vw, 2.8rem)', fontWeight: 600, color: '#fff', margin: '20px 0 0', lineHeight: 1.15 }}
+          >
+            Where Property Meets<br />Possibility.
+          </h2>
+          <div style={{ width: 280, height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 2, margin: '24px 0' }} />
+          <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.78)', lineHeight: 1.75, margin: 0, maxWidth: 480 }}>
+            We believe real estate is more than just transactions — it&apos;s about creating opportunities and building futures. With deep market knowledge, strong negotiation skills, and a commitment to excellence, we ensure every client receives the attention, care, and results they deserve.
+          </p>
         </div>
 
-        <section className="mt-10 overflow-hidden rounded-[2rem] border border-[#17637C]/20 bg-[#17637C] p-6 text-white shadow-[0_30px_100px_rgba(23,99,124,0.25)] sm:p-8 lg:p-10">
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/75">
-                <span className="h-2 w-2 rounded-full bg-[#F68B1F]" />
-                Why choose us
-              </div>
-              <h2 className="mt-5 max-w-2xl text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
-                Where realty vision becomes reality.
-              </h2>
-              <p className="mt-5 max-w-2xl text-base leading-8 text-white/75">
-                At ISKA Homes, we believe genuine partnerships are built on balance, trust,
-                and sustained value. We shape opportunities and build futures through market
-                knowledge, negotiation expertise, and a standard of excellence clients can feel.
-              </p>
-
-              <div className="mt-8 grid gap-3">
-                {signaturePoints.map((point) => (
-                  <div
-                    key={point}
-                    className="rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/85 backdrop-blur-sm"
-                  >
-                    {point}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="relative overflow-hidden rounded-[1.8rem] border border-white/10">
-              <div className="absolute inset-0 z-10 bg-gradient-to-t from-[#0f2d36]/55 via-transparent to-transparent" />
-              <img
-                src="/aboutUsImages/ww.jpeg"
-                alt="Real estate overview"
-                className="h-full min-h-[320px] w-full object-cover"
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-10 rounded-[2rem] border border-white/30 bg-white/20 p-6 shadow-[0_24px_80px_rgba(23,99,124,0.06)] backdrop-blur-xl sm:p-8 lg:p-10">
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#17637C]/10 bg-[#17637C]/[0.04] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#17637C]">
-              <span className="h-2 w-2 rounded-full bg-[#F68B1F]" />
-              Get in touch
-            </div>
-            <h2 className="mt-5 text-3xl font-semibold tracking-[-0.04em] text-[#17637C] sm:text-4xl">
-              Let&apos;s build your next property success story.
-            </h2>
-            <p className="mt-4 text-base leading-8 text-slate-600">
-              Reach out for listings, partnerships, development visibility, or tailored real estate
-              support. We are ready to connect.
-            </p>
-          </div>
-
-          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {contactCards.map((card) => {
-              const Icon = card.icon
-
-              return (
-                <div
-                  key={card.title}
-                  className="rounded-[1.75rem] border border-white/25 bg-white/15 p-5 transition duration-300 backdrop-blur-md hover:-translate-y-1 hover:border-[#17637C]/20 hover:bg-white/20"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#17637C] text-white shadow-[0_12px_30px_rgba(23,99,124,0.22)]">
-                    <Icon size={18} />
-                  </div>
-                  <h3 className="mt-5 text-base font-semibold text-[#17637C]">{card.title}</h3>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">{card.value}</p>
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="mt-8 overflow-hidden rounded-[1.8rem] border border-white/25 shadow-[0_20px_60px_rgba(23,99,124,0.08)]">
-            <iframe
-              title="Iska Homes Location"
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d31766.632567482047!2d-0.16099!3d5.6500!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xfdf9c7ebaeabe93%3A0xd9e9a38c83e7f123!2sEast%20Legon%2C%20Accra%2C%20Ghana!5e0!3m2!1sen!2sgh!4v1700000000000!5m2!1sen!2sgh"
-              className="h-[360px] w-full border-0"
-              allowFullScreen=""
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
+        {/* Right — image */}
+        <div className="p-8 lg:pr-12 lg:pl-0 lg:py-10" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{
+            width: '100%', maxWidth: 480, aspectRatio: '4/3', borderRadius: 16, overflow: 'hidden',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }}>
+            <img
+              src="/aboutUsImages/sitting1.jpeg"
+              alt="Floor plan view — premium property layout"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
             />
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
+
+      {/* ── Get In Touch ─────────────────────────── */}
+      <section style={{ padding: '48px 5%', marginTop: 24 }}>
+        <div style={{ textAlign: 'center', marginBottom: 8 }}>
+          <h2
+            className={playfairDisplay.className}
+            style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', fontWeight: 500, color: '#17637C', margin: 0 }}
+          >
+            Get In Touch
+          </h2>
+          <div style={{ width: '100%', maxWidth: 700, height: 2, background: '#17637C', margin: '16px auto 0' }} />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 32, marginTop: 40, maxWidth: 900, marginLeft: 'auto', marginRight: 'auto', textAlign: 'center' }}>
+          {contactCards.map((card) => {
+            const Icon = card.icon
+            return (
+              <div key={card.title}>
+                <div style={{
+                  width: 56, height: 56, borderRadius: '50%', background: '#17637C',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px',
+                }}>
+                  <Icon size={20} color="#fff" />
+                </div>
+                <p style={{ fontSize: 14, fontWeight: 600, color: '#17637C', margin: 0 }}>{card.title}</p>
+                <p style={{ fontSize: 13, color: '#666', margin: '4px 0 0', whiteSpace: 'pre-line' }}>{card.value}</p>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Map */}
+        <div style={{ marginTop: 40, borderRadius: 12, overflow: 'hidden', border: '1px solid #e5e5e5' }}>
+          <iframe
+            title="ISKA Homes Location"
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d31766.632567482047!2d-0.16099!3d5.6500!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xfdf9c7ebaeabe93%3A0xd9e9a38c83e7f123!2sEast%20Legon%2C%20Accra%2C%20Ghana!5e0!3m2!1sen!2sgh!4v1700000000000!5m2!1sen!2sgh"
+            style={{ width: '100%', height: 360, border: 'none', display: 'block' }}
+            allowFullScreen=""
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        </div>
+      </section>
     </div>
   )
 }
