@@ -352,7 +352,7 @@ const DeveloperTopNav = ({ onSearch }) => {
           {/* Logo / Branding - Hidden on small devices */}
           <div className="hidden md:flex items-center gap-3 flex-shrink-0">
             <Link href="/">
-              <img src="/iska-dark.png" alt="logo" className='w-[60px]'></img>
+              <img src="/ISKA Logo.png" alt="logo" className='w-[60px]'></img>
             </Link>
             <div>
             

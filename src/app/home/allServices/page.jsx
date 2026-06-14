@@ -116,7 +116,7 @@ const AllServicesPage = () => {
             <span className="inline-flex items-center  -primary_color/15 bg-primary_color/5 px-4 py-1.5 text-xs uppercase tracking-[0.25em] text-primary_color">
               Premium Property Services
             </span>
-            <h1 className="mt-6 text-4xl md:text-6xl lg:text-[5em] max-w-5xl  font-semibold leading-tight text-primary_color">
+            <h1 style={{ fontSize: 'clamp(2.4rem, 5vw, 4rem)' }} className="mt-6 max-w-5xl font-medium leading-tight text-primary_color">
               Choose the services you need and explore each one in detail.
             </h1>
             {/* <p className="mt-5 text-base md:text-lg text-gray-600 leading-relaxed">

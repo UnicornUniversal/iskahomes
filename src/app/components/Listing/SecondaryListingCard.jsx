@@ -6,9 +6,8 @@ import { MapPin, Bed, Bath, Square, Calendar, DollarSign, Users, Heart, Share2 }
 import { useAnalytics } from '@/hooks/useAnalytics'
 import { toast } from 'react-toastify'
 import { getSpecificationDataByTypeId, getFieldDataByKey } from '@/app/components/Data/StaticData'
-import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 
-const SecondaryListingCard = ({ listing, imageClasses = null, leadAttributionContext = null }) => {
+const SecondaryListingCard = ({ listing, imageClasses = null, overlay = false }) => {
   const { trackPropertyView, trackListingImpression, trackSavedListing, trackShare } = useAnalytics()
 
   const {
@@ -161,17 +160,11 @@ const SecondaryListingCard = ({ listing, imageClasses = null, leadAttributionCon
   }
 
   const specs = getSpecifications()
-  const analyticsSurface = leadAttributionContext || 'homepage'
-
-  const propertyPath = `/home/property/${listing_type}/${slug}/${id}`
-  const propertyHref = leadAttributionContext
-    ? withWebsiteLeadAttribution(propertyPath, leadAttributionContext)
-    : propertyPath
 
   // Analytics tracking functions
   const handleCardClick = () => {
     trackPropertyView(id, {
-      viewedFrom: analyticsSurface,
+      viewedFrom: 'homepage',
       listingType: listing_type,
       listing: listing, // Pass full listing object so lister_id can be extracted
       propertyTitle: title,
@@ -180,7 +173,7 @@ const SecondaryListingCard = ({ listing, imageClasses = null, leadAttributionCon
     })
 
     trackListingImpression(id, {
-      viewedFrom: analyticsSurface,
+      viewedFrom: 'homepage',
       listingType: listing_type,
       listing: listing, // Pass full listing object so lister_id can be extracted
       propertyTitle: title,
@@ -195,7 +188,7 @@ const SecondaryListingCard = ({ listing, imageClasses = null, leadAttributionCon
     
     // Track save action
     trackSavedListing(id, 'add', {
-      viewedFrom: analyticsSurface,
+      viewedFrom: 'homepage',
       listingType: listing_type,
       listing: listing // Pass full listing object so lister_id can be extracted
     })
@@ -210,16 +203,13 @@ const SecondaryListingCard = ({ listing, imageClasses = null, leadAttributionCon
     // Track share action
     trackShare('listing', 'link', {
       listingId: id,
-      viewedFrom: analyticsSurface,
+      viewedFrom: 'homepage',
       listingType: listing_type,
       listing: listing // Pass full listing object so lister_id can be extracted
     })
     
-    // Copy link to clipboard (include attribution when this card was placed with a context)
-    const path = leadAttributionContext
-      ? withWebsiteLeadAttribution(`/home/property/${listing_type}/${slug}/${id}`, leadAttributionContext)
-      : `/home/property/${listing_type}/${slug}/${id}`
-    const url = `${window.location.origin}${path.startsWith('/') ? path : `/${path}`}`
+    // Copy link to clipboard
+    const url = `${window.location.origin}/home/property/${listing_type}/${slug}/${id}`
     navigator.clipboard.writeText(url)
     toast.success('Link copied to clipboard!')
   }
@@ -244,8 +234,99 @@ const SecondaryListingCard = ({ listing, imageClasses = null, leadAttributionCon
     return null
   }
 
+  // ---------- OVERLAY MODE ----------
+  if (overlay) {
+    return (
+      <Link href={`/home/property/${listing_type}/${slug}/${id}`} onClick={handleCardClick} className="block h-full">
+        <div className="relative overflow-hidden rounded-xl h-full cursor-pointer group">
+          {/* Full-bleed image */}
+          {mainImage ? (
+            <img
+              src={mainImage}
+              alt={title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }}
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+              <div className="text-white text-2xl font-bold">{title?.charAt(0) || 'P'}</div>
+            </div>
+          )}
+
+          {/* Badges — top-left */}
+          <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
+            {is_featured && (
+              <span className="bg-yellow-500 text-white px-2 py-0.5 rounded-full text-[10px] font-medium">Featured</span>
+            )}
+            {is_verified && (
+              <span className="bg-green-500 text-white px-2 py-0.5 rounded-full text-[10px] font-medium">Verified</span>
+            )}
+            {is_premium && (
+              <span className="bg-purple-500 text-white px-2 py-0.5 rounded-full text-[10px] font-medium">Premium</span>
+            )}
+          </div>
+
+          {/* Bottom gradient overlay — visible on hover */}
+          <div
+            className="absolute inset-x-0 bottom-0 z-10 translate-y-full opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-400 ease-out"
+            style={{
+              background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.45) 55%, transparent 100%)',
+              padding: '48px 14px 14px',
+            }}
+          >
+            {/* Price + purpose row */}
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-white text-sm font-bold">
+                {formatPrice(price, currency, price_type, duration)}
+              </span>
+              {purpose_name && (
+                <span className="px-1.5 py-0.5 bg-white/20 backdrop-blur-sm text-white text-[10px] font-medium rounded-full">
+                  {purpose_name}
+                </span>
+              )}
+            </div>
+
+            {/* Title */}
+            <h6 className="text-white text-sm font-medium line-clamp-1 mb-1">{title}</h6>
+
+            {/* Location */}
+            <div className="flex items-center text-white/80 text-xs mb-1.5">
+              <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
+              <p className="line-clamp-1">{city && state ? `${city}, ${state}` : country}</p>
+            </div>
+
+            {/* Specs row */}
+            {specs.fields.length > 0 && (
+              <div className="flex items-center gap-3 text-white/80 text-xs">
+                {specs.fields.map((field, index) => {
+                  const IconComponent = field.icon
+                  const displayValue = field.type === 'select'
+                    ? (field.options?.find(opt => opt.value === field.value)?.label || field.value)
+                    : field.value
+                  if (displayValue === null || displayValue === undefined) return null
+                  if ((field.key === 'bedrooms' || field.key === 'bathrooms') && displayValue === 0) return null
+                  return (
+                    <div key={field.key || index} className="flex items-center gap-0.5">
+                      {IconComponent && <IconComponent className="w-3 h-3" />}
+                      <span>
+                        {(field.type === 'number' && (field.key === 'size' || field.key === 'property_size'))
+                          ? `${displayValue} ${listing_type === 'unit' ? 'sq ft' : 'sq m'}`
+                          : displayValue}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </Link>
+    )
+  }
+
+  // ---------- DEFAULT MODE ----------
   return (
-    <Link href={propertyHref} onClick={handleCardClick} className="block">
+    <Link href={`/home/property/${listing_type}/${slug}/${id}`} onClick={handleCardClick} className="block">
       <div className="overflow-hidden transition-all mx-auto duration-300 transform hover:-translate-y-1 cursor-pointer group flex flex-col w-auto">
         {/* Image Section */}
         <div className={`relative overflow-hidden ${getImageClasses()}`}>

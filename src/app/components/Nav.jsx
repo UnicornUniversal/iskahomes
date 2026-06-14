@@ -1,198 +1,559 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { getDashboardHref, getUserDisplayName } from "@/lib/dashboardRoutes";
-import { 
-  FaHome, 
-  FaCogs, 
-  FaSearch, 
-  FaHandshake, 
-  FaBuilding, 
+import {
+  FaHome,
+  FaCogs,
+  FaSearch,
+  FaHandshake,
+  FaBuilding,
   FaCity,
-  FaUsers, 
+  FaUsers,
   FaSitemap,
-  FaInfoCircle, 
-  FaUserPlus, 
-  FaSignInAlt, 
+  FaInfoCircle,
+  FaUserPlus,
+  FaSignInAlt,
   FaEnvelope,
   FaBars,
   FaTimes,
   FaUser,
-  FaSignOutAlt
+  FaSignOutAlt,
+  FaChevronDown,
 } from "react-icons/fa";
 
-const Nav = () => {
-  const [show_nav, set_show_nav] = useState(false);
-  const [sub_menu, set_sub_menu] =  useState("");
-  const { user, loading, logout } = useAuth();
-  const dashboardHref = user ? getDashboardHref(user) : null;
-  const displayName = user ? getUserDisplayName(user) : '';
-
-  const nav_options = useMemo(() => [
-    { nav_name: "Home", nav_icon: FaHome, nav_link: "/" },
-   
-    { nav_name: "All Services", nav_icon: FaCogs, nav_link: "/home/allServices", sub_menu:[
-      {"sub_link_name":"Virtual Tour", "sub_link_link":"/home/allServices"  },
-      {"sub_link_name":"3D Visualization", "sub_link_link":"/home/allServices"  },
-      {"sub_link_name":"Interior Design", "sub_link_link":"/home/allServices"  },
-      {"sub_link_name":"Smart Home Installation", "sub_link_link":"/home/allServices"  },
-      {"sub_link_name":"Space Planning Consultation", "sub_link_link":"/home/allServices"  },
-    ] },  
-    { nav_name: "Explore Properties", nav_icon: FaSearch, nav_link: "/home/exploreProperties" },
-    // { nav_name: "Sell A Property", nav_icon: FaHandshake, nav_link: "/projects" },
-    { nav_name: "Developers", nav_icon: FaBuilding, nav_link: "/home/allDevelopers" },
-    { nav_name: "All Developments", nav_icon: FaCity, nav_link: "/home/allDevelopments" },
-    { nav_name: "Agencies", nav_icon: FaSitemap, nav_link: "/home/allAgencies" },
-    {
-      nav_name: "Agents",
-      nav_icon: FaUsers,
-      nav_link:
-        user?.user_type === "agent" && dashboardHref
-          ? dashboardHref
-          : "/home/allAgents",
-    },
-    { nav_name: "About Us", nav_icon: FaInfoCircle, nav_link: "/home/aboutUs" },
-    { nav_name: "Contact Us", nav_icon: FaEnvelope, nav_link: "/home/contactUs" },
-
-
-  
-  ], [user?.user_type, dashboardHref]);
-
-
-const button_options = [
-  { nav_name: "Sign Up", nav_icon: FaUserPlus, nav_link: "/home/signup", isButton: true },
-  { nav_name: "Login", nav_icon: FaSignInAlt, nav_link: "/home/signin", isButton: true },
+/* ── Nav link data ─────────────────────────────────────── */
+const leftLinks = [
+  {
+    name: "All Services", href: "/home/allServices", icon: FaCogs,
+    children: [
+      { name: "Virtual Tour", href: "/home/allServices?service=virtual-tour" },
+      { name: "3D Visualization", href: "/home/allServices?service=3d-visualization" },
+      { name: "Interior Design", href: "/home/allServices?service=interior-design" },
+      { name: "Smart Home Installation", href: "/home/allServices?service=smart-home-installation" },
+      { name: "Space Planning Consultation", href: "/home/allServices?service=space-planning" },
+    ],
+  },
+  { name: "Explore Properties", href: "/home/exploreProperties", icon: FaSearch },
+  { name: "Developers", href: "/home/allDevelopers", icon: FaBuilding },
+  { name: "All Developments", href: "/home/allDevelopments", icon: FaCity },
 ];
 
-const handleLogout = () => {
-  logout();
-  set_show_nav(false);
-};
+const rightLinks = [
+  { name: "Agencies", href: "/home/allAgencies", icon: FaSitemap },
+  { name: "Agents", href: "/home/allAgents", icon: FaUsers },
+  { name: "About Us", href: "/home/aboutUs", icon: FaInfoCircle },
+  { name: "Contact Us", href: "/home/contactUs", icon: FaEnvelope },
+];
+
+/* ── Dropdown wrapper ──────────────────────────────────── */
+const Dropdown = ({ trigger, children, align = "left" }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
 
   return (
-    <div className="fixed top-0 w-full left-1/2 -translate-x-1/2 z-[2000] backdrop-blur-md">
-      {/* Toggle button for small + medium screens */}
-      <div
-        className="absolute top-4 right-4 lg:hidden bg-secondary_color p-2 rounded-sm z-[200] cursor-pointer"
-        onClick={() => set_show_nav(!show_nav)}
-      >
-        {show_nav ? (
-          <FaTimes size={24} className="text-white" />
-        ) : (
-          <FaBars size={24} className="text-white" />
-        )}
+    <div
+      ref={ref}
+      style={{ position: "relative" }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <div onClick={() => setOpen((v) => !v)} style={{ cursor: "pointer" }}>
+        {trigger}
       </div>
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            [align]: 0,
+            paddingTop: 4,
+            zIndex: 100,
+          }}
+        >
+          <div
+            style={{
+              minWidth: 160,
+              background: "#fff",
+              borderRadius: 8,
+              boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
+              padding: "6px 0",
+            }}
+          >
+            {children}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
-      {/* Navigation menu */}
-      <div
-        className={`${
-          show_nav ? "block pt-20" : "hidden"
-        } lg:flex py-[2em] lg:py-4 px-4  items-center lg:justify-between lg:gap-0 lg:p-2 lg:px-8 lg:shadow-lg lg:bg-white/90 lg:backdrop-blur-lg w-[90%] lg:w-full h-screen lg:h-auto max-h-screen lg:min-h-[30px] overflow-y-auto lg:overflow-visible bg-white/90 shadow-xl backdrop-blur-lg`}
+const DropdownItem = ({ href, children, onClick }) => (
+  <Link href={href} onClick={onClick}>
+    <div
+      className="text-primary_color"
+      style={{
+        padding: "10px 20px",
+        fontSize: "0.8rem",
+        fontWeight: 400,
+        cursor: "pointer",
+        transition: "background 0.2s",
+        whiteSpace: "nowrap",
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(23,99,124,0.06)")}
+      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+    >
+      {children}
+    </div>
+  </Link>
+);
+
+const MenuTrigger = () => (
+  <span
+    className="text-primary_color"
+    style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: 38,
+      height: 38,
+      cursor: "pointer",
+    }}
+  >
+    <FaBars size={20} />
+  </span>
+);
+
+/* ── Profile icon SVG ──────────────────────────────────── */
+const ProfileIcon = ({ size = 36 }) => (
+  <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="20" cy="20" r="19" stroke="currentColor" strokeWidth="2" />
+    <circle cx="20" cy="15" r="6" stroke="currentColor" strokeWidth="1.8" />
+    <path d="M8 34c0-6.627 5.373-12 12-12s12 5.373 12 12" stroke="currentColor" strokeWidth="1.8" />
+  </svg>
+);
+
+/* ══════════════════════════════════════════════════════════
+   NAV COMPONENT
+   ══════════════════════════════════════════════════════════ */
+const Nav = () => {
+  const [scrolled, setScrolled] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, loading, logout } = useAuth();
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 60);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const closeMobile = () => setMobileOpen(false);
+
+  /* ── Dashboard link helper ─────────────────────────── */
+  const getDashboardLink = () => {
+    if (!user) return "/";
+    const slug = user.profile?.slug || user.id;
+    const orgSlug = user.profile?.organization_slug || slug;
+    switch (user.user_type) {
+      case "developer": return `/developer/${slug}/dashboard`;
+      case "property_seeker": return `/propertySeeker/${slug}/dashboard`;
+      case "agent": return `/agents/${slug}/dashboard`;
+      case "agency": return `/agency/${slug}/dashboard`;
+      case "team_member":
+        return user.profile?.organization_type === "agency"
+          ? `/agency/${orgSlug}/dashboard`
+          : `/developer/${orgSlug}/dashboard`;
+      default: return "/";
+    }
+  };
+
+  const linkStyle = {
+    fontSize: "0.82rem",
+    fontWeight: 400,
+    cursor: "pointer",
+    transition: "opacity 0.2s",
+    whiteSpace: "nowrap",
+    textDecoration: "none",
+  };
+
+  /* ── Render a nav link (desktop) ───────────────────── */
+  const NavLink = ({ item }) => {
+    if (item.children) {
+      return (
+        <Dropdown
+          trigger={
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <Link href={item.href}>
+                <span
+                  className="text-primary_color"
+                  style={linkStyle}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.7")}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+                >
+                  {item.name}
+                </span>
+              </Link>
+              <span className="text-primary_color" style={{ display: "flex", alignItems: "center" }}>
+                <FaChevronDown size={10} />
+              </span>
+            </div>
+          }
+        >
+          {item.children.map((child) => (
+            <DropdownItem key={child.name} href={child.href}>
+              {child.name}
+            </DropdownItem>
+          ))}
+        </Dropdown>
+      );
+    }
+    return (
+      <Link href={item.href}>
+        <span
+          className="text-primary_color"
+          style={linkStyle}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.7")}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+        >
+          {item.name}
+        </span>
+      </Link>
+    );
+  };
+
+  /* ── Profile / auth section (desktop) ──────────────── */
+  const AuthSection = () => {
+    if (loading) {
+      return (
+        <div style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary_color" />
+        </div>
+      );
+    }
+
+    if (user) {
+      return (
+        <Link href={getDashboardLink()}>
+          <span
+            className="text-primary_color"
+            style={{ ...linkStyle, display: "flex", alignItems: "center", gap: 6 }}
+          >
+            <ProfileIcon size={32} />
+          </span>
+        </Link>
+      );
+    }
+
+    return (
+      <Dropdown
+        align="right"
+        trigger={
+          <span className="text-primary_color" style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
+            <ProfileIcon size={32} />
+          </span>
+        }
       >
-        {/* Logo (left) */}
-        <Link href="/">
-        <img
-          src="/iska-dark.png"
-          alt="Company Logo"
-          className="hidden lg:block max-w-[150px] lg:max-w-[100px] w-[12em] lg:w-[4em] lg:mr-8" />
-        <img
-          src="/iska-dark.png"
-          alt="Company Logo"
-          className="block   lg:hidden w-[12em] max-w-[150px] mb-8 " />
-</Link>
-        {/* Nav items (centered on md+) */}
-        <div className="flex flex-col lg:flex-row gap-2 lg:gap-2 h-auto items-start lg:items-center justify-start lg:justify-center w-full lg:w-auto flex-1">
-          {nav_options.map((each_value) => {
-            const IconComponent = each_value.nav_icon;
-            return (
-              <div key={each_value.nav_name} className="relative w-full lg:w-auto" onMouseEnter={()=>{each_value?.sub_menu ? set_sub_menu( each_value.nav_name) :set_sub_menu ("") }}  onMouseLeave={()=>{ set_sub_menu ("") }}  > 
-                <Link href={each_value.nav_link} >
-                  <div 
-                    onClick={()=>{ set_show_nav(false)}}
-                    className={`flex items-center gap-3 text-left lg:text-center text-[1.2em] lg:text-xs cursor-pointer transition-all duration-500 px-2 py-3 lg:px-3 lg:py-2 rounded-lg w-full lg:w-auto ${
-                      each_value.isButton 
-                        ? "bg-primary_color text-white px-4 py-2 lg:px-0 lg:py-0 rounded-md hover:bg-opacity-90" 
-                        : "text-primary_color lg:hover:text-[1.1em] lg:hover:font-semibold hover:bg-primary_color/10"
-                    }`}
-                  >
-                    <IconComponent size={22} className="lg:hidden" />
-                    <span>{each_value.nav_name}</span>
-                  </div>
-                </Link>  
+        <DropdownItem href="/home/signup">Sign Up</DropdownItem>
+        <DropdownItem href="/home/signin">Login</DropdownItem>
+      </Dropdown>
+    );
+  };
 
-                <div className="bg-white-200 bg-[rgba(255,255,255,1)]"> 
-                {each_value?.sub_menu && sub_menu === each_value.nav_name  ? <div className=" bg-white-200 bg-[rgba(255,255,255,1)] px-10 lg:absolute lg:shadow-xl lg:rounded-sm lg:top-[2em] lg:w-[15em] lg:h-[14em] flex flex-col justify-around items-start px-4" >
-                  {each_value?.sub_menu.map((each_sublink, index)=> {
-                    return <Link href={each_sublink.sub_link_link} key={index}> <p className="text-primary_color lg:hover:text-[1.1em] lg:hover:font-semibold transition-all duration-500 text-[1em] lg:text-xs cursor-pointer">{each_sublink.sub_link_name} </p> </Link>
-                  })}
-                </div> : "" }
+  /* ════════════════════════════════════════════════════════
+     DESKTOP NAVBAR
+     ════════════════════════════════════════════════════════ */
+
+  return (
+    <>
+      {/* ── DESKTOP NAV ──────────────────────────────────── */}
+      <nav
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 2000,
+          transition: "all 0.35s ease",
+          ...(scrolled
+            ? {
+                background: "rgba(255,255,255,0.7)",
+                backdropFilter: "blur(14px)",
+                WebkitBackdropFilter: "blur(14px)",
+                borderBottom: "1px solid rgba(255,255,255,0.35)",
+                boxShadow: "0 2px 20px rgba(0,0,0,0.06)",
+              }
+            : {
+                background: "transparent",
+              }),
+        }}
+        className="hidden md:block"
+      >
+        <div
+          style={{
+            maxWidth: 1400,
+            margin: "0 auto",
+            padding: scrolled ? "10px 32px" : "18px 32px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            transition: "padding 0.4s ease",
+            position: "relative",
+          }}
+        >
+          {/* Left links — fade out when not scrolled on initial, show always when scrolled */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 28,
+              flex: scrolled ? "0 0 auto" : 1,
+              justifyContent: "flex-start",
+              opacity: scrolled ? 0 : 1,
+              maxWidth: scrolled ? 0 : 600,
+              overflow: scrolled ? "hidden" : "visible",
+              transition: "opacity 0.35s ease, max-width 0.4s ease, flex 0.4s ease",
+              pointerEvents: scrolled ? "none" : "auto",
+            }}
+          >
+            {leftLinks.map((item) => (
+              <NavLink key={item.name} item={item} />
+            ))}
+          </div>
+
+          {/* Logo — centered initially, slides left when scrolled */}
+          <Link
+            href="/"
+            style={{
+              flexShrink: 0,
+              margin: scrolled ? "0 0" : "0 60px",
+              transition: "margin 0.4s ease",
+              order: scrolled ? -1 : 0,
+            }}
+          >
+            <img
+              src="/ISKA Logo.png"
+              alt="ISKA Homes"
+              style={{
+                height: scrolled ? 34 : 38,
+                width: "auto",
+                transition: "height 0.4s ease",
+              }}
+            />
+          </Link>
+
+          {/* Right links + profile — always visible, expands when scrolled */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: scrolled ? 22 : 28,
+              flex: 1,
+              justifyContent: scrolled ? "flex-end" : "flex-end",
+              transition: "gap 0.4s ease, justify-content 0.4s ease",
+            }}
+          >
+            {/* Initial state shows right links inline; scrolled state collapses all nav links into a hamburger menu */}
+            {!scrolled && rightLinks.map((item) => (
+              <NavLink key={item.name} item={item} />
+            ))}
+
+            {scrolled && (
+              <Dropdown
+                align="right"
+                trigger={<MenuTrigger />}
+              >
+                <div>
+                  {[...leftLinks, ...rightLinks].map((item) => (
+                    <React.Fragment key={`desktop-menu-${item.name}`}>
+                      <DropdownItem href={item.href}>
+                        {item.name}
+                      </DropdownItem>
+                      {item.children?.map((child) => (
+                        <DropdownItem key={`desktop-menu-${child.name}`} href={child.href}>
+                          <span style={{ paddingLeft: 12, fontSize: '0.78rem', opacity: 0.75 }}>{child.name}</span>
+                        </DropdownItem>
+                      ))}
+                    </React.Fragment>
+                  ))}
                 </div>
+              </Dropdown>
+            )}
+          </div>
 
+          {/* Profile icon — far right, with left padding to separate from links */}
+          <div
+            style={{
+              flexShrink: 0,
+              paddingLeft: scrolled ? 24 : 16,
+              transition: "padding-left 0.4s ease",
+            }}
+          >
+            <AuthSection />
+          </div>
+        </div>
+      </nav>
 
-                </div>
-            );
-          })}
+      {/* ── MOBILE NAV ───────────────────────────────────── */}
+      <nav
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 2000,
+          background: "rgba(255,255,255,0.92)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          borderBottom: "1px solid rgba(0,0,0,0.06)",
+        }}
+        className="md:hidden"
+      >
+        {/* Top bar */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px" }}>
+          <Link href="/" onClick={closeMobile}>
+            <img src="/ISKA Logo.png" alt="ISKA Homes" style={{ height: 36, width: "auto" }} />
+          </Link>
+          <button
+            onClick={() => setMobileOpen((v) => !v)}
+            className="text-primary_color"
+            style={{ background: "none", border: "none", cursor: "pointer", padding: 8 }}
+          >
+            {mobileOpen ? <FaTimes size={22} /> : <FaBars size={22} />}
+          </button>
         </div>
 
-        {/* Buttons (right on lg+) */}
-        <div className="flex flex-col gap-4 w-full lg:flex-row lg:gap-4 lg:w-auto lg:ml-8 lg:justify-end mt-4 lg:mt-0">
-          {loading ? (
-            <div className="flex items-center justify-center px-4 py-3">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary_color"></div>
-            </div>
-          ) : user ? (
-            <div className="flex flex-col lg:flex-row gap-4 w-full lg:w-auto relative z-10">
-              {dashboardHref ? (
-                <Link href={dashboardHref} className="w-full lg:w-auto">
+        {/* Slide-down panel */}
+        <div
+          style={{
+            maxHeight: mobileOpen ? "calc(100vh - 60px)" : 0,
+            overflow: "hidden",
+            transition: "max-height 0.35s ease",
+          }}
+        >
+          <div style={{ padding: "8px 16px 24px", overflowY: "auto", maxHeight: "calc(100vh - 60px)" }}>
+            {/* All nav links */}
+            {[...leftLinks, ...rightLinks].map((item) => (
+              <div key={item.name}>
+                <Link href={item.href} onClick={closeMobile}>
                   <div
-                    onClick={() => set_show_nav(false)}
-                    className="flex items-center gap-3 justify-center text-left lg:text-center text-[1.1em] lg:text-sm cursor-pointer transition-all duration-500 bg-primary_color text-white px-4 py-3 lg:px-6 lg:py-2 rounded-lg hover:bg-opacity-90 w-full lg:w-auto shadow-md hover:shadow-lg"
+                    className="text-primary_color"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "14px 8px",
+                      fontSize: "1rem",
+                      fontWeight: 400,
+                      borderBottom: "1px solid rgba(0,0,0,0.05)",
+                    }}
                   >
-                    <FaUser size={22} className="lg:hidden" />
-                    <span className="text-xs font-medium">
-                      Welcome, {displayName}
-                    </span>
+                    <item.icon size={18} />
+                    <span>{item.name}</span>
+                  </div>
+                </Link>
+                {/* Nested children */}
+                {item.children?.map((child) => (
+                  <Link href={child.href} key={child.name} onClick={closeMobile}>
+                    <div
+                      className="text-primary_color/70"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "12px 8px 12px 36px",
+                        fontSize: "0.9rem",
+                        fontWeight: 400,
+                        borderBottom: "1px solid rgba(0,0,0,0.03)",
+                      }}
+                    >
+                      {child.icon && <child.icon size={16} />}
+                      <span>{child.name}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ))}
+
+            {/* Auth section */}
+            <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+              {loading ? (
+                <div style={{ display: "flex", justifyContent: "center", padding: 16 }}>
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary_color" />
+                </div>
+              ) : user ? (
+                <Link href={getDashboardLink()} onClick={closeMobile}>
+                  <div
+                    className="bg-primary_color"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "12px 16px",
+                      borderRadius: 8,
+                      color: "#fff",
+                      fontSize: "0.9rem",
+                      fontWeight: 500,
+                    }}
+                  >
+                    <FaUser size={16} />
+                    <span>Welcome, {user.profile?.name || user.email}</span>
                   </div>
                 </Link>
               ) : (
-                <div className="flex items-center gap-3 justify-center text-left lg:text-center text-[1.1em] lg:text-sm bg-primary_color text-white px-4 py-3 lg:px-6 lg:py-2 rounded-lg w-full lg:w-auto">
-                  <FaUser size={22} className="lg:hidden" />
-                  <span className="text-xs font-medium">
-                    Welcome, {displayName}
-                  </span>
-                </div>
+                <>
+                  <Link href="/home/signup" onClick={closeMobile}>
+                    <div
+                      className="bg-primary_color"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        justifyContent: "center",
+                        padding: "12px 16px",
+                        borderRadius: 8,
+                        color: "#fff",
+                        fontSize: "0.9rem",
+                        fontWeight: 500,
+                      }}
+                    >
+                      <FaUserPlus size={16} />
+                      <span>Sign Up</span>
+                    </div>
+                  </Link>
+                  <Link href="/home/signin" onClick={closeMobile}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        justifyContent: "center",
+                        padding: "12px 16px",
+                        borderRadius: 8,
+                        fontSize: "0.9rem",
+                        fontWeight: 500,
+                        border: "1.5px solid var(--color-primary_color)",
+                      }}
+                      className="text-primary_color"
+                    >
+                      <FaSignInAlt size={16} />
+                      <span>Login</span>
+                    </div>
+                  </Link>
+                </>
               )}
-              
-              {/* Logout button - commented out for now */}
-              {/* <button
-                onClick={handleLogout}
-                className="flex items-center gap-3 justify-center text-left md:text-center text-[1.1em] md:text-sm cursor-pointer transition-all duration-500 bg-red-600 text-white px-4 py-3 md:px-6 md:py-2 rounded-lg hover:bg-opacity-90 w-full md:w-auto"
-              >
-                <FaSignOutAlt size={22} className="md:hidden" />
-                <span className="text-xs">Logout</span>
-              </button> */}
             </div>
-          ) : (
-            button_options.map((each_value) => {
-              const IconComponent = each_value.nav_icon;
-              return (
-                <Link href={each_value.nav_link} key={each_value.nav_name} className="w-full lg:w-auto">
-                  <div 
-                    onClick={() => set_show_nav(false)}
-                    className="flex items-center gap-3 justify-center text-left lg:text-center text-[1.1em] lg:text-sm cursor-pointer transition-all duration-500 bg-primary_color text-white px-4 py-3 lg:px-6 lg:py-2 rounded-lg hover:bg-opacity-90 w-full lg:w-auto"
-                  >
-                    <IconComponent size={22} className="lg:hidden" />
-                    <span className="text-xs ">{each_value.nav_name}</span>
-                  </div>
-                </Link>
-              );
-            })
-          )}
+          </div>
         </div>
-      </div>
-    </div>
+      </nav>
+    </>
   );
 };
 

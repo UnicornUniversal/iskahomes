@@ -9,11 +9,13 @@ import PostHogDebug from "./components/PostHogDebug";
 import Layout1 from "./layout/Layout1";
 import HomeCategories from "./components/general/HomeCategories";
 import Nav from "./components/Nav";
+import Footer from "./components/Footer";
 import WhyIskaHomes from "./components/general/WhyIskaHomes";
 import FeaturedDevelopments from "./components/general/FeaturedDevelopments";
 import OurServices from "./components/general/OurServices";
 export default function Home() {
   return (
+   <>
    <div className=" max-w-[1500px] mx-auto w-full h-full flex flex-col items-center justify-center" >
    <Nav />
    <Layout1>
@@ -42,5 +44,7 @@ export default function Home() {
 
       {/* <PostHogDebug /> */}
    </div>
+   <Footer />
+   </>
   );
 }

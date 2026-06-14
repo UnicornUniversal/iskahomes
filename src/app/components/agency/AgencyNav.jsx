@@ -298,7 +298,7 @@ const AgencyNav = () => {
                 {/* Logo - first element, links to homepage */}
                 <div className="mb-6 flex-shrink-0">
                     <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
-                        <img src="/iska-dark.png" alt="ISKA Homes" className="max-w-[120px] w-24" />
+                        <img src="/ISKA Logo.png" alt="ISKA Homes" className="max-w-[120px] w-24" />
                     </Link>
                 </div>
 

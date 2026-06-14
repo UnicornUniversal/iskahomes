@@ -5,12 +5,12 @@ import React, { useState } from 'react'
 
 const SimsPage = () => {
   const [to, setTo] = useState('')
-  const [message, setMessage] = useState('Test SMS from Iska Homes')
+  const [message, setMessage] = useState('Test SMS from ISKA Homes')
   const [status, setStatus] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [emailTo, setEmailTo] = useState('')
-  const [emailSubject, setEmailSubject] = useState('SendGrid test email from Iska Homes')
-  const [emailMessage, setEmailMessage] = useState('Hello, this is a test email from Iska Homes via SendGrid.')
+  const [emailSubject, setEmailSubject] = useState('SendGrid test email from ISKA Homes')
+  const [emailMessage, setEmailMessage] = useState('Hello, this is a test email from ISKA Homes via SendGrid.')
   const [emailStatus, setEmailStatus] = useState('')
   const [isSendingEmail, setIsSendingEmail] = useState(false)
   const [redisKey, setRedisKey] = useState('')
