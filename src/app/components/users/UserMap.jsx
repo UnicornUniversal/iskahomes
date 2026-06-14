@@ -42,6 +42,13 @@ const getListingPreviewImage = (listing) => {
   return null;
 };
 
+const truncateText = (text, maxLength) => {
+  const value = typeof text === 'string' ? text.trim() : '';
+  if (!value) return '';
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength).trim()}...`;
+};
+
 // Ghana city coordinates for fallback
 const ghanaCityCoordinates = {
   'Accra': { lat: 5.6037, lng: -0.1870 },
@@ -400,10 +407,10 @@ const UserMap = ({ filters = {}, leadAttributionContext = 'search' }) => {
                 ) : null}
                 <div className='p-2.5 '>
                   <p className='text-primary_color text-base font-semibold leading-0'>
-                    {m.title}
+                    {truncateText(m.title, 25)}
                   </p>
                   <p className='text-primary_color/80 text-sm leading-0'>
-                    {m.subtitle || 'Location not specified'}
+                    {truncateText(m.subtitle || 'Location not specified', 25)}
                   </p>
                   <a
                     href={withWebsiteLeadAttribution(

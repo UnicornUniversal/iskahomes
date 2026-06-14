@@ -2,24 +2,29 @@
 
 import React, { useMemo } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import useExtendedAuthProfile from '@/hooks/useExtendedAuthProfile'
 import { useParams } from 'next/navigation'
 import { MapPin, DollarSign, TrendingUp } from 'lucide-react'
 import DataCard from '@/app/components/developers/DataCard'
 import SalesTrendChart from '@/app/components/analytics/SalesTrendChart'
+import AgencySalesAnalytics from '@/app/components/agency/AgencySalesAnalytics'
+import AgencySalesRecords from '@/app/components/agency/AgencySalesRecords'
 import { formatCurrency } from '@/lib/utils'
 
 export default function AgencySalesPage() {
   const params = useParams()
   const { user } = useAuth()
+  const { extendedProfile } = useExtendedAuthProfile()
+  const profile = extendedProfile || user?.profile || {}
   
   // Get account ID from user profile
-  const accountId = user?.profile?.agency_id || user?.id
+  const accountId = profile?.agency_id || user?.id
 
   // Get currency from company_locations primary_location
   const currency = useMemo(() => {
-    if (!user?.profile?.company_locations) return 'GHS'
+    if (!profile?.company_locations) return 'GHS'
     
-    let locations = user.profile.company_locations
+    let locations = profile.company_locations
     if (typeof locations === 'string') {
       try {
         locations = JSON.parse(locations)
@@ -36,18 +41,19 @@ export default function AgencySalesPage() {
     }
     
     return 'GHS'
-  }, [user?.profile?.company_locations])
+  }, [profile?.company_locations])
 
   // Get values from user profile
-  const totalPropertiesSold = user?.profile?.total_sales ?? 0
-  const totalRevenue = user?.profile?.total_revenue ?? 0
-  const expectedRevenue = user?.profile?.estimated_revenue ?? 0
+  const totalPropertiesSold = profile?.total_sales ?? 0
+  const totalRevenue = profile?.total_revenue ?? 0
+  const expectedRevenue = profile?.estimated_revenue ?? 0
   const incomingRevenue = expectedRevenue - totalRevenue // Estimated remaining revenue
 
   return (
     <>
       <div className="mb-6">
-        <h1 className="text-primary_color mb-2">Sales Overview</h1>
+        <h1 className="text-primary_color mb-2">Sales Statistics</h1>
+        <p className="text-sm text-primary_color/70">Revenue, commissions, and property sales breakdown</p>
       </div>
 
       {/* Data Cards */}
@@ -75,9 +81,17 @@ export default function AgencySalesPage() {
       </div>
 
       {/* Sales Time Series */}
-      <div className="w-full">
+      <div className="w-full mb-6">
         <SalesTrendChart listerId={accountId} currency={currency} accountType="agency" />
       </div>
+
+      {/* Sales records table */}
+      <div className="w-full mb-6">
+        <AgencySalesRecords agencyId={accountId} currency={currency} />
+      </div>
+
+      {/* Agency-specific sales analytics */}
+      <AgencySalesAnalytics agencyId={accountId} currency={currency} />
     </>
   )
 }

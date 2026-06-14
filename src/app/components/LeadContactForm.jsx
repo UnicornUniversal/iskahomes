@@ -233,6 +233,17 @@ const LeadContactForm = ({
     }
   }
 
+  const getAgencyId = () => {
+    return (
+      agency?.agency_id ||
+      agency?.id ||
+      agent?.agency_id ||
+      profile?.agency_id ||
+      listing?.agency_id ||
+      null
+    )
+  }
+
   // Build analytics context so lister_id/lister_type are correct for agents, agencies, developers
   const getAnalyticsContext = (extra = {}) => ({
     ...getDistinctLeadRuleContext(),
@@ -253,6 +264,7 @@ const LeadContactForm = ({
       agent_id: profile.agent_id,
       agency_id: profile.agency_id
     }),
+    agency_id: getAgencyId(),
     developerId: developer?.developer_id,
     ...extra,
     // Lead attribution after ...extra so undefined keys do not wipe URL-resolved values
@@ -388,7 +400,6 @@ const LeadContactForm = ({
     
     // Listing context: create actual appointment via API
     if (listingId && accountId && accountId !== 'unknown' && token && ['developer', 'agent', 'agency'].includes(accountType)) {
-      const toastId = toast.loading("Booking appointment...", { autoClose: false })
       try {
         const appointmentType = mode === 'video' ? 'virtual' : 'in-person'
         const res = await fetch('/api/appointments', {
@@ -419,12 +430,12 @@ const LeadContactForm = ({
         }
         
         setLoading(false)
-        toast.update(toastId, { type: 'success', render: "Appointment request sent!", autoClose: 3000, isLoading: false })
+        toast.success('Appointment request sent!', { autoClose: 3500 })
         setAppointmentFieldErrors({ date: '', time: '', name: '', email: '', emailInvalid: '' })
         analytics.trackAppointmentClick(getAnalyticsContext({ appointmentType: mode === 'video' ? 'virtual' : 'viewing' })).catch(() => {})
       } catch (error) {
         setLoading(false)
-        toast.update(toastId, { type: 'error', render: error.message || "Failed to send appointment request", autoClose: 4000, isLoading: false })
+        toast.error(error.message || 'Failed to send appointment request', { autoClose: 4500 })
       }
       return
     }
@@ -496,7 +507,6 @@ const LeadContactForm = ({
     }
     
     setSendingMessage(true)
-    const toastId = toast.loading("Sending message...", { autoClose: false })
     
     try {
       const listingId = contextType === 'listing' ? (propertyId || listing?.id) : null
@@ -527,13 +537,13 @@ const LeadContactForm = ({
       }
       
       setSendingMessage(false)
-      toast.update(toastId, { type: 'success', render: "Message sent!", autoClose: 2000, isLoading: false })
+      toast.success('Message sent!', { autoClose: 3000 })
       setMessageData({ message: '' })
       
       analytics.trackMessageClick(getAnalyticsContext({ messageType: 'direct_message' })).catch(() => {})
     } catch (error) {
       setSendingMessage(false)
-      toast.update(toastId, { type: 'error', render: error.message || "Failed to send message", autoClose: 4000, isLoading: false })
+      toast.error(error.message || 'Failed to send message', { autoClose: 4500 })
     }
   }
 

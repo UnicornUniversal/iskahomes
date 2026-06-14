@@ -1,5 +1,5 @@
 'use client'
-import React, { useMemo, useEffect, useState, useRef } from 'react'
+import React, { useMemo } from 'react'
 import DeveloperHeader from '@/app/components/developers/DeveloperHeader'
 import DataCard from '@/app/components/developers/DataCard'
 import StatisticsView from '@/app/components/developers/DataStats/StatisticsView'
@@ -12,6 +12,8 @@ import PropertiesBySubType from '@/app/components/developers/DataStats/Propertie
 import LatestEngagements from '@/app/components/developers/DataStats/LatestEngagements'
 import LatestServiceCharge from '@/app/components/developers/DataStats/LatestServiceCharge'
 import { useAuth } from '@/contexts/AuthContext'
+import useExtendedAuthProfile from '@/hooks/useExtendedAuthProfile'
+import useDeveloperPropertyStats from '@/hooks/useDeveloperPropertyStats'
 import { Building2, Eye, BarChart3, Home, DollarSign } from 'lucide-react'
 import LatestLeads from '@/app/components/developers/DataStats/LatestLeads'
 import RecentMessages from '@/app/components/developers/DataStats/RecentMessages'
@@ -22,51 +24,11 @@ import RecentActivities from '@/app/components/developers/DataStats/RecentActivi
 import { formatCurrency } from '@/lib/utils'
 import Notifications from '@/app/components/general/Notifications'    
 import SimpleServices from '@/app/components/general/SimpleServices'
-import { supabase } from '@/lib/supabase'
 import ReportGenerator from '@/app/components/developers/ReportGenerator'
 const page = () => {
   const { user, loading: authLoading } = useAuth()
-  const [localUserData, setLocalUserData] = useState(null)
-  const hasRefreshedRef = useRef(false)
-
-  // Refresh user data when component mounts to ensure we have latest stats
-  useEffect(() => {
-    const refreshUserData = async () => {
-      // Allow both developers and team members
-      const isDeveloper = user?.user_type === 'developer'
-      const isTeamMember = user?.user_type === 'team_member' && user?.profile?.organization_type === 'developer'
-      
-      if (!user?.id || (!isDeveloper && !isTeamMember) || hasRefreshedRef.current) return
-      
-      hasRefreshedRef.current = true
-      try {
-        // For team members, use organization_id; for developers, use developer_id
-        const developerId = isTeamMember ? user.profile.organization_id : user.id
-        
-        const { data: userData, error } = await supabase
-          .from('developers')
-          .select('*')
-          .eq(isTeamMember ? 'id' : 'developer_id', developerId)
-          .single()
-
-        if (!error && userData) {
-          setLocalUserData(userData)
-        }
-      } catch (error) {
-        console.error('Error refreshing user data:', error)
-      }
-    }
-
-    // Wait for auth to finish loading, then refresh data
-    if (!authLoading && user) {
-      // Small delay to ensure loadUser() in AuthContext has completed
-      const timer = setTimeout(() => {
-        refreshUserData()
-      }, 100)
-      
-      return () => clearTimeout(timer)
-    }
-  }, [user?.id, authLoading]) // Only depend on user.id to avoid infinite loops
+  const { extendedProfile } = useExtendedAuthProfile()
+  const { stats: propertyStats } = useDeveloperPropertyStats()
 
   // Format number with commas
   const formatNumber = (num) => {
@@ -76,7 +38,7 @@ const page = () => {
 
   // Get currency from company_locations primary_location
   const currency = useMemo(() => {
-    const profileData = localUserData || user?.profile
+    const profileData = extendedProfile || user?.profile
     if (!profileData?.company_locations) return 'GHS'
     
     // Parse company_locations if it's a string
@@ -97,62 +59,21 @@ const page = () => {
     }
     
     return 'GHS'
-  }, [localUserData?.company_locations, user?.profile?.company_locations])
+  }, [extendedProfile?.company_locations, user?.profile?.company_locations])
 
-  // Use local data if available (from refresh), otherwise use user profile
-  const profileData = localUserData || user?.profile
+  // Use independently fetched data when available
+  const profileData = extendedProfile || user?.profile
 
-  const parseStatsArray = (value) => {
-    if (!value) return []
-    if (Array.isArray(value)) return value
-    if (typeof value === 'string') {
-      try {
-        const parsed = JSON.parse(value)
-        return Array.isArray(parsed) ? parsed : []
-      } catch (error) {
-        return []
-      }
-    }
-    return []
-  }
-
-  const mergeStatsWithNames = (primaryStats, fallbackStats) => {
-    const primary = parseStatsArray(primaryStats)
-    const fallback = parseStatsArray(fallbackStats)
-
-    if (primary.length === 0) return fallback
-
-    const fallbackByCategoryId = new Map(
-      fallback.map((item) => [String(item?.category_id ?? ''), item?.name]).filter(([id]) => id)
-    )
-
-    return primary.map((item) => {
-      const directName = item?.name
-      if (directName && String(directName).trim()) return item
-
-      const fallbackName = fallbackByCategoryId.get(String(item?.category_id ?? ''))
-      return fallbackName ? { ...item, name: fallbackName } : item
-    })
-  }
-  
   // Get values directly from user profile (for other metrics)
   const totalUnits = profileData?.total_units ?? 0
   const totalDevelopments = profileData?.total_developments ?? 0
   const totalRevenue = profileData?.total_revenue ?? 0
   const totalViews = profileData?.total_views ?? 0
   const totalImpressions = profileData?.total_impressions ?? 0
-  const propertyPurposesStats = mergeStatsWithNames(
-    profileData?.property_purposes_stats,
-    user?.profile?.property_purposes_stats
-  )
-  const propertyTypesStats = mergeStatsWithNames(
-    profileData?.property_types_stats,
-    user?.profile?.property_types_stats
-  )
-  const propertySubtypesStats = mergeStatsWithNames(
-    profileData?.property_subtypes_stats,
-    user?.profile?.property_subtypes_stats
-  )
+  const propertyPurposesStats = propertyStats.purposes
+  const propertyTypesStats = propertyStats.types
+  const propertySubtypesStats = propertyStats.subtypes
+  const propertyStatsTotalUnits = propertyStats.totalUnits || totalUnits
 
   if (authLoading) {
     return (
@@ -204,6 +125,7 @@ const page = () => {
           icon={Building2}
         />
         </div>
+   
 {/*    
         <ReportGenerator /> */}
 
@@ -259,15 +181,15 @@ const page = () => {
 
         <div className='w-full grid grid-cols-1 lg:grid-cols-3 gap-4'>
          
-         <PropertiesByCategories statsData={propertyPurposesStats} totalUnits={totalUnits} />
+         <PropertiesByCategories statsData={propertyPurposesStats} totalUnits={propertyStatsTotalUnits} />
     
     
  
 
      
   
-         <PropertiesByType statsData={propertyTypesStats} totalUnits={totalUnits} />
-         <PropertiesBySubType statsData={propertySubtypesStats} totalUnits={totalUnits} />
+         <PropertiesByType statsData={propertyTypesStats} totalUnits={propertyStatsTotalUnits} />
+         <PropertiesBySubType statsData={propertySubtypesStats} totalUnits={propertyStatsTotalUnits} />
    
    
      </div>

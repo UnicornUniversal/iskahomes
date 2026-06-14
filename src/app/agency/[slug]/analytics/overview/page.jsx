@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import useExtendedAuthProfile from '@/hooks/useExtendedAuthProfile'
 import { useParams } from 'next/navigation'
 import { MapPin, Users, TrendingUp, Eye, DollarSign, BarChart3 } from 'lucide-react'
 import DataCard from '@/app/components/developers/DataCard'
@@ -11,16 +12,18 @@ import { formatCurrency } from '@/lib/utils'
 export default function AnalyticsOverviewPage() {
   const params = useParams()
   const { user } = useAuth()
+  const { extendedProfile } = useExtendedAuthProfile()
+  const profile = extendedProfile || user?.profile || {}
   const slug = params.slug || ''
   
   // Get account ID from user profile
-  const accountId = user?.profile?.agency_id || user?.id
+  const accountId = profile?.agency_id || user?.id
 
   // Get currency from company_locations primary_location
   const currency = useMemo(() => {
-    if (!user?.profile?.company_locations) return 'GHS'
+    if (!profile?.company_locations) return 'GHS'
     
-    let locations = user.profile.company_locations
+    let locations = profile.company_locations
     if (typeof locations === 'string') {
       try {
         locations = JSON.parse(locations)
@@ -37,16 +40,16 @@ export default function AnalyticsOverviewPage() {
     }
     
     return 'GHS'
-  }, [user?.profile?.company_locations])
+  }, [profile?.company_locations])
 
   // Get values from user profile
-  const totalProperties = user?.profile?.total_listings ?? 0
-  const totalAgents = user?.profile?.total_agents ?? 0
-  const totalLeads = user?.profile?.total_leads ?? 0
-  const totalImpressions = user?.profile?.total_impressions ?? 0
-  const totalPropertiesSold = user?.profile?.total_sales ?? 0
-  const totalRevenue = user?.profile?.total_revenue ?? 0
-  const expectedRevenue = user?.profile?.estimated_revenue ?? 0
+  const totalProperties = profile?.total_listings ?? 0
+  const totalAgents = profile?.total_agents ?? 0
+  const totalLeads = profile?.total_leads ?? 0
+  const totalImpressions = profile?.total_impressions ?? 0
+  const totalPropertiesSold = profile?.total_sales ?? 0
+  const totalRevenue = profile?.total_revenue ?? 0
+  const expectedRevenue = profile?.estimated_revenue ?? 0
 
   return (
     <div className="w-full flex flex-col gap-6">

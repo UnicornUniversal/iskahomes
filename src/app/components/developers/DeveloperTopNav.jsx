@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import useExtendedAuthProfile from '@/hooks/useExtendedAuthProfile'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -11,6 +12,8 @@ import { supabase } from '@/lib/supabase'
 
 const DeveloperTopNav = ({ onSearch }) => {
   const { user, logout } = useAuth()
+  const { extendedProfile } = useExtendedAuthProfile()
+  const profile = extendedProfile || user?.profile || {}
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -99,11 +102,11 @@ const DeveloperTopNav = ({ onSearch }) => {
         }
         return '/avatar.jpg'
       }
-    } else if (!isTeamMember && user?.profile?.profile_image) {
+    } else if (!isTeamMember && profile?.profile_image) {
       // For developers, use their own profile image
-      const image = typeof user.profile.profile_image === 'string'
-        ? user.profile.profile_image
-        : user.profile.profile_image.url
+      const image = typeof profile.profile_image === 'string'
+        ? profile.profile_image
+        : profile.profile_image.url
       return image || '/avatar.jpg'
     }
     return '/avatar.jpg'
@@ -115,7 +118,7 @@ const DeveloperTopNav = ({ onSearch }) => {
   const teamMemberRole = isTeamMember ? user?.profile?.role_name || 'Team Member' : null
   const developerName = isTeamMember 
     ? (developerData?.name || user?.profile?.organization_name || 'Developer')
-    : (user?.profile?.name || user?.profile?.company_name || 'Developer')
+    : (profile?.name || profile?.company_name || 'Developer')
   
   const accountStatus = user?.profile?.account_status || 'active'
   const email = user?.profile?.email || user?.email || 'N/A'

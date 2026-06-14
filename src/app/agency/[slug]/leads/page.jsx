@@ -19,8 +19,8 @@ export default function AgencyLeadsPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="">Leads Management</h1>
-          <p className="">Manage and track all your property leads</p>
+          <h1 className="text-primary_color">Lead Management</h1>
+          <p className="text-sm text-primary_color/70">Manage and track all your property leads</p>
         </div>
 
         {/* Leads Management Component */}

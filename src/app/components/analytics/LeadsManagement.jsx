@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { FiMessageCircle, FiEdit3, FiTrash2, FiPlus, FiX, FiSend, FiUser, FiCalendar, FiPhone, FiMail, FiImage, FiStar, FiEye, FiExternalLink } from 'react-icons/fi'
+import { FiMessageCircle, FiEdit3, FiTrash2, FiPlus, FiX, FiSend, FiUser, FiCalendar, FiPhone, FiMail, FiImage, FiStar, FiEye, FiExternalLink, FiGrid, FiList } from 'react-icons/fi'
 import { BarChart3, MessageCircle, Phone, Calendar, TrendingUp, Award } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useParams, useRouter } from 'next/navigation'
@@ -11,6 +11,13 @@ import 'react-toastify/dist/ReactToastify.css'
 import Reminders from './Reminders'
 import CustomDropdown from '@/app/components/propertyManagement/modules/CustomDropdown'
 import AddLeadModal from './AddLeadModal'
+import LeadsPipelineView from './LeadsPipelineView'
+import {
+  buildPipelineStatusOptions,
+  getPipelineStatusLabel,
+  resolveLeadStatusForPipeline,
+} from '@/lib/leadsPipelineHelper'
+import { getAuthTokenForListerType, getAuthTokenForUser } from '@/lib/authTokens'
 
 const LEAD_CLASSIFICATION_OPTIONS = [
   { value: '', label: 'All' },
@@ -121,7 +128,7 @@ function getActionIcon(action) {
 }
 
 export default function LeadsManagement({ listerId, listerType = 'developer', listingId = null, pageSize = 20, initialLeadId = null, singleLeadMode = false }) {
-  const { user, developerToken, agencyToken, propertySeekerToken } = useAuth()
+  const { user, developerToken, agencyToken, agentToken, propertySeekerToken } = useAuth()
   const params = useParams()
   const router = useRouter()
   const [leads, setLeads] = useState([])
@@ -154,15 +161,50 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
   const [assignableUsers, setAssignableUsers] = useState([])
   const [loadingAssignableUsers, setLoadingAssignableUsers] = useState(false)
   const [leadsToday, setLeadsToday] = useState(0)
+  const [viewMode, setViewMode] = useState('list')
+  const [pipelineStages, setPipelineStages] = useState([])
+  const [loadingPipelineStages, setLoadingPipelineStages] = useState(false)
+  const [updatingLeadId, setUpdatingLeadId] = useState(null)
 
   const offset = useMemo(() => page * pageSize, [page, pageSize])
-  const authToken = listerType === 'agency' || listerType === 'agent' ? agencyToken : developerToken
-  const currentUserId = user?.id || user?.profile?.user_id || null
+  const pipelineFetchSize = 500
+
+  const pipelineStatusOptions = useMemo(
+    () => buildPipelineStatusOptions(pipelineStages),
+    [pipelineStages]
+  )
+
+  const pipelineStatusFilterOptions = useMemo(
+    () => [{ value: '', label: 'All Status' }, ...pipelineStatusOptions],
+    [pipelineStatusOptions]
+  )
+
+  const resolvedSelectedLeadStatus = useMemo(() => {
+    if (!selectedLead) return 'new'
+    return resolveLeadStatusForPipeline(selectedLead.status, pipelineStages)
+  }, [selectedLead, pipelineStages])
+  const authToken = getAuthTokenForListerType(listerType, {
+    developerToken,
+    agencyToken,
+    agentToken,
+  })
+  const currentUserId = user?.id || user?.profile?.user_id || user?.profile?.agent_id || null
   const isSuperAdmin = user?.profile?.permissions === null || /super\s*admin/i.test(String(user?.profile?.role_name || ''))
+  const isAgencyLeadsView = listerType === 'agency'
+  const isDeveloperLeadsView = listerType === 'developer'
+  const isAgentLeadsView = listerType === 'agent'
   const routeSlug = Array.isArray(params?.slug) ? params.slug[0] : params?.slug
 
   function openLeadDetailsPage(leadId) {
     if (!leadId) return
+    if (isAgentLeadsView || isAgencyLeadsView) {
+      const lead = leads.find((l) => l.id === leadId)
+      if (lead) {
+        setSelectedLead(lead)
+        setReminders(lead.reminders || [])
+      }
+      return
+    }
     const pathSlug = routeSlug || listerId
     if (!pathSlug) return
     router.push(`/developer/${pathSlug}/leads/${leadId}`)
@@ -187,9 +229,23 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
     })
   }, [assignableUsers, listerId])
 
+  const assignableLeadAgentOptions = useMemo(() => {
+    if (!isAgencyLeadsView) return []
+    return (assignableUsers || []).filter((userOption) => userOption?.type === 'agent')
+  }, [assignableUsers, isAgencyLeadsView])
+
+  const sourceAgentName = useMemo(() => {
+    if (!isAgencyLeadsView || !selectedLead) return null
+    if (selectedLead.lister_type !== 'agent') {
+      return 'Direct agency lead'
+    }
+    const sourceAgent = assignableLeadAgentOptions.find((agentOption) => agentOption.user_id === selectedLead.lister_id)
+    return sourceAgent?.name || selectedLead.lister_id || 'Unknown agent'
+  }, [assignableLeadAgentOptions, isAgencyLeadsView, selectedLead])
+
   useEffect(() => {
     async function loadAssignableUsers() {
-      if (!authToken) return
+      if (!authToken || isAgentLeadsView) return
       setLoadingAssignableUsers(true)
       try {
         const response = await fetch('/api/audit/users', {
@@ -209,7 +265,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
     }
 
     loadAssignableUsers()
-  }, [authToken])
+  }, [authToken, isAgentLeadsView])
 
   // Fetch developer profile for team members to get leads data
   useEffect(() => {
@@ -245,8 +301,13 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
     setError(null)
     
     try {
-      const currentPage = singleLeadMode ? 0 : page
-      const currentPageSize = singleLeadMode ? Math.max(pageSize, 200) : pageSize
+      const currentPage = viewMode === 'pipeline' || singleLeadMode ? 0 : page
+      const currentPageSize =
+        viewMode === 'pipeline'
+          ? pipelineFetchSize
+          : singleLeadMode
+            ? Math.max(pageSize, 200)
+            : pageSize
 
       const params = new URLSearchParams({
         lister_id: listerId,
@@ -266,7 +327,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         console.log('🔍 Loading all leads for lister:', listerId)
       }
       
-      if (statusFilter) {
+      if (statusFilter && viewMode !== 'pipeline') {
         params.append('status', statusFilter)
       }
       if (leadTypeFilter) {
@@ -292,12 +353,12 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         params.append('search', search)
       }
 
-      if (!isSuperAdmin && currentUserId) {
+      if (!isSuperAdmin && currentUserId && !isAgentLeadsView) {
         params.append('assigned_user', currentUserId)
       }
 
       const response = await fetch(`/api/leads?${params.toString()}`, {
-        headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
       })
       const result = await response.json()
 
@@ -363,12 +424,12 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         date_to: today
       })
 
-      if (!isSuperAdmin && currentUserId) {
+      if (!isSuperAdmin && currentUserId && !isAgentLeadsView) {
         params.append('assigned_user', currentUserId)
       }
 
       const response = await fetch(`/api/leads?${params.toString()}`, {
-        headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
       })
       const result = await response.json()
 
@@ -388,7 +449,80 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
     loadLeads()
     loadLeadsToday()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listerId, listerType, listingId, statusFilter, actionFilter, leadTypeFilter, leadClassificationFilter, dateFrom, dateTo, search, page, pageSize, isSuperAdmin, currentUserId, authToken, initialLeadId, singleLeadMode])
+  }, [listerId, listerType, listingId, statusFilter, actionFilter, leadTypeFilter, leadClassificationFilter, dateFrom, dateTo, search, page, pageSize, isSuperAdmin, currentUserId, authToken, initialLeadId, singleLeadMode, viewMode])
+
+  async function loadPipelineStages() {
+    if (!authToken) return
+    setLoadingPipelineStages(true)
+    try {
+      const response = await fetch('/api/leads-pipeline?seed_defaults=true', {
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+      const result = await response.json()
+      if (response.ok && result.success) {
+        setPipelineStages(result.data || [])
+      }
+    } catch (err) {
+      console.error('Error loading pipeline stages:', err)
+    } finally {
+      setLoadingPipelineStages(false)
+    }
+  }
+
+  useEffect(() => {
+    if (authToken) {
+      loadPipelineStages()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authToken])
+
+  async function handlePipelineStatusChange(leadId, newStatus) {
+    const lead = leads.find((l) => l.id === leadId)
+    if (!lead || lead.status === newStatus) return
+
+    const previousStatus = lead.status
+    setUpdatingLeadId(leadId)
+    setLeads((prev) =>
+      prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l))
+    )
+
+    try {
+      const response = await fetch(`/api/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      const result = await response.json()
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to update lead status')
+      }
+      if (selectedLead?.id === leadId) {
+        setSelectedLead((prev) =>
+          prev ? { ...prev, status: newStatus, status_tracker: result.data?.status_tracker || prev.status_tracker } : prev
+        )
+      }
+      toast.success('Lead status updated')
+    } catch (err) {
+      setLeads((prev) =>
+        prev.map((l) => (l.id === leadId ? { ...l, status: previousStatus } : l))
+      )
+      toast.error(err.message || 'Failed to update lead status')
+    } finally {
+      setUpdatingLeadId(null)
+    }
+  }
+
+  function switchViewMode(mode) {
+    if (mode === viewMode) return
+    if (mode === 'pipeline') {
+      setStatusFilter('')
+      setPage(0)
+    }
+    setViewMode(mode)
+  }
 
   function updateLeadStatusLocally(leadId, newStatus) {
     // Update locally (will be saved when user clicks "Save Changes")
@@ -688,7 +822,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
           ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
         },
         body: JSON.stringify({
-          status: selectedLead.status,
+          status: resolveLeadStatusForPipeline(selectedLead.status, pipelineStages),
           assigned_user: selectedLead.assigned_user || null,
           lead_classification: selectedLead.lead_classification || 'Standard',
           notes: notesToSave,
@@ -794,7 +928,12 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
     setSendingMessage(true)
     try {
       // Get token from AuthContext based on user type
-      const token = user?.user_type === 'developer' ? developerToken : propertySeekerToken
+      const token = getAuthTokenForUser(user, {
+        developerToken,
+        agencyToken,
+        agentToken,
+        propertySeekerToken,
+      })
       
       if (!token) {
         toast.error('Please log in to send messages')
@@ -997,7 +1136,35 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
             {listingId ? 'Single listing leads' : 'All leads for this lister'}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {!singleLeadMode && (
+            <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => switchViewMode('list')}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-primary_color text-white'
+                    : 'default_bg text-secondary_color-700 hover:bg-gray-50'
+                }`}
+              >
+                <FiList className="w-4 h-4" />
+                List
+              </button>
+              <button
+                type="button"
+                onClick={() => switchViewMode('pipeline')}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
+                  viewMode === 'pipeline'
+                    ? 'bg-primary_color text-white'
+                    : 'default_bg text-secondary_color-700 hover:bg-gray-50'
+                }`}
+              >
+                <FiGrid className="w-4 h-4" />
+                Pipeline
+              </button>
+            </div>
+          )}
           {!listingId && (
             <button
               onClick={() => setShowAddLeadModal(true)}
@@ -1022,7 +1189,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         }}
         listerId={listerId}
         listerType={listerType}
-        token={listerType === 'agency' || listerType === 'agent' ? agencyToken : developerToken}
+        token={authToken}
       />
 
       {/* Filters */}
@@ -1039,24 +1206,17 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
 
         {/* Filters Grid - Hidden on small, visible on medium+ */}
         <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-7 gap-4">
+          {viewMode !== 'pipeline' && (
           <div>
             <label className="block text-sm font-medium text-secondary_color-700 mb-1">Status</label>
             <CustomDropdown
-              options={[
-                { value: '', label: 'All Status' },
-                { value: 'new', label: 'New' },
-                { value: 'contacted', label: 'Contacted' },
-                { value: 'scheduled', label: 'Scheduled' },
-                { value: 'responded', label: 'Responded' },
-                { value: 'closed', label: 'Closed' },
-                { value: 'cold_lead', label: 'Cold Lead' },
-                { value: 'abandoned', label: 'Abandoned' }
-              ]}
+              options={pipelineStatusFilterOptions}
               value={statusFilter}
               onChange={(value) => { setPage(0); setStatusFilter(value) }}
               placeholder="All Status"
             />
           </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-secondary_color-700 mb-1">Lead Type</label>
             <CustomDropdown
@@ -1161,16 +1321,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                   <div>
                     <label className="block text-sm font-medium text-secondary_color-700 mb-1">Status</label>
                     <CustomDropdown
-                      options={[
-                        { value: '', label: 'All Status' },
-                        { value: 'new', label: 'New' },
-                        { value: 'contacted', label: 'Contacted' },
-                        { value: 'scheduled', label: 'Scheduled' },
-                        { value: 'responded', label: 'Responded' },
-                        { value: 'closed', label: 'Closed' },
-                        { value: 'cold_lead', label: 'Cold Lead' },
-                        { value: 'abandoned', label: 'Abandoned' }
-                      ]}
+                      options={pipelineStatusFilterOptions}
                       value={statusFilter}
                       onChange={(value) => { setPage(0); setStatusFilter(value) }}
                       placeholder="All Status"
@@ -1267,6 +1418,18 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
      
         {/* Leads Management - Takes 2/3 width */}
         <div className="w-full space-y-6">
+          {viewMode === 'pipeline' ? (
+            <LeadsPipelineView
+              stages={pipelineStages}
+              leads={filteredLeads}
+              loading={loading || loadingPipelineStages}
+              updatingLeadId={updatingLeadId}
+              onLeadClick={(lead) => setSelectedLead(lead)}
+              onOpenLeadPage={openLeadDetailsPage}
+              onStatusChange={handlePipelineStatusChange}
+            />
+          ) : (
+          <>
           {/* Table */}
           <div className="default_bg overflow-hidden">
             <div className="overflow-x-auto">
@@ -1484,6 +1647,8 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
           </button>
         </div>
       </div>
+          </>
+          )}
         </div>
         </>
       )}
@@ -1569,40 +1734,63 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                         <span className="text-sm text-secondary_color-700">{selectedLead.first_action_date}</span>
                       </div>
 
-                      {/* Leads Manager */}
-                      <div className="w-full">
-                        <span className="text-sm text-secondary_color-500 block mb-1.5">Leads Manager</span>
-                        <select
-                          value={selectedLead.assigned_user || ''}
-                          onChange={(e) => updateLeadAssignmentLocally(selectedLead.id, e.target.value)}
-                          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-secondary_color-500 focus:border-secondary_color-500"
-                        >
-                          <option value="">Unassigned</option>
-                          {assignableManagerOptions.map((userOption) => (
-                            <option key={userOption.user_id} value={userOption.user_id}>
-                              {userOption.name} {userOption.role ? `(${userOption.role})` : ''}
-                            </option>
-                          ))}
-                        </select>
-                        {loadingAssignableUsers && (
-                          <p className="text-xs text-secondary_color-500 mt-1">Loading users...</p>
-                        )}
-                      </div>
+                      {isAgencyLeadsView && (
+                        <div className="w-full">
+                          <span className="text-sm text-secondary_color-500 block mb-1.5">Source Agent</span>
+                          <div className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-secondary_color-700">
+                            {sourceAgentName}
+                          </div>
+                        </div>
+                      )}
+
+                      {(isDeveloperLeadsView || listerType === 'agent') && (
+                        <div className="w-full">
+                          <span className="text-sm text-secondary_color-500 block mb-1.5">Leads Manager</span>
+                          <select
+                            value={selectedLead.assigned_user || ''}
+                            onChange={(e) => updateLeadAssignmentLocally(selectedLead.id, e.target.value)}
+                            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-secondary_color-500 focus:border-secondary_color-500"
+                          >
+                            <option value="">Unassigned</option>
+                            {assignableManagerOptions.map((userOption) => (
+                              <option key={userOption.user_id} value={userOption.user_id}>
+                                {userOption.name} {userOption.role ? `(${userOption.role})` : ''}
+                              </option>
+                            ))}
+                          </select>
+                          {loadingAssignableUsers && (
+                            <p className="text-xs text-secondary_color-500 mt-1">Loading users...</p>
+                          )}
+                        </div>
+                      )}
+
+                      {isAgencyLeadsView && (
+                        <div className="w-full">
+                          <span className="text-sm text-secondary_color-500 block mb-1.5">Lead Agent</span>
+                          <select
+                            value={selectedLead.assigned_user || ''}
+                            onChange={(e) => updateLeadAssignmentLocally(selectedLead.id, e.target.value)}
+                            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-secondary_color-500 focus:border-secondary_color-500"
+                          >
+                            <option value="">Unassigned</option>
+                            {assignableLeadAgentOptions.map((agentOption) => (
+                              <option key={agentOption.user_id} value={agentOption.user_id}>
+                                {agentOption.name}
+                              </option>
+                            ))}
+                          </select>
+                          {loadingAssignableUsers && (
+                            <p className="text-xs text-secondary_color-500 mt-1">Loading agents...</p>
+                          )}
+                        </div>
+                      )}
 
                       <div className=" w-full">
                         <span className="text-sm text-secondary_color-500">Status:</span>
                         <div className="max-w-[300px]">
                           <CustomDropdown
-                            options={[
-                              { value: 'new', label: 'New' },
-                              { value: 'contacted', label: 'Contacted' },
-                              { value: 'scheduled', label: 'Scheduled' },
-                              { value: 'responded', label: 'Responded' },
-                              { value: 'closed', label: 'Closed' },
-                              { value: 'cold_lead', label: 'Cold Lead' },
-                              { value: 'abandoned', label: 'Abandoned' }
-                            ]}
-                            value={selectedLead.status || 'new'}
+                            options={pipelineStatusOptions}
+                            value={resolvedSelectedLeadStatus}
                             onChange={(value) => updateLeadStatusLocally(selectedLead.id, value)}
                             placeholder="Select Status"
                           />
@@ -1798,7 +1986,9 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                         selectedLead.status_tracker.map((status, idx) => (
                           <div key={idx} className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                            <span className="text-sm text-secondary_color-700 capitalize">{status}</span>
+                            <span className="text-sm text-secondary_color-700">
+                              {getPipelineStatusLabel(status, pipelineStages)}
+                            </span>
                           </div>
                         ))
                       ) : (

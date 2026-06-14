@@ -623,7 +623,10 @@ export async function POST(request) {
           slug: profile.slug,
           account_status: statusValue,
           admin_status: statusValue,
-          status: statusValue
+          status: statusValue,
+          company_locations: profile.company_locations || [],
+          default_currency: profile.default_currency || null,
+          commission_rate: profile.commission_rate ?? null
         };
       } else if (userType === 'agency') {
         const statusValue = profile.admin_status || profile.status || profile.account_status || null
@@ -634,7 +637,10 @@ export async function POST(request) {
           slug: profile.slug,
           account_status: statusValue,
           admin_status: statusValue,
-          status: statusValue
+          status: statusValue,
+          company_locations: profile.company_locations || [],
+          default_currency: profile.default_currency || null,
+          commission_rates: profile.commission_rates ?? null
         };
       } else if (userType === 'agent') {
         profileData = {
@@ -643,7 +649,10 @@ export async function POST(request) {
           name: profile.name,
           slug: profile.slug,
           account_status: profile.account_status,
-          agency_id: profile.agency_id
+          agency_id: profile.agency_id,
+          location_id: profile.location_id || null,
+          commission_rate: profile.commission_rate ?? null,
+          commission_rates: profile.commission_rates ?? null
         };
       } else if (userType === 'property_seeker') {
         profileData = {

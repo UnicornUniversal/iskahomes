@@ -9,6 +9,7 @@ import {
 } from 'react-icons/fi'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
+import useExtendedAuthProfile from '@/hooks/useExtendedAuthProfile'
 import ViewsTimeSeries from '@/app/components/analytics/ViewsTimeSeries'
 import ImpressionsTimeSeries from '@/app/components/analytics/ImpressionsTimeSeries'
 import DataCard from '@/app/components/developers/DataCard'
@@ -23,11 +24,13 @@ import { usePathname } from 'next/navigation'
 
 const AgencyDashboard = () => {
   const { user } = useAuth()
+  const { extendedProfile } = useExtendedAuthProfile()
+  const profile = extendedProfile || user?.profile || {}
   const pathname = usePathname()
   const slug = pathname?.split('/')[2] || ''
   
   // Use agency_id for all data - works for both owners and team members
-  const accountId = user?.profile?.agency_id || user?.id
+  const accountId = profile?.agency_id || user?.id
   
   const [viewsTimeSeries, setViewsTimeSeries] = useState([])
   const [impressionsTimeSeries, setImpressionsTimeSeries] = useState([])
@@ -41,10 +44,10 @@ const AgencyDashboard = () => {
 
   // Get currency from company_locations primary_location
   const currency = useMemo(() => {
-    if (!user?.profile?.company_locations) return 'GHS'
+    if (!profile?.company_locations) return 'GHS'
     
     // Parse company_locations if it's a string
-    let locations = user.profile.company_locations
+    let locations = profile.company_locations
     if (typeof locations === 'string') {
       try {
         locations = JSON.parse(locations)
@@ -61,13 +64,13 @@ const AgencyDashboard = () => {
     }
     
     return 'GHS'
-  }, [user?.profile?.company_locations])
+  }, [profile?.company_locations])
 
   // Get values from user profile (includes agency stats for team members from AuthContext)
-  const totalAgents = user?.profile?.total_agents ?? 0
-  const totalListings = user?.profile?.total_listings ?? 0
-  const totalLeads = user?.profile?.total_leads ?? 0
-  const totalRevenue = user?.profile?.total_revenue ?? 0
+  const totalAgents = profile?.total_agents ?? 0
+  const totalListings = profile?.total_listings ?? 0
+  const totalLeads = profile?.total_leads ?? 0
+  const totalRevenue = profile?.total_revenue ?? 0
 
   // Fetch analytics data
   useEffect(() => {
@@ -174,7 +177,7 @@ const AgencyDashboard = () => {
   ]
 
   return (
-    <div className='w-full flex flex-col gap-6'>
+    <div className='w-full flex flex-col gap-6 text-primary_color'>
       {/* Stats Grid */}
       <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
         {stats.map((stat, index) => (
@@ -191,7 +194,7 @@ const AgencyDashboard = () => {
 
       {/* Views and Impressions Time Series */}
       <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
-        <div className='bg-white rounded-xl shadow-sm border border-gray-100 p-6'>
+        <div className='secondary_bg rounded-xl shadow-sm border border-gray-100 p-6'>
           {loading ? (
             <div className='flex items-center justify-center py-12'>
               <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary_color'></div>
@@ -200,7 +203,7 @@ const AgencyDashboard = () => {
             <ViewsTimeSeries timeSeries={viewsTimeSeries} />
           )}
         </div>
-        <div className='bg-white rounded-xl shadow-sm border border-gray-100 p-6'>
+        <div className='secondary_bg rounded-xl shadow-sm border border-gray-100 p-6'>
           {loading ? (
             <div className='flex items-center justify-center py-12'>
               <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary_color'></div>
@@ -222,13 +225,15 @@ const AgencyDashboard = () => {
       </div>
 
       {/* Popular Listings | Top Agents */}
-      <div className='grid grid-cols-1 lg:grid-cols-2 gap-4'>
-        <div className='bg-white rounded-xl shadow-sm border border-gray-100'>
-          <PopularListings limit={4} userId={accountId} accountType="agency" />
-        </div>
-        <div>
+      <div className='grid grid-cols-1  gap-4'>
+      <div>
           <TopAgents limit={4} agencyId={accountId} />
         </div>
+     
+          <PopularListings limit={4} userId={accountId} accountType="agency" />
+         
+ 
+      
       </div>
 
       {/* Recent Messages | Latest Leads */}

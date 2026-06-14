@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import useExtendedAuthProfile from '@/hooks/useExtendedAuthProfile'
 import { useParams } from 'next/navigation'
 import { Plus, Trash2, Edit2, X, Check } from 'lucide-react'
 import { toast, ToastContainer } from 'react-toastify'
@@ -11,6 +12,8 @@ import CustomDropdown from '@/app/components/developers/units/CustomDropdown'
 export default function CommissionRatePage() {
   const params = useParams()
   const { user, refreshUser, agencyToken } = useAuth()
+  const { extendedProfile } = useExtendedAuthProfile()
+  const profile = extendedProfile || user?.profile || {}
   const slug = params.slug || ''
   
   const [purposes, setPurposes] = useState([])
@@ -46,8 +49,8 @@ export default function CommissionRatePage() {
 
   // Load commission rates from user profile
   useEffect(() => {
-    if (user?.profile?.commission_rates) {
-      let rates = user.profile.commission_rates
+    if (profile?.commission_rates) {
+      let rates = profile.commission_rates
       
       // Handle old format: {"default": 3.0}
       if (rates && typeof rates === 'object' && !Array.isArray(rates)) {
@@ -70,7 +73,7 @@ export default function CommissionRatePage() {
       setCommissionRates([])
       setLoading(false)
     }
-  }, [user?.profile?.commission_rates])
+  }, [profile?.commission_rates])
 
   // Purpose options for dropdown
   const purposeOptions = purposes.map(p => ({

@@ -3,93 +3,18 @@
 import React, { useMemo, useState } from 'react'
 import {
   ArrowRight,
-  Box,
-  Camera,
   CheckCircle,
-  Home,
   Mail,
-  Palette,
   Phone,
-  Ruler,
   User,
   X
 } from 'lucide-react'
+import { ISKA_SERVICES } from '@/lib/services'
 import { toast, ToastContainer } from 'react-toastify'
 import { motion, AnimatePresence } from 'framer-motion'
 import 'react-toastify/dist/ReactToastify.css'
 
-const services = [
-  {
-    id: 'virtual-tour',
-    name: 'Virtual Tour',
-    description: 'Experience properties from anywhere with our immersive 360° virtual tours. Perfect for remote viewing and showcasing properties to international clients.',
-    image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0',
-    icon: Camera,
-    features: [
-      '360° panoramic views',
-      'Interactive property exploration',
-      'HD quality imaging',
-      'Mobile-friendly experience',
-      'Shareable tour links'
-    ]
-  },
-  {
-    id: '3d-visualization',
-    name: '3D Visualization',
-    description: 'Bring your property visions to life with stunning 3D renderings and architectural visualizations. Perfect for pre-construction marketing and design presentations.',
-    image: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0',
-    icon: Box,
-    features: [
-      'Photorealistic 3D renders',
-      'Interior and exterior visualization',
-      'Multiple design options',
-      'Virtual staging capabilities',
-      'Animation and walkthroughs'
-    ]
-  },
-  {
-    id: 'interior-design',
-    name: 'Interior Design',
-    description: 'Transform your spaces with professional interior design services. From concept to completion, we create beautiful, functional living environments.',
-    image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0',
-    icon: Palette,
-    features: [
-      'Custom design concepts',
-      'Color scheme selection',
-      'Furniture and decor sourcing',
-      'Space optimization',
-      'Style consultation'
-    ]
-  },
-  {
-    id: 'smart-home-installation',
-    name: 'Smart Home Installation',
-    description: 'Upgrade your property with cutting-edge smart home technology. Control lighting, security, climate, and more from your smartphone.',
-    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0',
-    icon: Home,
-    features: [
-      'Smart lighting systems',
-      'Home security integration',
-      'Climate control automation',
-      'Voice assistant compatibility',
-      'Professional installation'
-    ]
-  },
-  {
-    id: 'space-planning-consultation',
-    name: 'Space Planning Consultation',
-    description: 'Maximize your property\'s potential with expert space planning. Optimize layouts for functionality, flow, and aesthetic appeal.',
-    image: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.1.0',
-    icon: Ruler,
-    features: [
-      'Layout optimization',
-      'Furniture placement',
-      'Traffic flow analysis',
-      'Storage solutions',
-      'Multi-purpose space design'
-    ]
-  }
-]
+const services = ISKA_SERVICES
 
 const AllServicesPage = () => {
   const [selectedServices, setSelectedServices] = useState([])

@@ -1,6 +1,7 @@
 'use client'
 
-import React from 'react'
+import React, { useMemo } from 'react'
+import Link from 'next/link'
 import { Doughnut, Bar } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -12,7 +13,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js'
-import { TrendingUp, Clock, Target } from 'lucide-react'
+import { TrendingUp, Clock, Target, Settings2 } from 'lucide-react'
 import { analyticsClasses, analyticsPalette, baseChartOptions, formatNumber, formatPercent } from './analyticsTheme'
 
 ChartJS.register(
@@ -25,7 +26,29 @@ ChartJS.register(
   Legend
 )
 
-export default function LeadLifecycle({ data }) {
+const statusColors = {
+  new: analyticsPalette.secondary,
+  contacted: analyticsPalette.primary,
+  scheduled: analyticsPalette.amber,
+  responded: analyticsPalette.violet,
+  closed: analyticsPalette.emerald,
+  cold_lead: analyticsPalette.slate,
+  abandoned: analyticsPalette.rose,
+  unspecified: analyticsPalette.slate,
+}
+
+const paletteFallback = [
+  analyticsPalette.primary,
+  analyticsPalette.secondary,
+  analyticsPalette.emerald,
+  analyticsPalette.violet,
+  analyticsPalette.amber,
+  analyticsPalette.rose,
+  '#14b8a6',
+  '#64748b',
+]
+
+export default function LeadLifecycle({ data, configurePipelineHref = null }) {
   if (!data || !data.statusDistribution) {
     return (
       <div className={analyticsClasses.section}>
@@ -34,128 +57,177 @@ export default function LeadLifecycle({ data }) {
     )
   }
 
-  const { statusDistribution, funnelConversionRates, avgTimeToConversion } = data
+  const {
+    statusDistribution,
+    funnelSteps = [],
+    funnelConversionRates = {},
+    statusLabels = {},
+    pipelineStages = [],
+    pipelineSummary = {},
+    avgTimeToConversion,
+  } = data
 
-  // Status distribution chart
-  const statusLabels = Object.keys(statusDistribution).map(s => 
-    s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' ')
-  )
-  const statusValues = Object.values(statusDistribution)
-  const statusColors = {
-    new: analyticsPalette.secondary,
-    contacted: analyticsPalette.primary,
-    scheduled: analyticsPalette.amber,
-    responded: analyticsPalette.violet,
-    closed: analyticsPalette.emerald,
-    cold_lead: analyticsPalette.slate,
-    abandoned: analyticsPalette.rose
-  }
+  const orderedBreakdown = useMemo(() => {
+    const order = pipelineStages.map((s) => s.status)
+    const seen = new Set()
+    const rows = []
+
+    order.forEach((key) => {
+      const count = statusDistribution[key] || 0
+      if (count > 0) {
+        rows.push({ key, label: statusLabels[key] || key.replace(/_/g, ' '), count })
+        seen.add(key)
+      }
+    })
+
+    Object.entries(statusDistribution).forEach(([key, count]) => {
+      if (count > 0 && !seen.has(key)) {
+        rows.push({ key, label: statusLabels[key] || key.replace(/_/g, ' '), count })
+      }
+    })
+
+    return rows
+  }, [pipelineStages, statusDistribution, statusLabels])
+
+  const statusChartEntries = orderedBreakdown.length > 0 ? orderedBreakdown : []
 
   const statusChartData = {
-    labels: statusLabels,
+    labels: statusChartEntries.map((e) => e.label),
     datasets: [{
-      data: statusValues,
-      backgroundColor: Object.keys(statusDistribution).map(s => statusColors[s] || analyticsPalette.slate),
+      data: statusChartEntries.map((e) => e.count),
+      backgroundColor: statusChartEntries.map((e, i) =>
+        statusColors[e.key] || paletteFallback[i % paletteFallback.length]
+      ),
       borderWidth: 2,
-      borderColor: '#fff'
-    }]
+      borderColor: '#fff',
+    }],
   }
 
-  // Funnel conversion rates
-  const funnelLabels = [
-    'New → Contacted',
-    'Contacted → Scheduled',
-    'Scheduled → Closed'
-  ]
-  const funnelValues = [
-    funnelConversionRates.newToContacted || 0,
-    funnelConversionRates.contactedToScheduled || 0,
-    funnelConversionRates.scheduledToClosed || 0
-  ]
+  const funnelLabels =
+    funnelSteps.length > 0
+      ? funnelSteps.map((s) => s.label)
+      : ['New → Contacted', 'Contacted → Scheduled', 'Scheduled → Closed']
+
+  const funnelValues =
+    funnelSteps.length > 0
+      ? funnelSteps.map((s) => s.rate)
+      : [
+          funnelConversionRates.newToContacted || 0,
+          funnelConversionRates.contactedToScheduled || 0,
+          funnelConversionRates.scheduledToClosed || 0,
+        ]
 
   const funnelChartData = {
     labels: funnelLabels,
     datasets: [{
       label: 'Conversion Rate (%)',
       data: funnelValues,
-      backgroundColor: [
-        analyticsPalette.secondary,
-        analyticsPalette.primary,
-        analyticsPalette.emerald
-      ],
-      borderColor: [
-        analyticsPalette.secondary,
-        analyticsPalette.primary,
-        analyticsPalette.emerald
-      ],
-      borderWidth: 1
-    }]
+      backgroundColor: funnelLabels.map((_, i) => paletteFallback[i % paletteFallback.length]),
+      borderColor: funnelLabels.map((_, i) => paletteFallback[i % paletteFallback.length]),
+      borderWidth: 1,
+    }],
   }
 
   const totalLeads = Object.values(statusDistribution).reduce((a, b) => a + b, 0)
-  const inProgress = (statusDistribution.contacted || 0) + 
-                     (statusDistribution.scheduled || 0) + 
-                     (statusDistribution.responded || 0)
-  const closed = statusDistribution.closed || 0
-  const lost = (statusDistribution.abandoned || 0) + (statusDistribution.cold_lead || 0)
+  const inProgress = pipelineSummary.inProgress ?? 0
+  const closed = pipelineSummary.closed ?? 0
+  const lost = pipelineSummary.lost ?? 0
+  const unspecified = pipelineSummary.unspecified ?? 0
 
   return (
     <div className={analyticsClasses.section}>
-      <div className="space-y-3">
-        <span className={analyticsClasses.eyebrow}>Lifecycle Health</span>
-        <div>
-          <h3 className={analyticsClasses.title}>Lead Lifecycle & Funnel</h3>
-          <p className={analyticsClasses.subtitle}>
-            A cleaner view of where leads sit in the pipeline and how well they move from one stage to the next.
-          </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-3">
+          <span className={analyticsClasses.eyebrow}>Lifecycle Health</span>
+          <div>
+            <h3 className={analyticsClasses.title}>Lead Lifecycle & Pipeline</h3>
+            <p className={analyticsClasses.subtitle}>
+              Status counts follow your configured pipeline stages (New, custom stages, Unspecified).
+            </p>
+          </div>
         </div>
+        {configurePipelineHref && (
+          <Link
+            href={configurePipelineHref}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-primary_color/20 px-3 py-2 text-sm font-medium text-primary_color hover:bg-primary_color/5"
+          >
+            <Settings2 className="h-4 w-4" />
+            Configure pipeline
+          </Link>
+        )}
+      </div>
+
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {[
+          { label: 'New', value: pipelineSummary.new ?? 0 },
+          { label: 'In progress', value: inProgress },
+          { label: 'Closed', value: closed },
+          { label: 'Lost', value: lost },
+          { label: 'Unspecified', value: unspecified },
+        ].map((item) => (
+          <div key={item.label} className={analyticsClasses.compactCard}>
+            <p className="text-xs font-medium text-primary_color/70">{item.label}</p>
+            <p className="mt-2 text-xl font-semibold text-primary_color">{formatNumber(item.value)}</p>
+          </div>
+        ))}
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className={analyticsClasses.subPanel}>
           <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Status Distribution</h4>
           <div className="mt-4 h-72">
-            <Doughnut
-              data={statusChartData}
-              options={{
-                ...baseChartOptions({ legendPosition: 'bottom' }),
-                plugins: {
-                  legend: {
-                    ...baseChartOptions({ legendPosition: 'bottom' }).plugins.legend,
-                    position: 'bottom'
-                  }
-                }
-              }}
-            />
+            {statusChartEntries.length > 0 ? (
+              <Doughnut
+                data={statusChartData}
+                options={{
+                  ...baseChartOptions({ legendPosition: 'bottom' }),
+                  plugins: {
+                    legend: {
+                      ...baseChartOptions({ legendPosition: 'bottom' }).plugins.legend,
+                      position: 'bottom',
+                    },
+                  },
+                }}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-primary_color/60">
+                No status data in this date range
+              </div>
+            )}
           </div>
         </div>
 
         <div className={analyticsClasses.subPanel}>
           <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Funnel Conversion</h4>
           <div className="mt-4 h-72">
-            <Bar
-              data={funnelChartData}
-              options={{
-                ...baseChartOptions({ showLegend: false, yMax: 100, yTitle: 'Conversion Rate (%)' }),
-                scales: {
-                  ...baseChartOptions({ showLegend: false, yMax: 100, yTitle: 'Conversion Rate (%)' }).scales,
-                  y: {
-                    ...baseChartOptions({ showLegend: false, yMax: 100, yTitle: 'Conversion Rate (%)' }).scales.y,
-                    ticks: {
-                      color: analyticsPalette.slate,
-                      callback(value) {
-                        return `${value}%`
-                      }
-                    }
-                  }
-                }
-              }}
-            />
+            {funnelLabels.length > 0 ? (
+              <Bar
+                data={funnelChartData}
+                options={{
+                  ...baseChartOptions({ showLegend: false, yMax: 100, yTitle: 'Conversion Rate (%)' }),
+                  scales: {
+                    ...baseChartOptions({ showLegend: false, yMax: 100, yTitle: 'Conversion Rate (%)' }).scales,
+                    y: {
+                      ...baseChartOptions({ showLegend: false, yMax: 100, yTitle: 'Conversion Rate (%)' }).scales.y,
+                      ticks: {
+                        color: analyticsPalette.slate,
+                        callback(value) {
+                          return `${value}%`
+                        },
+                      },
+                    },
+                  },
+                }}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-primary_color/60">
+                Add pipeline stages to see funnel steps
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Key Metrics */}
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className={analyticsClasses.compactCard}>
           <div className="mb-3 flex items-center gap-2 text-slate-500">
@@ -193,15 +265,17 @@ export default function LeadLifecycle({ data }) {
       </div>
 
       <div className="mt-6">
-        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Detailed Status Breakdown</h4>
-        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
-          {Object.entries(statusDistribution).map(([status, count]) => {
+        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Pipeline stage breakdown</h4>
+        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+          {(orderedBreakdown.length > 0 ? orderedBreakdown : pipelineStages.map((s) => ({
+            key: s.status,
+            label: s.label,
+            count: statusDistribution[s.status] || 0,
+          }))).map(({ key, label, count }) => {
             const percentage = totalLeads > 0 ? ((count / totalLeads) * 100).toFixed(1) : 0
             return (
-              <div key={status} className={analyticsClasses.compactCard}>
-                <p className="text-sm font-medium capitalize text-primary_color/70">
-                  {status.replace('_', ' ')}
-                </p>
+              <div key={key} className={analyticsClasses.compactCard}>
+                <p className="text-sm font-medium text-primary_color/70">{label}</p>
                 <p className="mt-3 text-2xl font-semibold tracking-tight text-primary_color">{formatNumber(count)}</p>
                 <p className="mt-1 text-xs text-primary_color/70">{formatPercent(percentage)}</p>
               </div>
@@ -212,4 +286,3 @@ export default function LeadLifecycle({ data }) {
     </div>
   )
 }
-

@@ -1,6 +1,8 @@
 'use client'
 import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
+import useExtendedAuthProfile from '@/hooks/useExtendedAuthProfile'
 import LeadsManagement from '@/app/components/analytics/LeadsManagement'
 import LeadsTrend from '@/app/components/analytics/LeadsTrend'
 import LeadSourceBreakdown from '@/app/components/analytics/LeadSourceBreakdown'
@@ -16,7 +18,7 @@ import OperationalEfficiency from '@/app/components/analytics/OperationalEfficie
 import { analyticsClasses } from '@/app/components/analytics/analyticsTheme'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { BarChart3, MessageCircle, Phone, Calendar, TrendingUp, Loader2, UserX } from 'lucide-react'
+import { BarChart3, MessageCircle, Phone, Calendar, TrendingUp, Loader2, UserX, Settings2 } from 'lucide-react'
 
 const formatDateInput = (date) => {
   const year = date.getFullYear()
@@ -47,7 +49,11 @@ const getThisWeekRange = () => {
 const LeadAnalytics = () => {
   const params = useParams()
   const { user } = useAuth()
-  const listerId = user?.profile?.developer_id || params.slug
+  const { extendedProfile } = useExtendedAuthProfile({ scope: 'analytics' })
+  const profile = extendedProfile || user?.profile || {}
+  const slug = params.slug || profile?.slug || user?.profile?.slug || ''
+  const listerId = profile?.developer_id || params.slug
+  const configurePipelineHref = slug ? `/developer/${slug}/leads/leadsPipeline` : null
   const [analyticsData, setAnalyticsData] = useState(null)
   const [loadingAnalytics, setLoadingAnalytics] = useState(true)
   const [temporalDateRange, setTemporalDateRange] = useState(() => getThisWeekRange())
@@ -99,15 +105,15 @@ const LeadAnalytics = () => {
 
   // Extract leads data directly from user profile
   const getTotalLeadsData = () => {
-    if (!user?.profile) return null
+    if (!profile) return null
 
     // Parse leads_breakdown JSON
     let leadsBreakdown = null
-    if (user.profile.leads_breakdown) {
+    if (profile.leads_breakdown) {
       try {
-        leadsBreakdown = typeof user.profile.leads_breakdown === 'string'
-          ? JSON.parse(user.profile.leads_breakdown)
-          : user.profile.leads_breakdown
+        leadsBreakdown = typeof profile.leads_breakdown === 'string'
+          ? JSON.parse(profile.leads_breakdown)
+          : profile.leads_breakdown
       } catch (e) {
         console.error('Error parsing leads_breakdown:', e)
       }
@@ -115,10 +121,10 @@ const LeadAnalytics = () => {
 
     // Parse conversion_rate (can be string or number)
     let conversionRate = 0
-    if (user.profile.conversion_rate) {
-      conversionRate = typeof user.profile.conversion_rate === 'string'
-        ? parseFloat(user.profile.conversion_rate)
-        : user.profile.conversion_rate
+    if (profile.conversion_rate) {
+      conversionRate = typeof profile.conversion_rate === 'string'
+        ? parseFloat(profile.conversion_rate)
+        : profile.conversion_rate
     }
 
     // Extract messaging data from nested structure
@@ -129,17 +135,17 @@ const LeadAnalytics = () => {
 
     // HYBRID APPROACH: Use aggregate total_unique_leads + total_anonymous_leads for developer-level display
     // This shows unique individuals across ALL contexts (profile + listings + developments)
-    const totalUniqueLeads = user.profile.total_unique_leads || 0 // Aggregate across all contexts
-    const totalAnonymousLeads = user.profile.total_anonymous_leads || 0 // Aggregate across all contexts
+    const totalUniqueLeads = profile.total_unique_leads || 0 // Aggregate across all contexts
+    const totalAnonymousLeads = profile.total_anonymous_leads || 0 // Aggregate across all contexts
     const totalLeads = totalUniqueLeads + totalAnonymousLeads // Total unique individuals across all contexts
     
     // Fallback to profile-specific if aggregate not available
-    const profileUniqueLeads = user.profile.unique_leads || 0 // Profile-specific only
-    const profileAnonymousLeads = user.profile.anonymous_leads || 0 // Profile-specific only
+    const profileUniqueLeads = profile.unique_leads || 0 // Profile-specific only
+    const profileAnonymousLeads = profile.anonymous_leads || 0 // Profile-specific only
     const profileTotalLeads = profileUniqueLeads + profileAnonymousLeads
     
     // Use aggregate if available, otherwise fallback to profile-specific, then to total_leads
-    const totalLeadsFallback = profileTotalLeads > 0 ? profileTotalLeads : (leadsBreakdown?.total_leads || user.profile.total_leads || 0)
+    const totalLeadsFallback = profileTotalLeads > 0 ? profileTotalLeads : (leadsBreakdown?.total_leads || profile.total_leads || 0)
     const finalTotalLeads = totalLeads > 0 ? totalLeads : totalLeadsFallback
     
     return {
@@ -154,7 +160,7 @@ const LeadAnalytics = () => {
       whatsapp_leads: whatsappLeads,
       direct_message_leads: directMessageLeads,
       email_leads: leadsBreakdown?.email?.total || 0,
-      appointment_leads: user.profile.total_appointments || leadsBreakdown?.appointment?.total || 0,
+      appointment_leads: profile.total_appointments || leadsBreakdown?.appointment?.total || 0,
       website_leads: leadsBreakdown?.website?.total || 0,
       // Keep message_leads as sum for backward compatibility
       message_leads: messageTotal,
@@ -224,10 +230,28 @@ const LeadAnalytics = () => {
                   Lead Analytics
                 </h1>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-primary_color/70 md:text-base">
-                  A cleaner developer view for how leads arrive, which actions dominate, and where conversion quality is strongest.
+                  How leads arrive, how they move through your configured pipeline, and where conversion is strongest.
                 </p>
               </div>
             </div>
+
+            {configurePipelineHref && (
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={configurePipelineHref}
+                  className="inline-flex items-center gap-2 rounded-lg border border-primary_color/25 px-4 py-2 text-sm font-medium text-primary_color hover:bg-primary_color/5"
+                >
+                  <Settings2 className="h-4 w-4" />
+                  Configure pipeline
+                </Link>
+                <Link
+                  href={`/developer/${slug}/leads`}
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary_color px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                >
+                  Manage leads
+                </Link>
+              </div>
+            )}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="default_bg2 rounded-3xl bg-white/20 p-4">
@@ -287,7 +311,10 @@ const LeadAnalytics = () => {
               appliedDateRange={analyticsData.appliedDateRange}
               loading={loadingAnalytics}
             />
-            <LeadLifecycle data={analyticsData.lifecycleAnalysis} />
+            <LeadLifecycle
+              data={analyticsData.lifecycleAnalysis}
+              configurePipelineHref={configurePipelineHref}
+            />
             <TemporalPatterns
               data={analyticsData.temporalPatterns}
               dateRange={{

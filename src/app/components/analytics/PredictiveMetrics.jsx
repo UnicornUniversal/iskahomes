@@ -36,33 +36,33 @@ export default function PredictiveMetrics({ data }) {
     pipelineHealth = {}
   } = data
 
-  // Pipeline health chart
-  const pipelineLabels = ['New', 'In Progress', 'Closed', 'Lost']
-  const pipelineValues = [
-    pipelineHealth?.new || 0,
-    pipelineHealth?.inProgress || 0,
-    pipelineHealth?.closed || 0,
-    pipelineHealth?.lost || 0
+  const pipelineSegments = [
+    { label: 'New', value: pipelineHealth?.new || 0, color: analyticsPalette.secondary },
+    { label: 'In Progress', value: pipelineHealth?.inProgress || 0, color: analyticsPalette.amber },
+    { label: 'Closed', value: pipelineHealth?.closed || 0, color: analyticsPalette.emerald },
+    { label: 'Lost', value: pipelineHealth?.lost || 0, color: analyticsPalette.rose },
   ]
-
-  const pipelineChartData = {
-    labels: pipelineLabels,
-    datasets: [{
-      data: pipelineValues,
-      backgroundColor: [
-        analyticsPalette.secondary,
-        analyticsPalette.amber,
-        analyticsPalette.emerald,
-        analyticsPalette.rose
-      ],
-      borderWidth: 2,
-      borderColor: '#fff'
-    }]
+  if ((pipelineHealth?.unspecified || 0) > 0) {
+    pipelineSegments.push({
+      label: 'Unspecified',
+      value: pipelineHealth.unspecified,
+      color: analyticsPalette.slate,
+    })
   }
 
-  const totalPipeline = pipelineValues.reduce((a, b) => a + b, 0)
-  const pipelinePercentages = pipelineValues.map(v => 
-    totalPipeline > 0 ? ((v / totalPipeline) * 100).toFixed(1) : 0
+  const pipelineChartData = {
+    labels: pipelineSegments.map((s) => s.label),
+    datasets: [{
+      data: pipelineSegments.map((s) => s.value),
+      backgroundColor: pipelineSegments.map((s) => s.color),
+      borderWidth: 2,
+      borderColor: '#fff',
+    }],
+  }
+
+  const totalPipeline = pipelineSegments.reduce((a, s) => a + s.value, 0)
+  const pipelinePercentages = pipelineSegments.map((s) =>
+    totalPipeline > 0 ? ((s.value / totalPipeline) * 100).toFixed(1) : 0
   )
 
   // Calculate health score
@@ -170,45 +170,30 @@ export default function PredictiveMetrics({ data }) {
       <div className="mt-6">
         <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Pipeline Breakdown</h4>
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-3xl border border-sky-100 bg-sky-50/70 p-4">
-            <p className="text-sm text-primary_color/70">New Leads</p>
-            <p className="mt-2 text-3xl font-semibold tracking-tight text-primary_color">
-              {formatNumber(pipelineHealth?.new || 0)}
-            </p>
-            <p className="mt-1 text-xs text-primary_color/70">
-              {formatPercent(pipelinePercentages[0])} of pipeline
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-amber-100 bg-amber-50/70 p-4">
-            <p className="text-sm text-primary_color/70">In Progress</p>
-            <p className="mt-2 text-3xl font-semibold tracking-tight text-primary_color">
-              {formatNumber(pipelineHealth?.inProgress || 0)}
-            </p>
-            <p className="mt-1 text-xs text-primary_color/70">
-              {formatPercent(pipelinePercentages[1])} of pipeline
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-emerald-100 bg-emerald-50/70 p-4">
-            <p className="text-sm text-primary_color/70">Closed</p>
-            <p className="mt-2 text-3xl font-semibold tracking-tight text-primary_color">
-              {formatNumber(pipelineHealth?.closed || 0)}
-            </p>
-            <p className="mt-1 text-xs text-primary_color/70">
-              {formatPercent(pipelinePercentages[2])} of pipeline
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-rose-100 bg-rose-50/70 p-4">
-            <p className="text-sm text-primary_color/70">Lost</p>
-            <p className="mt-2 text-3xl font-semibold tracking-tight text-primary_color">
-              {formatNumber(pipelineHealth?.lost || 0)}
-            </p>
-            <p className="mt-1 text-xs text-primary_color/70">
-              {formatPercent(pipelinePercentages[3])} of pipeline
-            </p>
-          </div>
+          {pipelineSegments.map((segment, index) => (
+            <div
+              key={segment.label}
+              className={`rounded-3xl border p-4 ${
+                index === 0
+                  ? 'border-sky-100 bg-sky-50/70'
+                  : index === 1
+                    ? 'border-amber-100 bg-amber-50/70'
+                    : index === 2
+                      ? 'border-emerald-100 bg-emerald-50/70'
+                      : index === 3
+                        ? 'border-rose-100 bg-rose-50/70'
+                        : 'border-slate-200 bg-slate-50/70'
+              }`}
+            >
+              <p className="text-sm text-primary_color/70">{segment.label}</p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight text-primary_color">
+                {formatNumber(segment.value)}
+              </p>
+              <p className="mt-1 text-xs text-primary_color/70">
+                {formatPercent(pipelinePercentages[index])} of pipeline
+              </p>
+            </div>
+          ))}
         </div>
       </div>
     </div>

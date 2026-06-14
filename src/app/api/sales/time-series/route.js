@@ -9,6 +9,7 @@ export async function GET(request) {
     const range = searchParams.get('range') // week, month, year (for backward compatibility)
     const dateFrom = searchParams.get('date_from')
     const dateTo = searchParams.get('date_to')
+    const accountType = searchParams.get('account_type') || 'developer'
 
     if (!userId && !slug) {
       return NextResponse.json(
@@ -25,7 +26,6 @@ export async function GET(request) {
       )
     }
 
-    const accountType = searchParams.get('account_type') || 'developer'
     let finalUserId = userId
 
     // Get user_id from slug if needed (developer only)

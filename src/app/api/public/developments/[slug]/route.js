@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { APPROVED_ADMIN_STATUS } from '@/lib/publicDevelopmentsHelper'
 
 export async function GET(request, { params }) {
   try {
@@ -20,6 +21,7 @@ export async function GET(request, { params }) {
       .select('*')
       .eq('slug', slug)
       .eq('development_status', 'active')
+      .eq('admin_status', APPROVED_ADMIN_STATUS)
       .single()
 
     if (developmentError) {
@@ -54,10 +56,15 @@ export async function GET(request, { params }) {
         customer_care
       `)
       .eq('developer_id', development.developer_id)
+      .eq('admin_status', APPROVED_ADMIN_STATUS)
       .single()
 
     if (developerError) {
       console.error('❌ Error fetching developer:', developerError)
+      return NextResponse.json(
+        { error: 'Development not found' },
+        { status: 404 }
+      )
     }
 
     // Resolve property types for the development
@@ -162,6 +169,7 @@ export async function GET(request, { params }) {
       `)
       .eq('developer_id', development.developer_id)
       .eq('development_status', 'active')
+      .eq('admin_status', APPROVED_ADMIN_STATUS)
       .neq('id', development.id)
       .order('created_at', { ascending: false })
       .limit(6)

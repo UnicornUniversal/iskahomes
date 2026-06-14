@@ -24,6 +24,7 @@ export async function POST(request) {
       development_id,
       lister_id,
       lister_type, // 'developer', 'agent', 'agency'
+      agency_id,
       seeker_id,
       action, // For phone: 'click' or 'copy'
       message_type, // For message: 'direct_message', 'whatsapp', 'email'
@@ -86,6 +87,22 @@ export async function POST(request) {
     // Determine if this is an anonymous lead
     // is_anonymous = !is_logged_in (if user is not logged in, they are anonymous)
     const is_anonymous = !is_logged_in
+
+    // Resolve parent agency for agency-scoped querying/rollups.
+    // - direct agency lead => agency_id is lister_id
+    // - agent lead => use provided agency_id or infer from agents table
+    let resolvedAgencyId = agency_id || null
+    if (!resolvedAgencyId && lister_type === 'agency') {
+      resolvedAgencyId = lister_id
+    }
+    if (!resolvedAgencyId && lister_type === 'agent' && lister_id) {
+      const { data: agentRecord } = await supabaseAdmin
+        .from('agents')
+        .select('agency_id')
+        .eq('agent_id', lister_id)
+        .maybeSingle()
+      resolvedAgencyId = agentRecord?.agency_id || null
+    }
 
     // Determine action type and metadata
     let actionType = 'lead_unknown'
@@ -193,6 +210,7 @@ export async function POST(request) {
       existingLead = leads
     }
 
+    const defaultAssignedUser = lister_type === 'agent' ? lister_id : null
     let leadRecord = null
 
     if (existingLead) {
@@ -211,6 +229,8 @@ export async function POST(request) {
           last_action_type: actionType,
           lead_score: Math.max(existingLead.lead_score || 0, leadScore), // Keep highest score
           is_anonymous: is_anonymous, // Update is_anonymous (in case user logged in/out)
+          agency_id: existingLead.agency_id || resolvedAgencyId,
+          assigned_user: existingLead.assigned_user || defaultAssignedUser,
           updated_at: actionTimestamp
         })
         .eq('id', existingLead.id)
@@ -231,6 +251,7 @@ export async function POST(request) {
       const newLead = {
         listing_id: context_type === 'listing' ? listing_id : null,
         development_id: context_type === 'development' ? development_id : null,
+        agency_id: resolvedAgencyId,
         lister_id: lister_id,
         lister_type: lister_type,
         seeker_id: finalSeekerId,
@@ -241,6 +262,7 @@ export async function POST(request) {
         lead_source_context: finalLeadSourceContext,
         lead_origin: lead_origin || 'platform',
         lead_classification,
+        assigned_user: defaultAssignedUser,
         lead_actions: [actionObj],
         total_actions: 1,
         lead_score: leadScore,

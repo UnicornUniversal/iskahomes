@@ -272,24 +272,30 @@ export const AuthProvider = ({ children }) => {
           let organizationSlug = null;
           let organizationName = null;
           let developerId = null;
+          let orgAdminStatus = '';
+          let orgProfileStatus = '';
           
           if (teamMember.organization_type === 'developer') {
             const { data: devOrg } = await supabase
               .from('developers')
-              .select('slug, name, developer_id')
+              .select('slug, name, developer_id, admin_status, account_status')
               .eq('id', teamMember.organization_id)
               .single();
             organizationSlug = devOrg?.slug;
             organizationName = devOrg?.name;
             developerId = devOrg?.developer_id; // Add developer_id for easy access
+            orgAdminStatus = devOrg?.admin_status || '';
+            orgProfileStatus = devOrg?.account_status || '';
           } else if (teamMember.organization_type === 'agency') {
             const { data: agencyOrg } = await supabase
               .from('agencies')
-              .select('slug, name, agency_id')
+              .select('slug, name, agency_id, admin_status, account_status')
               .eq('agency_id', teamMember.organization_id)
               .single();
             organizationSlug = agencyOrg?.slug;
             organizationName = agencyOrg?.name;
+            orgAdminStatus = agencyOrg?.admin_status || '';
+            orgProfileStatus = agencyOrg?.account_status || '';
           }
           
           const userData = {
@@ -304,6 +310,8 @@ export const AuthProvider = ({ children }) => {
               organization_slug: organizationSlug,
               organization_name: organizationName,
               developer_id: developerId, // Add developer_id so components can use it directly
+              organization_admin_status: orgAdminStatus,
+              organization_profile_status: orgProfileStatus,
               role_id: teamMember.role_id,
               role_name: teamMember.role?.name,
               permissions: teamMember.permissions,
@@ -322,7 +330,7 @@ export const AuthProvider = ({ children }) => {
           
           const { data: userData, error } = await supabase
             .from('developers')
-            .select('*')
+            .select('id, developer_id, name, email, slug, admin_status, account_status, company_locations, default_currency, commission_rate')
             .eq('developer_id', developerId)
             .single();
 
@@ -352,19 +360,17 @@ export const AuthProvider = ({ children }) => {
               .eq('status', 'active')
               .maybeSingle()
             
-            // Enrich stats with category names
-            const enrichedProfile = await enrichDeveloperStats(userData);
-            
             // Add permissions from organization_team_members if found
+            const minimalDeveloperProfile = { ...userData }
             if (teamMember && teamMember.permissions) {
-              enrichedProfile.permissions = teamMember.permissions
-              enrichedProfile.role_id = teamMember.role_id
-              enrichedProfile.role_name = teamMember.role?.name
-              enrichedProfile.team_member_id = teamMember.id
+              minimalDeveloperProfile.permissions = teamMember.permissions
+              minimalDeveloperProfile.role_id = teamMember.role_id
+              minimalDeveloperProfile.role_name = teamMember.role?.name
+              minimalDeveloperProfile.team_member_id = teamMember.id
             } else {
               // Legacy user or not set up - set all permissions to true (Super Admin)
               console.warn('Developer not found in organization_team_members, using full permissions')
-              enrichedProfile.permissions = null // null means all permissions (Super Admin)
+              minimalDeveloperProfile.permissions = null // null means all permissions (Super Admin)
             }
             
             // Fetch subscription data
@@ -374,7 +380,12 @@ export const AuthProvider = ({ children }) => {
               id: userData.developer_id,
               email: userData.email,
               user_type: 'developer',
-              profile: enrichedProfile, // Store enriched developer profile with permissions
+              profile: {
+                ...minimalDeveloperProfile,
+                company_locations: userData.company_locations || [],
+                default_currency: userData.default_currency || null,
+                commission_rate: userData.commission_rate ?? null
+              },
               subscription: subscription || null // Add subscription data
             });
           } else {
@@ -455,24 +466,30 @@ export const AuthProvider = ({ children }) => {
           let organizationSlug = null;
           let organizationName = null;
           let developerId = null;
+          let orgAdminStatus = '';
+          let orgProfileStatus = '';
           
           if (teamMember.organization_type === 'developer') {
             const { data: devOrg } = await supabase
               .from('developers')
-              .select('slug, name, developer_id')
+              .select('slug, name, developer_id, admin_status, account_status')
               .eq('id', teamMember.organization_id)
               .single();
             organizationSlug = devOrg?.slug;
             organizationName = devOrg?.name;
             developerId = devOrg?.developer_id; // Add developer_id for easy access
+            orgAdminStatus = devOrg?.admin_status || '';
+            orgProfileStatus = devOrg?.account_status || '';
           } else if (teamMember.organization_type === 'agency') {
             const { data: agencyOrg } = await supabase
               .from('agencies')
-              .select('slug, name, agency_id')
+              .select('slug, name, agency_id, admin_status, account_status')
               .eq('agency_id', teamMember.organization_id)
               .single();
             organizationSlug = agencyOrg?.slug;
             organizationName = agencyOrg?.name;
+            orgAdminStatus = agencyOrg?.admin_status || '';
+            orgProfileStatus = agencyOrg?.account_status || '';
           }
           
           setUser({
@@ -487,6 +504,8 @@ export const AuthProvider = ({ children }) => {
               organization_slug: organizationSlug,
               organization_name: organizationName,
               developer_id: developerId, // Add developer_id so components can use it directly
+              organization_admin_status: orgAdminStatus,
+              organization_profile_status: orgProfileStatus,
               role_id: teamMember.role_id,
               role_name: teamMember.role?.name,
               permissions: teamMember.permissions,
@@ -504,7 +523,7 @@ export const AuthProvider = ({ children }) => {
           
           const { data: userData, error } = await supabase
             .from('agencies')
-            .select('*')
+            .select('id, agency_id, name, email, slug, admin_status, account_status, company_locations, default_currency, commission_rates')
             .eq('agency_id', agencyId)
             .single();
 
@@ -553,7 +572,22 @@ export const AuthProvider = ({ children }) => {
               id: userData.agency_id,
               email: userData.email,
               user_type: 'agency',
-              profile: userData,
+              profile: {
+                id: userData.id,
+                agency_id: userData.agency_id,
+                name: userData.name,
+                email: userData.email,
+                slug: userData.slug,
+                admin_status: userData.admin_status,
+                account_status: userData.account_status,
+                company_locations: userData.company_locations || [],
+                default_currency: userData.default_currency || null,
+                commission_rates: userData.commission_rates ?? null,
+                permissions: userData.permissions ?? null,
+                role_id: userData.role_id,
+                role_name: userData.role_name,
+                team_member_id: userData.team_member_id
+              },
               subscription: subscription || null
             });
           } else {
@@ -584,82 +618,8 @@ export const AuthProvider = ({ children }) => {
           }
           return;
         }
-      } else if (propertySeekerTokenValue) {
-        // Verify property seeker token
-        const decoded = verifyToken(propertySeekerTokenValue);
-        
-        if (decoded && decoded.id) {
-          setPropertySeekerToken(propertySeekerTokenValue);
-          
-          const seekerId = decoded.id;
-          
-          const { data: userData, error } = await supabase
-            .from('property_seekers')
-            .select('*')
-            .eq('id', seekerId)
-            .single();
-
-          if (error) {
-            // Auth failure - logout and redirect
-            console.error('Auth failure - Property seeker profile fetch error:', error);
-              localStorage.removeItem('property_seeker_token');
-              setPropertySeekerToken('');
-            setUser(null);
-            // Handle auth failure (logout, clear storage, redirect)
-            if (typeof window !== 'undefined') {
-              handleAuthFailure('/home/signin');
-            }
-            return;
-          } else if (userData) {
-            console.log('🔍 Property Seeker Auth - User data:', userData)
-            console.log('🔍 Property Seeker Auth - Token:', propertySeekerTokenValue)
-            
-            // Property seekers typically don't have subscriptions, but fetch anyway
-            const subscription = await fetchUserSubscription(seekerId, 'property_seeker');
-            
-            setUser({
-              id: userData.id,
-              email: userData.email,
-              user_type: 'property_seeker',
-              profile: {
-                id: userData.id,
-                user_id: userData.user_id,
-                name: userData.name,
-                slug: userData.slug,
-                status: userData.status
-              },
-              subscription: subscription || null
-            });
-          } else {
-            // No user data found - auth failure
-            console.error('Auth failure - Property seeker profile not found');
-            localStorage.removeItem('property_seeker_token');
-            setPropertySeekerToken('');
-            setUser(null);
-            if (typeof window !== 'undefined') {
-              if (handleAuthFailure) {
-                handleAuthFailure('/home/signin');
-              } else {
-                window.location.href = '/home/signin';
-              }
-            }
-            return;
-          }
-        } else {
-          // Invalid token - auth failure
-          console.error('Auth failure - Invalid property seeker token');
-          localStorage.removeItem('property_seeker_token');
-          setPropertySeekerToken('');
-          setUser(null);
-          if (handleAuthFailure) {
-            handleAuthFailure('/home/signin');
-          } else {
-            window.location.href = '/home/signin';
-          }
-          return;
-        }
       } else if (agentTokenValue) {
-        // Verify agent token
+        // Verify agent token (before property_seeker so agent sessions win when both exist)
         const decoded = verifyToken(agentTokenValue);
         
         if (decoded && (decoded.user_type === 'agent' || decoded.agent_id)) {
@@ -669,34 +629,44 @@ export const AuthProvider = ({ children }) => {
           
           const { data: userData, error } = await supabase
             .from('agents')
-            .select('*')
+            .select('id, agent_id, agency_id, location_id, name, email, slug, admin_status, account_status, agent_status, commission_rate, commission_rates')
             .eq('agent_id', agentId)
             .single();
 
           if (error) {
-            // Auth failure - logout and redirect
             console.error('Auth failure - Agent profile fetch error:', error);
             localStorage.removeItem('agent_token');
             setAgentToken('');
             setUser(null);
-            // Handle auth failure (logout, clear storage, redirect)
             if (typeof window !== 'undefined') {
               handleAuthFailure('/home/signin');
             }
             return;
           } else if (userData) {
-            // Fetch subscription data
             const subscription = await fetchUserSubscription(agentId, 'agent');
             
             setUser({
               id: userData.agent_id,
               email: userData.email,
+              name: userData.name,
               user_type: 'agent',
-              profile: userData,
+              profile: {
+                id: userData.id,
+                agent_id: userData.agent_id,
+                agency_id: userData.agency_id,
+                name: userData.name,
+                email: userData.email,
+                slug: userData.slug,
+                admin_status: userData.admin_status,
+                account_status: userData.account_status,
+                agent_status: userData.agent_status,
+                location_id: userData.location_id || null,
+                commission_rate: userData.commission_rate ?? null,
+                commission_rates: userData.commission_rates ?? null
+              },
               subscription: subscription || null
             });
           } else {
-            // No user data found - auth failure
             console.error('Auth failure - Agent profile not found');
             localStorage.removeItem('agent_token');
             setAgentToken('');
@@ -711,10 +681,75 @@ export const AuthProvider = ({ children }) => {
             return;
           }
         } else {
-          // Invalid token - auth failure
           console.error('Auth failure - Invalid agent token');
           localStorage.removeItem('agent_token');
           setAgentToken('');
+          setUser(null);
+          if (handleAuthFailure) {
+            handleAuthFailure('/home/signin');
+          } else {
+            window.location.href = '/home/signin';
+          }
+          return;
+        }
+      } else if (propertySeekerTokenValue) {
+        const decoded = verifyToken(propertySeekerTokenValue);
+        
+        if (decoded && decoded.id) {
+          setPropertySeekerToken(propertySeekerTokenValue);
+          
+          const seekerId = decoded.id;
+          
+          const { data: userData, error } = await supabase
+            .from('property_seekers')
+            .select('id, user_id, name, email, slug, status')
+            .eq('id', seekerId)
+            .single();
+
+          if (error) {
+            console.error('Auth failure - Property seeker profile fetch error:', error);
+              localStorage.removeItem('property_seeker_token');
+              setPropertySeekerToken('');
+            setUser(null);
+            if (typeof window !== 'undefined') {
+              handleAuthFailure('/home/signin');
+            }
+            return;
+          } else if (userData) {
+            const subscription = await fetchUserSubscription(seekerId, 'property_seeker');
+            
+            setUser({
+              id: userData.id,
+              email: userData.email,
+              name: userData.name,
+              user_type: 'property_seeker',
+              profile: {
+                id: userData.id,
+                user_id: userData.user_id,
+                name: userData.name,
+                slug: userData.slug,
+                status: userData.status
+              },
+              subscription: subscription || null
+            });
+          } else {
+            console.error('Auth failure - Property seeker profile not found');
+            localStorage.removeItem('property_seeker_token');
+            setPropertySeekerToken('');
+            setUser(null);
+            if (typeof window !== 'undefined') {
+              if (handleAuthFailure) {
+                handleAuthFailure('/home/signin');
+              } else {
+                window.location.href = '/home/signin';
+              }
+            }
+            return;
+          }
+        } else {
+          console.error('Auth failure - Invalid property seeker token');
+          localStorage.removeItem('property_seeker_token');
+          setPropertySeekerToken('');
           setUser(null);
           if (handleAuthFailure) {
             handleAuthFailure('/home/signin');
@@ -1037,6 +1072,7 @@ export const AuthProvider = ({ children }) => {
             // Add subscription to user object
             const userWithSubscription = {
               ...data.user,
+              name: data.user.profile?.name || data.user.name,
               subscription: subscription || null
             };
             
@@ -1045,7 +1081,7 @@ export const AuthProvider = ({ children }) => {
             posthog.identify(data.user.id, {
               email: data.user.email,
               user_type: data.user.user_type,
-              name: data.user.profile?.name,
+              name: userWithSubscription.name,
               agent_id: data.user.profile?.agent_id
             });
             

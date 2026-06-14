@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Filters from '@/app/components/users/Filters'
 import SearchProperties from '@/app/components/users/SearchProperties'
+import ExplorePropertiesToolbar from '@/app/components/users/ExplorePropertiesToolbar'
 import dynamic from 'next/dynamic'
 
 // Dynamically import UserMap to avoid SSR issues
@@ -25,6 +26,7 @@ const ExplorePropertiesContent = () => {
   const searchParams = useSearchParams();
   const [filters, setFilters] = useState({});
   const [showFiltersModal, setShowFiltersModal] = useState(false);
+  const [viewMode, setViewMode] = useState('map');
 
   // Track URL updates to prevent reset loops
   const isUpdatingUrlRef = useRef(false);
@@ -184,37 +186,75 @@ const ExplorePropertiesContent = () => {
     }, 300);
   };
 
-  return (
-    <div className='w-full h-full overflow-y-scroll'>
-      {/* Mobile/Tablet Filter Button */}
-      <button
-        onClick={() => setShowFiltersModal(true)}
-        className="lg:hidden fixed top-4 left-4 z-[1001] bg-primary_color text-white p-3 rounded-full shadow-lg hover:bg-primary_color/90 transition-colors"
-        aria-label="Open filters"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-        </svg>
-      </button>
+  const overlayToolbar = (
+    <div
+      className={`flex absolute top-4 z-[1001] justify-center pointer-events-none pl-4 pr-14 md:px-4 ${
+        viewMode === 'map'
+          ? 'left-0 right-0 lg:left-[350px] lg:right-[500px]'
+          : 'left-0 right-0 lg:left-[350px]'
+      }`}
+    >
+      <div className="pointer-events-auto w-full flex justify-center">
+        <div className="w-full max-w-2xl bg-white/95 backdrop-blur-md rounded-full shadow-lg border border-primary_color/10 px-2.5 py-1.5 md:px-3 md:py-2">
+          <ExplorePropertiesToolbar
+            onOpenFilters={() => setShowFiltersModal(true)}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            variant="overlay"
+          />
+        </div>
+      </div>
+    </div>
+  );
 
+  return (
+    <div className='w-full h-full overflow-y-scroll max-md:mt-[4em]'>
       <div className='relative auto'>
         {/* Desktop - Left side - Filters (lg and above) */}
         <div className='hidden lg:block z-1000 absolute top-0 left-0 border border-primary_color/10 max-w-[350px] w-full h-[calc(100vh-6rem)]'>
           <Filters onChange={handleFiltersChange} initial={filters} />
         </div>
 
-        {/* Center - Map */}
-        <UserMap filters={filters} leadAttributionContext="explore" />
+        {viewMode === 'map' ? (
+          <>
+            {overlayToolbar}
 
-        {/* Desktop - Right side - Search Properties (lg and above) */}
-        <div className='hidden lg:block absolute bg-white/20 backdrop-blur-sm z-1000 top-0 bottom-0 border border-primary_color/10 max-w-[500px] right-0 w-full h-screen overflow-hidden'>
-          <SearchProperties filters={filters} leadAttributionContext="explore" />
-        </div>
+            {/* Center - Map */}
+            <UserMap filters={filters} leadAttributionContext="explore" />
 
-        {/* Mobile/Tablet - Bottom overlay Search Properties (50% height) */}
-        <div className='lg:hidden absolute bottom-0 left-0 right-0 z-[999] bg-white/95 backdrop-blur-sm border-t border-primary_color/10' style={{ height: '50%' }}>
-          <SearchProperties filters={filters} leadAttributionContext="explore" />
-        </div>
+            {/* Desktop - Right side - Search Properties (lg and above) */}
+            <div className='hidden lg:block absolute bg-white/20 backdrop-blur-sm z-1000 top-0 bottom-0 border border-primary_color/10 max-w-[500px] right-0 w-full h-screen overflow-hidden'>
+              <SearchProperties
+                filters={filters}
+                leadAttributionContext="explore"
+                variant="panel"
+              />
+            </div>
+
+            {/* Mobile/Tablet - Bottom overlay Search Properties (50% height) */}
+            <div className='lg:hidden absolute bottom-0 left-0 right-0 z-[999] bg-white/95 backdrop-blur-sm border-t border-primary_color/10' style={{ height: '50%' }}>
+              <SearchProperties
+                filters={filters}
+                leadAttributionContext="explore"
+                variant="panel"
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            {/* List view - full-width property grid */}
+            <div className='relative w-full lg:pl-[350px] h-[calc(100vh-6rem)] lg:h-screen bg-white/95 backdrop-blur-sm border border-primary_color/10 overflow-hidden'>
+              {overlayToolbar}
+              <div className="h-full pt-[4.5rem]">
+                <SearchProperties
+                  filters={filters}
+                  leadAttributionContext="explore"
+                  variant="full"
+                />
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Mobile/Tablet Filters Modal */}

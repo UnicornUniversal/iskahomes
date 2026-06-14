@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import {
+  APPROVED_ADMIN_STATUS,
+  getApprovedDeveloperIds
+} from '@/lib/publicDevelopmentsHelper'
 
 export async function GET(request) {
   try {
@@ -90,19 +94,28 @@ export async function GET(request) {
     }
 
     if (shouldSearchDevelopments) {
-      const { data: developments, error } = await supabase
-        .from('developments')
-        .select('country, state, city, town')
-        .eq('development_status', 'active')
-        .or(`country.ilike.%${searchTerm}%,state.ilike.%${searchTerm}%,city.ilike.%${searchTerm}%,town.ilike.%${searchTerm}%,full_address.ilike.%${searchTerm}%`)
-        .limit(100)
+      const approvedDeveloperIds = await getApprovedDeveloperIds()
+      let developments = []
 
-      if (error) {
-        console.error('Error searching development locations:', error)
-        return NextResponse.json(
-          { error: 'Failed to search locations', details: error.message },
-          { status: 500 }
-        )
+      if (approvedDeveloperIds.length > 0) {
+        const { data: developmentRows, error } = await supabase
+          .from('developments')
+          .select('country, state, city, town')
+          .eq('development_status', 'active')
+          .eq('admin_status', APPROVED_ADMIN_STATUS)
+          .in('developer_id', approvedDeveloperIds)
+          .or(`country.ilike.%${searchTerm}%,state.ilike.%${searchTerm}%,city.ilike.%${searchTerm}%,town.ilike.%${searchTerm}%,full_address.ilike.%${searchTerm}%`)
+          .limit(100)
+
+        if (error) {
+          console.error('Error searching development locations:', error)
+          return NextResponse.json(
+            { error: 'Failed to search locations', details: error.message },
+            { status: 500 }
+          )
+        }
+
+        developments = developmentRows || []
       }
 
       addLocationsToMap(developments)

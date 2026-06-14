@@ -141,9 +141,13 @@ export async function GET(request) {
     let query = supabase
       .from('leads')
       .select('id, seeker_id, lead_actions, first_action_date, last_action_date, total_actions')
-      .eq('lister_id', finalListerId)
-      .eq('lister_type', listerType)
       .not('seeker_id', 'is', null) // Only leads with seeker_id
+
+    if (listerType === 'agency') {
+      query = query.eq('agency_id', finalListerId)
+    } else {
+      query = query.eq('lister_id', finalListerId).eq('lister_type', listerType)
+    }
 
     // If listingId is provided, filter by that specific listing
     // If not provided, show ALL leads (aggregate across all listings + profile-level leads)

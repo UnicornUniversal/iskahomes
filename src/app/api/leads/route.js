@@ -88,7 +88,14 @@ export async function GET(request) {
     }
 
     const isSuperAdmin = userInfo?.permissions === null || /super\s*admin/i.test(String(roleName))
-    const effectiveAssignedUser = isSuperAdmin ? (assignedUserFilter || null) : userInfo.user_id
+    const agentOwnsLister =
+      userInfo?.user_type === 'agent' &&
+      listerType === 'agent' &&
+      listerId &&
+      (listerId === userInfo.agent_id || listerId === userInfo.user_id)
+    const effectiveAssignedUser = isSuperAdmin || agentOwnsLister
+      ? assignedUserFilter || null
+      : userInfo.user_id
     const auditActorId = userInfo.user_id || listerId || 'unknown'
 
     if (!listerId && !effectiveAssignedUser) {
@@ -118,44 +125,6 @@ export async function GET(request) {
       }
     }
 
-    // Build query for leads
-    let query = supabaseAdmin
-      .from('leads')
-      .select(`
-        id,
-        listing_id,
-        lister_id,
-        lister_type,
-        seeker_id,
-        lead_actions,
-        total_actions,
-        first_action_date,
-        last_action_date,
-        last_action_type,
-        status,
-        notes,
-        created_at,
-        updated_at,
-        context_type
-      `)
-      .eq('lister_id', finalListerId)
-      .eq('lister_type', listerType)
-      .not('seeker_id', 'is', null) // Only leads with seeker_id
-      .or('is_anonymous.is.null,is_anonymous.eq.false') // Exclude anonymous leads (only get non-anonymous leads)
-
-    // Filter by listing_id if provided
-    if (listingId) {
-      query = query.eq('listing_id', listingId)
-    } else {
-      // Only get listing-based leads (listing_id is not null)
-      query = query.not('listing_id', 'is', null)
-    }
-
-    // Filter by status if provided
-    if (status) {
-      query = query.eq('status', status)
-    }
-
     // Fetch ALL leads (no pagination yet - we'll group first)
     // We need all records to properly group by (seeker_id, listing_id)
     // IMPORTANT: Exclude anonymous/unknown seekers - only get leads with user IDs (non-anonymous)
@@ -167,6 +136,7 @@ export async function GET(request) {
         development_id,
         lister_id,
         lister_type,
+        agency_id,
         seeker_id,
         is_anonymous,
         lead_name,
@@ -190,10 +160,14 @@ export async function GET(request) {
         updated_at,
         context_type
       `)
-      .eq('lister_type', listerType)
 
-    if (finalListerId) {
+    if (listerType === 'agency' && finalListerId) {
+      dataQuery = dataQuery.eq('agency_id', finalListerId)
+    } else if (finalListerId) {
+      dataQuery = dataQuery.eq('lister_type', listerType)
       dataQuery = dataQuery.eq('lister_id', finalListerId)
+    } else {
+      dataQuery = dataQuery.eq('lister_type', listerType)
     }
     if (effectiveAssignedUser) {
       dataQuery = dataQuery.eq('assigned_user', effectiveAssignedUser)
@@ -202,6 +176,7 @@ export async function GET(request) {
     console.log('🔍 Query filters:', {
       lister_id: finalListerId || 'not_provided',
       lister_type: listerType,
+      agency_id: listerType === 'agency' ? (finalListerId || 'not_provided') : null,
       assigned_user: effectiveAssignedUser || 'all',
       listing_id: listingId || 'all listing-based leads'
     })
@@ -623,6 +598,7 @@ export async function GET(request) {
         listing_country: listing?.country || null,
         lister_id: lead.lister_id,
         lister_type: lead.lister_type,
+        agency_id: lead.agency_id || null,
         seeker_id: lead.seeker_id,
         seeker_name: displayName,
         seeker_email: displayEmail,

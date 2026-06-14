@@ -2,17 +2,20 @@
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import useExtendedAuthProfile from '@/hooks/useExtendedAuthProfile'
 import { Users, TrendingUp, DollarSign, Loader2, MapPin } from 'lucide-react'
 import Link from 'next/link'
 import { formatCurrency } from '@/lib/utils'
 
 const TopAgents = ({ limit = 7, agencyId = null }) => {
   const { user } = useAuth()
+  const { extendedProfile } = useExtendedAuthProfile()
+  const profile = extendedProfile || user?.profile || {}
   const [agents, setAgents] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Use provided agencyId or fall back to auth user
-  const accountId = agencyId || user?.profile?.agency_id || user?.id
+  const accountId = agencyId || profile?.agency_id || user?.id
 
   useEffect(() => {
     if (!accountId) {
@@ -74,9 +77,9 @@ const TopAgents = ({ limit = 7, agencyId = null }) => {
   }
 
   const getCurrency = () => {
-    if (!user?.profile?.company_locations) return 'GHS'
+    if (!profile?.company_locations) return 'GHS'
     
-    let locations = user.profile.company_locations
+    let locations = profile.company_locations
     if (typeof locations === 'string') {
       try {
         locations = JSON.parse(locations)

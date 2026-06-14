@@ -70,7 +70,7 @@ const page = () => {
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
   
   // Filter visibility - default to true on desktop, false on mobile
-  const [showFilters, setShowFilters] = useState(true)
+  const [showFilters, setShowFilters] = useState(false)
 
   // Debug user object
   useEffect(() => {

@@ -1043,7 +1043,7 @@ const ProfilePage = () => {
                 className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all duration-200 ${
                   activeTab === tab.id
                     ? 'secondary_button'
-                    : 'hover:secondary_button'
+                    : 'text-primary_color hover:secondary_button'
                 }`}
               >
                 <tab.icon className="w-4 h-4" />
@@ -1057,7 +1057,7 @@ const ProfilePage = () => {
         {activeTab === 'profile' && (
           <div className=" rounded-2xl shadow-sm border border-gray-100 text-primary_color overflow-hidden">
             {/* Cover Photo */}
-            <div className="relative h-80 bg-gradient-to-r from-primary_color to-blue-600 rounded-t-2xl overflow-hidden">
+            <div className="relative h-80 bg-white rounded-t-2xl overflow-hidden">
               {formData.cover_image ? (
                 <img
                   src={formData.cover_image instanceof File ? URL.createObjectURL(formData.cover_image) : (typeof formData.cover_image === 'object' ? formData.cover_image.url : formData.cover_image)}
@@ -1065,16 +1065,16 @@ const ProfilePage = () => {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="text-center !text-white">
+                <div className="w-full h-full flex items-center justify-center pointer-events-none">
+                  <div className="text-center text-primary_color">
                     <FiCamera className="w-16 h-16 mx-auto mb-4" />
                     <p className="text-xl font-medium">Set Cover Image</p>
                     <p className="text-sm opacity-80">Upload a cover photo for your profile</p>
                   </div>
                 </div>
               )}
-              <label className="absolute top-4 right-4 /90 backdrop-blur-sm rounded-lg p-2 cursor-pointer shadow-lg hover: transition-colors z-10">
-                <FiCamera className="w-4 h-4 " />
+              <label className="absolute top-4 right-4 bg-white rounded-lg p-2 cursor-pointer shadow-lg hover:bg-gray-50 transition-colors z-10">
+                <FiCamera className="w-4 h-4 text-primary_color" />
                 <input
                   type="file"
                   accept="image/*"
@@ -1096,15 +1096,15 @@ const ProfilePage = () => {
                         className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
                       />
                     ) : (
-                      <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center">
-                        <div className="text-center text-white">
+                      <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg bg-white flex items-center justify-center">
+                        <div className="text-center text-primary_color">
                           <FiUser className="w-8 h-8 mx-auto mb-1 opacity-70" />
                           <p className="text-xs font-medium">Set Profile Photo</p>
                         </div>
                       </div>
                     )}
-                    <label className="absolute bottom-0 right-0 bg-white  rounded-full p-2 cursor-pointer shadow-lg hover: transition-colors">
-                      <FiCamera className="w-4 h-4 text-gray-600" />
+                    <label className="absolute bottom-0 right-0 bg-white rounded-full p-2 cursor-pointer shadow-lg hover:bg-gray-50 transition-colors">
+                      <FiCamera className="w-4 h-4 text-primary_color" />
                       <input
                         type="file"
                         accept="image/*"

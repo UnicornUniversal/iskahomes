@@ -3,9 +3,12 @@
 import React, { useState, useMemo } from 'react'
 import { FiX, FiMail, FiPhone, FiUser, FiMapPin, FiLoader, FiCheckCircle, FiAlertCircle } from 'react-icons/fi'
 import { useAuth } from '@/contexts/AuthContext'
+import useExtendedAuthProfile from '@/hooks/useExtendedAuthProfile'
 
 const AddAgentModal = ({ isOpen, onClose, onAdd }) => {
   const { user } = useAuth()
+  const { extendedProfile } = useExtendedAuthProfile()
+  const profile = extendedProfile || user?.profile || {}
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -18,9 +21,9 @@ const AddAgentModal = ({ isOpen, onClose, onAdd }) => {
 
   // Get company locations from user profile
   const companyLocations = useMemo(() => {
-    if (!user?.profile?.company_locations) return []
+    if (!profile?.company_locations) return []
     
-    let locations = user.profile.company_locations
+    let locations = profile.company_locations
     if (typeof locations === 'string') {
       try {
         locations = JSON.parse(locations)
@@ -30,7 +33,7 @@ const AddAgentModal = ({ isOpen, onClose, onAdd }) => {
     }
     
     return Array.isArray(locations) ? locations : []
-  }, [user?.profile?.company_locations])
+  }, [profile?.company_locations])
 
   const handleChange = (e) => {
     const { name, value } = e.target

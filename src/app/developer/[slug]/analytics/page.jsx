@@ -21,6 +21,7 @@ import {
 import { DateRangePicker } from '@/app/components/ui/date-range-picker'
 import { ExportDropdown } from '@/app/components/ui/export-dropdown'
 import { useAuth } from '@/contexts/AuthContext'
+import useExtendedAuthProfile from '@/hooks/useExtendedAuthProfile'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -49,6 +50,8 @@ ChartJS.register(
 const AnalyticsOverview = () => {
   const params = useParams()
   const { user } = useAuth()
+  const { extendedProfile } = useExtendedAuthProfile()
+  const profile = extendedProfile || user?.profile || {}
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
   
@@ -66,16 +69,16 @@ const AnalyticsOverview = () => {
   const [dateRange, setDateRange] = useState(defaultRange)
 
   // Get real data from user profile - use unique_leads + anonymous_leads instead of total_leads
-  const totalViews = user?.profile?.total_views || 0
-  const totalUniqueLeads = user?.profile?.total_unique_leads || 0 // Aggregate across all contexts
-  const totalAnonymousLeads = user?.profile?.total_anonymous_leads || 0 // Aggregate across all contexts
+  const totalViews = profile?.total_views || 0
+  const totalUniqueLeads = profile?.total_unique_leads || 0 // Aggregate across all contexts
+  const totalAnonymousLeads = profile?.total_anonymous_leads || 0 // Aggregate across all contexts
   const totalLeads = totalUniqueLeads + totalAnonymousLeads // Total unique individuals
   // Fallback to profile-specific if aggregate not available
-  const profileUniqueLeads = user?.profile?.unique_leads || 0
-  const profileAnonymousLeads = user?.profile?.anonymous_leads || 0
+  const profileUniqueLeads = profile?.unique_leads || 0
+  const profileAnonymousLeads = profile?.anonymous_leads || 0
   const profileTotalLeads = profileUniqueLeads + profileAnonymousLeads
-  const finalTotalLeads = totalLeads > 0 ? totalLeads : (profileTotalLeads > 0 ? profileTotalLeads : (user?.profile?.total_leads || 0))
-  const totalImpressions = user?.profile?.total_impressions || 0
+  const finalTotalLeads = totalLeads > 0 ? totalLeads : (profileTotalLeads > 0 ? profileTotalLeads : (profile?.total_leads || 0))
+  const totalImpressions = profile?.total_impressions || 0
   const conversionRate = totalViews > 0 ? ((finalTotalLeads / totalViews) * 100) : 0
 
   // Dummy analytics data based on development_analytics schema (for charts and other metrics)

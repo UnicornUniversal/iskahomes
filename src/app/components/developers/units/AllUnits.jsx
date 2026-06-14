@@ -79,7 +79,7 @@ import {
   // Filter visibility for mobile/tablet
   const [showFilters, setShowFilters] = useState(false)
   // Filter visibility for desktop
-  const [showDesktopFilters, setShowDesktopFilters] = useState(true)
+  const [showDesktopFilters, setShowDesktopFilters] = useState(false)
 
   // Use cached categorization data
   const { data: purposesData = [], loading: purposesLoading } = usePropertyPurposes()
@@ -531,7 +531,7 @@ import {
 
   if (loading) {
     return (
-      <div className="w-full p-6">
+      <div className="w-full min-w-0">
         <div className="w-full flex justify-between items-center mb-6">
           <h1 className=" font-bold ">{pageTitle}</h1>
           {!isAgency && canCreate && (
@@ -557,7 +557,7 @@ import {
 
   if (error) {
     return (
-      <div className="w-full p-6">
+      <div className="w-full min-w-0">
         <div className="w-full flex justify-between items-center mb-6">
           <h1 className="">{pageTitle}</h1>
           {!isAgency && canCreate && (
@@ -591,12 +591,14 @@ import {
   }
 
   return (
-    <div className="w-full p-6">
+    <div className="w-full min-w-0">
       {/* Header - Full Width */}
-      <div className="w-full flex justify-between items-center flex-wrap gap-4 mb-6">
-        <div>
+      <div className="w-full flex justify-between items-start sm:items-center flex-wrap gap-4 mb-6">
+        <div className="min-w-0 flex-1">
           <p>Manage all your</p>
-          <h1 className="text-[4em]">Listings {itemLabelPlural}</h1>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-primary_color leading-tight">
+            Listings {itemLabelPlural}
+          </h1>
           <p className="mt-1">
             Showing {filteredUnits.length} of {units.length} {units.length === 1 ? itemLabel.toLowerCase() : itemLabelPlural.toLowerCase()}
           </p>
@@ -605,7 +607,7 @@ import {
         {!isAgency && canCreate && (
           <button 
             onClick={handleAddUnit}
-            className="primary_button transition-colors flex items-center gap-2"
+            className="primary_button transition-colors flex items-center gap-2 flex-shrink-0"
           >
             <Plus className="w-4 h-4" />
             {addButtonLabel}
