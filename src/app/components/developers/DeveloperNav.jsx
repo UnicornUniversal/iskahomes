@@ -27,7 +27,8 @@ import {
     FiChevronLeft,
     FiChevronUp,
     FiShield,
-    FiActivity
+    FiActivity,
+    FiGitBranch
 } from 'react-icons/fi'
 import Link from 'next/link'
 
@@ -35,7 +36,7 @@ const DeveloperNav = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const [isCollapsed, setIsCollapsed] = useState(true)
     const [isMobile, setIsMobile] = useState(false)
-    const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false)
+    const [openSubmenus, setOpenSubmenus] = useState({ Analytics: false, Leads: false })
     const [isLoggingOut, setIsLoggingOut] = useState(false)
     const [isClient, setIsClient] = useState(false)
     const pathname = usePathname()
@@ -95,7 +96,22 @@ const DeveloperNav = () => {
             label: 'Leads',
             href: `/developer/${developerSlug}/leads`,
             icon: FiUsers,
-            permission: 'leads'
+            hasSubmenu: true,
+            permission: 'leads',
+            submenu: [
+                {
+                    label: 'Lead Management',
+                    href: `/developer/${developerSlug}/leads`,
+                    icon: FiUsers,
+                    permission: 'leads.view',
+                },
+                {
+                    label: 'Leads Pipeline',
+                    href: `/developer/${developerSlug}/leads/leadsPipeline`,
+                    icon: FiGitBranch,
+                    permission: 'leads.update_status',
+                },
+            ],
         },
         {
             label: 'Clients',
@@ -205,15 +221,14 @@ const DeveloperNav = () => {
             // Check main route permission
             if (!canAccess(item.permission)) return false
             
-            // Filter submenu items if it's analytics
+            // Filter submenu items (Analytics, Leads, etc.)
             if (item.hasSubmenu && item.submenu) {
-                item.submenu = item.submenu.filter(subItem => {
+                item.submenu = item.submenu.filter((subItem) => {
                     if (subItem.permission) {
                         return userHasPermission(user, subItem.permission)
                     }
                     return true
                 })
-                // Only show analytics if it has at least one submenu item
                 return item.submenu.length > 0
             }
             
@@ -245,8 +260,19 @@ const DeveloperNav = () => {
         }
     }
 
-    const toggleAnalytics = () => {
-        setIsAnalyticsOpen(!isAnalyticsOpen)
+    const toggleSubmenu = (label) => {
+        setOpenSubmenus((prev) => ({ ...prev, [label]: !prev[label] }))
+    }
+
+    const getSubmenuPathPrefix = (label) => {
+        if (label === 'Analytics') return `/developer/${developerSlug}/analytics`
+        if (label === 'Leads') return `/developer/${developerSlug}/leads`
+        return ''
+    }
+
+    const isSubmenuSectionActive = (label) => {
+        const prefix = getSubmenuPathPrefix(label)
+        return prefix ? pathname.startsWith(prefix) : false
     }
 
     const handleLogout = async () => {
@@ -316,15 +342,15 @@ const DeveloperNav = () => {
         }
     }
 
-    // Check if any analytics submenu item is active
-    const isAnalyticsActive = pathname.startsWith(`/developer/${developerSlug}/analytics`)
-
-    // Auto-open analytics submenu when on analytics pages
+    // Auto-open submenu sections when on matching routes
     useEffect(() => {
-        if (isAnalyticsActive) {
-            setIsAnalyticsOpen(true)
+        if (isSubmenuSectionActive('Analytics')) {
+            setOpenSubmenus((prev) => ({ ...prev, Analytics: true }))
         }
-    }, [isAnalyticsActive])
+        if (isSubmenuSectionActive('Leads')) {
+            setOpenSubmenus((prev) => ({ ...prev, Leads: true }))
+        }
+    }, [pathname, developerSlug])
 
     // Update CSS custom property for navigation width
     useEffect(() => {
@@ -422,7 +448,9 @@ const DeveloperNav = () => {
                         const IconComponent = item.icon
                         // Check if current pathname matches this nav item
                         const isActive = pathname === item.href
-                        const isAnalyticsItem = item.hasSubmenu && item.label === 'Analytics'
+                        const hasSubmenu = item.hasSubmenu && item.submenu?.length > 0
+                        const isSubmenuOpen = openSubmenus[item.label]
+                        const isSubmenuActive = hasSubmenu && isSubmenuSectionActive(item.label)
                         const isLogoutItem = item.isLogout
                         
                         return (
@@ -448,35 +476,35 @@ const DeveloperNav = () => {
                                             </span>
                                         )}
                                     </button>
-                                ) : isAnalyticsItem ? (
+                                ) : hasSubmenu ? (
                                     <button
-                                        onClick={toggleAnalytics}
+                                        type="button"
+                                        onClick={() => toggleSubmenu(item.label)}
                                         className={`group relative text-[0.8em] flex items-center ${isCollapsed ? 'justify-center px-2' : 'space-x-3 px-4'} w-full py-3 rounded-xl transition-all duration-300 ease-in-out transform hover:scale-105 ${
-                                            isAnalyticsActive
+                                            isSubmenuActive
                                                 ? 'bg-primary_color text-white shadow-lg shadow-primary_color/25 border-l-4 border-white'
                                                 : 'text-gray-600 hover:text-primary_color hover:bg-white hover:shadow-md'
                                         }`}
                                         title={isCollapsed ? item.label : undefined}
                                     >
-                                        {/* Active indicator */}
-                                        {isAnalyticsActive && (
+                                        {isSubmenuActive && (
                                             <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-white rounded-r-full animate-pulse"></div>
                                         )}
                                         
                                         {/* Active background glow */}
-                                        {isAnalyticsActive && (
+                                        {isSubmenuActive && (
                                             <div className="absolute inset-0 bg-gradient-to-r from-primary_color/20 to-transparent rounded-xl"></div>
                                         )}
                                         
                                         {/* Icon */}
                                         <div className={`flex-shrink-0 transition-all duration-300 relative z-10 ${
-                                            isAnalyticsActive 
+                                            isSubmenuActive 
                                                 ? 'text-white' 
                                                 : 'text-gray-400 group-hover:text-primary_color'
                                         }`}>
                                             {IconComponent && (
                                                 <IconComponent className={`w-5 h-5 transition-all duration-300 ${
-                                                    isAnalyticsActive ? 'scale-110' : 'group-hover:scale-105'
+                                                    isSubmenuActive ? 'scale-110' : 'group-hover:scale-105'
                                                 }`} />
                                             )}
                                         </div>
@@ -484,7 +512,7 @@ const DeveloperNav = () => {
                                         {/* Label */}
                                         {!isCollapsed && (
                                             <span className={`font-medium transition-all duration-300 relative z-10 ${
-                                                isAnalyticsActive 
+                                                isSubmenuActive 
                                                     ? 'text-white font-semibold' 
                                                     : 'text-gray-700 group-hover:text-primary_color'
                                             }`}>
@@ -495,9 +523,9 @@ const DeveloperNav = () => {
                                         {/* Chevron Icon */}
                                         {!isCollapsed && (
                                             <div className={`ml-auto transition-all duration-300 ${
-                                                isAnalyticsActive ? 'text-white' : 'text-gray-400'
+                                                isSubmenuActive ? 'text-white' : 'text-gray-400'
                                             }`}>
-                                                {isAnalyticsOpen ? (
+                                                {isSubmenuOpen ? (
                                                     <FiChevronDown className="w-4 h-4" />
                                                 ) : (
                                                     <FiChevronRight className="w-4 h-4" />
@@ -506,7 +534,7 @@ const DeveloperNav = () => {
                                         )}
                                         
                                         {/* Hover effect */}
-                                        {!isAnalyticsActive && (
+                                        {!isSubmenuActive && (
                                             <div className="absolute inset-0 bg-gradient-to-r from-primary_color/5 to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                                         )}
                                     </button>
@@ -562,20 +590,31 @@ const DeveloperNav = () => {
                                     </a>
                                 )}
 
-                                {/* Analytics Submenu */}
-                                {isAnalyticsItem && isAnalyticsOpen && !isCollapsed && (
+                                {/* Submenu (Analytics, Leads, etc.) */}
+                                {hasSubmenu && isSubmenuOpen && !isCollapsed && (
                                     <div className="ml-6 mt-2 space-y-1">
                                         {item.submenu.map((subItem, subIndex) => {
                                             const SubIconComponent = subItem.icon
-                                            const isSubActive = pathname === subItem.href
-                                            
+                                            const leadsBase = `/developer/${developerSlug}/leads`
+                                            const pipelineHref = `${leadsBase}/leadsPipeline`
+                                            let isSubActive = pathname === subItem.href
+                                            if (subItem.href === leadsBase) {
+                                                isSubActive =
+                                                    pathname === leadsBase ||
+                                                    (pathname.startsWith(`${leadsBase}/`) &&
+                                                        !pathname.startsWith(pipelineHref))
+                                            } else if (subItem.href === pipelineHref) {
+                                                isSubActive =
+                                                    pathname === pipelineHref ||
+                                                    pathname.startsWith(`${pipelineHref}/`)
+                                            }
+
                                             return (
                                                 <a
                                                     key={subIndex}
                                                     href={subItem.href}
                                                     onClick={() => {
                                                         setIsMobileMenuOpen(false)
-                                                        setIsAnalyticsOpen(false)
                                                     }}
                                                     className={`group relative text-[0.75em] flex items-center space-x-3 px-4 py-2 rounded-lg transition-all duration-300 ease-in-out transform hover:scale-105 ${
                                                         isSubActive

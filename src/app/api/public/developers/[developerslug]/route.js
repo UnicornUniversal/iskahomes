@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { APPROVED_ADMIN_STATUS } from '@/lib/publicDevelopmentsHelper'
 
 export async function GET(request, { params }) {
   try {
@@ -55,6 +56,7 @@ export async function GET(request, { params }) {
       `)
       .eq('slug', developerslug)
       .eq('account_status', 'active')
+      .eq('admin_status', APPROVED_ADMIN_STATUS)
       .single()
 
     if (developerError) {
@@ -122,6 +124,7 @@ export async function GET(request, { params }) {
       `)
       .eq('developer_id', developer.developer_id)
       .eq('development_status', 'active')
+      .eq('admin_status', APPROVED_ADMIN_STATUS)
       .order('created_at', { ascending: false })
 
     if (developmentsError) {

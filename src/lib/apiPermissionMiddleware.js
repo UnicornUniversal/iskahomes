@@ -133,21 +133,23 @@ export const getUserFromToken = async (token) => {
 
     // Agent: JWT user_id is the same as agents.agent_id and listings.user_id
     if (decoded.user_type === 'agent') {
+      const agentLookupId = decoded.agent_id || decoded.user_id
       const { data: agent, error } = await supabaseAdmin
         .from('agents')
         .select('id, agent_id')
-        .eq('agent_id', decoded.user_id)
+        .eq('agent_id', agentLookupId)
         .eq('account_status', 'active')
         .maybeSingle()
 
       if (error || !agent) return null
 
       return {
-        user_id: decoded.user_id,
+        user_id: agent.agent_id,
         user_type: 'agent',
         organization_type: 'agent',
         organization_id: agent.id,
-        agent_id: agent.agent_id
+        agent_id: agent.agent_id,
+        permissions: null,
       }
     }
 

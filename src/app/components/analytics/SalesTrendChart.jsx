@@ -58,9 +58,9 @@ const SalesTrendChart = React.memo(({ listerId, currency: propCurrency = 'USD', 
         date_from: dateRange.startDate,
         date_to: dateRange.endDate
       })
-      if (accountType === 'agency') {
+      if (accountType === 'agency' || accountType === 'agent') {
         params.append('user_id', listerId)
-        params.append('account_type', 'agency')
+        params.append('account_type', accountType)
       } else {
         params.append('slug', listerId)
       }
@@ -94,9 +94,9 @@ const SalesTrendChart = React.memo(({ listerId, currency: propCurrency = 'USD', 
         date_from: dateRange.startDate,
         date_to: dateRange.endDate
       })
-      if (accountType === 'agency') {
+      if (accountType === 'agency' || accountType === 'agent') {
         params.append('user_id', listerId)
-        params.append('account_type', 'agency')
+        params.append('account_type', accountType)
       } else {
         params.append('slug', listerId)
       }
@@ -223,7 +223,7 @@ const SalesTrendChart = React.memo(({ listerId, currency: propCurrency = 'USD', 
     return (
       <div className="default_bg rounded-lg shadow p-6">
         <div className="flex items-center flex-wrap justify-between mb-4 gap-4">
-          <h3 className="text-lg font-semibold text-gray-900">Sales Trend</h3>
+          <h3 className="text-lg font-semibold text-primary_color">Sales Trend</h3>
           <div className="flex items-center gap-2">
             <div className="w-[280px] h-10 bg-gray-100 animate-pulse rounded-lg" />
             <div className="w-24 h-10 bg-gray-100 animate-pulse rounded-lg" />
@@ -239,7 +239,7 @@ const SalesTrendChart = React.memo(({ listerId, currency: propCurrency = 'USD', 
   return (
     <div className="default_bg rounded-lg shadow p-6">
       <div className="flex items-center flex-wrap justify-between mb-4 gap-4">
-        <h3 className="text-lg font-semibold text-gray-900">Sales Trend</h3>
+        <h3 className="text-lg font-semibold text-primary_color">Sales Trend</h3>
         <div className="flex items-center gap-2">
           <DateRangePicker
             startDate={dateRange.startDate}

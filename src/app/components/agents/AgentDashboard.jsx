@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useMemo } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useParams } from 'next/navigation'
+import useAgentProfile from '@/hooks/useAgentProfile'
 import { MapPin, DollarSign, TrendingUp, Users, Eye } from 'lucide-react'
 import DataCard from '@/app/components/developers/DataCard'
 import LatestLeads from '@/app/components/developers/DataStats/LatestLeads'
@@ -20,84 +20,12 @@ const formatNumber = (num) => {
 }
 
 const AgentDashboard = () => {
-  const { user, agentToken } = useAuth()
-  const params = useParams()
-  const slug = params.slug || ''
-  
-  const [agent, setAgent] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const { user } = useAuth()
+  const { agent, loading } = useAgentProfile()
 
-  // Get currency from agency profile
   const currency = useMemo(() => {
-    if (!agent?.location_data?.currency) {
-      // Try to get from agency
-      if (user?.profile?.company_locations) {
-        let locations = user.profile.company_locations
-        if (typeof locations === 'string') {
-          try {
-            locations = JSON.parse(locations)
-          } catch (e) {
-            return 'GHS'
-          }
-        }
-        
-        if (Array.isArray(locations)) {
-          const primaryLocation = locations.find(loc => loc.primary_location === true)
-          if (primaryLocation?.currency) {
-            return primaryLocation.currency
-          }
-        }
-      }
-      return 'GHS'
-    }
-    return agent.location_data.currency
-  }, [agent, user?.profile?.company_locations])
-
-  useEffect(() => {
-    if (!user?.id) {
-      setLoading(false)
-      return
-    }
-
-    let isMounted = true
-
-    const fetchAgentProfile = async () => {
-      try {
-        setLoading(true)
-        const token = user?.token || agentToken
-        
-        if (!token) {
-          setLoading(false)
-          return
-        }
-
-        const response = await fetch('/api/agents/profile', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-
-        if (response.ok) {
-          const result = await response.json()
-          if (isMounted && result.success) {
-            setAgent(result.data)
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching agent profile:', error)
-      } finally {
-        if (isMounted) {
-          setLoading(false)
-        }
-      }
-    }
-
-    fetchAgentProfile()
-
-    return () => {
-      isMounted = false
-    }
-  }, [user?.id, user?.token, agentToken])
+    return agent?.location_data?.currency || 'GHS'
+  }, [agent?.location_data?.currency])
 
   // Get values from agent profile
   const totalProperties = agent?.total_listings ?? 0

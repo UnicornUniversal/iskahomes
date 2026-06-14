@@ -11,7 +11,8 @@ import HomeCategories from "./components/general/HomeCategories";
 import Nav from "./components/Nav";
 import Footer from "./components/Footer";
 import WhyIskaHomes from "./components/general/WhyIskaHomes";
-import MeetDevelopers from "./components/general/MeetDevelopers";
+import FeaturedDevelopments from "./components/general/FeaturedDevelopments";
+import OurServices from "./components/general/OurServices";
 export default function Home() {
   return (
    <>
@@ -28,8 +29,9 @@ export default function Home() {
   <div className="w-full h-full flex flex-col gap-4">
   <HomeProperties />
   <HomeCategories />
-  <MeetDevelopers />
+  <OurServices />
     <DevelopmentHeaders />
+    <FeaturedDevelopments linkContext="homepage" />
   <WhyIskaHomes/>
   </div>
 {/*       

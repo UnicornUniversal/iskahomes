@@ -13,6 +13,7 @@ import { toast } from 'react-toastify'
 import AppointmentsList from './appointments/AppointmentsList'
 import AppointmentsCalendar from './appointments/AppointmentsCalendar'
 import EventModal from './appointments/EventModal'
+import DataCard from './DataCard'
 
 const Appointments = ({ accountId: propAccountId = null, accountType: propAccountType = 'developer', readOnly = false }) => {
   const { user, isAuthenticated } = useAuth()
@@ -222,7 +223,7 @@ const Appointments = ({ accountId: propAccountId = null, accountType: propAccoun
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
                 viewMode === 'list' 
                   ? 'bg-primary_color text-white shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  : 'text-primary_color hover:bg-primary_color/10'
               }`}
             >
               <FiList className="w-4 h-4" />
@@ -233,7 +234,7 @@ const Appointments = ({ accountId: propAccountId = null, accountType: propAccoun
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
                 viewMode === 'calendar' 
                   ? 'bg-primary_color text-white shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  : 'text-primary_color hover:bg-primary_color/10'
               }`}
             >
               <FiGrid className="w-4 h-4" />
@@ -246,22 +247,22 @@ const Appointments = ({ accountId: propAccountId = null, accountType: propAccoun
         <div className="bg-white/50 rounded-2xl p-6 mb-6 shadow-sm border border-gray-100">
           <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
             <div className="relative flex-1 max-w-md">
-              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary_color w-5 h-5" />
               <input
                 type="text"
                 placeholder="Search by client name or property..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200"
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-primary_color placeholder:text-primary_color/60 focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200"
               />
             </div>
 
             <div className="flex items-center gap-2">
-              <FiFilter className="text-gray-400 w-5 h-5" />
+              <FiFilter className="text-primary_color w-5 h-5" />
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200"
+                className="px-4 py-3 border border-gray-200 rounded-xl text-primary_color focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200"
               >
                 <option value="all">All Status</option>
                 <option value="pending">Pending</option>
@@ -276,22 +277,17 @@ const Appointments = ({ accountId: propAccountId = null, accountType: propAccoun
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {[
-            { label: 'Total Appointments', value: appointments.length, color: 'bg-blue-500' },
-            { label: 'Pending', value: appointments.filter(a => a.status === 'pending').length, color: 'bg-yellow-500' },
-            { label: 'Confirmed', value: appointments.filter(a => a.status === 'confirmed').length, color: 'bg-green-500' },
-            { label: 'Completed', value: appointments.filter(a => a.status === 'completed').length, color: 'bg-purple-500' }
+            { label: 'Total Appointments', value: appointments.length },
+            { label: 'Pending', value: appointments.filter(a => a.status === 'pending').length },
+            { label: 'Confirmed', value: appointments.filter(a => a.status === 'confirmed').length },
+            { label: 'Completed', value: appointments.filter(a => a.status === 'completed').length }
           ].map((stat, index) => (
-            <div key={index} className="bg-white/50 rounded-2xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-600 text-sm font-medium">{stat.label}</p>
-                  <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
-                </div>
-                <div className={`w-12 h-12 rounded-xl ${stat.color} flex items-center justify-center`}>
-                  <FiCalendar className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </div>
+            <DataCard
+              key={index}
+              title={stat.label}
+              value={stat.value.toLocaleString()}
+              icon={FiCalendar}
+            />
           ))}
         </div>
 

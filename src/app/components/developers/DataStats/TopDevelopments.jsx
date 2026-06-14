@@ -2,12 +2,15 @@
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import useExtendedAuthProfile from '@/hooks/useExtendedAuthProfile'
 import { Building2, Eye, TrendingUp, Loader2, Image as ImageIcon, MapPin } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 
 const TopDevelopments = () => {
   const { user } = useAuth()
+  const { extendedProfile } = useExtendedAuthProfile()
+  const profile = extendedProfile || user?.profile || {}
   const [developments, setDevelopments] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -15,7 +18,7 @@ const TopDevelopments = () => {
     // For team members, use organization_id; for developers, use developer_id
     const developerId = user?.user_type === 'team_member' 
       ? user?.profile?.organization_id 
-      : user?.profile?.developer_id
+      : profile?.developer_id
     
     if (!developerId) {
       setLoading(false)
@@ -47,14 +50,14 @@ const TopDevelopments = () => {
     return () => {
       isMounted = false
     }
-  }, [user?.profile?.developer_id])
+  }, [profile?.developer_id, user?.user_type, user?.profile?.organization_id])
 
   const getCurrency = () => {
-    if (!user?.profile) return 'GHS'
+    if (!profile) return 'GHS'
     
     // Get currency from primary location in company_locations
-    if (user.profile.company_locations && Array.isArray(user.profile.company_locations)) {
-      const primaryLocation = user.profile.company_locations.find(
+    if (profile.company_locations && Array.isArray(profile.company_locations)) {
+      const primaryLocation = profile.company_locations.find(
         loc => loc.primary_location === true
       )
       if (primaryLocation?.currency) {
@@ -63,8 +66,8 @@ const TopDevelopments = () => {
     }
     
     // Fallback to default_currency if primary location not found
-    if (user.profile.default_currency?.code) {
-      return user.profile.default_currency.code
+    if (profile.default_currency?.code) {
+      return profile.default_currency.code
     }
     
     return 'GHS' // Default fallback

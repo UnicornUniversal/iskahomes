@@ -55,7 +55,7 @@ const PropertyDetailPage = () => {
   const params = useParams()
   const router = useRouter()
   const { listing_type, slug, id } = params
-  const { user, propertySeekerToken } = useAuth()
+  const { user, propertySeekerToken, loading: authLoading } = useAuth()
   const analytics = useAnalytics()
 
   const [listing, setListing] = useState(null)
@@ -69,6 +69,13 @@ const PropertyDetailPage = () => {
   const [saving, setSaving] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
+  const canShowLeadContactForm = !authLoading && (!user || user.user_type === 'property_seeker')
+
+  useEffect(() => {
+    if (!canShowLeadContactForm && showContactModal) {
+      setShowContactModal(false)
+    }
+  }, [canShowLeadContactForm, showContactModal])
 
   useEffect(() => {
     const fetchListing = async () => {
@@ -1115,37 +1122,41 @@ const PropertyDetailPage = () => {
             </div>
 
             {/* Right Column - LeadContactForm - Only on XL devices */}
-            <div className="hidden xl:block xl:col-span-1">
-              <div className="sticky top-2">
-                <div className=" rounded-2xl  p-6">
-                  <LeadContactForm 
-                    contextType="listing"
-                    propertyId={listing?.id}
-                    propertyTitle={title}
-                    propertyType={listing_type}
-                    developer={developers}
-                    agent={agent}
-                    agency={agency}
-                    listing={listing}
-                  />
+            {canShowLeadContactForm && (
+              <div className="hidden xl:block xl:col-span-1">
+                <div className="sticky top-2">
+                  <div className=" rounded-2xl  p-6">
+                    <LeadContactForm 
+                      contextType="listing"
+                      propertyId={listing?.id}
+                      propertyTitle={title}
+                      propertyType={listing_type}
+                      developer={developers}
+                      agent={agent}
+                      agency={agency}
+                      listing={listing}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* LeadContactForm at Bottom - For Small/Medium/Large devices (not XL) */}
-          <div className="xl:hidden mt-8">
-            <LeadContactForm 
-              contextType="listing"
-              propertyId={id}
-              propertyTitle={title}
-              propertyType={listing_type}
-              developer={developers}
-              agent={agent}
-              agency={agency}
-              listing={listing}
-            />
-          </div>
+          {canShowLeadContactForm && (
+            <div className="xl:hidden mt-10 md:mt-12">
+              <LeadContactForm 
+                contextType="listing"
+                propertyId={id}
+                propertyTitle={title}
+                propertyType={listing_type}
+                developer={developers}
+                agent={agent}
+                agency={agency}
+                listing={listing}
+              />
+            </div>
+          )}
 
           {/* Rest of Content After Two Column Layout */}
           <div className="space-y-8">
@@ -1278,28 +1289,30 @@ const PropertyDetailPage = () => {
         property={listing}
       />
 
-      {/* Floating Contact Button - Only on Small/Medium/Large devices (not XL) */}
-      <div className="xl:hidden fixed bottom-6 right-6 z-40">
-        <button
-          onClick={() => setShowContactModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110 flex items-center justify-center"
-          aria-label="Contact Property Owner"
-        >
-          <MessageCircle className="w-6 h-6" />
-        </button>
-      </div>
+      {/* Floating Contact Button - Only for eligible users on <= xl */}
+      {canShowLeadContactForm && (
+        <div className="xl:hidden fixed bottom-6 right-6 z-40">
+          <button
+            onClick={() => setShowContactModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110 flex items-center justify-center"
+            aria-label="Contact Property Owner"
+          >
+            <MessageCircle className="w-6 h-6" />
+          </button>
+        </div>
+      )}
 
       {/* Contact Modal - Only on Small/Medium/Large devices */}
-      {showContactModal && (
+      {canShowLeadContactForm && showContactModal && (
         <div 
-          className="xl:hidden fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+          className="xl:hidden fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-start justify-center p-4 pt-20 md:pt-24"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowContactModal(false)
             }
           }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[calc(100vh-6rem)] md:max-h-[calc(100vh-7rem)] overflow-hidden flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">Contact Property Owner</h2>

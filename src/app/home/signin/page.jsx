@@ -61,7 +61,7 @@ const SignInPage = () => {
           redirectUrl = `/developer/${user.profile?.slug}/dashboard`
           break
         case 'agent':
-          redirectUrl = `/agents/${user.profile?.slug}/dashboard`
+          redirectUrl = `/agents/${user.profile?.slug || user.profile?.agent_id || user.id}/dashboard`
           break
         case 'agency':
           redirectUrl = `/agency/${user.profile?.slug}/dashboard`

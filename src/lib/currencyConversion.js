@@ -292,52 +292,59 @@ export async function processCurrencyConversions({
             console.warn('⚠️ Developer profile not found')
           }
         } else if (accountType === 'agent') {
-          // For agents, check if they have company_locations or default_currency
-          const { data: profile } = await supabaseAdmin
+          const { data: agent } = await supabaseAdmin
             .from('agents')
-            .select('company_locations, default_currency')
-            .eq('developer_id', userId)
-          .single()
+            .select('agency_id, location_id')
+            .eq('agent_id', userId)
+            .maybeSingle()
 
-          if (profile) {
-            // Parse company_locations if it exists and is a string
-            let companyLocations = profile.company_locations
-            if (companyLocations) {
+          if (agent?.agency_id) {
+            const { data: agency } = await supabaseAdmin
+              .from('agencies')
+              .select('company_locations, default_currency')
+              .eq('agency_id', agent.agency_id)
+              .maybeSingle()
+
+            if (agency?.company_locations) {
+              let companyLocations = agency.company_locations
               if (typeof companyLocations === 'string') {
                 try {
                   companyLocations = JSON.parse(companyLocations)
                 } catch (parseError) {
-                  console.warn('Failed to parse agent company_locations as JSON:', parseError)
+                  console.warn('Failed to parse agency company_locations as JSON:', parseError)
                   companyLocations = null
                 }
               }
 
               if (Array.isArray(companyLocations) && companyLocations.length > 0) {
-                const primaryLocation = companyLocations.find(
-                  loc => loc.primary_location === true || loc.primary_location === 'true'
-          )
-          if (primaryLocation?.currency) {
-            primaryCurrency = primaryLocation.currency
-                  console.log(`✅ Found agent primary location currency: ${primaryCurrency}`)
-                } else if (primaryLocation) {
-                  console.warn('⚠️ Agent primary location found but has no currency')
+                const assignedLocation = agent.location_id
+                  ? companyLocations.find((loc) => loc.id === agent.location_id)
+                  : null
+                const primaryLocation =
+                  assignedLocation ||
+                  companyLocations.find(
+                    (loc) => loc.primary_location === true || loc.primary_location === 'true'
+                  )
+
+                if (primaryLocation?.currency) {
+                  primaryCurrency = primaryLocation.currency
+                  console.log(`✅ Found agent currency from agency location: ${primaryCurrency}`)
                 }
               }
             }
 
-            // Fallback to default_currency for agents
-            if (primaryCurrency === 'USD' && profile.default_currency) {
-              let defaultCurrency = profile.default_currency
+            if (primaryCurrency === 'USD' && agency?.default_currency) {
+              let defaultCurrency = agency.default_currency
               if (typeof defaultCurrency === 'string') {
                 try {
                   defaultCurrency = JSON.parse(defaultCurrency)
                 } catch (parseError) {
-                  console.warn('Failed to parse agent default_currency as JSON:', parseError)
+                  console.warn('Failed to parse agency default_currency as JSON:', parseError)
                 }
               }
               if (defaultCurrency?.code) {
                 primaryCurrency = defaultCurrency.code
-                console.log(`✅ Using agent default_currency: ${primaryCurrency}`)
+                console.log(`✅ Using agency default_currency for agent: ${primaryCurrency}`)
               }
             }
           }

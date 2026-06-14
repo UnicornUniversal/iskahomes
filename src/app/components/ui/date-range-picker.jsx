@@ -120,10 +120,10 @@ const DateRangePicker = ({
         )}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          <Calendar className="w-4 h-4 text-primary_color flex-shrink-0" />
           <span className={cn(
             'truncate',
-            (!startDate && !endDate) && 'text-gray-400'
+            (!startDate && !endDate) ? 'text-gray-400' : 'text-primary_color'
           )}>
             {formatDateRange()}
           </span>

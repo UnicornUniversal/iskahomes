@@ -304,36 +304,6 @@ const DevelopmentLocations = ({ formData, updateFormData, isEditMode }) => {
           </p>
         </div>
 
-        {/* Primary Location Display */}
-        {locations.length > 0 && locations.some(loc => loc.isPrimary) && (
-          <div className="secondary_bg p-4 rounded-lg border-2 border-primary_color">
-            <div className="flex items-center gap-2 mb-2">
-              <Star className="w-5 h-5 text-primary_color fill-primary_color" />
-              <h3 className="text-lg font-semibold text-primary_color">Primary Location</h3>
-            </div>
-            {(() => {
-              const primaryLocation = locations.find(loc => loc.isPrimary) || locations[0]
-              return (
-                <div>
-                  {primaryLocation.fullAddress && (
-                    <p className="text-sm mb-1">
-                      <span className="font-medium">Address:</span> {primaryLocation.fullAddress}
-                    </p>
-                  )}
-                  <p className="text-sm mb-1">
-                    {[
-                      primaryLocation.town,
-                      primaryLocation.city,
-                      primaryLocation.state,
-                      primaryLocation.country
-                    ].filter(Boolean).join(', ') || 'Location details not set'}
-                  </p>
-                </div>
-              )
-            })()}
-          </div>
-        )}
-
         {/* Existing Locations List */}
         {locations.length > 0 && (
           <div className="space-y-4">

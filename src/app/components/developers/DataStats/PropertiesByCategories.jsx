@@ -25,18 +25,19 @@ const pieColors = [
 
 const PropertiesByCategories = ({ statsData = null, totalUnits = null }) => {
   const { user } = useAuth()
+  const profile = user?.profile || {}
   
   // Get data from user profile
   const purposes = useMemo(() => {
     if (Array.isArray(statsData) && statsData.length > 0) return statsData
-    if (!user?.profile?.property_purposes_stats) return []
-    return user.profile.property_purposes_stats
-  }, [statsData, user?.profile?.property_purposes_stats])
+    if (!profile?.property_purposes_stats) return []
+    return profile.property_purposes_stats
+  }, [statsData, profile?.property_purposes_stats])
   
   const total = useMemo(() => {
     if (typeof totalUnits === 'number') return totalUnits
-    return user?.profile?.total_units || 0
-  }, [totalUnits, user?.profile?.total_units])
+    return profile?.total_units || 0
+  }, [totalUnits, profile?.total_units])
 
   if (!purposes || purposes.length === 0) {
     return (

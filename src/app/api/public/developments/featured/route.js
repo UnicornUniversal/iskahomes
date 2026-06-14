@@ -1,155 +1,213 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { APPROVED_ADMIN_STATUS } from '@/lib/publicDevelopmentsHelper'
 
-export async function GET(request) {
+const FEATURED_PACKAGE_IDS = {
+  infinity: 'cc8a96fb-0a20-41af-9aa1-d68f5d1752ce',
+  platinum: 'b6668135-af4d-42cb-a776-06a1f1c9e21f'
+}
+
+const TIER_LIMITS = {
+  infinity: 6,
+  platinum: 4
+}
+
+const parseImageUrl = (value) => {
+  if (!value) return null
+
   try {
-    const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get('limit')) || 5
+    if (typeof value === 'string') {
+      const parsed = JSON.parse(value)
+      const resolved = parsed?.url || parsed || null
+      return typeof resolved === 'string' && resolved.startsWith('http') ? resolved : null
+    }
 
-    // First, get all active packages and filter for platinum/infinity
-    const { data: allPackages, error: packageError } = await supabase
-      .from('subscriptions_package')
+    if (typeof value === 'object') {
+      const resolved = value?.url || value || null
+      return typeof resolved === 'string' && resolved.startsWith('http') ? resolved : null
+    }
+  } catch {
+    if (typeof value === 'string' && value.startsWith('http')) {
+      return value
+    }
+  }
+
+  return null
+}
+
+const parseTypeIds = (value) => {
+  if (!value) return []
+
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+async function getApprovedDeveloperIdsForPackage(packageId) {
+  const { data: subscriptions, error: subError } = await supabase
+    .from('subscriptions')
+    .select('user_id')
+    .eq('user_type', 'developer')
+    .in('status', ['active', 'grace_period'])
+    .eq('package_id', packageId)
+
+  if (subError) {
+    throw subError
+  }
+
+  const subscriptionDeveloperIds = (subscriptions || []).map((sub) => sub.user_id).filter(Boolean)
+
+  if (subscriptionDeveloperIds.length === 0) {
+    return []
+  }
+
+  const { data: approvedDevelopers, error: approvedDevelopersError } = await supabase
+    .from('developers')
+    .select('developer_id')
+    .in('developer_id', subscriptionDeveloperIds)
+    .eq('admin_status', APPROVED_ADMIN_STATUS)
+
+  if (approvedDevelopersError) {
+    throw approvedDevelopersError
+  }
+
+  return (approvedDevelopers || []).map((developer) => developer.developer_id).filter(Boolean)
+}
+
+async function enrichDevelopment(development, subscriptionTier) {
+  const { data: developer } = await supabase
+    .from('developers')
+    .select(`
+      id,
+      developer_id,
+      name,
+      slug,
+      profile_image,
+      city,
+      region,
+      country,
+      company_locations,
+      total_units,
+      total_developments,
+      verified
+    `)
+    .eq('developer_id', development.developer_id)
+    .eq('admin_status', APPROVED_ADMIN_STATUS)
+    .maybeSingle()
+
+  const typeIds = parseTypeIds(development.types)
+  let propertyTypes = []
+
+  if (typeIds.length > 0) {
+    const { data: types } = await supabase
+      .from('property_types')
       .select('id, name')
-      .eq('is_active', true)
+      .in('id', typeIds)
 
-    if (packageError) {
-      console.error('Error fetching packages:', packageError)
-      return NextResponse.json(
-        { error: 'Failed to fetch packages' },
-        { status: 500 }
+    propertyTypes = types || []
+  }
+
+  return {
+    ...development,
+    subscription_tier: subscriptionTier,
+    developer: developer || null,
+    property_types: propertyTypes,
+    banner_url: parseImageUrl(development.banner)
+  }
+}
+
+async function fetchTierDevelopments(packageId, tierName, limit, excludeDevelopmentIds = []) {
+  const developerIds = await getApprovedDeveloperIdsForPackage(packageId)
+
+  if (developerIds.length === 0) {
+    return []
+  }
+
+  const fetchLimit = limit + excludeDevelopmentIds.length
+
+  const { data: developments, error } = await supabase
+    .from('developments')
+    .select('*')
+    .in('developer_id', developerIds)
+    .eq('development_status', 'active')
+    .eq('admin_status', APPROVED_ADMIN_STATUS)
+    .order('created_at', { ascending: false })
+    .limit(fetchLimit)
+
+  if (error) {
+    throw error
+  }
+
+  const filteredDevelopments = (developments || [])
+    .filter((development) => !excludeDevelopmentIds.includes(development.id))
+    .slice(0, limit)
+
+  return Promise.all(
+    filteredDevelopments.map((development) => enrichDevelopment(development, tierName))
+  )
+}
+
+async function resolvePackageIds() {
+  const { data: packages, error } = await supabase
+    .from('subscriptions_package')
+    .select('id, name')
+    .eq('is_active', true)
+
+  if (error) {
+    throw error
+  }
+
+  const packageMap = new Map(
+    (packages || []).map((pkg) => [pkg.name?.toLowerCase(), pkg.id])
+  )
+
+  return {
+    infinity: FEATURED_PACKAGE_IDS.infinity || packageMap.get('infinity') || packageMap.get('infinite'),
+    platinum: FEATURED_PACKAGE_IDS.platinum || packageMap.get('platinum')
+  }
+}
+
+export async function GET() {
+  try {
+    const packageIds = await resolvePackageIds()
+    const featuredDevelopments = []
+    const usedDevelopmentIds = []
+
+    if (packageIds.infinity) {
+      const infinityDevelopments = await fetchTierDevelopments(
+        packageIds.infinity,
+        'infinity',
+        TIER_LIMITS.infinity,
+        usedDevelopmentIds
       )
-    }
 
-    // Filter for platinum or infinity (case-insensitive)
-    const packages = allPackages?.filter(pkg => {
-      const name = pkg.name?.toLowerCase()
-      return name === 'platinum' || name === 'infinity'
-    }) || []
-
-    if (packageError) {
-      console.error('Error fetching packages:', packageError)
-      return NextResponse.json(
-        { error: 'Failed to fetch packages' },
-        { status: 500 }
-      )
-    }
-
-    const packageIds = packages?.map(pkg => pkg.id) || []
-
-    if (packageIds.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: []
+      infinityDevelopments.forEach((development) => {
+        featuredDevelopments.push(development)
+        usedDevelopmentIds.push(development.id)
       })
     }
 
-    // Get developers with platinum or infinity subscriptions
-    const { data: subscriptions, error: subError } = await supabase
-      .from('subscriptions')
-      .select('user_id')
-      .eq('user_type', 'developer')
-      .in('status', ['active', 'grace_period'])
-      .in('package_id', packageIds)
-
-    if (subError) {
-      console.error('Error fetching subscriptions:', subError)
-      return NextResponse.json(
-        { error: 'Failed to fetch subscriptions' },
-        { status: 500 }
+    if (packageIds.platinum) {
+      const platinumDevelopments = await fetchTierDevelopments(
+        packageIds.platinum,
+        'platinum',
+        TIER_LIMITS.platinum,
+        usedDevelopmentIds
       )
-    }
 
-    // Extract developer IDs
-    const developerIds = subscriptions?.map(sub => sub.user_id) || []
-
-    if (developerIds.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: []
+      platinumDevelopments.forEach((development) => {
+        featuredDevelopments.push(development)
+        usedDevelopmentIds.push(development.id)
       })
     }
-
-    // Fetch developments from these developers
-    const { data: developments, error: devError } = await supabase
-      .from('developments')
-      .select('*')
-      .in('developer_id', developerIds)
-      .eq('development_status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(limit)
-
-    if (devError) {
-      console.error('Error fetching developments:', devError)
-      return NextResponse.json(
-        { error: 'Failed to fetch developments' },
-        { status: 500 }
-      )
-    }
-
-    // Enrich developments with developer info and property types
-    const enrichedDevelopments = await Promise.all(
-      (developments || []).map(async (development) => {
-        // Fetch developer
-        const { data: developer } = await supabase
-          .from('developers')
-          .select('id, name, slug, profile_image')
-          .eq('id', development.developer_id)
-          .maybeSingle()
-
-        // Parse and fetch property types
-        let propertyTypes = []
-        if (development.types) {
-          try {
-            const typeIds = typeof development.types === 'string' 
-              ? JSON.parse(development.types) 
-              : development.types
-            
-            if (Array.isArray(typeIds) && typeIds.length > 0) {
-              const { data: types } = await supabase
-                .from('property_types')
-                .select('id, name')
-                .in('id', typeIds)
-              propertyTypes = types || []
-            }
-          } catch (e) {
-            console.error('Error parsing types:', e)
-          }
-        }
-
-        // Parse banner image
-        let bannerUrl = null
-        if (development.banner) {
-          try {
-            if (typeof development.banner === 'string') {
-              const parsed = JSON.parse(development.banner)
-              bannerUrl = parsed?.url || parsed || null
-            } else if (typeof development.banner === 'object') {
-              bannerUrl = development.banner?.url || development.banner || null
-            }
-            if (bannerUrl && !bannerUrl.startsWith('http')) {
-              bannerUrl = null
-            }
-          } catch (e) {
-            if (development.banner.startsWith('http')) {
-              bannerUrl = development.banner
-            }
-          }
-        }
-
-        return {
-          ...development,
-          developer: developer || null,
-          property_types: propertyTypes,
-          banner_url: bannerUrl
-        }
-      })
-    )
 
     return NextResponse.json({
       success: true,
-      data: enrichedDevelopments
+      data: featuredDevelopments
     })
-
   } catch (error) {
     console.error('Error in featured developments API:', error)
     return NextResponse.json(
@@ -158,4 +216,3 @@ export async function GET(request) {
     )
   }
 }
-

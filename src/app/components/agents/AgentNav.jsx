@@ -12,7 +12,8 @@ import {
     FiLogOut,
     FiMenu,
     FiX,
-    FiTrendingUp
+    FiTrendingUp,
+    FiDollarSign
 } from 'react-icons/fi'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'react-toastify'
@@ -22,7 +23,7 @@ const AgentNav = ({ active }) => {
     const [isLoggingOut, setIsLoggingOut] = useState(false)
     const pathname = usePathname()
     const params = useParams()
-    const { logout } = useAuth()
+    const { user, logout } = useAuth()
     
     // Get slug from params or pathname
     const getSlug = () => {
@@ -63,24 +64,21 @@ const AgentNav = ({ active }) => {
             icon: FiTrendingUp
         },
         {
+            label: 'Sales',
+            href: `/agents/${slug}/sales`,
+            icon: FiDollarSign
+        },
+        {
             label: 'Profile',
             href: `/agents/${slug}/profile`,
             icon: FiUser
         }
     ]
 
-    // Determine active item from pathname
-    const getActiveIndex = () => {
-        if (!pathname) return active || 1
-        for (let i = 0; i < navItems.length; i++) {
-            if (pathname.includes(navItems[i].href.split('/').pop())) {
-                return i + 1
-            }
-        }
-        return active || 1
+    const isNavActive = (href) => {
+        if (!pathname) return false
+        return pathname === href || pathname.startsWith(`${href}/`)
     }
-
-    const activeIndex = getActiveIndex()
 
     const toggleMobileMenu = () => {
         setIsMobileMenuOpen(!isMobileMenuOpen)
@@ -158,7 +156,7 @@ const AgentNav = ({ active }) => {
             {/* Mobile Menu Toggle Button - Only visible on mobile */}
             <button
                 onClick={toggleMobileMenu}
-                className="lg:hidden fixed top-4 left-4 z-10 p-2 bg-primary_color text-white rounded-lg shadow-lg hover:bg-primary_color/90 transition-all duration-300"
+                className="lg:hidden fixed top-4 right-4 z-50 p-2 bg-primary_color text-white rounded-lg shadow-lg hover:bg-primary_color/90 transition-all duration-300"
                 aria-label="Toggle navigation menu"
             >
                 {isMobileMenuOpen ? (
@@ -171,19 +169,21 @@ const AgentNav = ({ active }) => {
             {/* Mobile Overlay */}
             {isMobileMenuOpen && (
                 <div 
-                    className="lg:hidden fixed inset-0  bg-opacity-10 z-40"
+                    className="lg:hidden fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
                     onClick={toggleMobileMenu}
                 />
             )}
 
-            {/* Navigation Menu */}
-            <nav className={`fixed lg:relative   flex flex-col bg-gradient-to-b from-white  to-gray-50 min-h-screen py-8 w-[85vw] max-w-[300px] px-[1em] shadow-lg border-r border-gray-100 z-50 transition-transform duration-300 ease-in-out ${
-                isMobileMenuOpen 
-                    ? 'translate-x-0' 
-                    : '-translate-x-full lg:translate-x-0'
-            }`}>
+            {/* Navigation — fixed drawer on mobile; sticky sidebar in flex layout on desktop (agency pattern) */}
+            <nav
+                className={`fixed lg:sticky lg:top-0 flex-shrink-0 flex flex-col bg-gradient-to-b from-white to-gray-50 h-screen max-h-screen py-8 w-[85vw] max-w-[280px] px-6 shadow-lg border-r border-gray-100 z-50 transition-transform duration-300 ease-in-out overflow-hidden ${
+                    isMobileMenuOpen
+                        ? 'translate-x-0'
+                        : '-translate-x-full lg:translate-x-0'
+                }`}
+            >
                 {/* Logo - first element, links to homepage */}
-                <div className="mb-6">
+                <div className="mb-6 flex-shrink-0">
                     <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
                         <img src="/ISKA Logo.png" alt="ISKA Homes" className="max-w-[120px] w-24" />
                     </Link>
@@ -198,16 +198,16 @@ const AgentNav = ({ active }) => {
                     <FiX className="w-5 h-5" />
                 </button>
 
-                <div className="mb-8">
+                <div className="mb-8 flex-shrink-0">
                     <h5 className="mb-2">Agent</h5>
                     <h3 className="mb-2">Dashboard</h3>
                     <div className="w-12 h-1 bg-primary_color rounded-full"></div>
                 </div>
                 
-                <div className="space-y-2 w-full">
+                <div className="space-y-2 w-full flex-1 overflow-y-auto min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                     {navItems.map((item, index) => {
                         const IconComponent = item.icon
-                        const isActive = activeIndex === index + 1
+                        const isActive = isNavActive(item.href)
                         
                         return (
                             <Link
@@ -255,8 +255,7 @@ const AgentNav = ({ active }) => {
                 </div>
 
                 {/* Logout */}
-                <br/>
-                <div className="mb-4 space-y-2 w-full rounded-xl shadow-primary_red/25 bg-primary_red">
+                <div className="mt-4 flex-shrink-0 space-y-2 w-full rounded-xl shadow-primary_red/25 bg-primary_red">
                     <button
                         onClick={handleLogout}
                         disabled={isLoggingOut}
@@ -270,10 +269,6 @@ const AgentNav = ({ active }) => {
                         </span>
                     </button>
                 </div>
-
-                <br/>
-                
-              
             </nav>
         </>
     )

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { APPROVED_ADMIN_STATUS } from '@/lib/publicDevelopmentsHelper'
 
 export async function GET(request) {
   try {
@@ -13,6 +14,35 @@ export async function GET(request) {
         { error: 'Developer ID is required' },
         { status: 400 }
       )
+    }
+
+    const { data: developer, error: developerError } = await supabase
+      .from('developers')
+      .select('developer_id')
+      .eq('developer_id', developerId)
+      .eq('admin_status', APPROVED_ADMIN_STATUS)
+      .maybeSingle()
+
+    if (developerError) {
+      console.error('Error verifying developer approval status:', developerError)
+      return NextResponse.json(
+        { error: 'Failed to fetch developments' },
+        { status: 500 }
+      )
+    }
+
+    if (!developer) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          pages: 0,
+          hasMore: false
+        }
+      })
     }
 
     // Calculate offset
@@ -36,6 +66,7 @@ export async function GET(request) {
       `)
       .eq('developer_id', developerId)
       .eq('development_status', 'active')
+      .eq('admin_status', APPROVED_ADMIN_STATUS)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
@@ -53,6 +84,7 @@ export async function GET(request) {
       .select('*', { count: 'exact', head: true })
       .eq('developer_id', developerId)
       .eq('development_status', 'active')
+      .eq('admin_status', APPROVED_ADMIN_STATUS)
 
     return NextResponse.json({
       success: true,

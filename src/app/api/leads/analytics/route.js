@@ -1,5 +1,55 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import {
+  DEFAULT_PIPELINE_STAGES,
+  createEmptyStatusDistribution,
+  resolveLeadStatusForPipeline,
+  buildAnalyticsStageOrder,
+  buildStatusLabelMap,
+  computePipelineHealthFromDistribution,
+  computePipelineFunnelSteps,
+  PIPELINE_CLOSED_STATUS_KEYS,
+} from '@/lib/leadsPipelineHelper'
+
+async function loadListerPipelineStages(listerId, listerType) {
+  const { data, error } = await supabaseAdmin
+    .from('leads_pipeline')
+    .select('status, value, sort_order, is_default')
+    .eq('user_id', listerId)
+    .eq('user_type', listerType)
+    .order('sort_order', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching leads_pipeline for analytics:', error)
+    return [...DEFAULT_PIPELINE_STAGES]
+  }
+  return data?.length ? data : [...DEFAULT_PIPELINE_STAGES]
+}
+
+function buildLifecycleAnalysisPayload({
+  pipelineStages,
+  statusDistribution,
+  statusTransitions,
+  funnelSteps,
+  avgTimeToConversion,
+}) {
+  const pipelineSummary = computePipelineHealthFromDistribution(statusDistribution, pipelineStages)
+  const funnelConversionRates = {}
+  funnelSteps.forEach((step) => {
+    funnelConversionRates[step.key] = step.rate
+  })
+
+  return {
+    statusDistribution,
+    statusTransitions,
+    funnelConversionRates,
+    funnelSteps,
+    pipelineStages: buildAnalyticsStageOrder(pipelineStages),
+    statusLabels: buildStatusLabelMap(pipelineStages),
+    pipelineSummary,
+    avgTimeToConversion,
+  }
+}
 
 function isUUID(str) {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -98,8 +148,12 @@ export async function GET(request) {
     let dateFilter = supabaseAdmin
       .from('leads')
       .select('*')
-      .eq('lister_id', finalListerId)
-      .eq('lister_type', listerType)
+
+    if (listerType === 'agency') {
+      dateFilter = dateFilter.eq('agency_id', finalListerId)
+    } else {
+      dateFilter = dateFilter.eq('lister_id', finalListerId).eq('lister_type', listerType)
+    }
 
     // first_action_date is a DATE column — compare with YYYY-MM-DD only so rows are not
     // dropped by timestamptz vs date coercion quirks in PostgREST.
@@ -109,6 +163,8 @@ export async function GET(request) {
     if (dateTo) {
       dateFilter = dateFilter.lte('first_action_date', dateTo)
     }
+
+    const pipelineStages = await loadListerPipelineStages(finalListerId, listerType)
 
     const { data: allLeads, error: leadsError } = await dateFilter
 
@@ -121,9 +177,21 @@ export async function GET(request) {
     }
 
     if (!allLeads || allLeads.length === 0) {
+      const emptyDistribution = createEmptyStatusDistribution(pipelineStages)
+      const emptyFunnel = computePipelineFunnelSteps([], pipelineStages)
+      const emptyLifecycle = buildLifecycleAnalysisPayload({
+        pipelineStages,
+        statusDistribution: emptyDistribution,
+        statusTransitions: {},
+        funnelSteps: emptyFunnel,
+        avgTimeToConversion: 0,
+      })
+      const emptyPipelineHealth = computePipelineHealthFromDistribution(emptyDistribution, pipelineStages)
+
       return NextResponse.json({
         success: true,
         data: {
+          pipelineStages: buildAnalyticsStageOrder(pipelineStages),
           channelPerformance: {
             phone: { total: 0, closed: 0, conversionRate: 0, avgLeadScore: 0, highValueLeads: 0, highValuePercentage: 0 },
             whatsapp: { total: 0, closed: 0, conversionRate: 0, avgLeadScore: 0, highValueLeads: 0, highValuePercentage: 0 },
@@ -131,24 +199,7 @@ export async function GET(request) {
             email: { total: 0, closed: 0, conversionRate: 0, avgLeadScore: 0, highValueLeads: 0, highValuePercentage: 0 },
             appointment: { total: 0, closed: 0, conversionRate: 0, avgLeadScore: 0, highValueLeads: 0, highValuePercentage: 0 }
           },
-          lifecycleAnalysis: {
-            statusDistribution: {
-              new: 0,
-              contacted: 0,
-              scheduled: 0,
-              responded: 0,
-              closed: 0,
-              cold_lead: 0,
-              abandoned: 0
-            },
-            statusTransitions: {},
-            funnelConversionRates: {
-              newToContacted: 0,
-              contactedToScheduled: 0,
-              scheduledToClosed: 0
-            },
-            avgTimeToConversion: 0
-          },
+          lifecycleAnalysis: emptyLifecycle,
           temporalPatterns: {
             dayOfWeekPerformance: [
               { day: 'Sunday', total: 0, closed: 0, conversionRate: 0 },
@@ -181,12 +232,7 @@ export async function GET(request) {
             totalClosed: 0,
             overallConversionRate: 0,
             avgLeadScore: 0,
-            pipelineHealth: {
-              new: 0,
-              inProgress: 0,
-              closed: 0,
-              lost: 0
-            }
+            pipelineHealth: emptyPipelineHealth,
           },
           comparativeAnalysis: {},
           operationalEfficiency: {
@@ -258,15 +304,7 @@ export async function GET(request) {
       appointment: { leads: [], total: 0, closed: 0, scores: [] }
     }
 
-    const statusDistribution = {
-      new: 0,
-      contacted: 0,
-      scheduled: 0,
-      responded: 0,
-      closed: 0,
-      cold_lead: 0,
-      abandoned: 0
-    }
+    const statusDistribution = createEmptyStatusDistribution(pipelineStages)
 
     const contextStats = {
       listing: { total: 0, closed: 0, scores: [] },
@@ -301,10 +339,10 @@ export async function GET(request) {
 
     allLeads.forEach(lead => {
       totalLeads++
-      const status = lead.status || 'new'
-      statusDistribution[status] = (statusDistribution[status] || 0) + 1
-      
-      if (status === 'closed') {
+      const statusKey = resolveLeadStatusForPipeline(lead.status, pipelineStages)
+      statusDistribution[statusKey] = (statusDistribution[statusKey] || 0) + 1
+
+      if (PIPELINE_CLOSED_STATUS_KEYS.has(statusKey)) {
         totalClosed++
       }
 
@@ -316,7 +354,7 @@ export async function GET(request) {
       if (contextStats[context]) {
         contextStats[context].total++
         contextStats[context].scores.push(leadScore)
-        if (status === 'closed') {
+        if (PIPELINE_CLOSED_STATUS_KEYS.has(statusKey)) {
           contextStats[context].closed++
         }
       }
@@ -325,13 +363,13 @@ export async function GET(request) {
       const actionCount = lead.total_actions || 0
       if (actionCount === 1) {
         engagementStats.singleAction.total++
-        if (status === 'closed') engagementStats.singleAction.closed++
+        if (PIPELINE_CLOSED_STATUS_KEYS.has(statusKey)) engagementStats.singleAction.closed++
       } else if (actionCount >= 3) {
         engagementStats.highEngagement.total++
-        if (status === 'closed') engagementStats.highEngagement.closed++
+        if (PIPELINE_CLOSED_STATUS_KEYS.has(statusKey)) engagementStats.highEngagement.closed++
       } else {
         engagementStats.multiAction.total++
-        if (status === 'closed') engagementStats.multiAction.closed++
+        if (PIPELINE_CLOSED_STATUS_KEYS.has(statusKey)) engagementStats.multiAction.closed++
       }
 
       // Channel analysis from the full action history. This keeps WhatsApp and
@@ -360,7 +398,7 @@ export async function GET(request) {
           channelStats[channel].leads.push(lead)
           channelStats[channel].total++
           channelStats[channel].scores.push(leadScore)
-          if (status === 'closed') {
+          if (PIPELINE_CLOSED_STATUS_KEYS.has(statusKey)) {
             channelStats[channel].closed++
           }
         })
@@ -386,17 +424,17 @@ export async function GET(request) {
         
         if (dayOfWeekStats[dayOfWeek]) {
           dayOfWeekStats[dayOfWeek].total++
-          if (status === 'closed') dayOfWeekStats[dayOfWeek].closed++
+          if (PIPELINE_CLOSED_STATUS_KEYS.has(statusKey)) dayOfWeekStats[dayOfWeek].closed++
         }
         
         if (hourOfDayStats[hourOfDay]) {
           hourOfDayStats[hourOfDay].total++
-          if (status === 'closed') hourOfDayStats[hourOfDay].closed++
+          if (PIPELINE_CLOSED_STATUS_KEYS.has(statusKey)) hourOfDayStats[hourOfDay].closed++
         }
       }
 
       // Time to conversion
-      if (status === 'closed' && lead.first_action_date && lead.last_action_date) {
+      if (PIPELINE_CLOSED_STATUS_KEYS.has(statusKey) && lead.first_action_date && lead.last_action_date) {
         const firstDate = new Date(lead.first_action_date)
         const lastDate = new Date(lead.last_action_date)
         const daysToClose = (lastDate - firstDate) / (1000 * 60 * 60 * 24)
@@ -413,7 +451,7 @@ export async function GET(request) {
           statuses: statusTracker,
           firstActionDate: lead.first_action_date,
           lastActionDate: lead.last_action_date,
-          status: status
+          status: statusKey,
         })
       }
     })
@@ -439,16 +477,8 @@ export async function GET(request) {
       }
     })
 
-    // Calculate lifecycle metrics
     const statusTransitions = {}
-    const avgTimeInStatus = {}
-    const funnelMetrics = {
-      newToContacted: { total: 0, converted: 0 },
-      contactedToScheduled: { total: 0, converted: 0 },
-      scheduledToClosed: { total: 0, converted: 0 }
-    }
-
-    lifecycleData.forEach(lead => {
+    lifecycleData.forEach((lead) => {
       const statuses = lead.statuses
       for (let i = 0; i < statuses.length - 1; i++) {
         const from = statuses[i]
@@ -456,34 +486,21 @@ export async function GET(request) {
         const key = `${from}_to_${to}`
         statusTransitions[key] = (statusTransitions[key] || 0) + 1
       }
-
-      // Funnel metrics
-      if (statuses.includes('new') && statuses.includes('contacted')) {
-        funnelMetrics.newToContacted.total++
-        if (lead.status === 'closed') funnelMetrics.newToContacted.converted++
-      }
-      if (statuses.includes('contacted') && statuses.includes('scheduled')) {
-        funnelMetrics.contactedToScheduled.total++
-        if (lead.status === 'closed') funnelMetrics.contactedToScheduled.converted++
-      }
-      if (statuses.includes('scheduled') && statuses.includes('closed')) {
-        funnelMetrics.scheduledToClosed.total++
-        if (lead.status === 'closed') funnelMetrics.scheduledToClosed.converted++
-      }
     })
 
-    // Calculate funnel conversion rates
-    const funnelConversionRates = {
-      newToContacted: funnelMetrics.newToContacted.total > 0
-        ? (funnelMetrics.newToContacted.converted / funnelMetrics.newToContacted.total) * 100
-        : 0,
-      contactedToScheduled: funnelMetrics.contactedToScheduled.total > 0
-        ? (funnelMetrics.contactedToScheduled.converted / funnelMetrics.contactedToScheduled.total) * 100
-        : 0,
-      scheduledToClosed: funnelMetrics.scheduledToClosed.total > 0
-        ? (funnelMetrics.scheduledToClosed.converted / funnelMetrics.scheduledToClosed.total) * 100
+    const funnelSteps = computePipelineFunnelSteps(lifecycleData, pipelineStages)
+    const avgTimeToConversionVal =
+      timeToConversion.length > 0
+        ? timeToConversion.reduce((a, b) => a + b, 0) / timeToConversion.length
         : 0
-    }
+    const lifecycleAnalysis = buildLifecycleAnalysisPayload({
+      pipelineStages,
+      statusDistribution,
+      statusTransitions,
+      funnelSteps,
+      avgTimeToConversion: parseFloat(avgTimeToConversionVal.toFixed(2)),
+    })
+    const pipelineHealth = computePipelineHealthFromDistribution(statusDistribution, pipelineStages)
 
     // Calculate context performance
     const contextPerformance = {}
@@ -517,9 +534,6 @@ export async function GET(request) {
     // Calculate operational efficiency
     const avgResponseTime = responseTimes.length > 0
       ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length
-      : 0
-    const avgTimeToConversion = timeToConversion.length > 0
-      ? timeToConversion.reduce((a, b) => a + b, 0) / timeToConversion.length
       : 0
     const abandonmentRate = totalLeads > 0
       ? ((statusDistribution.abandoned || 0) / totalLeads) * 100
@@ -557,13 +571,9 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       data: {
+        pipelineStages: buildAnalyticsStageOrder(pipelineStages),
         channelPerformance,
-        lifecycleAnalysis: {
-          statusDistribution,
-          statusTransitions,
-          funnelConversionRates,
-          avgTimeToConversion: parseFloat(avgTimeToConversion.toFixed(2))
-        },
+        lifecycleAnalysis,
         temporalPatterns: {
           dayOfWeekPerformance,
           hourOfDayPerformance
@@ -575,16 +585,11 @@ export async function GET(request) {
           totalClosed,
           overallConversionRate: parseFloat(overallConversionRate.toFixed(2)),
           avgLeadScore: parseFloat((totalScore / totalLeads).toFixed(2)),
-          pipelineHealth: {
-            new: statusDistribution.new,
-            inProgress: statusDistribution.contacted + statusDistribution.scheduled + statusDistribution.responded,
-            closed: statusDistribution.closed,
-            lost: statusDistribution.abandoned + statusDistribution.cold_lead
-          }
+          pipelineHealth,
         },
         operationalEfficiency: {
           avgResponseTime: parseFloat(avgResponseTime.toFixed(2)),
-          avgTimeToConversion: parseFloat(avgTimeToConversion.toFixed(2)),
+          avgTimeToConversion: lifecycleAnalysis.avgTimeToConversion,
           abandonmentRate: parseFloat(abandonmentRate.toFixed(2)),
           coldLeadRate: parseFloat(coldLeadRate.toFixed(2)),
           responseTimeDistribution: {

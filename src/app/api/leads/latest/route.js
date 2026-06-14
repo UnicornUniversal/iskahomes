@@ -40,6 +40,7 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const listerId = searchParams.get('lister_id')
+    const listerType = searchParams.get('lister_type') || 'developer'
     const limit = parseInt(searchParams.get('limit')) || 7
 
     if (!listerId) {
@@ -52,12 +53,19 @@ export async function GET(request) {
     // Fetch latest leads for the developer/agent
     // Note: We fetch all records first, then group them to avoid duplicates
     // IMPORTANT: Exclude anonymous/unknown seekers - only get leads with user IDs (non-anonymous)
-    const { data: allLeads, error: leadsError } = await supabase
+    let latestLeadsQuery = supabase
       .from('leads')
-      .select('id, listing_id, seeker_id, lister_id, lister_type, context_type, total_actions, lead_score, lead_actions, first_action_date, last_action_date, last_action_type, status, status_tracker, lead_classification, created_at')
-      .eq('lister_id', listerId)
+      .select('id, listing_id, seeker_id, lister_id, lister_type, agency_id, context_type, total_actions, lead_score, lead_actions, first_action_date, last_action_date, last_action_type, status, status_tracker, lead_classification, created_at')
       .not('seeker_id', 'is', null) // Only leads with seeker_id
       .or('is_anonymous.is.null,is_anonymous.eq.false') // Exclude anonymous leads (only get non-anonymous leads)
+
+    if (listerType === 'agency') {
+      latestLeadsQuery = latestLeadsQuery.eq('agency_id', listerId)
+    } else {
+      latestLeadsQuery = latestLeadsQuery.eq('lister_id', listerId).eq('lister_type', listerType)
+    }
+
+    const { data: allLeads, error: leadsError } = await latestLeadsQuery
       .order('last_action_date', { ascending: false })
       .order('created_at', { ascending: false })
 

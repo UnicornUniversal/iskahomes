@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import useExtendedAuthProfile from '@/hooks/useExtendedAuthProfile'
 import Link from 'next/link'
 import { 
   ArrowLeft, 
@@ -27,6 +28,8 @@ import SoldListings from '@/app/components/analytics/SoldListings'
 const SalesAnalytics = () => {
   const params = useParams()
   const { user } = useAuth()
+  const { extendedProfile } = useExtendedAuthProfile()
+  const profile = extendedProfile || user?.profile || {}
   const [overview, setOverview] = useState({
     totalRevenue: 0,
     totalUnitsSold: 0,
@@ -43,10 +46,10 @@ const SalesAnalytics = () => {
       return overview.currency
     }
     
-    if (!user?.profile?.company_locations) return 'USD'
+    if (!profile?.company_locations) return 'USD'
     
     // Parse company_locations if it's a string
-    let locations = user.profile.company_locations
+    let locations = profile.company_locations
     if (typeof locations === 'string') {
       try {
         locations = JSON.parse(locations)
@@ -63,8 +66,8 @@ const SalesAnalytics = () => {
     }
     
     // Fallback to default_currency
-    if (user?.profile?.default_currency) {
-      let defaultCurrency = user.profile.default_currency
+    if (profile?.default_currency) {
+      let defaultCurrency = profile.default_currency
       if (typeof defaultCurrency === 'string') {
         try {
           defaultCurrency = JSON.parse(defaultCurrency)
@@ -78,7 +81,7 @@ const SalesAnalytics = () => {
     }
     
     return 'USD'
-  }, [overview.currency, user?.profile?.company_locations, user?.profile?.default_currency])
+  }, [overview.currency, profile?.company_locations, profile?.default_currency])
 
   // Fetch overview only once when slug changes
   useEffect(() => {

@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import {
+  APPROVED_ADMIN_STATUS,
+  applyPublicDevelopmentFilters,
+  getApprovedDeveloperIds
+} from '@/lib/publicDevelopmentsHelper'
 
 const parseArrayField = (value) => {
   if (!value) return []
@@ -39,6 +44,23 @@ export async function GET(request) {
       page, limit, search, status, location, locationType, developerId, developerName, selectedTypes, selectedSubtypes
     })
 
+    const approvedDeveloperIds = await getApprovedDeveloperIds()
+
+    if (approvedDeveloperIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          developments: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            pages: 0
+          }
+        }
+      })
+    }
+
     let matchedDeveloperIds = []
 
     if (developerName && !developerId) {
@@ -46,7 +68,7 @@ export async function GET(request) {
         .from('developers')
         .select('developer_id')
         .ilike('name', `%${developerName}%`)
-        .in('account_status', ['active', 'approved'])
+        .eq('admin_status', APPROVED_ADMIN_STATUS)
 
       if (developerMatchError) {
         console.error('❌ Error matching developers by name:', developerMatchError)
@@ -120,20 +142,24 @@ export async function GET(request) {
       return nextQuery
     }
 
-    let query = applyFilters(
-      supabase
-      .from('developments')
-      .select('*')
-      .eq('development_status', 'active')
-      .order('created_at', { ascending: false })
+    let query = applyPublicDevelopmentFilters(
+      applyFilters(
+        supabase
+          .from('developments')
+          .select('*')
+          .order('created_at', { ascending: false })
+      ),
+      approvedDeveloperIds
     )
 
     // Get total count for pagination
-    const countQuery = applyFilters(
-      supabase
-        .from('developments')
-        .select('*', { count: 'exact', head: true })
-        .eq('development_status', 'active')
+    const countQuery = applyPublicDevelopmentFilters(
+      applyFilters(
+        supabase
+          .from('developments')
+          .select('*', { count: 'exact', head: true })
+      ),
+      approvedDeveloperIds
     )
 
     const { count, error: countError } = await countQuery
@@ -185,6 +211,7 @@ export async function GET(request) {
             .from('developers')
             .select('id, developer_id, name, slug, profile_image, verified')
             .in('developer_id', developerIds)
+            .eq('admin_status', APPROVED_ADMIN_STATUS)
         : Promise.resolve({ data: [], error: null }),
       purposeIds.length > 0
         ? supabase.from('property_purposes').select('id, name').in('id', purposeIds)
