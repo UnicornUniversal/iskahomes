@@ -6,9 +6,10 @@ import DeveloperNav from '@/app/components/developers/DeveloperNav'
 import DeveloperTopNav from '@/app/components/developers/DeveloperTopNav'
 import { handleAuthFailure } from '@/lib/authFailureHandler'
 import AccountStatusGuard from '@/app/components/shared/AccountStatusGuard'
+import SubscriptionGuard from '@/app/components/shared/SubscriptionGuard'
 
 export default function DeveloperLayout({ children }) {
-  const { user, loading, isAuthenticated, developerToken } = useAuth()
+  const { user, loading, hydrating, isAuthenticated, developerToken } = useAuth()
   
   // Protect route - check authentication
   useEffect(() => {
@@ -42,8 +43,8 @@ export default function DeveloperLayout({ children }) {
     }
   }, [loading, isAuthenticated, user, developerToken])
   
-  // Show loading while checking auth
-  if (loading) {
+  // Show loading while checking auth or hydrating post-login profile
+  if (loading || hydrating) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -67,7 +68,9 @@ export default function DeveloperLayout({ children }) {
         <DeveloperNav />
         <div className='flex-1 flex flex-col p-2  default_bg md:!p-[2em] mt-[3em] h-full min-h-[700px]  md:mt-[7em] overflow-hidden lg:transition-all lg:duration-300' style={{marginLeft: 'clamp(0px, var(--nav-width, 0px), 300px)'}}>
           <AccountStatusGuard entityType="developer">
-            {children}
+            <SubscriptionGuard entityType="developer">
+              {children}
+            </SubscriptionGuard>
           </AccountStatusGuard>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import crypto from 'crypto'
 import { verifyToken } from '@/lib/jwt'
+import { assertLeadCreationAllowed } from '@/lib/subscriptionLimitsServer'
 
 const LEAD_CLASSIFICATIONS = ['Premium', 'High Value', 'Standard']
 
@@ -149,6 +150,18 @@ export async function POST(request) {
         .eq('slug', lister_id)
         .single()
       if (developer) finalListerId = developer.developer_id
+    }
+
+    const leadLimitCheck = await assertLeadCreationAllowed({
+      listerType: lister_type,
+      listerId: finalListerId,
+      agencyId: lister_type === 'agency' ? finalListerId : null,
+    })
+    if (!leadLimitCheck.allowed) {
+      return NextResponse.json(
+        { error: leadLimitCheck.message, code: 'SUBSCRIPTION_LIMIT', limitKey: 'leads_per_month' },
+        { status: 403 }
+      )
     }
 
     const now = new Date()

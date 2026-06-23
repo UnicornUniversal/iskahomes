@@ -6,14 +6,28 @@ import { userHasPermission } from '@/lib/permissionHelpers'
 import { toast } from 'react-toastify'
 import { FiShield, FiEdit, FiTrash2, FiUsers, FiLock } from 'react-icons/fi'
 import EditRoleModal from './EditRoleModal'
+import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits'
+import { SUBSCRIPTION_LOCKED_CARD_CLASS } from '@/lib/subscriptionLimits'
 
 const RolesList = ({ onRefresh, organizationType = 'developer' }) => {
   const { user, developerToken, agencyToken } = useAuth()
   const token = organizationType === 'agency' ? agencyToken : developerToken
+  const { getCumulativeLockedIds, getLimitTooltip } = useSubscriptionLimits()
   const [roles, setRoles] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedRole, setSelectedRole] = useState(null)
   const [showEditModal, setShowEditModal] = useState(false)
+
+  const lockedRoleIds = React.useMemo(
+    () =>
+      getCumulativeLockedIds(
+        roles,
+        'total_roles_limit',
+        (role) => role.created_at || role.updated_at,
+        (role) => role.id
+      ),
+    [roles, getCumulativeLockedIds]
+  )
 
   useEffect(() => {
     fetchRoles()
@@ -89,10 +103,13 @@ const RolesList = ({ onRefresh, organizationType = 'developer' }) => {
             No roles found. Create a role to get started!
           </div>
         ) : (
-          roles.map((role) => (
+          roles.map((role) => {
+            const locked = lockedRoleIds.has(role.id)
+            return (
             <div
               key={role.id}
-              className="secondary_bg rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+              className={`secondary_bg rounded-xl shadow-sm border border-gray-200 p-6 transition-shadow ${locked ? SUBSCRIPTION_LOCKED_CARD_CLASS : 'hover:shadow-md'}`}
+              title={locked ? getLimitTooltip('total_roles_limit') : undefined}
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -153,7 +170,8 @@ const RolesList = ({ onRefresh, organizationType = 'developer' }) => {
                 </div>
               </div>
             </div>
-          ))
+            )
+          })
         )}
       </div>
 

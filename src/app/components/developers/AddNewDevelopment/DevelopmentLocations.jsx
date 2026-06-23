@@ -4,7 +4,7 @@ import PropertyLocation from '@/app/components/propertyManagement/modules/Proper
 import { toast } from 'react-toastify'
 import { Plus, X, Edit3, MapPin, Star } from 'lucide-react'
 
-const DevelopmentLocations = ({ formData, updateFormData, isEditMode }) => {
+const DevelopmentLocations = ({ formData, updateFormData, isEditMode, suspendMap = false }) => {
   const [locations, setLocations] = useState([])
   const [editingIndex, setEditingIndex] = useState(null)
   const [showModal, setShowModal] = useState(false)
@@ -45,6 +45,12 @@ const DevelopmentLocations = ({ formData, updateFormData, isEditMode }) => {
       setLocations([])
     }
   }, [formData.development_locations])
+
+  useEffect(() => {
+    if (!suspendMap) return
+    setShowModal(false)
+    setEditingIndex(null)
+  }, [suspendMap])
 
   const handleLocationUpdate = (locationData) => {
     setCurrentLocation(locationData)
@@ -396,7 +402,7 @@ const DevelopmentLocations = ({ formData, updateFormData, isEditMode }) => {
       </div>
 
       {/* Modal for Add/Edit Location */}
-      {showModal && (
+      {showModal && !suspendMap && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pt-24" style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(8px)' }}>
           <div ref={modalRef} className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[85vh] overflow-y-auto border border-gray-200 z-[10000]">
             <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between">
@@ -414,6 +420,7 @@ const DevelopmentLocations = ({ formData, updateFormData, isEditMode }) => {
             
             <div className="p-6 space-y-4">
               <PropertyLocation
+                key={editingIndex !== null ? `edit-${editingIndex}` : 'new-location'}
                 formData={{ location: currentLocation }}
                 updateFormData={(data) => {
                   if (data.location) {
@@ -421,6 +428,7 @@ const DevelopmentLocations = ({ formData, updateFormData, isEditMode }) => {
                   }
                 }}
                 isEditMode={isEditMode}
+                enableMap
               />
               
               {/* Primary Location Checkbox */}

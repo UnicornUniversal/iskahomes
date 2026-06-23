@@ -21,6 +21,9 @@ import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import AddAgentModal from './AddAgentModal'
 import { formatCurrency } from '@/lib/utils'
+import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits'
+import SubscriptionLimitButton from '@/app/components/shared/SubscriptionLimitButton'
+import { SUBSCRIPTION_LOCKED_ROW_CLASS } from '@/lib/subscriptionLimits'
 
 const AgentManagement = () => {
   const { user } = useAuth()
@@ -43,6 +46,29 @@ const AgentManagement = () => {
   }
   
   const slug = getSlug()
+
+  const {
+    canCreateMore,
+    getCumulativeLockedIds,
+    getLimitTooltip,
+    usageSummary,
+  } = useSubscriptionLimits()
+
+  const lockedAgentIds = React.useMemo(
+    () =>
+      getCumulativeLockedIds(
+        agents,
+        'number_of_agents',
+        (agent) => agent.created_at || agent.joined_at || agent.invited_at || agent.joinDate,
+        (agent) => agent.agent_id || agent.id
+      ),
+    [agents, getCumulativeLockedIds]
+  )
+
+  const isAgentLocked = (agent) => lockedAgentIds.has(agent.agent_id || agent.id)
+  const agentLockMessage = getLimitTooltip('number_of_agents')
+
+  const canAddAgent = canCreateMore('number_of_agents')
 
   // Fetch agents
   useEffect(() => {
@@ -127,14 +153,21 @@ const AgentManagement = () => {
         <div>
           <h2 className='text-2xl font-bold text-primary_color mb-1'>Agent Management</h2>
           <p className='text-sm text-gray-600'>Manage your agency agents and their performance</p>
+          {usageSummary.agentsLimit != null && (
+            <p className='text-xs text-gray-500 mt-1'>
+              Plan: {agents.length}/{usageSummary.agentsLimit} agents
+            </p>
+          )}
         </div>
-        <button 
+        <SubscriptionLimitButton
           onClick={() => setIsAddModalOpen(true)}
+          enabled={canAddAgent}
+          limitKey="number_of_agents"
           className='flex items-center gap-2 bg-primary_color text-white px-6 py-3 rounded-lg hover:bg-primary_color/90 transition-colors duration-300 shadow-lg shadow-primary_color/20'
         >
           <FiPlus className='w-5 h-5' />
           <span className='font-medium'>Add New Agent</span>
-        </button>
+        </SubscriptionLimitButton>
       </div>
 
       {/* Stats Cards */}
@@ -202,7 +235,7 @@ const AgentManagement = () => {
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className='px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary_color/20 focus:border-primary_color'
+              className='w-full md:w-auto md:min-w-[11rem] shrink-0 pl-4 pr-10 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary_color/20 focus:border-primary_color'
             >
               <option value='all'>All Status</option>
               <option value='active'>Active</option>
@@ -270,8 +303,14 @@ const AgentManagement = () => {
               </tr>
             </thead>
             <tbody className='divide-y divide-gray-200'>
-              {filteredAgents.map((agent) => (
-                <tr key={agent.id} className='hover:bg-gray-50 transition-colors duration-150'>
+              {filteredAgents.map((agent) => {
+                const locked = isAgentLocked(agent)
+                return (
+                <tr
+                  key={agent.id}
+                  className={`hover:bg-gray-50 transition-colors duration-150 ${locked ? SUBSCRIPTION_LOCKED_ROW_CLASS : ''}`}
+                  title={locked ? agentLockMessage : undefined}
+                >
                   <td className='px-6 py-4 whitespace-nowrap'>
                     <Link href={`/agency/${slug}/agents/${agent.id}/profile`}>
                       <div className='flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-opacity'>
@@ -337,19 +376,21 @@ const AgentManagement = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
         </div>
       ) : (
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
-          {filteredAgents.map((agent) => (
-            <Link
-              key={agent.id}
-              href={`/agency/${slug}/agents/${agent.id}/profile`}
-              className='bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md hover:border-primary_color/20 transition-all duration-300'
-            >
+          {filteredAgents.map((agent) => {
+            const locked = isAgentLocked(agent)
+            const card = (
+              <div
+                className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 transition-all duration-300 ${locked ? SUBSCRIPTION_LOCKED_ROW_CLASS : 'hover:shadow-md hover:border-primary_color/20'}`}
+                title={locked ? agentLockMessage : undefined}
+              >
               <div className='flex items-center space-x-4 mb-4'>
                 <div className='w-12 h-12 rounded-full bg-primary_color/10 flex items-center justify-center flex-shrink-0'>
                   <span className='text-lg font-semibold text-primary_color'>{agent.avatar}</span>
@@ -393,8 +434,17 @@ const AgentManagement = () => {
                   )}
                 </div>
               </div>
-            </Link>
-          ))}
+              </div>
+            )
+            if (locked) {
+              return <div key={agent.id}>{card}</div>
+            }
+            return (
+              <Link key={agent.id} href={`/agency/${slug}/agents/${agent.id}/profile`}>
+                {card}
+              </Link>
+            )
+          })}
         </div>
       )}
 

@@ -12,6 +12,9 @@ import {
   FiFilter,
   FiClock,
 } from 'react-icons/fi'
+import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits'
+import SubscriptionLimitButton from '@/app/components/shared/SubscriptionLimitButton'
+import { getNumericLimit, SUBSCRIPTION_LOCKED_ROW_CLASS } from '@/lib/subscriptionLimits'
 
 const EVENT_LABELS = {
   auth_signup: 'Account created',
@@ -161,6 +164,29 @@ const AuditTrail = () => {
   const [exportFormat, setExportFormat] = useState('csv')
   const [error, setError] = useState('')
 
+  const {
+    limits,
+    isFeatureEnabled,
+    getLimitTooltip,
+    getCumulativeLockedIds,
+    loading: limitsLoading,
+  } = useSubscriptionLimits()
+
+  const auditCap = getNumericLimit(limits, 'audit_trails_limit')
+  const canExportAudit = isFeatureEnabled('audit_trails_export_enabled')
+  const auditAccessBlocked = auditCap === 0
+
+  const lockedEventKeys = useMemo(
+    () =>
+      getCumulativeLockedIds(
+        events,
+        'audit_trails_limit',
+        (evt) => evt.timestamp,
+        (evt) => evt.uuid || `${evt.event}-${evt.timestamp}`
+      ),
+    [events, getCumulativeLockedIds]
+  )
+
   const today = new Date().toISOString().split('T')[0]
 
   useEffect(() => {
@@ -289,7 +315,7 @@ const AuditTrail = () => {
   }
 
   const handleExport = async () => {
-    if (!token || exporting) return
+    if (!token || exporting || !canExportAudit) return
     try {
       setExporting(exportFormat)
       const params = new URLSearchParams()
@@ -331,13 +357,29 @@ const AuditTrail = () => {
     )
   }
 
+  if (!limitsLoading && auditAccessBlocked) {
+    return (
+      <div className="p-12 text-center space-y-3">
+        <p className="text-primary_color font-medium">Audit trail is not included in your current plan.</p>
+        <p className="text-sm text-primary_color/80">{getLimitTooltip('audit_trails_limit')}</p>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full space-y-4">
       {/* Filters */}
       <div className="rounded-xl p-3 bg-white/30 space-y-2">
-        <div className="flex items-center gap-2 text-sm font-medium text-primary_color">
-          <FiFilter className="w-4 h-4 text-primary_color" />
-          Filters
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 text-sm font-medium text-primary_color">
+            <FiFilter className="w-4 h-4 text-primary_color" />
+            Filters
+          </div>
+          {auditCap != null && (
+            <p className="text-xs text-primary_color/70">
+              Plan includes up to {auditCap} audit records (oldest records retained).
+            </p>
+          )}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 w-full">
           <div className="flex flex-col gap-1 w-full">
@@ -387,9 +429,15 @@ const AuditTrail = () => {
                 <option value="excel">Excel</option>
                 <option value="pdf">PDF</option>
               </select>
-              <button type="button" onClick={handleExport} disabled={!!exporting} className="secondary_button whitespace-nowrap">
+              <SubscriptionLimitButton
+                type="button"
+                onClick={handleExport}
+                enabled={canExportAudit && !exporting}
+                limitKey="audit_trails_export_enabled"
+                className="secondary_button whitespace-nowrap"
+              >
                 {exporting ? 'Exporting...' : 'Export'}
-              </button>
+              </SubscriptionLimitButton>
             </div>
           </div>
         </div>
@@ -427,10 +475,16 @@ const AuditTrail = () => {
             {filteredEvents.map((evt, index) => {
               const ActionIcon = getActionIcon(evt.event)
               const uniqueKey = evt.uuid ? `${evt.uuid}-${index}` : `evt-${index}-${evt.timestamp || ''}-${evt.event}`
+              const eventKey = evt.uuid || `${evt.event}-${evt.timestamp}`
+              const locked = lockedEventKeys.has(eventKey)
               const label = evt.event ? (EVENT_LABELS[evt.event] || evt.event.replace(/_/g, ' ')) : 'Unknown action'
               const userName = getUserName(evt.user_id || evt.distinct_id, evt)
               return (
-                <div key={uniqueKey} className="flex items-start gap-3 py-3 px-1 hover:bg-primary_color/10 rounded-lg transition-colors">
+                <div
+                  key={uniqueKey}
+                  className={`flex items-start gap-3 py-3 px-1 rounded-lg transition-colors ${locked ? SUBSCRIPTION_LOCKED_ROW_CLASS : 'hover:bg-primary_color/10'}`}
+                  title={locked ? getLimitTooltip('audit_trails_limit') : undefined}
+                >
                   <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary_color/10 text-primary_color flex items-center justify-center">
                     <ActionIcon className="w-5 h-5" />
                   </div>

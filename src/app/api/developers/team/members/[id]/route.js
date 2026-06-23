@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest, requirePermission } from '@/lib/apiPermissionMiddleware'
+import {
+  TEAM_MEMBER_WITH_ROLE_SELECT,
+  withEffectiveTeamMemberPermissions,
+} from '@/lib/teamMemberPermissions'
 import { captureAuditEvent } from '@/lib/auditLogger'
 
 // GET - Fetch a specific team member
@@ -20,10 +24,7 @@ export async function GET(request, { params }) {
     // Fetch the team member with role info
     const { data: member, error } = await supabaseAdmin
       .from('organization_team_members')
-      .select(`
-        *,
-        role:organization_roles(id, name, description, is_system_role)
-      `)
+      .select(TEAM_MEMBER_WITH_ROLE_SELECT)
       .eq('id', id)
       .eq('organization_type', organizationType)
       .eq('organization_id', userInfo.organization_id)
@@ -34,7 +35,7 @@ export async function GET(request, { params }) {
     }
 
     // Remove sensitive data
-    const { password_hash, invitation_token, ...sanitized } = member
+    const { password_hash, invitation_token, ...sanitized } = withEffectiveTeamMemberPermissions(member)
 
     return NextResponse.json({ 
       success: true,
@@ -152,7 +153,7 @@ export async function PUT(request, { params }) {
       // Verify new role exists
       const { data: newRole } = await supabaseAdmin
         .from('organization_roles')
-        .select('id, permissions')
+        .select('id, name, permissions')
         .eq('id', role_id)
         .eq('organization_type', organizationType)
         .eq('organization_id', userInfo.organization_id)
@@ -160,6 +161,13 @@ export async function PUT(request, { params }) {
 
       if (!newRole) {
         return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
+      }
+
+      if (newRole.name === 'Super Admin') {
+        return NextResponse.json(
+          { error: 'Super Admin role is reserved for the account owner and cannot be assigned' },
+          { status: 400 }
+        )
       }
 
       updateData.role_id = role_id
@@ -179,10 +187,7 @@ export async function PUT(request, { params }) {
       .from('organization_team_members')
       .update(updateData)
       .eq('id', id)
-      .select(`
-        *,
-        role:organization_roles(id, name, description, is_system_role)
-      `)
+      .select(TEAM_MEMBER_WITH_ROLE_SELECT)
       .single()
 
     if (error) {
@@ -194,7 +199,7 @@ export async function PUT(request, { params }) {
     }
 
     // Remove sensitive data
-    const { password_hash, invitation_token, ...sanitized } = updatedMember
+    const { password_hash, invitation_token, ...sanitized } = withEffectiveTeamMemberPermissions(updatedMember)
 
     const auditUserId = userInfo.developer_id || userInfo.agency_id || userInfo.user_id
     captureAuditEvent('team_member_updated', {

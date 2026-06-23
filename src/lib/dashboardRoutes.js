@@ -1,6 +1,8 @@
 /**
  * Display name for nav / headers — prefers profile name over email.
  */
+import { userCanAccessRoute } from './permissionHelpers'
+
 export function getUserDisplayName(user) {
   if (!user) return ''
 
@@ -58,4 +60,58 @@ export function getDashboardHref(user) {
       }
       return null
   }
+}
+
+/** Agency auth account id (agencies.agency_id) — for owners and team members acting on behalf of the agency. */
+export function getAgencyAccountId(user) {
+  if (!user) return null
+  const profile = user.profile || {}
+  if (profile.agency_id) return profile.agency_id
+  if (user.user_type === 'agency') return user.id
+  return null
+}
+
+export function getAgencySlug(user) {
+  if (!user) return null
+  const profile = user.profile || {}
+  if (user.user_type === 'team_member' && profile.organization_type === 'agency') {
+    return profile.organization_slug || profile.slug || null
+  }
+  return profile.slug || profile.organization_slug || null
+}
+
+const AGENCY_LANDING_ROUTES = [
+  ['dashboard', 'dashboard'],
+  ['agents', 'agents'],
+  ['listings', 'properties'],
+  ['appointments', 'appointments'],
+  ['messages', 'messages'],
+  ['leads', 'leads'],
+  ['analytics', 'analytics/overview'],
+  ['sales', 'sales'],
+  ['subscriptions', 'subscriptions'],
+  ['team', 'team'],
+  ['audit_trail', 'audit'],
+  ['profile', 'profile'],
+]
+
+/** First agency page the user is allowed to access (team members skip dashboard if denied). */
+export function getAgencyLandingHref(user) {
+  const slug = getAgencySlug(user)
+  if (!slug) return getDashboardHref(user)
+
+  if (user?.user_type === 'agency') {
+    return `/agency/${slug}/dashboard`
+  }
+
+  if (user?.user_type === 'team_member' && user.profile?.organization_type === 'agency') {
+    for (const [permission, path] of AGENCY_LANDING_ROUTES) {
+      if (userCanAccessRoute(user, permission)) {
+        return `/agency/${slug}/${path}`
+      }
+    }
+    return `/agency/${slug}/profile`
+  }
+
+  return `/agency/${slug}/dashboard`
 }

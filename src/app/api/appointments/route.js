@@ -5,6 +5,7 @@ import { captureAuditEvent } from '@/lib/auditLogger'
 import { NOTIFICATION_TYPES } from '@/lib/notifications/constants'
 import { cancelNotificationByRecord, rescheduleNotificationFromRecord, scheduleNotificationFromRecord } from '@/lib/notifications/scheduler'
 import { startNotificationWorker } from '@/lib/notifications/worker'
+import { assertAppointmentCreationAllowed } from '@/lib/subscriptionLimitsServer'
 
 export async function POST(request) {
   try {
@@ -80,6 +81,21 @@ export async function POST(request) {
     }
 
     console.log('Creating appointment:', { account_type, account_id, listing_id, seeker_id, client_name })
+
+    const appointmentLimitCheck = await assertAppointmentCreationAllowed({
+      accountType: account_type,
+      accountId: account_id,
+    })
+    if (!appointmentLimitCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: appointmentLimitCheck.message,
+          code: 'SUBSCRIPTION_LIMIT',
+          limitKey: 'appointments_per_month',
+        },
+        { status: 403 }
+      )
+    }
 
     // Insert appointment into database
     const { data: appointment, error } = await supabase

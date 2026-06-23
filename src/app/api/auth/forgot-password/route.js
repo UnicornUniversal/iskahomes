@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { buildFrontendUrl } from '@/lib/frontendUrl'
 import { captureAuditEvent } from '@/lib/auditLogger'
 
 export async function POST(request) {
@@ -17,7 +18,7 @@ export async function POST(request) {
 
     // Send password reset email using Supabase Auth
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://iskahomes.vercel.app/'}/reset-password`,
+      redirectTo: buildFrontendUrl('/reset-password'),
     })
 
     if (error) {

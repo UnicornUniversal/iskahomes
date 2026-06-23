@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import useAgentProfile from '@/hooks/useAgentProfile'
-import { MapPin, DollarSign, TrendingUp, Users, Eye } from 'lucide-react'
+import { MapPin, DollarSign, TrendingUp, Coins } from 'lucide-react'
 import DataCard from '@/app/components/developers/DataCard'
 import LatestLeads from '@/app/components/developers/DataStats/LatestLeads'
 import RecentMessages from '@/app/components/developers/DataStats/RecentMessages'
@@ -32,7 +32,7 @@ const AgentDashboard = () => {
   const totalLeads = agent?.total_leads ?? 0
   const totalSales = agent?.properties_sold ?? 0
   const totalRevenue = agent?.total_revenue ?? 0
-  const totalProfileViews = agent?.total_profile_views ?? 0
+  const totalCommission = agent?.total_commission ?? 0
 
   const listerId = agent?.agent_id || user?.id
 
@@ -75,9 +75,9 @@ const AgentDashboard = () => {
           icon={DollarSign}
         />
         <DataCard 
-          title="Profile Views" 
-          value={formatNumber(totalProfileViews)}
-          icon={Eye}
+          title="Total Commissions" 
+          value={formatCurrency(totalCommission, currency)}
+          icon={Coins}
         />
       </div>
 

@@ -7,6 +7,8 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { CustomSelect } from '@/app/components/ui/custom-select'
 import { userHasPermission } from '@/lib/permissionHelpers'
+import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits'
+import SubscriptionLimitButton from '@/app/components/shared/SubscriptionLimitButton'
 import { 
   usePropertyPurposes, 
   usePropertyTypes, 
@@ -71,6 +73,27 @@ const page = () => {
   
   // Filter visibility - default to true on desktop, false on mobile
   const [showFilters, setShowFilters] = useState(false)
+
+  const {
+    canCreateMore,
+    getCumulativeLockedIds,
+    getLimitTooltip,
+    usageSummary,
+  } = useSubscriptionLimits()
+
+  const lockedDevelopmentIds = useMemo(
+    () =>
+      getCumulativeLockedIds(
+        developments,
+        'developments_limit',
+        (dev) => dev.created_at || dev.updated_at
+      ),
+    [developments, getCumulativeLockedIds]
+  )
+
+  const canAddDevelopment = canCreateMore('developments_limit')
+  const canShowAddButton =
+    user?.user_type === 'agent' || userHasPermission(user, 'developments.create')
 
   // Debug user object
   useEffect(() => {
@@ -412,12 +435,22 @@ const page = () => {
           {/* Header */}
           <div className='flex justify-between items-center flex-wrap gap-4'>
             <h1 className="">Manage your Developments</h1>
-            {(user?.user_type === 'agent' || userHasPermission(user, 'developments.create')) && (
-              <Link href={`/developer/${params.slug}/developments/addNewDevelopment`}>
-                <button className='primary_button'>
+            {canShowAddButton && (
+              canAddDevelopment ? (
+                <Link href={`/developer/${params.slug}/developments/addNewDevelopment`}>
+                  <button type="button" className='primary_button'>
+                    Add Development
+                  </button>
+                </Link>
+              ) : (
+                <SubscriptionLimitButton
+                  enabled={false}
+                  limitKey="developments_limit"
+                  className='primary_button'
+                >
                   Add Development
-                </button>
-              </Link>
+                </SubscriptionLimitButton>
+              )
             )}
           </div>
 
@@ -425,6 +458,9 @@ const page = () => {
           <div className='flex items-center justify-between flex-wrap gap-4'>
             <span className='text-sm text-primary_color'>
               Showing {filteredDevelopments.length} of {developments.length} developments
+              {usageSummary.developmentsLimit != null && (
+                <span className='text-gray-500'> · Plan: {usageSummary.developments}/{usageSummary.developmentsLimit}</span>
+              )}
             </span>
             {/* View Toggle */}
             <div className='flex items-center gap-2'>
@@ -499,6 +535,8 @@ const page = () => {
                       total_units: development.total_units || 0
                     }}
                     viewMode={viewMode}
+                    locked={lockedDevelopmentIds.has(development.id)}
+                    lockMessage={getLimitTooltip('developments_limit')}
                   />
                 ))}
               </div>

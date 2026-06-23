@@ -2,8 +2,9 @@
 import React from 'react'
 import { useRouter } from 'next/navigation'
 import { MapPin } from 'lucide-react'
+import { SUBSCRIPTION_LOCKED_CARD_CLASS } from '@/lib/subscriptionLimits'
 
-const UnitCard = ({ unit, developerSlug, accountType = 'developer' }) => {
+const UnitCard = ({ unit, developerSlug, accountType = 'developer', locked = false, lockMessage }) => {
   const router = useRouter()
   const isAgent = accountType === 'agent'
   const isAgency = accountType === 'agency'
@@ -67,6 +68,11 @@ const UnitCard = ({ unit, developerSlug, accountType = 'developer' }) => {
   }
 
   const handleCardClick = (e) => {
+    if (locked) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
     e.preventDefault()
     e.stopPropagation()
     
@@ -91,8 +97,9 @@ const UnitCard = ({ unit, developerSlug, accountType = 'developer' }) => {
 
   return (
     <div 
-      className="bg-white/20 backdrop-blur-sm duration-300 cursor-pointer border border-gray-200"
+      className={`bg-white/20 backdrop-blur-sm duration-300 border border-gray-200 ${locked ? SUBSCRIPTION_LOCKED_CARD_CLASS : 'cursor-pointer'}`}
       onClick={handleCardClick}
+      title={locked ? lockMessage : undefined}
     >
       {/* Image Section */}
       <div className="relative h-48 overflow-hidden rounded-t-lg">

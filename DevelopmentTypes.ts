@@ -154,7 +154,7 @@ export interface Development {
   seo?: SEO;
 
   // System fields
-  development_status?: 'active' | 'inactive' | 'draft';
+  development_status?: 'active' | 'inactive' | 'draft' | 'deleted';
   featured?: boolean;
   verified?: boolean;
   views?: number;

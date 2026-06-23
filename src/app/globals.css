@@ -139,6 +139,49 @@
   height: auto;
 }
 
+/* Development units swiper (developer dashboard) */
+.development-units-swiper {
+  padding: 8px 36px 40px 36px;
+  overflow: visible;
+}
+
+.development-units-swiper .swiper-slide {
+  width: 260px !important;
+  max-width: 260px;
+  height: auto;
+  flex-shrink: 0;
+}
+
+.development-units-swiper .swiper-button-next,
+.development-units-swiper .swiper-button-prev {
+  color: var(--color-primary_color);
+  background: white;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-primary_color);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  top: 42%;
+}
+
+.development-units-swiper .swiper-button-prev {
+  left: 0;
+}
+
+.development-units-swiper .swiper-button-next {
+  right: 0;
+}
+
+.development-units-swiper .swiper-button-next:after,
+.development-units-swiper .swiper-button-prev:after {
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.development-units-swiper .swiper-button-disabled {
+  opacity: 0.35;
+}
+
 /* Simple Services Swiper custom styles */
 .simple-services-swiper {
   width: 100%;

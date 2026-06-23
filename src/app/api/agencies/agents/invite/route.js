@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 import { sendAgentInvitationEmail } from '@/lib/sendgrid'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { checkEmailAvailableForInvitation, normalizeEmail } from '@/lib/emailAvailability'
 import { getSubscriptionLimitsForUser } from '@/lib/subscriptionLimitsServer'
 import { checkNumericLimit } from '@/lib/subscriptionLimits'
 import crypto from 'crypto'
@@ -53,7 +54,8 @@ export async function POST(request) {
     }
 
     const body = await request.json()
-    const { name, email, phone, location_id } = body
+    const { name, email: rawEmail, phone, location_id } = body
+    const email = normalizeEmail(rawEmail)
 
     // Validate required fields
     if (!name || !email) {
@@ -72,11 +74,11 @@ export async function POST(request) {
       )
     }
 
-    // Check if agent with this email already exists
+    // Check if agent with this email already exists for this agency
     const { data: existingAgent, error: checkError } = await supabaseAdmin
       .from('agents')
       .select('id, invitation_status')
-      .eq('email', email)
+      .ilike('email', email)
       .eq('agency_id', agencyId)
       .maybeSingle()
 
@@ -94,6 +96,16 @@ export async function POST(request) {
         { error: 'An agent with this email has already accepted an invitation' },
         { status: 400 }
       )
+    }
+
+    const emailAvailability = await checkEmailAvailableForInvitation(email, {
+      ignoreAgentId: existingAgent?.id || null,
+    })
+    if (emailAvailability.available === null) {
+      return NextResponse.json({ error: emailAvailability.message }, { status: 500 })
+    }
+    if (!emailAvailability.available) {
+      return NextResponse.json({ error: emailAvailability.message }, { status: 409 })
     }
 
     // Get agency details for email and company_locations

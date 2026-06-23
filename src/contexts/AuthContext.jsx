@@ -6,6 +6,10 @@ import { supabase } from '@/lib/supabase';
 import posthog from 'posthog-js';
 import { handleAuthFailure } from '@/lib/authFailureHandler';
 import { clearAnonymousId } from '@/lib/anonymousId';
+import {
+  TEAM_MEMBER_WITH_ROLE_SELECT,
+  resolvePermissionsFromTeamMember,
+} from '@/lib/teamMemberPermissions';
 
 const AuthContext = createContext();
 
@@ -121,6 +125,7 @@ const enrichDeveloperStats = async (developerData) => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [hydrating, setHydrating] = useState(false);
   const [developerToken, setDeveloperToken] = useState('');
   const [agencyToken, setAgencyToken] = useState('');
   const [agentToken, setAgentToken] = useState('');
@@ -178,7 +183,28 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  const loadUser = async () => {
+  const loadUser = async ({ silent = false } = {}) => {
+    let resolvedUser = null;
+    const commitUser = (userData) => {
+      setUser(userData);
+      resolvedUser = userData;
+      return userData;
+    };
+    const redirectOnAuthFailure = () => {
+      if (silent || typeof window === 'undefined') return;
+      if (handleAuthFailure) {
+        handleAuthFailure('/home/signin');
+      } else {
+        window.location.href = '/home/signin';
+      }
+    };
+
+    if (silent) {
+      setHydrating(true);
+    } else {
+      setLoading(true);
+    }
+
     try {
       // Check for all possible token types
       const developerTokenValue = localStorage.getItem('developer_token');
@@ -242,10 +268,7 @@ export const AuthProvider = ({ children }) => {
           // Load team member from organization_team_members
           const { data: teamMember, error: teamError } = await supabase
             .from('organization_team_members')
-            .select(`
-              *,
-              role:organization_roles(id, name, description, is_system_role)
-            `)
+            .select(TEAM_MEMBER_WITH_ROLE_SELECT)
             .eq('id', decoded.team_member_id)
             .eq('status', 'active')
             .maybeSingle();
@@ -253,8 +276,7 @@ export const AuthProvider = ({ children }) => {
           if (teamError) {
             console.error('🔐 AUTH CONTEXT: Error loading team member:', teamError);
             // Don't clear token on database error, might be temporary
-            setLoading(false);
-            return;
+            return null;
           }
           
           if (!teamMember) {
@@ -263,15 +285,16 @@ export const AuthProvider = ({ children }) => {
             setDeveloperToken('');
             setUser(null);
             if (typeof window !== 'undefined') {
-              handleAuthFailure('/home/signin');
+              redirectOnAuthFailure();
             }
-            return;
+            return null;
           }
           
           // Get organization details and developer_id
           let organizationSlug = null;
           let organizationName = null;
           let developerId = null;
+          let agencyId = null;
           let orgAdminStatus = '';
           let orgProfileStatus = '';
           
@@ -283,17 +306,18 @@ export const AuthProvider = ({ children }) => {
               .single();
             organizationSlug = devOrg?.slug;
             organizationName = devOrg?.name;
-            developerId = devOrg?.developer_id; // Add developer_id for easy access
+            developerId = devOrg?.developer_id;
             orgAdminStatus = devOrg?.admin_status || '';
             orgProfileStatus = devOrg?.account_status || '';
           } else if (teamMember.organization_type === 'agency') {
             const { data: agencyOrg } = await supabase
               .from('agencies')
               .select('slug, name, agency_id, admin_status, account_status')
-              .eq('agency_id', teamMember.organization_id)
+              .eq('id', teamMember.organization_id)
               .single();
             organizationSlug = agencyOrg?.slug;
             organizationName = agencyOrg?.name;
+            agencyId = agencyOrg?.agency_id;
             orgAdminStatus = agencyOrg?.admin_status || '';
             orgProfileStatus = agencyOrg?.account_status || '';
           }
@@ -309,20 +333,22 @@ export const AuthProvider = ({ children }) => {
               organization_id: teamMember.organization_id,
               organization_slug: organizationSlug,
               organization_name: organizationName,
-              developer_id: developerId, // Add developer_id so components can use it directly
-              organization_admin_status: orgAdminStatus,
+              developer_id: developerId,
+              agency_id: agencyId,
+              organization_admin_status: orgAdminStatus || orgProfileStatus,
               organization_profile_status: orgProfileStatus,
+              admin_status: orgAdminStatus || orgProfileStatus,
+              account_status: orgProfileStatus || orgAdminStatus,
               role_id: teamMember.role_id,
               role_name: teamMember.role?.name,
-              permissions: teamMember.permissions,
+              permissions: resolvePermissionsFromTeamMember(teamMember),
               email: teamMember.email,
               first_name: teamMember.first_name,
               last_name: teamMember.last_name
             }
           };
-          setUser(userData);
           console.log('🔐 AUTH CONTEXT: Team member loaded successfully from developer_token');
-          return;
+          return commitUser(userData);
         } else if (decoded && decoded.developer_id) {
           setDeveloperToken(developerTokenValue);
           
@@ -342,7 +368,7 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
             // Handle auth failure (logout, clear storage, redirect)
             if (typeof window !== 'undefined') {
-              handleAuthFailure('/home/signin');
+              redirectOnAuthFailure();
             }
             return;
           } else if (userData) {
@@ -350,20 +376,16 @@ export const AuthProvider = ({ children }) => {
             // Even owners need to be in organization_team_members to have permissions loaded
             const { data: teamMember, error: teamError } = await supabase
               .from('organization_team_members')
-              .select(`
-                *,
-                role:organization_roles(id, name, description, is_system_role)
-              `)
+              .select(TEAM_MEMBER_WITH_ROLE_SELECT)
               .eq('organization_type', 'developer')
               .eq('organization_id', userData.id)
               .eq('user_id', developerId)
               .eq('status', 'active')
               .maybeSingle()
             
-            // Add permissions from organization_team_members if found
             const minimalDeveloperProfile = { ...userData }
-            if (teamMember && teamMember.permissions) {
-              minimalDeveloperProfile.permissions = teamMember.permissions
+            if (teamMember) {
+              minimalDeveloperProfile.permissions = resolvePermissionsFromTeamMember(teamMember)
               minimalDeveloperProfile.role_id = teamMember.role_id
               minimalDeveloperProfile.role_name = teamMember.role?.name
               minimalDeveloperProfile.team_member_id = teamMember.id
@@ -376,7 +398,7 @@ export const AuthProvider = ({ children }) => {
             // Fetch subscription data
             const subscription = await fetchUserSubscription(developerId, 'developer');
             
-            setUser({
+            return commitUser({
               id: userData.developer_id,
               email: userData.email,
               user_type: 'developer',
@@ -386,7 +408,7 @@ export const AuthProvider = ({ children }) => {
                 default_currency: userData.default_currency || null,
                 commission_rate: userData.commission_rate ?? null
               },
-              subscription: subscription || null // Add subscription data
+              subscription: subscription || null
             });
           } else {
             // No user data found - auth failure
@@ -395,11 +417,7 @@ export const AuthProvider = ({ children }) => {
             setDeveloperToken('');
             setUser(null);
             if (typeof window !== 'undefined') {
-              if (handleAuthFailure) {
-                handleAuthFailure('/home/signin');
-              } else {
-                window.location.href = '/home/signin';
-              }
+              redirectOnAuthFailure();
             }
             return;
           }
@@ -409,11 +427,7 @@ export const AuthProvider = ({ children }) => {
           localStorage.removeItem('developer_token');
           setDeveloperToken('');
           setUser(null);
-          if (handleAuthFailure) {
-            handleAuthFailure('/home/signin');
-          } else {
-            window.location.href = '/home/signin';
-          }
+          redirectOnAuthFailure();
           return;
         }
       } else if (agencyTokenValue) {
@@ -436,19 +450,14 @@ export const AuthProvider = ({ children }) => {
           // Load team member from organization_team_members
           const { data: teamMember, error: teamError } = await supabase
             .from('organization_team_members')
-            .select(`
-              *,
-              role:organization_roles(id, name, description, is_system_role)
-            `)
+            .select(TEAM_MEMBER_WITH_ROLE_SELECT)
             .eq('id', decoded.team_member_id)
             .eq('status', 'active')
             .maybeSingle();
           
           if (teamError) {
             console.error('🔐 AUTH CONTEXT: Error loading team member:', teamError);
-            // Don't clear token on database error, might be temporary
-            setLoading(false);
-            return;
+            return null;
           }
           
           if (!teamMember) {
@@ -457,15 +466,16 @@ export const AuthProvider = ({ children }) => {
             setAgencyToken('');
             setUser(null);
             if (typeof window !== 'undefined') {
-              handleAuthFailure('/home/signin');
+              redirectOnAuthFailure();
             }
-            return;
+            return null;
           }
           
           // Get organization details and developer_id
           let organizationSlug = null;
           let organizationName = null;
           let developerId = null;
+          let agencyId = null;
           let orgAdminStatus = '';
           let orgProfileStatus = '';
           
@@ -477,22 +487,23 @@ export const AuthProvider = ({ children }) => {
               .single();
             organizationSlug = devOrg?.slug;
             organizationName = devOrg?.name;
-            developerId = devOrg?.developer_id; // Add developer_id for easy access
+            developerId = devOrg?.developer_id;
             orgAdminStatus = devOrg?.admin_status || '';
             orgProfileStatus = devOrg?.account_status || '';
           } else if (teamMember.organization_type === 'agency') {
             const { data: agencyOrg } = await supabase
               .from('agencies')
               .select('slug, name, agency_id, admin_status, account_status')
-              .eq('agency_id', teamMember.organization_id)
+              .eq('id', teamMember.organization_id)
               .single();
             organizationSlug = agencyOrg?.slug;
             organizationName = agencyOrg?.name;
+            agencyId = agencyOrg?.agency_id;
             orgAdminStatus = agencyOrg?.admin_status || '';
             orgProfileStatus = agencyOrg?.account_status || '';
           }
           
-          setUser({
+          const agencyTeamMemberUser = {
             id: decoded.user_id,
             email: teamMember.email,
             user_type: 'team_member',
@@ -503,19 +514,22 @@ export const AuthProvider = ({ children }) => {
               organization_id: teamMember.organization_id,
               organization_slug: organizationSlug,
               organization_name: organizationName,
-              developer_id: developerId, // Add developer_id so components can use it directly
-              organization_admin_status: orgAdminStatus,
+              developer_id: developerId,
+              agency_id: agencyId,
+              organization_admin_status: orgAdminStatus || orgProfileStatus,
               organization_profile_status: orgProfileStatus,
+              admin_status: orgAdminStatus || orgProfileStatus,
+              account_status: orgProfileStatus || orgAdminStatus,
               role_id: teamMember.role_id,
               role_name: teamMember.role?.name,
-              permissions: teamMember.permissions,
+              permissions: resolvePermissionsFromTeamMember(teamMember),
               email: teamMember.email,
               first_name: teamMember.first_name,
               last_name: teamMember.last_name
             }
-          });
+          };
           console.log('🔐 AUTH CONTEXT: Team member loaded successfully from agency_token');
-          return;
+          return commitUser(agencyTeamMemberUser);
         } else if (decoded && decoded.agency_id) {
           setAgencyToken(agencyTokenValue);
           
@@ -535,7 +549,7 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
             // Handle auth failure (logout, clear storage, redirect)
             if (typeof window !== 'undefined') {
-              handleAuthFailure('/home/signin');
+              redirectOnAuthFailure();
             }
             return;
           } else if (userData) {
@@ -543,19 +557,15 @@ export const AuthProvider = ({ children }) => {
             // Even owners need to be in organization_team_members to have permissions loaded
             const { data: teamMember, error: teamError } = await supabase
               .from('organization_team_members')
-              .select(`
-                *,
-                role:organization_roles(id, name, description, is_system_role)
-              `)
+              .select(TEAM_MEMBER_WITH_ROLE_SELECT)
               .eq('organization_type', 'agency')
               .eq('organization_id', userData.id)
               .eq('user_id', agencyId)
               .eq('status', 'active')
               .maybeSingle()
             
-            // Add permissions from organization_team_members if found
-            if (teamMember && teamMember.permissions) {
-              userData.permissions = teamMember.permissions
+            if (teamMember) {
+              userData.permissions = resolvePermissionsFromTeamMember(teamMember)
               userData.role_id = teamMember.role_id
               userData.role_name = teamMember.role?.name
               userData.team_member_id = teamMember.id
@@ -568,7 +578,7 @@ export const AuthProvider = ({ children }) => {
             // Fetch subscription data
             const subscription = await fetchUserSubscription(agencyId, 'agency');
             
-            setUser({
+            return commitUser({
               id: userData.agency_id,
               email: userData.email,
               user_type: 'agency',
@@ -597,11 +607,7 @@ export const AuthProvider = ({ children }) => {
             setAgencyToken('');
             setUser(null);
             if (typeof window !== 'undefined') {
-              if (handleAuthFailure) {
-                handleAuthFailure('/home/signin');
-              } else {
-                window.location.href = '/home/signin';
-              }
+              redirectOnAuthFailure();
             }
             return;
           }
@@ -611,11 +617,7 @@ export const AuthProvider = ({ children }) => {
           localStorage.removeItem('agency_token');
           setAgencyToken('');
           setUser(null);
-          if (handleAuthFailure) {
-            handleAuthFailure('/home/signin');
-          } else {
-            window.location.href = '/home/signin';
-          }
+          redirectOnAuthFailure();
           return;
         }
       } else if (agentTokenValue) {
@@ -639,13 +641,13 @@ export const AuthProvider = ({ children }) => {
             setAgentToken('');
             setUser(null);
             if (typeof window !== 'undefined') {
-              handleAuthFailure('/home/signin');
+              redirectOnAuthFailure();
             }
             return;
           } else if (userData) {
             const subscription = await fetchUserSubscription(agentId, 'agent');
             
-            setUser({
+            return commitUser({
               id: userData.agent_id,
               email: userData.email,
               name: userData.name,
@@ -672,11 +674,7 @@ export const AuthProvider = ({ children }) => {
             setAgentToken('');
             setUser(null);
             if (typeof window !== 'undefined') {
-              if (handleAuthFailure) {
-                handleAuthFailure('/home/signin');
-              } else {
-                window.location.href = '/home/signin';
-              }
+              redirectOnAuthFailure();
             }
             return;
           }
@@ -685,11 +683,7 @@ export const AuthProvider = ({ children }) => {
           localStorage.removeItem('agent_token');
           setAgentToken('');
           setUser(null);
-          if (handleAuthFailure) {
-            handleAuthFailure('/home/signin');
-          } else {
-            window.location.href = '/home/signin';
-          }
+          redirectOnAuthFailure();
           return;
         }
       } else if (propertySeekerTokenValue) {
@@ -712,13 +706,13 @@ export const AuthProvider = ({ children }) => {
               setPropertySeekerToken('');
             setUser(null);
             if (typeof window !== 'undefined') {
-              handleAuthFailure('/home/signin');
+              redirectOnAuthFailure();
             }
             return;
           } else if (userData) {
             const subscription = await fetchUserSubscription(seekerId, 'property_seeker');
             
-            setUser({
+            return commitUser({
               id: userData.id,
               email: userData.email,
               name: userData.name,
@@ -738,11 +732,7 @@ export const AuthProvider = ({ children }) => {
             setPropertySeekerToken('');
             setUser(null);
             if (typeof window !== 'undefined') {
-              if (handleAuthFailure) {
-                handleAuthFailure('/home/signin');
-              } else {
-                window.location.href = '/home/signin';
-              }
+              redirectOnAuthFailure();
             }
             return;
           }
@@ -751,11 +741,7 @@ export const AuthProvider = ({ children }) => {
           localStorage.removeItem('property_seeker_token');
           setPropertySeekerToken('');
           setUser(null);
-          if (handleAuthFailure) {
-            handleAuthFailure('/home/signin');
-          } else {
-            window.location.href = '/home/signin';
-          }
+          redirectOnAuthFailure();
           return;
         }
       } else {
@@ -777,7 +763,7 @@ export const AuthProvider = ({ children }) => {
           // Only redirect if on a protected route (don't redirect from public pages)
           if (isProtectedRoute && !isPublicRoute) {
             console.log('No token found on protected route, redirecting to signin');
-            handleAuthFailure('/home/signin');
+            redirectOnAuthFailure();
             return;
           }
         }
@@ -795,11 +781,7 @@ export const AuthProvider = ({ children }) => {
         setAgentToken('');
         setPropertySeekerToken('');
         setUser(null);
-        if (handleAuthFailure) {
-          handleAuthFailure('/home/signin');
-        } else {
-          window.location.href = '/home/signin';
-        }
+        redirectOnAuthFailure();
       } else {
         // Other errors - also logout for security
         localStorage.removeItem('developer_token');
@@ -811,15 +793,17 @@ export const AuthProvider = ({ children }) => {
         setAgentToken('');
         setPropertySeekerToken('');
         setUser(null);
-        if (handleAuthFailure) {
-          handleAuthFailure('/home/signin');
-        } else {
-          window.location.href = '/home/signin';
-        }
+        redirectOnAuthFailure();
       }
     } finally {
-      setLoading(false);
+      if (silent) {
+        setHydrating(false);
+      } else {
+        setLoading(false);
+      }
     }
+
+    return resolvedUser;
   };
 
   // Load user from token on mount
@@ -904,212 +888,88 @@ export const AuthProvider = ({ children }) => {
           // Clear anonymous ID when user logs in (they now have a real user ID)
           clearAnonymousId();
           
-          // Handle different user types
-          if (data.user.user_type === 'team_member') {
-            // Team members use the same token as their organization
-            const orgType = data.user.profile?.organization_type
-            console.log('🔐 AUTH CONTEXT: Team member login, orgType:', orgType);
-            
-            // CRITICAL: Save token FIRST, synchronously, before anything else
-            if (orgType === 'developer') {
-              console.log('🔐 AUTH CONTEXT: Saving developer_token for team member');
-              localStorage.setItem('developer_token', data.token);
-              // CRITICAL: Set state immediately and synchronously
-              setDeveloperToken(data.token);
-              // Verify it was saved
-              const savedToken = localStorage.getItem('developer_token');
-              console.log('🔐 AUTH CONTEXT: Token saved verification:', savedToken ? 'YES' : 'NO', savedToken?.substring(0, 20));
-            } else if (orgType === 'agency') {
-              console.log('🔐 AUTH CONTEXT: Saving agency_token for team member');
-              localStorage.setItem('agency_token', data.token);
-              // CRITICAL: Set state immediately and synchronously
-              setAgencyToken(data.token);
-              // Verify it was saved
-              const savedToken = localStorage.getItem('agency_token');
-              console.log('🔐 AUTH CONTEXT: Token saved verification:', savedToken ? 'YES' : 'NO', savedToken?.substring(0, 20));
-            } else {
-              console.error('🔐 AUTH CONTEXT: Unknown organization type for team member:', orgType);
-              return { success: false, error: 'Unknown organization type' };
-            }
-            
-            // Team members don't have subscriptions (organization has it)
-            // Enrich profile with developer_id if it's a developer organization
-            let enrichedUser = { ...data.user };
-            if (enrichedUser.profile?.organization_type === 'developer' && !enrichedUser.profile?.developer_id) {
-              const { data: devOrg } = await supabase
-                .from('developers')
-                .select('developer_id')
-                .eq('id', enrichedUser.profile.organization_id)
-                .single();
-              if (devOrg?.developer_id) {
-                enrichedUser.profile.developer_id = devOrg.developer_id;
-              }
-            }
-            
-            console.log('🔐 AUTH CONTEXT: Setting user data:', enrichedUser);
-            // CRITICAL: Set user state immediately
-            setUser(enrichedUser);
-            
-            // Force a small delay to ensure state updates propagate
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            // Track login with PostHog
-            posthog.identify(data.user.id, {
-              email: data.user.email,
-              user_type: 'team_member',
-              organization_type: data.user.profile?.organization_type,
-              organization_id: data.user.profile?.organization_id,
-              role_name: data.user.profile?.role_name
-            });
-            
-            posthog.capture('user_logged_in', {
-              user_type: 'team_member',
-              organization_type: data.user.profile?.organization_type,
-              login_method: 'email'
-            });
-            
-            console.log('🔐 AUTH CONTEXT: Team member login successful, token persisted');
-            return { success: true, user: data.user };
-          } else if (data.user.user_type === 'developer') {
-            // Store developer token
-            localStorage.setItem('developer_token', data.token);
-            setDeveloperToken(data.token);
-            
-            // Fetch subscription data
-            const subscription = await fetchUserSubscription(data.user.id, 'developer');
-            
-            // Add subscription to user object
-            const userWithSubscription = {
-              ...data.user,
-              subscription: subscription || null
-            };
-            
-            setUser(userWithSubscription);
-            
-            // Track login with PostHog
-            posthog.identify(data.user.id, {
-              email: data.user.email,
-              user_type: data.user.user_type,
-              name: data.user.profile?.name,
-              developer_id: data.user.profile?.developer_id
-            });
-            
-            posthog.capture('user_logged_in', {
-              user_type: data.user.user_type,
-              login_method: 'email'
-            });
-            
-            return { success: true, user: userWithSubscription };
-          } else if (data.user.user_type === 'agency') {
-            // Store agency token
-            localStorage.setItem('agency_token', data.token);
-            setAgencyToken(data.token);
-            
-            // Fetch subscription data
-            const subscription = await fetchUserSubscription(data.user.id, 'agency');
-            
-            // Add subscription to user object
-            const userWithSubscription = {
-              ...data.user,
-              subscription: subscription || null
-            };
-            
-            setUser(userWithSubscription);
-            
-            // Track login with PostHog
-            posthog.identify(data.user.id, {
-              email: data.user.email,
-              user_type: data.user.user_type,
-              name: data.user.profile?.name,
-              agency_id: data.user.profile?.agency_id
-            });
-            
-            posthog.capture('user_logged_in', {
-              user_type: data.user.user_type,
-              login_method: 'email'
-            });
-            
-            return { success: true, user: userWithSubscription };
-          } else if (data.user.user_type === 'property_seeker') {
-            // Store property seeker token
-            console.log('🔍 Property Seeker Login - Storing token:', data.token)
-            console.log('🔍 Property Seeker Login - User data:', data.user)
-            localStorage.setItem('property_seeker_token', data.token);
-            setPropertySeekerToken(data.token);
-            
-            // Property seekers typically don't have subscriptions, but fetch anyway
-            const subscription = await fetchUserSubscription(data.user.id, 'property_seeker');
-            
-            // Add subscription to user object
-            const userWithSubscription = {
-              ...data.user,
-              subscription: subscription || null
-            };
-            
-            setUser(userWithSubscription);
-            
-            // Track login with PostHog
-            posthog.identify(data.user.id, {
-              email: data.user.email,
-              user_type: data.user.user_type,
-              name: data.user.profile?.name
-            });
-            
-            posthog.capture('user_logged_in', {
-              user_type: data.user.user_type,
-              login_method: 'email'
-            });
-            
-            return { success: true, user: userWithSubscription };
-          } else if (data.user.user_type === 'agent') {
-            // Store agent token
-            localStorage.setItem('agent_token', data.token);
-            setAgentToken(data.token);
-            
-            // Fetch subscription data
-            const subscription = await fetchUserSubscription(data.user.id, 'agent');
-            
-            // Add subscription to user object
-            const userWithSubscription = {
-              ...data.user,
-              name: data.user.profile?.name || data.user.name,
-              subscription: subscription || null
-            };
-            
-            setUser(userWithSubscription);
-            
-            posthog.identify(data.user.id, {
-              email: data.user.email,
-              user_type: data.user.user_type,
-              name: userWithSubscription.name,
-              agent_id: data.user.profile?.agent_id
-            });
-            
-            posthog.capture('user_logged_in', {
-              user_type: data.user.user_type,
-              login_method: 'email'
-            });
-            
-            return { success: true, user: userWithSubscription };
-          } else if (data.user.user_type === 'admin') {
-            // Store admin token
+          const userType = data.user.user_type;
+          const orgType = data.user.profile?.organization_type;
+          let sessionUser = null;
+
+          if (userType === 'admin') {
             localStorage.setItem('admin_token', data.token);
             setUser(data.user);
-            
-            posthog.identify(data.user.id, {
-              email: data.user.email,
-              user_type: data.user.user_type
-            });
-            
-            posthog.capture('user_logged_in', {
-              user_type: data.user.user_type,
-              login_method: 'email'
-            });
-            
-            return { success: true, user: data.user };
+            sessionUser = data.user;
           } else {
-            return { success: false, error: 'Invalid user type' };
+            const hydrateFromToken = userType === 'team_member' || userType === 'developer' || userType === 'agency';
+
+            if (userType === 'team_member') {
+              if (orgType === 'developer') {
+                localStorage.setItem('developer_token', data.token);
+                setDeveloperToken(data.token);
+              } else if (orgType === 'agency') {
+                localStorage.setItem('agency_token', data.token);
+                setAgencyToken(data.token);
+              } else {
+                return { success: false, error: 'Unknown organization type' };
+              }
+            } else if (userType === 'developer') {
+              localStorage.setItem('developer_token', data.token);
+              setDeveloperToken(data.token);
+            } else if (userType === 'agency') {
+              localStorage.setItem('agency_token', data.token);
+              setAgencyToken(data.token);
+            } else if (userType === 'property_seeker') {
+              localStorage.setItem('property_seeker_token', data.token);
+              setPropertySeekerToken(data.token);
+            } else if (userType === 'agent') {
+              localStorage.setItem('agent_token', data.token);
+              setAgentToken(data.token);
+            } else {
+              return { success: false, error: 'Invalid user type' };
+            }
+
+            if (hydrateFromToken) {
+              sessionUser = await loadUser({ silent: true });
+              if (!sessionUser) {
+                return {
+                  success: false,
+                  error: 'Failed to load your profile after login. Please try again.',
+                };
+              }
+            } else if (userType === 'agent') {
+              const subscription = await fetchUserSubscription(data.user.id, 'agent');
+              sessionUser = {
+                ...data.user,
+                name: data.user.profile?.name || data.user.name,
+                subscription: subscription || null,
+              };
+              setUser(sessionUser);
+            } else if (userType === 'property_seeker') {
+              const subscription = await fetchUserSubscription(data.user.id, 'property_seeker');
+              sessionUser = {
+                ...data.user,
+                subscription: subscription || null,
+              };
+              setUser(sessionUser);
+            }
           }
+
+          posthog.identify(sessionUser.id, {
+            email: sessionUser.email,
+            user_type: sessionUser.user_type,
+            name: sessionUser.profile?.name || sessionUser.name,
+            organization_type: sessionUser.profile?.organization_type,
+            organization_id: sessionUser.profile?.organization_id,
+            role_name: sessionUser.profile?.role_name,
+            developer_id: sessionUser.profile?.developer_id,
+            agency_id: sessionUser.profile?.agency_id,
+            agent_id: sessionUser.profile?.agent_id,
+          });
+
+          posthog.capture('user_logged_in', {
+            user_type: sessionUser.user_type,
+            organization_type: sessionUser.profile?.organization_type,
+            login_method: 'email',
+          });
+
+          return { success: true, user: sessionUser };
         } else {
           // No token returned - login failed
           console.error('Login failed: No token in response');
@@ -1189,6 +1049,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     loading,
+    hydrating,
     developerToken,
     agencyToken,
     agentToken,

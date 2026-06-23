@@ -8,6 +8,7 @@ import { ToastContainer, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { getAgencyLandingHref } from '@/lib/dashboardRoutes'
 
 const SignInPage = () => {
   const { login, isAuthenticated, user, loading } = useAuth()
@@ -77,7 +78,7 @@ const SignInPage = () => {
           if (user.profile?.organization_type === 'developer') {
             redirectUrl = `/developer/${user.profile?.organization_slug}/dashboard`
           } else if (user.profile?.organization_type === 'agency') {
-            redirectUrl = `/agency/${user.profile?.organization_slug}/dashboard`
+            redirectUrl = getAgencyLandingHref(user)
           } else {
             redirectUrl = '/'
           }
@@ -150,7 +151,7 @@ const SignInPage = () => {
         if (userData.profile?.organization_type === 'developer') {
           redirectUrl = `/developer/${userData.profile?.organization_slug}/dashboard`
         } else if (userData.profile?.organization_type === 'agency') {
-          redirectUrl = `/agency/${userData.profile?.organization_slug}/dashboard`
+          redirectUrl = getAgencyLandingHref(userData)
         } else {
           redirectUrl = '/'
         }
