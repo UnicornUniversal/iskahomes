@@ -181,7 +181,7 @@ const SignupPage = () => {
             {/* Top Section */}
             <div>
               <p className="text-sm font-normal mb-2 text-white">Welcome to</p>
-              <h1 className="text-7xl font-bold mb-4 text-white">Iska Homes</h1>
+              <h1 className="text-7xl font-bold mb-4 text-white">ISKA Homes</h1>
               <p className="text-sm text-white/90">Join thousands of users finding their perfect property</p>
             </div>
 
@@ -211,7 +211,7 @@ const SignupPage = () => {
             <div className="max-w-lg mx-auto w-full">
               {/* Mobile Header */}
               <div className="lg:hidden mb-8">
-                <h1 className="text-3xl font-bold text-[#17637C] mb-2">Iska Homes</h1>
+                <h1 className="text-3xl font-bold text-[#17637C] mb-2">ISKA Homes</h1>
                 <p className="text-gray-600">Create your account to get started</p>
               </div>
 
@@ -322,15 +322,15 @@ const TermsAgreementField = ({ checked, onChange }) => (
       />
       <span className="text-sm text-gray-700 leading-6">
         I agree to the{' '}
-        <Link href="/home/terms-of-agreement" className="text-[#17637C] font-semibold hover:underline">
+        <Link href="/home/termsOfService" className="text-[#17637C] font-semibold hover:underline">
           Terms of Agreement
         </Link>
         ,{' '}
-        <Link href="/home/privacy-policy" className="text-[#17637C] font-semibold hover:underline">
+        <Link href="/home/privacyPolicy" className="text-[#17637C] font-semibold hover:underline">
           Privacy Policy
         </Link>
         , and{' '}
-        <Link href="/home/cookie-policy" className="text-[#17637C] font-semibold hover:underline">
+        <Link href="/home/cookiePolicy" className="text-[#17637C] font-semibold hover:underline">
           Cookie Policy
         </Link>
         .

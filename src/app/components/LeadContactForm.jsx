@@ -349,8 +349,8 @@ const LeadContactForm = ({
     
     // Check if user is logged in
     if (!user) {
-      toast.error("Please log in to book an appointment")
-      router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'))
+      toast.error("Please sign up or log in to book an appointment")
+      router.push('/home/signup')
       return
     }
     
@@ -446,7 +446,7 @@ const LeadContactForm = ({
     if (contextType === 'listing' && listingId) {
       if (!token) {
         toast.error('Your session expired. Please log in again to book.')
-        router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'))
+        router.push('/home/signin')
         return
       }
       if (accountId === 'unknown') {
@@ -469,8 +469,8 @@ const LeadContactForm = ({
     
     // Check if user is logged in
     if (!user) {
-      toast.error("Please log in to send a message")
-      router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'))
+      toast.error("Please sign up or log in to send a message")
+      router.push('/home/signup')
       return
     }
     
@@ -495,7 +495,7 @@ const LeadContactForm = ({
     const token = propertySeekerToken || (typeof window !== 'undefined' ? localStorage.getItem('property_seeker_token') : null)
     if (!token) {
       toast.error("Session expired. Please log in again.")
-      router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'))
+      router.push('/home/signin')
       return
     }
     
@@ -662,7 +662,7 @@ const LeadContactForm = ({
         {!user && (
           <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
             <p className="text-xs text-orange-800 font-medium">
-              Please <Link href={`/login?redirect=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/')}`} className="underline font-bold">log in</Link> as a property seeker to book appointments or send messages.
+              Please <Link href="/home/signin" className="underline font-bold">log in</Link> as a property seeker to book appointments or send messages.
             </p>
           </div>
         )}

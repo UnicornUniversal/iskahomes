@@ -756,6 +756,27 @@ const ProfileForm = ({ accountType = 'developer' }) => {
       return
     }
 
+    const requiredFields = [
+      { key: 'name', label: 'Company Name' },
+      { key: 'slogan', label: 'Slogan' },
+      { key: 'website', label: 'Website' },
+      { key: 'email', label: 'Primary Email' },
+      { key: 'phone', label: 'Primary Phone' },
+      { key: 'founded_year', label: 'Founded Year' },
+      { key: 'company_size', label: 'Company Size' },
+      { key: 'description', label: 'Company Description' },
+      { key: 'license_number', label: 'License Number' },
+    ]
+    const missingFields = requiredFields.filter(f => !formData[f.key]?.toString().trim())
+    if (missingFields.length > 0) {
+      toast.error(`Please fill in required fields: ${missingFields.map(f => f.label).join(', ')}`)
+      return
+    }
+    if (!formData.social_media?.whatsapp?.trim()) {
+      toast.error('WhatsApp is required')
+      return
+    }
+
     setSaving(true)
     try {
       
@@ -1262,11 +1283,12 @@ const ProfileForm = ({ accountType = 'developer' }) => {
                   <h4 className="font-semibold mb-4">Basic Details</h4>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 md:p-2 ">
                     <div>
-                      <label className="block font-medium mb-2">Company Name</label>
+                      <label className="block font-medium mb-2">Company Name <span className="text-red-500">*</span></label>
                       <div className="relative">
                         <FiHome className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" />
                         <input
                           type="text"
+                          required
                           value={formData.name}
                           onChange={(e) => handleInputChange('name', e.target.value)}
                           className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
@@ -1274,11 +1296,12 @@ const ProfileForm = ({ accountType = 'developer' }) => {
                       </div>
                     </div>
                     <div>
-                      <label className="block font-medium mb-2">Slogan</label>
+                      <label className="block font-medium mb-2">Slogan <span className="text-red-500">*</span></label>
                       <div className="relative">
                         <FiHome className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" />
                         <input
                           type="text"
+                          required
                           value={formData.slogan}
                           onChange={(e) => handleInputChange('slogan', e.target.value)}
                           className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
@@ -1293,11 +1316,12 @@ const ProfileForm = ({ accountType = 'developer' }) => {
                 <div className="mb-8">
                   <h4 className="font-semibold mb-4">Contact Information</h4>
                   <div className="mb-6">
-                    <label className="block font-medium mb-2">Website</label>
+                    <label className="block font-medium mb-2">Website <span className="text-red-500">*</span></label>
                     <div className="relative">
                       <FiGlobe className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" />
                       <input
                         type="url"
+                        required
                         value={formData.website}
                         onChange={(e) => handleInputChange('website', e.target.value)}
                         className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
@@ -1314,11 +1338,12 @@ const ProfileForm = ({ accountType = 'developer' }) => {
                       </h5>
                       <div className="space-y-3">
                         <div>
-                          <label className="block font-medium mb-2">Primary Email</label>
+                          <label className="block font-medium mb-2">Primary Email <span className="text-red-500">*</span></label>
                           <div className="relative">
                             <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" />
                             <input
                               type="email"
+                              required
                               value={formData.email}
                               onChange={(e) => handleInputChange('email', e.target.value)}
                               className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
@@ -1362,11 +1387,12 @@ const ProfileForm = ({ accountType = 'developer' }) => {
                       </h5>
                       <div className="space-y-3">
                         <div>
-                          <label className="block font-medium mb-2">Primary Phone</label>
+                          <label className="block font-medium mb-2">Primary Phone <span className="text-red-500">*</span></label>
                           <div className="relative">
                             <FiPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" />
                             <input
                               type="tel"
+                              required
                               value={formData.phone}
                               onChange={(e) => handleInputChange('phone', e.target.value)}
                               className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
@@ -1409,11 +1435,12 @@ const ProfileForm = ({ accountType = 'developer' }) => {
                   <h4 className="font-semibold mb-4">Company Details</h4>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 md:p-2 ">
                     <div>
-                      <label className="block font-medium mb-2">Founded Year</label>
+                      <label className="block font-medium mb-2">Founded Year <span className="text-red-500">*</span></label>
                       <div className="relative">
                         <FiCalendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" />
                         <input
                           type="text"
+                          required
                           value={formData.founded_year}
                           onChange={(e) => handleInputChange('founded_year', e.target.value)}
                           className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
@@ -1421,7 +1448,7 @@ const ProfileForm = ({ accountType = 'developer' }) => {
                       </div>
                     </div>
                     <div>
-                      <label className="block font-medium mb-2">Company Size</label>
+                      <label className="block font-medium mb-2">Company Size <span className="text-red-500">*</span></label>
                       <CustomSelect
                         value={formData.company_size}
                         onChange={(e) => handleInputChange('company_size', e.target.value)}
@@ -1436,8 +1463,9 @@ const ProfileForm = ({ accountType = 'developer' }) => {
                     </div>
                   </div>
                   <div className="mt-6">
-                    <label className="block font-medium mb-2">Company Description</label>
+                    <label className="block font-medium mb-2">Company Description <span className="text-red-500">*</span></label>
                     <textarea
+                      required
                       value={formData.description}
                       onChange={(e) => handleInputChange('description', e.target.value)}
                       rows={4}
@@ -1879,9 +1907,10 @@ const ProfileForm = ({ accountType = 'developer' }) => {
                 
                 {/* License Number */}
                 <div className="mb-6">
-                  <label className="block font-medium mb-2">License Number</label>
+                  <label className="block font-medium mb-2">License Number <span className="text-red-500">*</span></label>
                   <input
                     type="text"
+                    required
                     value={formData.license_number}
                     onChange={(e) => handleInputChange('license_number', e.target.value)}
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
@@ -1920,68 +1949,6 @@ const ProfileForm = ({ accountType = 'developer' }) => {
               </div>
               <hr className="border-white/50 mt-6" />
             </div>
-
-            {/* Section 5.5: Company Statistics */}
-            <div className=" rounded-2xl p-2 md:p-2 md:p-6">
-              <div className="flex items-center flex-wrap justify-between mb-6">
-                <h3 className=" flex items-center gap-2">
-                  <FiFileText className="w-6 h-6" />
-                  Company Statistics
-                </h3>
-                <button
-                  onClick={addCompanyStat}
-                  className="primary_button flex items-center gap-2"
-                >
-                  <FiPlus className="w-4 h-4" />
-                  Add Statistic
-                </button>
-              </div>
-
-              {(formData.company_statistics || []).length === 0 ? (
-                <div className="text-center py-8  rounded-xl border border-gray-200">
-                  <FiFileText className="w-12 h-12 mx-auto mb-2" />
-                  <p>No company statistics added</p>
-                  <p>Add metrics like Employees, Projects Completed, Awards, etc.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {(formData.company_statistics || []).map((row, index) => (
-                    <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end  border border-gray-200 rounded-xl p-4">
-                      <div className="md:col-span-2">
-                        <label className="block font-medium mb-2">Label</label>
-                        <input
-                          type="text"
-                          value={row.label || ''}
-                          onChange={(e) => updateCompanyStat(index, 'label', e.target.value)}
-                          placeholder="e.g., Employees"
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block font-medium mb-2">Value</label>
-                        <input
-                          type="text"
-                          value={row.value || ''}
-                          onChange={(e) => updateCompanyStat(index, 'value', e.target.value)}
-                          placeholder="e.g., 250+"
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
-                        />
-                      </div>
-                      <div className="flex md:justify-end">
-                        <button
-                          onClick={() => removeCompanyStat(index)}
-                          className="tertiary_button px-4 py-3 rounded-xl flex items-center gap-2"
-                        >
-                          <FiTrash2 className="w-4 h-4" />
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <hr className="border-white/50 mt-6" />
 
             {/* Save Button at the End */}
             <div className="sticky bottom-6 mt-10 px-6 py-4 z-10">

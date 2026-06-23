@@ -254,8 +254,20 @@ const AgentNav = ({ active }) => {
                     })}
                 </div>
 
+                {/* Back to Home */}
+                <div className="mt-4 mb-2 flex-shrink-0">
+                    <Link
+                        href="/"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="group relative text-[0.8em] flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 ease-in-out bg-primary_color/10 hover:bg-primary_color text-primary_color hover:text-white"
+                    >
+                        <FiHome className="w-5 h-5" />
+                        <span className="font-medium">Back to Home</span>
+                    </Link>
+                </div>
+
                 {/* Logout */}
-                <div className="mt-4 flex-shrink-0 space-y-2 w-full rounded-xl shadow-primary_red/25 bg-primary_red">
+                <div className="flex-shrink-0 space-y-2 w-full rounded-xl shadow-primary_red/25 bg-primary_red">
                     <button
                         onClick={handleLogout}
                         disabled={isLoggingOut}

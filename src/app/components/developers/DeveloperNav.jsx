@@ -201,6 +201,12 @@ const DeveloperNav = () => {
             permission: 'subscriptions'
         },
         {
+            label: 'Back to Home',
+            href: '/',
+            icon: FiHome,
+            isHomeLink: true
+        },
+        {
             label: 'Logout',
             href: '#',
             icon: FiLogOut,
@@ -210,8 +216,9 @@ const DeveloperNav = () => {
 
     // Filter nav items based on permissions (only for developers/agencies/team members)
     const navItems = allNavItems.filter(item => {
-        // Always show logout
+        // Always show logout and home link
         if (item.isLogout) return true
+        if (item.isHomeLink) return true
         
         // For agents, show all items (no permission system)
         if (user?.user_type === 'agent') return true
