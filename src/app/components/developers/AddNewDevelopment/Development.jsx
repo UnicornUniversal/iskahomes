@@ -1,5 +1,6 @@
 "use client"
 import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
@@ -13,14 +14,17 @@ import DevelopmentAmenities from './DevelopmentAmenities'
 import DevelopmentMedia from './DevelopmentMedia'
 import DevelopmentFiles from './DevelopmentFiles'
 import DeleteDevelopmentModal from '../DeleteDevelopmentModal'
+import DashboardDevelopmentUnits from '../DashboardDevelopmentUnits'
 
 const Development = ({ isAddMode, developmentId }) => {
   const { user } = useAuth()
+  const router = useRouter()
   const [developmentData, setDevelopmentData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [developmentStats, setDevelopmentStats] = useState({ listingsCount: 0, totalUnits: 0 });
   
   // Debug user state
@@ -245,17 +249,15 @@ const Development = ({ isAddMode, developmentId }) => {
 
       if (response.ok) {
         const result = await response.json();
+        setShowDeleteModal(false);
+        setIsDeleting(true);
+
         toast.success(result.message || 'Development deleted successfully!', {
           position: "top-center",
           autoClose: 2000,
         });
-        
-        setShowDeleteModal(false);
-        
-        // Redirect to developments list
-        setTimeout(() => {
-          window.location.href = `/developer/${user.profile?.slug || user.profile.id}/developments`;
-        }, 1500);
+
+        router.push(`/developer/${user.profile?.slug || user.profile.id}/developments`);
       } else {
         const error = await response.json();
         const errorMessage = error?.error || error?.message || 'Failed to delete development';
@@ -577,10 +579,31 @@ const Development = ({ isAddMode, developmentId }) => {
     }
   };
 
+  const developerSlug =
+    user?.profile?.organization_slug || user?.profile?.slug || user?.profile?.id
+
+  const navigationSections = [
+    { id: 'description', label: 'Description' },
+    { id: 'categories', label: 'Categories' },
+    { id: 'locations', label: 'Locations' },
+    { id: 'amenities', label: 'Amenities' },
+    { id: 'media', label: 'Media' },
+    { id: 'files', label: 'Files' },
+    ...(!isAddMode ? [{ id: 'units', label: 'Units' }] : []),
+  ]
+
   if (loading) {
     return (
       <div className='w-full flex justify-center items-center py-8'>
         <div className='text-lg'>Loading development data...</div>
+      </div>
+    );
+  }
+
+  if (isDeleting) {
+    return (
+      <div className='w-full flex justify-center items-center py-8'>
+        <div className='text-lg'>Redirecting...</div>
       </div>
     );
   }
@@ -605,14 +628,7 @@ const Development = ({ isAddMode, developmentId }) => {
       {/* Navigation Menu */}
       <div className='sticky top-0 border-b border-gray-200 py-4 z-10'>
         <div className='flex gap-4 w-full overflow-x-auto'>
-          {[
-            { id: 'description', label: 'Description' },
-            { id: 'categories', label: 'Categories' },
-            { id: 'locations', label: 'Locations' },
-            { id: 'amenities', label: 'Amenities' },
-            { id: 'media', label: 'Media' },
-            { id: 'files', label: 'Files' }
-          ].map(section => (
+          {navigationSections.map(section => (
             <button
               key={section.id}
               onClick={() => scrollToSection(section.id)}
@@ -659,7 +675,8 @@ const Development = ({ isAddMode, developmentId }) => {
           <DevelopmentLocations 
             formData={formData}
             updateFormData={updateFormData}
-            isEditMode={!isAddMode} 
+            isEditMode={!isAddMode}
+            suspendMap={showDeleteModal || deleteLoading}
           />
         </div>
 
@@ -682,26 +699,36 @@ const Development = ({ isAddMode, developmentId }) => {
         </div>
 
         {/* Files Section */}
-        <div id='files' className='scroll-mt-20 mb-20'>
+        <div id='files' className='scroll-mt-20'>
           <DevelopmentFiles 
             formData={formData}
             updateFormData={updateFormData}
             isEditMode={!isAddMode} 
           />
         </div>
+
+        {/* Units Section */}
+        {!isAddMode && (
+          <div id='units' className='scroll-mt-20 mb-20'>
+            <DashboardDevelopmentUnits
+              developmentId={developmentId}
+              developerSlug={developerSlug}
+            />
+          </div>
+        )}
       </form>
 
       {/* Sticky Submit Button */}
       {((user?.user_type === 'agent') || 
         (isAddMode && userHasPermission(user, 'developments.create')) || 
         (!isAddMode && userHasPermission(user, 'developments.edit'))) && (
-        <div className='fixed bottom-0 left-0 right-0 p-4 z-30 pointer-events-none'>
+        <div className='fixed bottom-0 left-0 right-0 p-4 z-30 pointer-events-none  '>
           <div className='max-w-7xl mx-auto flex justify-center items-center'>
             <button
               type='button'
               onClick={handleSubmit}
               disabled={loading}
-              className='primary_button pointer-events-auto flex items-center justify-center gap-2'
+              className='primary_button pointer-events-auto flex items-center justify-center gap-2 !bg-primary_color !text-white !border-primary_color hover:!bg-primary_color/90 hover:!text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
             >
               {loading ? (
                 <>

@@ -3,8 +3,13 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest, requirePermission } from '@/lib/apiPermissionMiddleware'
 import { sendTeamMemberInvitationEmail } from '@/lib/sendgrid'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { checkEmailAvailableForInvitation, normalizeEmail } from '@/lib/emailAvailability'
 import { getSubscriptionLimitsForUser } from '@/lib/subscriptionLimitsServer'
 import { checkNumericLimit } from '@/lib/subscriptionLimits'
+import {
+  TEAM_MEMBER_WITH_ROLE_SELECT,
+  withEffectiveTeamMemberPermissions,
+} from '@/lib/teamMemberPermissions'
 import crypto from 'crypto'
 
 // GET - Fetch all team members for a developer organization
@@ -24,10 +29,7 @@ export async function GET(request) {
     // Fetch all team members with role info
     const { data: teamMembers, error } = await supabaseAdmin
       .from('organization_team_members')
-      .select(`
-        *,
-        role:organization_roles(id, name, description, is_system_role)
-      `)
+      .select(TEAM_MEMBER_WITH_ROLE_SELECT)
       .eq('organization_type', organizationType)
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false })
@@ -42,7 +44,7 @@ export async function GET(request) {
 
     // Remove sensitive data (password_hash, invitation_token)
     const sanitizedMembers = (teamMembers || []).map(member => {
-      const { password_hash, invitation_token, ...sanitized } = member
+      const { password_hash, invitation_token, ...sanitized } = withEffectiveTeamMemberPermissions(member)
       return sanitized
     })
 
@@ -101,7 +103,8 @@ export async function POST(request) {
     const organizationType = userInfo.organization_type || 'developer'
 
     const body = await request.json()
-    const { email, role_id, first_name, last_name, phone, invitation_message } = body
+    const { email: rawEmail, role_id, first_name, last_name, phone, invitation_message } = body
+    const email = normalizeEmail(rawEmail)
 
     if (!email || !role_id) {
       return NextResponse.json({ error: 'Email and role_id are required' }, { status: 400 })
@@ -110,7 +113,7 @@ export async function POST(request) {
     // Verify role exists and belongs to this organization
     const { data: role } = await supabaseAdmin
       .from('organization_roles')
-      .select('id, permissions')
+      .select('id, name, permissions, is_system_role')
       .eq('id', role_id)
       .eq('organization_type', organizationType)
       .eq('organization_id', organizationId)
@@ -118,6 +121,13 @@ export async function POST(request) {
 
     if (!role) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
+    }
+
+    if (role.name === 'Super Admin') {
+      return NextResponse.json(
+        { error: 'Super Admin role is reserved for the account owner and cannot be assigned' },
+        { status: 400 }
+      )
     }
 
     const subscriptionUserId = userInfo.developer_id || userInfo.agency_id || userInfo.user_id
@@ -143,7 +153,7 @@ export async function POST(request) {
       .select('id, status')
       .eq('organization_type', organizationType)
       .eq('organization_id', organizationId)
-      .eq('email', email)
+      .ilike('email', email)
       .neq('status', 'inactive')
       .maybeSingle()
 
@@ -151,6 +161,14 @@ export async function POST(request) {
       return NextResponse.json({ 
         error: 'User with this email is already a team member' 
       }, { status: 400 })
+    }
+
+    const emailAvailability = await checkEmailAvailableForInvitation(email)
+    if (emailAvailability.available === null) {
+      return NextResponse.json({ error: emailAvailability.message }, { status: 500 })
+    }
+    if (!emailAvailability.available) {
+      return NextResponse.json({ error: emailAvailability.message }, { status: 409 })
     }
 
     // Generate invitation token

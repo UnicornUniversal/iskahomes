@@ -21,7 +21,7 @@ import {
     FiGitBranch,
     FiPercent
 } from 'react-icons/fi'
-import { userCanAccessRoute } from '@/lib/permissionHelpers'
+import { userCanAccessRoute, userHasPermission } from '@/lib/permissionHelpers'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
@@ -31,8 +31,13 @@ const AgencyNav = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const [isLoggingOut, setIsLoggingOut] = useState(false)
     const [openSubmenus, setOpenSubmenus] = useState({ Leads: false, Sales: false })
+    const [isClient, setIsClient] = useState(false)
     const pathname = usePathname()
     const { user, logout } = useAuth()
+
+    useEffect(() => {
+        setIsClient(true)
+    }, [])
 
     useEffect(() => {
         if (pathname?.includes('/leads')) {
@@ -43,88 +48,111 @@ const AgencyNav = () => {
         }
     }, [pathname])
 
-    // Extract slug from pathname (e.g., /agency/premier-realty/dashboard -> premier-realty)
-    const getSlug = () => {
+    // Extract slug from pathname or user profile (team members use organization_slug)
+    const getSlugFromPath = () => {
         const parts = pathname?.split('/') || []
         if (parts.length >= 3 && parts[1] === 'agency') {
             return parts[2]
         }
-        return 'premier-realty' // fallback
+        return null
     }
 
-    const slug = getSlug()
+    const slug = isClient
+        ? (user?.profile?.organization_slug || getSlugFromPath() || user?.profile?.slug || 'agency')
+        : (getSlugFromPath() || 'agency')
 
-    const navItems = [
+    const canAccess = (routeCategory) => {
+        if (user?.user_type === 'agent') return true
+        if (user?.user_type === 'agency' || user?.user_type === 'team_member') {
+            return userCanAccessRoute(user, routeCategory)
+        }
+        return true
+    }
+
+    const allNavItems = [
         {
             label: 'Dashboard',
             href: `/agency/${slug}/dashboard`,
-            icon: FiHome
+            icon: FiHome,
+            permission: 'dashboard'
         },
         {
             label: 'Agents',
             href: `/agency/${slug}/agents`,
-            icon: FiUsers
+            icon: FiUsers,
+            permission: 'agents'
         },
         {
             label: 'Properties',
             href: `/agency/${slug}/properties`,
-            icon: FiMapPin
+            icon: FiMapPin,
+            permission: 'listings'
         },
         {
             label: 'Appointments',
             href: `/agency/${slug}/appointments`,
-            icon: FiCalendar
+            icon: FiCalendar,
+            permission: 'appointments'
         },
         {
             label: 'Messages',
             href: `/agency/${slug}/messages`,
-            icon: FiMessageSquare
+            icon: FiMessageSquare,
+            permission: 'messages'
         },
         {
             label: 'Leads',
             href: `/agency/${slug}/leads`,
             icon: FiTrendingUp,
             hasSubmenu: true,
+            permission: 'leads',
             submenu: [
                 {
                     label: 'Lead Management',
                     href: `/agency/${slug}/leads`,
-                    icon: FiTrendingUp
+                    icon: FiTrendingUp,
+                    permission: 'leads.view'
                 },
                 {
                     label: 'Leads Pipeline',
                     href: `/agency/${slug}/leads/leadsPipeline`,
-                    icon: FiGitBranch
+                    icon: FiGitBranch,
+                    permission: 'leads.update_status'
                 }
             ]
         },
         {
             label: 'Analytics',
             href: `/agency/${slug}/analytics/overview`,
-            icon: FiBarChart2
+            icon: FiBarChart2,
+            permission: 'analytics'
         },
         {
             label: 'Sales',
             href: `/agency/${slug}/sales`,
             icon: FiCreditCard,
             hasSubmenu: true,
+            permission: 'sales',
             submenu: [
                 {
                     label: 'Sales Statistics',
                     href: `/agency/${slug}/sales`,
-                    icon: FiTrendingUp
+                    icon: FiTrendingUp,
+                    permission: 'sales.view'
                 },
                 {
                     label: 'Commission Rates',
                     href: `/agency/${slug}/sales/commissionRate`,
-                    icon: FiPercent
+                    icon: FiPercent,
+                    permission: 'agents.manage_commission'
                 }
             ]
         },
         {
             label: 'Subscriptions',
             href: `/agency/${slug}/subscriptions`,
-            icon: FiCreditCard
+            icon: FiCreditCard,
+            permission: 'subscriptions'
         },
         {
             label: 'Team',
@@ -135,18 +163,39 @@ const AgencyNav = () => {
         {
             label: 'Audit',
             href: `/agency/${slug}/audit`,
-            icon: FiActivity
+            icon: FiActivity,
+            permission: 'audit_trail'
         },
         {
             label: 'Profile',
             href: `/agency/${slug}/profile`,
-            icon: FiUser
+            icon: FiUser,
+            permission: 'profile'
         }
-    ].filter((item) => {
-        if (!item.permission) return true
-        if (user?.user_type === 'agent') return true
-        return userCanAccessRoute(user, item.permission)
-    })
+    ]
+
+    const navItems = allNavItems
+        .map((item) => {
+            if (!item.hasSubmenu || !item.submenu) return item
+            return {
+                ...item,
+                submenu: item.submenu.filter((subItem) => {
+                    if (!subItem.permission) return true
+                    return userHasPermission(user, subItem.permission)
+                })
+            }
+        })
+        .filter((item) => {
+            if (user?.user_type === 'agent') return true
+            if (user?.user_type === 'agency' || user?.user_type === 'team_member') {
+                if (!canAccess(item.permission)) return false
+                if (item.hasSubmenu && item.submenu) {
+                    return item.submenu.length > 0
+                }
+                return true
+            }
+            return true
+        })
 
     const toggleMobileMenu = () => {
         setIsMobileMenuOpen(!isMobileMenuOpen)
@@ -426,12 +475,12 @@ const AgencyNav = () => {
                 </div>
 
                 {/* Agency Info Footer */}
-                <div className="pt-6 pb-4 border-t border-gray-200">
+                {/* <div className="pt-6 pb-4 border-t border-gray-200">
                     <div className="px-4 py-3 bg-primary_color/5 rounded-lg">
                         <p className="text-xs text-gray-500 mb-1">Agency Name</p>
                         <p className="text-sm font-semibold text-primary_color">Premier Realty</p>
                     </div>
-                </div>
+                </div> */}
                 </div>
             </nav>
         </>

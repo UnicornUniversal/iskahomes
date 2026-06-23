@@ -18,6 +18,9 @@ import {
   resolveLeadStatusForPipeline,
 } from '@/lib/leadsPipelineHelper'
 import { getAuthTokenForListerType, getAuthTokenForUser } from '@/lib/authTokens'
+import { shouldScopeLeadsToAssignee } from '@/lib/permissionHelpers'
+import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits'
+import { SUBSCRIPTION_LOCKED_ROW_CLASS } from '@/lib/subscriptionLimits'
 
 const LEAD_CLASSIFICATION_OPTIONS = [
   { value: '', label: 'All' },
@@ -193,7 +196,27 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
   const isAgencyLeadsView = listerType === 'agency'
   const isDeveloperLeadsView = listerType === 'developer'
   const isAgentLeadsView = listerType === 'agent'
+  const scopeLeadsToAssignee = shouldScopeLeadsToAssignee(user, listerType)
   const routeSlug = Array.isArray(params?.slug) ? params.slug[0] : params?.slug
+  const {
+    getMonthlyLockedIds,
+    canCreateMore,
+    usageSummary,
+    packageName,
+    loading: subscriptionLimitsLoading,
+  } = useSubscriptionLimits()
+
+  const lockedLeadIds = useMemo(
+    () =>
+      getMonthlyLockedIds(
+        leads,
+        'leads_per_month',
+        (lead) => lead.created_at || lead.first_action_date
+      ),
+    [leads, getMonthlyLockedIds]
+  )
+
+  const canAddLead = canCreateMore('leads_per_month')
 
   function openLeadDetailsPage(leadId) {
     if (!leadId) return
@@ -353,7 +376,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         params.append('search', search)
       }
 
-      if (!isSuperAdmin && currentUserId && !isAgentLeadsView) {
+      if (scopeLeadsToAssignee && currentUserId) {
         params.append('assigned_user', currentUserId)
       }
 
@@ -424,7 +447,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         date_to: today
       })
 
-      if (!isSuperAdmin && currentUserId && !isAgentLeadsView) {
+      if (scopeLeadsToAssignee && currentUserId) {
         params.append('assigned_user', currentUserId)
       }
 
@@ -1167,14 +1190,33 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
           )}
           {!listingId && (
             <button
-              onClick={() => setShowAddLeadModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary_color text-white rounded-lg hover:bg-primary_color/90 transition-colors text-sm font-medium"
+              onClick={() => canAddLead && setShowAddLeadModal(true)}
+              disabled={!canAddLead || subscriptionLimitsLoading}
+              title={
+                canAddLead
+                  ? 'Add a new lead'
+                  : `Monthly lead limit reached (${usageSummary.leadsThisMonth}/${usageSummary.leadsLimit ?? '—'})`
+              }
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
+                canAddLead
+                  ? 'bg-primary_color text-white hover:bg-primary_color/90'
+                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+              }`}
             >
               <FiPlus className="w-4 h-4" />
               Add Lead
             </button>
           )}
           <div className="text-sm text-secondary_color-500">
+            {usageSummary.leadsLimit != null && (
+              <span className="mr-3">
+                This month:{' '}
+                <span className="font-medium text-secondary_color-900">
+                  {usageSummary.leadsThisMonth}/{usageSummary.leadsLimit}
+                </span>
+                {packageName ? ` (${packageName})` : ''}
+              </span>
+            )}
             Total: <span className="font-medium text-secondary_color-900">{total}</span>
           </div>
         </div>
@@ -1477,10 +1519,13 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                   </td>
                 </tr>
               )}
-              {filteredLeads.map((lead) => (
+              {filteredLeads.map((lead) => {
+                const isLocked = lockedLeadIds.has(lead.id)
+                return (
                 <tr 
                   key={lead.id} 
-                  className="hover:bg-gray-50 transition-colors"
+                  className={`hover:bg-gray-50 transition-colors ${isLocked ? SUBSCRIPTION_LOCKED_ROW_CLASS : ''}`}
+                  title={isLocked ? 'Over monthly plan limit — upgrade to interact with this lead' : undefined}
                 >
                   <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center gap-2">
@@ -1616,7 +1661,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                     </div>
                   </td>
                 </tr>
-              ))}
+              )})}
                 </tbody>
               </table>
             </div>

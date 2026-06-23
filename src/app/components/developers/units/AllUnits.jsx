@@ -7,6 +7,8 @@ import { Plus, Loader2 } from 'lucide-react'
 import { toast } from 'react-toastify'
 import { CustomSelect } from '@/app/components/ui/custom-select'
 import { userHasPermission } from '@/lib/permissionHelpers'
+import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits'
+import SubscriptionLimitButton from '@/app/components/shared/SubscriptionLimitButton'
 import { 
   usePropertyPurposes, 
   usePropertyTypes
@@ -84,6 +86,56 @@ import {
   // Use cached categorization data
   const { data: purposesData = [], loading: purposesLoading } = usePropertyPurposes()
   const { data: typesData = [], loading: typesLoading } = usePropertyTypes()
+
+  const {
+    canCreateMore,
+    getCumulativeLockedIds,
+    getUnitsDevelopmentLockedIds,
+    canAddUnitAnyDevelopment,
+    getLimitTooltip,
+    usageSummary,
+    getLimitValue,
+  } = useSubscriptionLimits()
+
+  const isListingAccount = isAgent || isAgency
+  const subscriptionLimitKey = isListingAccount ? 'listing_limits' : 'units_per_development'
+
+  const lockedUnitIds = useMemo(() => {
+    if (isListingAccount) {
+      return getCumulativeLockedIds(
+        units,
+        'listing_limits',
+        (unit) => unit.created_at || unit.updated_at
+      )
+    }
+    return getUnitsDevelopmentLockedIds(
+      units,
+      (unit) => unit.development_id,
+      (unit) => unit.created_at || unit.updated_at
+    )
+  }, [units, isListingAccount, getCumulativeLockedIds, getUnitsDevelopmentLockedIds])
+
+  const canAddBySubscription = useMemo(() => {
+    if (isListingAccount) {
+      return canCreateMore('listing_limits')
+    }
+    return canAddUnitAnyDevelopment(units, (unit) => unit.development_id)
+  }, [isListingAccount, canCreateMore, canAddUnitAnyDevelopment, units])
+
+  const showAddButton = canCreate
+  const addButtonEnabled = canCreate && canAddBySubscription
+
+  const limitUsageLabel = useMemo(() => {
+    if (isListingAccount) {
+      const limit = usageSummary.listingsLimit
+      const used = usageSummary.listings
+      if (limit == null) return null
+      return `${used}/${limit} listings`
+    }
+    const perDevLimit = getLimitValue('units_per_development')
+    if (perDevLimit == null) return null
+    return `Up to ${perDevLimit} units per development`
+  }, [isListingAccount, usageSummary, getLimitValue])
 
   // Convert to options format for CustomSelect - using IDs as values
   const purposeOptions = useMemo(() => [
@@ -350,8 +402,11 @@ import {
 
 
   const handleAddUnit = () => {
-    // Check requirements before navigating
-    if (!canCreate) {
+    if (!addButtonEnabled) {
+      if (!canAddBySubscription) {
+        toast.error(getLimitTooltip(subscriptionLimitKey))
+        return
+      }
       if (requirementMessage) {
         toast.error(requirementMessage)
       } else {
@@ -364,10 +419,12 @@ import {
       ? (user?.profile?.slug || user?.profile?.agent_slug)
       : (user?.profile?.organization_slug || user?.profile?.slug)
     if (!slug) {
-      toast.error(`${isAgent ? 'Agent' : 'Developer'} profile not found`)
+      toast.error(`${isAgent ? 'Agent' : isAgency ? 'Agency' : 'Developer'} profile not found`)
       return
     }
-    if (isAgent) {
+    if (isAgency) {
+      router.push(`/agency/${slug}/properties/addNewProperty`)
+    } else if (isAgent) {
       router.push(`/agents/${slug}/properties/addNewProperty`)
     } else {
       router.push(`/developer/${slug}/units/addNewUnit`)
@@ -534,14 +591,16 @@ import {
       <div className="w-full min-w-0">
         <div className="w-full flex justify-between items-center mb-6">
           <h1 className=" font-bold ">{pageTitle}</h1>
-          {!isAgency && canCreate && (
-            <button 
+          {showAddButton && (
+            <SubscriptionLimitButton
               onClick={handleAddUnit}
+              enabled={addButtonEnabled}
+              limitKey={subscriptionLimitKey}
               className="primary_button flex items-center gap-2"
             >
               {addButtonLabel}
               <Plus className="w-4 h-4" />
-            </button>
+            </SubscriptionLimitButton>
           )}
         </div>
         
@@ -560,14 +619,16 @@ import {
       <div className="w-full min-w-0">
         <div className="w-full flex justify-between items-center mb-6">
           <h1 className="">{pageTitle}</h1>
-          {!isAgency && canCreate && (
-            <button 
+          {showAddButton && (
+            <SubscriptionLimitButton
               onClick={handleAddUnit}
+              enabled={addButtonEnabled}
+              limitKey={subscriptionLimitKey}
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
             >
               <Plus className="w-4 h-4" />
               {addButtonLabel}
-            </button>
+            </SubscriptionLimitButton>
           )}
         </div>
         
@@ -601,17 +662,22 @@ import {
           </h1>
           <p className="mt-1">
             Showing {filteredUnits.length} of {units.length} {units.length === 1 ? itemLabel.toLowerCase() : itemLabelPlural.toLowerCase()}
+            {limitUsageLabel && (
+              <span className="text-gray-500"> · Plan: {limitUsageLabel}</span>
+            )}
           </p>
         </div>
-        {/* Add New Property/Unit button - for developers, team members, and agents (when requirements met) */}
-        {!isAgency && canCreate && (
-          <button 
+        {/* Add New Property/Unit button */}
+        {showAddButton && (
+          <SubscriptionLimitButton
             onClick={handleAddUnit}
+            enabled={addButtonEnabled}
+            limitKey={subscriptionLimitKey}
             className="primary_button transition-colors flex items-center gap-2 flex-shrink-0"
           >
             <Plus className="w-4 h-4" />
             {addButtonLabel}
-          </button>
+          </SubscriptionLimitButton>
         )}
       </div>
 
@@ -686,13 +752,15 @@ import {
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">{emptyStateTitle}</h3>
             <p className="text-gray-600 mb-6">{emptyStateMessage}</p>
-            {!isAgency && canCreate && (
-              <button 
+            {showAddButton && (
+              <SubscriptionLimitButton
                 onClick={handleAddUnit}
+                enabled={addButtonEnabled}
+                limitKey={subscriptionLimitKey}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 {emptyStateButton}
-              </button>
+              </SubscriptionLimitButton>
             )}
             {!checkingRequirements && !canCreate && requirementMessage && (
               <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg max-w-md mx-auto">
@@ -746,6 +814,8 @@ import {
                   unit={unit}
                   developerSlug={user?.profile?.organization_slug || user?.profile?.slug}
                   accountType={accountType}
+                  locked={lockedUnitIds.has(unit.id)}
+                  lockMessage={getLimitTooltip(subscriptionLimitKey)}
                 />
               </div>
             ))}

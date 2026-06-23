@@ -19,21 +19,32 @@ const ResetPasswordContent = () => {
   const [isSuccess, setIsSuccess] = useState(false)
   const [accessToken, setAccessToken] = useState('')
   const [refreshToken, setRefreshToken] = useState('')
+  const [linkError, setLinkError] = useState('')
   
   const router = useRouter()
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    // Get tokens from URL hash or search params
-    const hash = window.location.hash
-    const urlParams = new URLSearchParams(hash.substring(1))
-    
-    const token = urlParams.get('access_token')
-    const refresh = urlParams.get('refresh_token')
-    
+    const hashParams = new URLSearchParams(window.location.hash.substring(1))
+    const type = hashParams.get('type') || searchParams.get('type')
+
+    if (type && type !== 'recovery') {
+      setLinkError('Invalid reset link. Please request a new password reset.')
+      return
+    }
+
+    const token =
+      hashParams.get('access_token') || searchParams.get('access_token')
+    const refresh =
+      hashParams.get('refresh_token') || searchParams.get('refresh_token')
+
     if (token) setAccessToken(token)
     if (refresh) setRefreshToken(refresh)
-  }, [])
+
+    if (!token) {
+      setLinkError('Invalid or expired reset link. Please request a new password reset.')
+    }
+  }, [searchParams])
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -213,6 +224,14 @@ const ResetPasswordContent = () => {
             <p className="text-gray-600">
               Enter your new password below.
             </p>
+            {linkError && (
+              <p className="mt-4 text-sm text-red-600">
+                {linkError}{' '}
+                <a href="/forgot-password" className="font-medium text-primary_color hover:underline">
+                  Request a new link
+                </a>
+              </p>
+            )}
           </div>
 
           {/* Form */}
@@ -291,7 +310,7 @@ const ResetPasswordContent = () => {
             {/* Submit Button */}
             <Button
               type="submit"
-              disabled={isLoading || !passwordValidation.isValid}
+              disabled={isLoading || !passwordValidation.isValid || !accessToken}
               className="w-full bg-primary_color hover:bg-primary_color/90 text-white py-3 px-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (

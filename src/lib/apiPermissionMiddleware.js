@@ -6,6 +6,22 @@
 import { supabaseAdmin } from './supabase'
 import { verifyToken } from './jwt'
 import { hasPermission } from './rolesAndPermissions'
+import {
+  TEAM_MEMBER_WITH_ROLE_SELECT,
+  resolvePermissionsFromTeamMember,
+} from './teamMemberPermissions'
+
+function normalizePermissions(permissions) {
+  if (!permissions) return null
+  if (typeof permissions === 'string') {
+    try {
+      return JSON.parse(permissions)
+    } catch {
+      return null
+    }
+  }
+  return typeof permissions === 'object' ? permissions : null
+}
 
 /**
  * Get user info from token (supports both owner/admin and team members)
@@ -21,10 +37,7 @@ export const getUserFromToken = async (token) => {
     if (decoded.user_type === 'team_member') {
       let query = supabaseAdmin
         .from('organization_team_members')
-        .select(`
-          *,
-          role:organization_roles(id, name, description, is_system_role)
-        `)
+        .select(TEAM_MEMBER_WITH_ROLE_SELECT)
         .eq('user_id', decoded.user_id)
         .eq('status', 'active')
       if (decoded.organization_id) {
@@ -41,7 +54,7 @@ export const getUserFromToken = async (token) => {
         organization_id: teamMember.organization_id,
         team_member_id: teamMember.id,
         role_id: teamMember.role_id,
-        permissions: teamMember.permissions,
+        permissions: resolvePermissionsFromTeamMember(teamMember),
         role: teamMember.role
       }
 
@@ -79,7 +92,7 @@ export const getUserFromToken = async (token) => {
       // Even owners need to be in organization_team_members
       const { data: teamMember } = await supabaseAdmin
         .from('organization_team_members')
-        .select('permissions, role_id')
+        .select(TEAM_MEMBER_WITH_ROLE_SELECT)
         .eq('organization_type', 'developer')
         .eq('organization_id', developer.id)
         .eq('user_id', decoded.user_id)
@@ -92,9 +105,9 @@ export const getUserFromToken = async (token) => {
         organization_type: 'developer',
         organization_id: developer.id,
         developer_id: developer.developer_id,
-        // Load permissions from organization_team_members, or null if not found (Super Admin)
-        permissions: teamMember?.permissions || null,
-        role_id: teamMember?.role_id || null
+        permissions: teamMember ? resolvePermissionsFromTeamMember(teamMember) : null,
+        role_id: teamMember?.role_id || null,
+        role: teamMember?.role || null,
       }
     }
 
@@ -112,7 +125,7 @@ export const getUserFromToken = async (token) => {
       // Even owners need to be in organization_team_members
       const { data: teamMember } = await supabaseAdmin
         .from('organization_team_members')
-        .select('permissions, role_id')
+        .select(TEAM_MEMBER_WITH_ROLE_SELECT)
         .eq('organization_type', 'agency')
         .eq('organization_id', agency.id)
         .eq('user_id', decoded.user_id)
@@ -125,9 +138,9 @@ export const getUserFromToken = async (token) => {
         organization_type: 'agency',
         organization_id: agency.id,
         agency_id: agency.agency_id,
-        // Load permissions from organization_team_members, or null if not found (Super Admin)
-        permissions: teamMember?.permissions || null,
-        role_id: teamMember?.role_id || null
+        permissions: teamMember ? resolvePermissionsFromTeamMember(teamMember) : null,
+        role_id: teamMember?.role_id || null,
+        role: teamMember?.role || null,
       }
     }
 
@@ -136,7 +149,7 @@ export const getUserFromToken = async (token) => {
       const agentLookupId = decoded.agent_id || decoded.user_id
       const { data: agent, error } = await supabaseAdmin
         .from('agents')
-        .select('id, agent_id')
+        .select('id, agent_id, agency_id')
         .eq('agent_id', agentLookupId)
         .eq('account_status', 'active')
         .maybeSingle()
@@ -149,6 +162,7 @@ export const getUserFromToken = async (token) => {
         organization_type: 'agent',
         organization_id: agent.id,
         agent_id: agent.agent_id,
+        agency_id: agent.agency_id,
         permissions: null,
       }
     }
@@ -173,9 +187,10 @@ export const checkPermission = (userInfo, permissionKey) => {
   if (userInfo.permissions === null) return true
 
   // Check permissions for team members, developers, and agencies
-  if (userInfo.permissions) {
+  const permissions = normalizePermissions(userInfo.permissions)
+  if (permissions) {
     return hasPermission(
-      userInfo.permissions,
+      permissions,
       permissionKey,
       userInfo.organization_type || (userInfo.user_type === 'developer' ? 'developer' : 'agency')
     )

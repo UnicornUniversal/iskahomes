@@ -2,8 +2,9 @@
 import React from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { SUBSCRIPTION_LOCKED_CARD_CLASS } from '@/lib/subscriptionLimits'
 
-const DevelopmentCard = ({ development, viewMode = 'list' }) => {
+const DevelopmentCard = ({ development, viewMode = 'list', locked = false, lockMessage }) => {
   const params = useParams()
 
   // Get the first available image
@@ -49,9 +50,8 @@ const DevelopmentCard = ({ development, viewMode = 'list' }) => {
   const isGrid = viewMode === 'grid'
   const isList = viewMode === 'list'
 
-  return (
-    <Link href={`/developer/${params.slug}/developments/${development?.id || development?.slug}`}>
-      <div className='rounded-lg border border-primary_color text-primary_color overflow-hidden hover:shadow-lg transition-shadow duration-300 cursor-pointer h-full flex flex-col '>
+  const cardInner = (
+      <div className={`rounded-lg border border-primary_color text-primary_color overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full flex flex-col ${locked ? SUBSCRIPTION_LOCKED_CARD_CLASS : 'cursor-pointer'}`} title={locked ? lockMessage : undefined}>
         <div className={`flex ${isGrid ? 'flex-col' : 'flex-col md:flex-row'} h-full`}>
           {/* Development Image */}
           <div className={`relative flex-shrink-0 overflow-hidden ${
@@ -149,6 +149,15 @@ const DevelopmentCard = ({ development, viewMode = 'list' }) => {
           </div>
         </div>
       </div>
+  )
+
+  if (locked) {
+    return cardInner
+  }
+
+  return (
+    <Link href={`/developer/${params.slug}/developments/${development?.id || development?.slug}`}>
+      {cardInner}
     </Link>
   )
 }

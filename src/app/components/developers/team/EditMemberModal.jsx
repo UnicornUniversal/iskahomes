@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'react-toastify'
 import { FiX, FiShield, FiUser, FiPhone } from 'react-icons/fi'
+import { filterAssignableTeamRoles } from '@/lib/permissionHelpers'
 
 const EditMemberModal = ({ isOpen, onClose, member, onSuccess, organizationType = 'developer' }) => {
   const { developerToken, agencyToken } = useAuth()
@@ -43,7 +44,7 @@ const EditMemberModal = ({ isOpen, onClose, member, onSuccess, organizationType 
 
       if (response.ok) {
         const result = await response.json()
-        setRoles(result.data || [])
+        setRoles(filterAssignableTeamRoles(result.data || []))
       } else {
         const error = await response.json()
         toast.error(error.error || 'Failed to load roles')

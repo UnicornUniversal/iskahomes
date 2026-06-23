@@ -9,12 +9,16 @@ import { toast } from 'react-toastify'
 import RolesList from '@/app/components/developers/team/RolesList'
 import CreateRoleModal from '@/app/components/developers/team/CreateRoleModal'
 import { FiUsers, FiShield, FiPlus } from 'react-icons/fi'
+import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits'
+import SubscriptionLimitButton from '@/app/components/shared/SubscriptionLimitButton'
 
 const RolesPage = () => {
   const { user } = useAuth()
   const pathname = usePathname()
   const [showCreateRoleModal, setShowCreateRoleModal] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const { canCreateMore, usageSummary } = useSubscriptionLimits()
+  const canCreateRole = canCreateMore('total_roles_limit')
 
   // Get the developer slug from the pathname
   const slug = pathname?.split('/')[2] || 'developer'
@@ -30,16 +34,21 @@ const RolesPage = () => {
         <div>
           <h1 className="text-3xl font-bold text-primary_color mb-2">Team Management</h1>
           <p className="text-gray-600">Manage your team members, roles, and permissions</p>
+          {usageSummary.rolesLimit != null && (
+            <p className="text-sm text-gray-500">Plan: {usageSummary.roles}/{usageSummary.rolesLimit} roles</p>
+          )}
         </div>
         <div className="flex gap-3">
           {(user?.user_type === 'agent' || userHasPermission(user, 'team.manage_roles')) && (
-            <button
+            <SubscriptionLimitButton
               onClick={() => setShowCreateRoleModal(true)}
+              enabled={canCreateRole}
+              limitKey="total_roles_limit"
               className="flex items-center gap-2 px-4 py-2 bg-primary_color text-white rounded-lg hover:bg-primary_color/90 transition-colors"
             >
               <FiPlus className="w-5 h-5" />
               Create Role
-            </button>
+            </SubscriptionLimitButton>
           )}
         </div>
       </div>

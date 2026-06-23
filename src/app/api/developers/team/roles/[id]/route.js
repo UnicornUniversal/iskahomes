@@ -117,6 +117,16 @@ export async function PUT(request, { params }) {
       }, { status: 500 })
     }
 
+    // Keep team_members.permissions snapshot in sync (runtime always reads from role join)
+    if (permissions !== undefined) {
+      await supabaseAdmin
+        .from('organization_team_members')
+        .update({ permissions: updatedRole.permissions })
+        .eq('role_id', id)
+        .eq('organization_type', organizationType)
+        .eq('organization_id', userInfo.organization_id)
+    }
+
     return NextResponse.json({ 
       success: true,
       data: updatedRole,

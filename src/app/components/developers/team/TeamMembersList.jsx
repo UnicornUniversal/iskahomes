@@ -6,14 +6,28 @@ import { userHasPermission } from '@/lib/permissionHelpers'
 import { toast } from 'react-toastify'
 import { FiMail, FiPhone, FiUser, FiEdit, FiTrash2, FiClock, FiCheckCircle, FiXCircle } from 'react-icons/fi'
 import EditMemberModal from './EditMemberModal'
+import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits'
+import { SUBSCRIPTION_LOCKED_ROW_CLASS } from '@/lib/subscriptionLimits'
 
 const TeamMembersList = ({ onRefresh, organizationType = 'developer' }) => {
   const { user, developerToken, agencyToken } = useAuth()
   const token = organizationType === 'agency' ? agencyToken : developerToken
+  const { getCumulativeLockedIds, getLimitTooltip } = useSubscriptionLimits()
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedMember, setSelectedMember] = useState(null)
   const [showEditModal, setShowEditModal] = useState(false)
+
+  const lockedMemberIds = React.useMemo(
+    () =>
+      getCumulativeLockedIds(
+        members,
+        'total_users_limit',
+        (member) => member.accepted_at || member.invited_at || member.created_at,
+        (member) => member.id
+      ),
+    [members, getCumulativeLockedIds]
+  )
 
   useEffect(() => {
     fetchMembers()
@@ -125,8 +139,14 @@ const TeamMembersList = ({ onRefresh, organizationType = 'developer' }) => {
                 </td>
               </tr>
             ) : (
-              members.map((member) => (
-                <tr key={member.id} className="hover:bg-gray-50 transition-colors">
+              members.map((member) => {
+                const locked = lockedMemberIds.has(member.id)
+                return (
+                <tr
+                  key={member.id}
+                  className={`hover:bg-gray-50 transition-colors ${locked ? SUBSCRIPTION_LOCKED_ROW_CLASS : ''}`}
+                  title={locked ? getLimitTooltip('total_users_limit') : undefined}
+                >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-primary_color/10 flex items-center justify-center">
@@ -195,7 +215,8 @@ const TeamMembersList = ({ onRefresh, organizationType = 'developer' }) => {
                     </div>
                   </td>
                 </tr>
-              ))
+                )
+              })
             )}
           </tbody>
         </table>

@@ -6,6 +6,10 @@ import { generateToken } from '@/lib/jwt'
 import { captureAuditEvent } from '@/lib/auditLogger'
 import crypto from 'crypto'
 import { setKey, getKey, deleteKey } from '@/lib/redis'
+import {
+  TEAM_MEMBER_WITH_ROLE_SELECT,
+  resolvePermissionsFromTeamMember,
+} from '@/lib/teamMemberPermissions'
 
 const OTP_TTL_SECONDS = 180
 const OTP_MAX_ATTEMPTS = 5
@@ -171,10 +175,7 @@ export async function POST(request) {
     if (!userType) {
       const { data: teamMembers, error: teamError } = await supabaseAdmin
         .from('organization_team_members')
-        .select(`
-          *,
-          role:organization_roles(id, name, description)
-        `)
+        .select(TEAM_MEMBER_WITH_ROLE_SELECT)
         .eq('user_id', user.id)
         .eq('status', 'active')
       
@@ -220,7 +221,7 @@ export async function POST(request) {
               developer_id: developerId, // Add developer_id so components can use it directly
               role_id: member.role_id,
               role_name: member.role?.name,
-              permissions: member.permissions,
+              permissions: resolvePermissionsFromTeamMember(member),
               email: member.email,
               first_name: member.first_name,
               last_name: member.last_name
@@ -295,7 +296,7 @@ export async function POST(request) {
             developer_id: developerId, // Add developer_id so components can use it directly
             role_id: teamMember.role_id,
             role_name: teamMember.role?.name,
-            permissions: teamMember.permissions,
+            permissions: resolvePermissionsFromTeamMember(teamMember),
             email: teamMember.email,
             first_name: teamMember.first_name,
             last_name: teamMember.last_name
@@ -581,23 +582,33 @@ export async function POST(request) {
         // Get organization details for team member
         let organizationSlug = null
         let organizationName = null
+        let developerId = null
+        let agencyId = null
+        let orgAdminStatus = ''
+        let orgProfileStatus = ''
         
         if (profile.organization_type === 'developer') {
           const { data: devOrg } = await supabaseAdmin
             .from('developers')
-            .select('slug, name')
+            .select('slug, name, developer_id, admin_status, account_status')
             .eq('id', profile.organization_id)
             .single()
           organizationSlug = devOrg?.slug
           organizationName = devOrg?.name
+          developerId = devOrg?.developer_id
+          orgAdminStatus = devOrg?.admin_status || ''
+          orgProfileStatus = devOrg?.account_status || ''
         } else if (profile.organization_type === 'agency') {
           const { data: agencyOrg } = await supabaseAdmin
             .from('agencies')
-            .select('slug, name')
+            .select('slug, name, agency_id, admin_status, account_status')
             .eq('id', profile.organization_id)
             .single()
           organizationSlug = agencyOrg?.slug
           organizationName = agencyOrg?.name
+          agencyId = agencyOrg?.agency_id
+          orgAdminStatus = agencyOrg?.admin_status || ''
+          orgProfileStatus = agencyOrg?.account_status || ''
         }
 
         profileData = {
@@ -607,6 +618,12 @@ export async function POST(request) {
           organization_id: profile.organization_id,
           organization_slug: organizationSlug,
           organization_name: organizationName,
+          developer_id: developerId,
+          agency_id: agencyId,
+          organization_admin_status: orgAdminStatus || orgProfileStatus,
+          organization_profile_status: orgProfileStatus,
+          admin_status: orgAdminStatus || orgProfileStatus,
+          account_status: orgProfileStatus || orgAdminStatus,
           role_id: profile.role_id,
           role_name: profile.role_name,
           permissions: profile.permissions,

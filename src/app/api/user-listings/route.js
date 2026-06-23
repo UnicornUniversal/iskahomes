@@ -34,6 +34,7 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit')) || 12
     const search = searchParams.get('search') || ''
     const listingType = searchParams.get('listing_type') || ''
+    const developmentId = searchParams.get('development_id') || ''
     const status = searchParams.get('status') || ''
     const purpose = searchParams.get('purpose') || ''
     const category = searchParams.get('category') || ''
@@ -57,6 +58,10 @@ export async function GET(request) {
 
     if (listingType) {
       query = query.eq('listing_type', listingType)
+    }
+
+    if (developmentId) {
+      query = query.eq('development_id', developmentId)
     }
 
     if (status) {
@@ -112,6 +117,9 @@ export async function GET(request) {
     }
     if (listingType) {
       countQuery = countQuery.eq('listing_type', listingType)
+    }
+    if (developmentId) {
+      countQuery = countQuery.eq('development_id', developmentId)
     }
     if (status) {
       countQuery = countQuery.eq('listing_status', status)

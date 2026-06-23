@@ -21,6 +21,7 @@ import RecentMessages from '@/app/components/developers/DataStats/RecentMessages
 import LatestLeads from '@/app/components/developers/DataStats/LatestLeads'
 import { formatCurrency } from '@/lib/utils'
 import { usePathname } from 'next/navigation'
+import { getAgencyAccountId } from '@/lib/dashboardRoutes'
 
 const AgencyDashboard = () => {
   const { user } = useAuth()
@@ -30,7 +31,7 @@ const AgencyDashboard = () => {
   const slug = pathname?.split('/')[2] || ''
   
   // Use agency_id for all data - works for both owners and team members
-  const accountId = profile?.agency_id || user?.id
+  const accountId = getAgencyAccountId(user)
   
   const [viewsTimeSeries, setViewsTimeSeries] = useState([])
   const [impressionsTimeSeries, setImpressionsTimeSeries] = useState([])

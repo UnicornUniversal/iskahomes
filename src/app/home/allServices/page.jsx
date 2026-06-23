@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react'
 import {
   ArrowRight,
   CheckCircle,
+  Home,
   Mail,
   Phone,
   User,

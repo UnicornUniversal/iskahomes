@@ -120,9 +120,14 @@ const SalesInformationModal = ({
     setAsvBreakdown(prev => prev.filter((_, i) => i !== index))
   }
 
+  const fieldClassName =
+    'flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary_color/30'
+  const textareaClassName =
+    'flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary_color/30 disabled:cursor-not-allowed disabled:opacity-50'
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full transform transition-all duration-300 ease-out max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full transform transition-all duration-300 ease-out max-h-[90vh] overflow-y-auto [color-scheme:light]">
         {/* Header */}
         <div className="p-6 pb-4">
           <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full">
@@ -161,7 +166,7 @@ const SalesInformationModal = ({
                       onChange={(e) => { setClientSearch(e.target.value); setSelectedClient(null); setClientDropdownOpen(true) }}
                       onFocus={() => setClientDropdownOpen(true)}
                       onBlur={() => setTimeout(() => setClientDropdownOpen(false), 150)}
-                      className="flex h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm"
+                      className={`${fieldClassName} pl-9 pr-3`}
                     />
                   </div>
                   {clientDropdownOpen && clientsFiltered.length > 0 && (
@@ -189,7 +194,7 @@ const SalesInformationModal = ({
                   value={buyerName}
                   onChange={(e) => setBuyerName(e.target.value)}
                   placeholder={`Enter ${saleType === 'sold' ? 'buyer' : 'tenant'} name`}
-                  className="w-full"
+                  className="w-full bg-white text-gray-900"
                 />
               )}
             </div>
@@ -203,7 +208,7 @@ const SalesInformationModal = ({
                 id="salesSource"
                 value={salesSource}
                 onChange={(e) => setSalesSource(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className={fieldClassName}
               >
                 <option value="Iska Homes">Iska Homes</option>
                 <option value="Referral">Referral</option>
@@ -227,7 +232,7 @@ const SalesInformationModal = ({
                   value={otherSource}
                   onChange={(e) => setOtherSource(e.target.value)}
                   placeholder="Enter sales source"
-                  className="w-full"
+                  className="w-full bg-white text-gray-900"
                 />
               </div>
             )}
@@ -243,7 +248,7 @@ const SalesInformationModal = ({
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Add any additional notes about this sale..."
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className={textareaClassName}
               />
             </div>
 
@@ -270,7 +275,7 @@ const SalesInformationModal = ({
                     value={asv}
                     onChange={(e) => setAsv(e.target.value)}
                     placeholder="Enter actual sales value"
-                    className="w-full"
+                    className="w-full bg-white text-gray-900"
                   />
                 </div>
 
@@ -303,7 +308,7 @@ const SalesInformationModal = ({
                           value={item.name}
                           onChange={(e) => updateBreakdownItem(index, 'name', e.target.value)}
                           placeholder="Name"
-                          className="col-span-7 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          className={`col-span-7 ${fieldClassName}`}
                         />
                         <input
                           type="number"
@@ -312,7 +317,7 @@ const SalesInformationModal = ({
                           value={item.value}
                           onChange={(e) => updateBreakdownItem(index, 'value', e.target.value)}
                           placeholder="Value"
-                          className="col-span-4 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          className={`col-span-4 ${fieldClassName}`}
                         />
                         <button
                           type="button"

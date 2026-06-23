@@ -4,6 +4,7 @@ import { captureAuditEvent } from '@/lib/auditLogger'
 import { resolveLeadAttributionFromParts } from '@/lib/leadAttributionResolve'
 import { incrementLeadSourceBreakdown } from '@/lib/leadSourceBreakdownAggregation'
 import { applyLeadSourceBreakdownHourlyBuckets } from '@/lib/applyLeadSourceBreakdownOnNewLead'
+import { assertLeadCreationAllowed } from '@/lib/subscriptionLimitsServer'
 import crypto from 'crypto'
 
 const LEAD_CLASSIFICATIONS = ['Premium', 'High Value', 'Standard']
@@ -102,6 +103,18 @@ export async function POST(request) {
         .eq('agent_id', lister_id)
         .maybeSingle()
       resolvedAgencyId = agentRecord?.agency_id || null
+    }
+
+    const leadLimitCheck = await assertLeadCreationAllowed({
+      listerType: lister_type,
+      listerId: lister_id,
+      agencyId: resolvedAgencyId,
+    })
+    if (!leadLimitCheck.allowed) {
+      return NextResponse.json(
+        { error: leadLimitCheck.message, code: 'SUBSCRIPTION_LIMIT', limitKey: 'leads_per_month' },
+        { status: 403 }
+      )
     }
 
     // Determine action type and metadata

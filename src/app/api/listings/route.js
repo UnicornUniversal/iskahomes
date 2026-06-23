@@ -1013,6 +1013,23 @@ export async function POST(request) {
       }
     }
 
+    if (accountType === 'agency' && !existingListing) {
+      const { limits } = await getSubscriptionLimitsForUser(userId, 'agency')
+      const { data: agency } = await supabaseAdmin
+        .from('agencies')
+        .select('total_listings')
+        .eq('agency_id', userId)
+        .single()
+      const countAfterCreate = (agency?.total_listings ?? 0) + 1
+      const { allowed } = checkNumericLimit(limits, 'listing_limits', countAfterCreate)
+      if (!allowed) {
+        return NextResponse.json(
+          { error: 'You have reached your plan limit for listings. Please upgrade your subscription to add more.' },
+          { status: 403 }
+        )
+      }
+    }
+
     // Extract basic listing data from parsed propertyData
     const listingData = {
       account_type: propertyData.account_type || 'developer',

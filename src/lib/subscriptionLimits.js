@@ -164,3 +164,188 @@ export function hasClientManagementAddonInLimits(limits) {
 }
 
 export { UNLIMITED_NUMBER, normalizeApiLimits, mergeApiLimits }
+
+/**
+ * Whether a numeric limit is unlimited (-1 or very large).
+ */
+export function isUnlimitedLimitValue(value) {
+  const n = Number(value)
+  return n === UNLIMITED_NUMBER || n >= 1e9
+}
+
+/**
+ * Get numeric limit or undefined if missing/unlimited.
+ */
+export function getNumericLimit(limits, key) {
+  const entry = limits?.[key]
+  if (!entry || entry.data_type !== 'number') return undefined
+  const value = Number(entry.value)
+  if (isUnlimitedLimitValue(value)) return undefined
+  return value
+}
+
+/**
+ * Mark items that exceed the calendar-month cap (soft limit UI).
+ * Items from prior months are never locked.
+ * @param {Array} items
+ * @param {string} limitKey - e.g. leads_per_month
+ * @param {object} limits - effective api_limits
+ * @param {(item) => string|Date} getCreatedAt
+ * @param {Date} referenceMonth
+ * @returns {Set<string|number>} ids that should be locked
+ */
+export function getMonthlyOverLimitIds(
+  items,
+  limitKey,
+  limits,
+  getCreatedAt,
+  referenceMonth = new Date()
+) {
+  const cap = getNumericLimit(limits, limitKey)
+  if (cap === undefined || !Array.isArray(items) || items.length === 0) {
+    return new Set()
+  }
+
+  const month = referenceMonth.getMonth()
+  const year = referenceMonth.getFullYear()
+
+  const thisMonth = items
+    .filter((item) => {
+      const raw = getCreatedAt(item)
+      const date = raw instanceof Date ? raw : new Date(raw)
+      if (Number.isNaN(date.getTime())) return false
+      return date.getMonth() === month && date.getFullYear() === year
+    })
+    .sort((a, b) => {
+      const da = new Date(getCreatedAt(a)).getTime()
+      const db = new Date(getCreatedAt(b)).getTime()
+      return da - db
+    })
+
+  const locked = new Set()
+  thisMonth.slice(cap).forEach((item) => {
+    if (item?.id != null) locked.add(item.id)
+  })
+  return locked
+}
+
+export const SUBSCRIPTION_LOCKED_ROW_CLASS =
+  'opacity-50 pointer-events-none select-none relative'
+
+export const SUBSCRIPTION_LOCKED_CARD_CLASS =
+  'opacity-50 pointer-events-none select-none relative'
+
+export const SUBSCRIPTION_LIMIT_TOOLTIPS = {
+  listing_limits: 'Listing limit reached. Upgrade your subscription to add or manage more properties.',
+  units_per_development: 'Unit limit for this development reached. Upgrade your subscription to add more units.',
+  developments_limit: 'Development limit reached. Upgrade your subscription to add more developments.',
+  number_of_agents: 'Agent limit reached. Upgrade your subscription to invite more agents.',
+  total_users_limit: 'Team member limit reached. Upgrade your subscription to add more users.',
+  total_roles_limit: 'Role limit reached. Upgrade your subscription to add more roles.',
+  leads_per_month: 'Monthly lead limit reached. Upgrade your subscription for more leads this month.',
+  appointments_per_month: 'Monthly appointment limit reached. Upgrade your subscription for more bookings this month.',
+  audit_trails_limit: 'Audit trail view limit reached. Upgrade your subscription to access more history.',
+  audit_trails_export_enabled: 'Audit export is not included in your plan. Upgrade to export audit trails.',
+  lead_export_pdf: 'PDF export is not included in your plan. Upgrade your subscription.',
+  lead_export_csv: 'CSV export is not included in your plan. Upgrade your subscription.',
+  lead_export_excel: 'Excel export is not included in your plan. Upgrade your subscription.',
+  advanced_analytics_enabled: 'Advanced analytics is not included in your plan. Upgrade your subscription.',
+  transactions_records_enabled: 'Transaction records are not included in your plan. Upgrade your subscription.',
+  default: 'Plan limit reached. Upgrade your subscription to continue.',
+}
+
+export function getSubscriptionLimitTooltip(limitKey) {
+  return SUBSCRIPTION_LIMIT_TOOLTIPS[limitKey] || SUBSCRIPTION_LIMIT_TOOLTIPS.default
+}
+
+/**
+ * Cumulative cap — oldest items stay active, excess are locked (listings, developments, agents, audit rows).
+ */
+export function getCumulativeOverLimitIds(items, limitKey, limits, getCreatedAt, getId = (item) => item?.id) {
+  const cap = getNumericLimit(limits, limitKey)
+  if (cap === undefined || !Array.isArray(items) || items.length === 0) {
+    return new Set()
+  }
+  if (cap === 0) {
+    const locked = new Set()
+    items.forEach((item) => {
+      const id = getId(item)
+      if (id != null) locked.add(id)
+    })
+    return locked
+  }
+
+  const sorted = [...items].sort((a, b) => {
+    const da = new Date(getCreatedAt(a)).getTime()
+    const db = new Date(getCreatedAt(b)).getTime()
+    return da - db
+  })
+
+  const locked = new Set()
+  sorted.slice(cap).forEach((item) => {
+    const id = getId(item)
+    if (id != null) locked.add(id)
+  })
+  return locked
+}
+
+/**
+ * Per-development unit cap for developer accounts.
+ */
+export function getUnitsPerDevelopmentOverLimitIds(
+  units,
+  limits,
+  getDevelopmentId = (u) => u?.development_id,
+  getCreatedAt = (u) => u?.created_at,
+  getId = (u) => u?.id
+) {
+  const cap = getNumericLimit(limits, 'units_per_development')
+  if (cap === undefined || !Array.isArray(units) || units.length === 0) {
+    return new Set()
+  }
+
+  const byDev = {}
+  for (const unit of units) {
+    const devId = getDevelopmentId(unit) || '__none__'
+    if (!byDev[devId]) byDev[devId] = []
+    byDev[devId].push(unit)
+  }
+
+  const locked = new Set()
+  for (const group of Object.values(byDev)) {
+    const sorted = [...group].sort((a, b) => {
+      const da = new Date(getCreatedAt(a)).getTime()
+      const db = new Date(getCreatedAt(b)).getTime()
+      return da - db
+    })
+    sorted.slice(cap).forEach((unit) => {
+      const id = getId(unit)
+      if (id != null) locked.add(id)
+    })
+  }
+  return locked
+}
+
+export function canAddUnitToAnyDevelopment(units, limits, getDevelopmentId = (u) => u?.development_id) {
+  const cap = getNumericLimit(limits, 'units_per_development')
+  if (cap === undefined) return true
+
+  const counts = {}
+  for (const unit of units || []) {
+    const devId = getDevelopmentId(unit) || '__none__'
+    counts[devId] = (counts[devId] || 0) + 1
+  }
+
+  if (Object.keys(counts).length === 0) return true
+  return Object.values(counts).some((count) => count < cap)
+}
+
+export const USAGE_KEY_BY_LIMIT = {
+  listing_limits: 'total_listings',
+  number_of_agents: 'total_agents',
+  developments_limit: 'total_developments',
+  total_users_limit: 'total_team_members',
+  total_roles_limit: 'total_roles',
+  leads_per_month: 'leads_per_month',
+  appointments_per_month: 'appointments_per_month',
+}

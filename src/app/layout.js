@@ -1,12 +1,13 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Poppins, Playfair_Display } from "next/font/google";
-import Layout1 from "./layout/Layout1";
+import { Suspense } from "react";
 
 import { AuthProvider } from "@/contexts/AuthContext";
 import { PostHogProvider } from "./providers";
 import DisableNumberInputScroll from "./components/DisableNumberInputScroll";
 import ToastProvider from "./components/ToastProvider";
+import AuthHashRedirect from "./components/AuthHashRedirect";
 
 
 
@@ -50,6 +51,9 @@ export default function RootLayout({ children }) {
       >
         <PostHogProvider>
           <AuthProvider>
+            <Suspense fallback={null}>
+              <AuthHashRedirect />
+            </Suspense>
             <DisableNumberInputScroll />
             <ToastProvider />
             {/* <Nav /> */}

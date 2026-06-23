@@ -545,11 +545,12 @@ export async function DELETE(request, { params }) {
     // Get full development data to access metrics
     const { data: existingDevelopment, error: fetchError } = await supabaseAdmin
       .from('developments')
-      .select('developer_id, total_units, estimated_revenue, total_revenue, development_status')
+      .select('developer_id, total_units, total_estimated_revenue, total_revenue, development_status')
       .eq('id', id)
       .single()
 
     if (fetchError) {
+      console.error('Error fetching development for delete:', fetchError)
       return NextResponse.json(
         { error: 'Development not found' },
         { status: 404 }
@@ -574,7 +575,7 @@ export async function DELETE(request, { params }) {
     // Store developer_id and metrics before soft deletion
     const developerIdToUpdate = existingDevelopment.developer_id
     const totalUnits = existingDevelopment.total_units || 0
-    const estimatedRevenue = existingDevelopment.estimated_revenue || 0
+    const estimatedRevenue = existingDevelopment.total_estimated_revenue || 0
     const totalRevenue = existingDevelopment.total_revenue || 0
 
     // Soft delete: Set development_status to 'deleted'

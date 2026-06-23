@@ -10,8 +10,125 @@ const MapComponent = dynamic(() => import('./MapComponent'), {
   loading: () => <div className="h-96 bg-gray-100 rounded-lg flex items-center justify-center">Loading map...</div>
 })
 
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API
+
+const googleMapsFailureCallbacks = new Set()
+
+const subscribeToGoogleMapsFailure = (callback) => {
+  googleMapsFailureCallbacks.add(callback)
+  return () => googleMapsFailureCallbacks.delete(callback)
+}
+
+const notifyGoogleMapsFailure = () => {
+  googleMapsFailureCallbacks.forEach((callback) => callback())
+}
+
+const isGoogleMapsRuntimeErrorMessage = (message) => (
+  message.includes('BillingNotEnabledMapError') ||
+  message.includes('Google Maps JavaScript API error') ||
+  message.includes('ApiNotActivatedMapError') ||
+  message.includes('InvalidKeyMapError') ||
+  message.includes('RefererNotAllowedMapError')
+)
+
+const hasGoogleMapsDomError = (root) => {
+  if (!root) return false
+
+  return !!(
+    root.querySelector('.gm-err-container') ||
+    root.querySelector('.gm-err-message') ||
+    root.textContent?.includes("can't load Google Maps")
+  )
+}
+
+if (typeof window !== 'undefined' && !window.__iskaGoogleMapsFailureDetectionInstalled) {
+  window.__iskaGoogleMapsFailureDetectionInstalled = true
+
+  const previousAuthFailure = window.gm_authFailure
+  window.gm_authFailure = () => {
+    notifyGoogleMapsFailure()
+    if (typeof previousAuthFailure === 'function') previousAuthFailure()
+  }
+
+  const originalConsoleError = console.error.bind(console)
+  console.error = (...args) => {
+    const message = args.map((arg) => {
+      if (typeof arg === 'string') return arg
+      if (arg instanceof Error) return arg.message
+      try { return JSON.stringify(arg) } catch { return String(arg) }
+    }).join(' ')
+
+    if (isGoogleMapsRuntimeErrorMessage(message)) {
+      notifyGoogleMapsFailure()
+      return
+    }
+
+    originalConsoleError(...args)
+  }
+
+  window.addEventListener('error', (event) => {
+    if (isGoogleMapsRuntimeErrorMessage(event?.message || '')) {
+      notifyGoogleMapsFailure()
+    }
+  })
+}
+
+// Map Nominatim results to the same location shape used by Google Places / our database
+const parseNominatimResult = (result) => {
+  const address = result?.address || {}
+
+  const country = address.country || ''
+  const countryCode = (address.country_code || '').toUpperCase()
+  const state = address.state || address.region || address.state_district || ''
+  const city = address.city || address.town || address.municipality || address.county || ''
+  const town = address.suburb || address.neighbourhood || address.neighborhood || address.quarter || address.village || address.hamlet || ''
+
+  return {
+    country,
+    countryCode,
+    state,
+    city,
+    town,
+    fullAddress: result?.display_name || '',
+    coordinates: {
+      latitude: (result?.lat ?? '').toString(),
+      longitude: (result?.lon ?? '').toString()
+    }
+  }
+}
+
+const searchNominatim = async (query) => {
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
+    { headers: { 'Accept-Language': 'en' } }
+  )
+
+  if (!response.ok) return []
+  const data = await response.json()
+  return Array.isArray(data) ? data : []
+}
+
+const reverseGeocodeNominatim = async (lat, lng) => {
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+    { headers: { 'Accept-Language': 'en' } }
+  )
+
+  if (!response.ok) return null
+  const data = await response.json()
+  return data ? parseNominatimResult(data) : null
+}
+
+const GoogleMapsFailureSync = ({ failed, onFailure }) => {
+  useEffect(() => {
+    if (failed) onFailure()
+  }, [failed, onFailure])
+
+  return null
+}
+
 // Google Map Component - Memoized with proper cleanup
-const GoogleMapViewer = React.memo(({ center, zoom, coordinates, onMapClick }) => {
+const GoogleMapViewer = React.memo(({ center, zoom, coordinates, onMapClick, onGoogleMapsError }) => {
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const markerRef = useRef(null)
@@ -126,12 +243,48 @@ const GoogleMapViewer = React.memo(({ center, zoom, coordinates, onMapClick }) =
     }
   }, [coordinates?.latitude, coordinates?.longitude, handleMarkerDrag])
 
+  // Detect billing/auth errors that still allow the script to load
+  useEffect(() => {
+    if (!mapRef.current || !onGoogleMapsError) return
+
+    const reportError = () => onGoogleMapsError()
+
+    if (hasGoogleMapsDomError(mapRef.current)) {
+      reportError()
+      return
+    }
+
+    const observer = new MutationObserver(() => {
+      if (hasGoogleMapsDomError(mapRef.current)) {
+        reportError()
+        observer.disconnect()
+      }
+    })
+
+    observer.observe(mapRef.current, { childList: true, subtree: true, characterData: true })
+
+    const intervalId = window.setInterval(() => {
+      if (hasGoogleMapsDomError(mapRef.current)) {
+        reportError()
+        window.clearInterval(intervalId)
+      }
+    }, 500)
+
+    const timeoutId = window.setTimeout(() => window.clearInterval(intervalId), 10000)
+
+    return () => {
+      observer.disconnect()
+      window.clearInterval(intervalId)
+      window.clearTimeout(timeoutId)
+    }
+  }, [onGoogleMapsError])
+
   return <div ref={mapRef} className="w-full h-full" />
 })
 
 GoogleMapViewer.displayName = 'GoogleMapViewer'
 
-const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocations = [], accountType, developments = [], user }) => {
+const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocations = [], accountType, developments = [], user, enableMap = true }) => {
   const [locationData, setLocationData] = useState({
     id: null, // Location ID from development_locations (for developer units)
     country: '',
@@ -149,6 +302,11 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
 
   const [searchQuery, setSearchQuery] = useState('')
   const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false)
+  const [useOsmFallback, setUseOsmFallback] = useState(!GOOGLE_MAPS_API_KEY)
+  const [osmSuggestions, setOsmSuggestions] = useState([])
+  const [showOsmSuggestions, setShowOsmSuggestions] = useState(false)
+  const [isOsmSearching, setIsOsmSearching] = useState(false)
+  const [osmMapMounted, setOsmMapMounted] = useState(false)
   const [mapCenter, setMapCenter] = useState([7.9465, -1.0232]) // Ghana coordinates
   const [mapZoom, setMapZoom] = useState(6) // Zoom level for Ghana
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState([])
@@ -162,6 +320,33 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
   const autocompleteTimeoutRef = useRef(null)
   const lastFormDataRef = useRef(null)
   const scheduleTimerRef = useRef(null)
+  const osmSearchTimeoutRef = useRef(null)
+
+  const handleGoogleMapsFailure = useCallback(() => {
+    setUseOsmFallback(true)
+  }, [])
+
+  useEffect(() => subscribeToGoogleMapsFailure(handleGoogleMapsFailure), [handleGoogleMapsFailure])
+
+  useEffect(() => {
+    if (!useOsmFallback) {
+      setOsmMapMounted(false)
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(() => setOsmMapMounted(true), 100)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      setOsmMapMounted(false)
+    }
+  }, [useOsmFallback])
+
+  useEffect(() => {
+    if (!enableMap) {
+      setOsmMapMounted(false)
+    }
+  }, [enableMap])
 
   const scheduleParentUpdate = useCallback((nextLocation) => {
     // Avoid setState during render of child by deferring to task queue
@@ -246,7 +431,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
 
   // Google Maps API configuration - memoized to prevent re-renders
   const mapOptions = useMemo(() => ({
-    apiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API,
+    apiKey: GOOGLE_MAPS_API_KEY,
     libraries: ['places']
   }), [])
 
@@ -353,6 +538,9 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
       if (autocompleteTimeoutRef.current) {
         clearTimeout(autocompleteTimeoutRef.current)
       }
+      if (osmSearchTimeoutRef.current) {
+        clearTimeout(osmSearchTimeoutRef.current)
+      }
     }
   }, [])
 
@@ -379,7 +567,11 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
 
   // Initialize Google Places services when Google Maps loads
   useEffect(() => {
+    if (useOsmFallback) return
+
     const initializePlacesServices = () => {
+      if (useOsmFallback) return
+
       if (window.google && window.google.maps && window.google.maps.places) {
         try {
           const autocomplete = new window.google.maps.places.AutocompleteService()
@@ -389,6 +581,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
           setIsGoogleMapsLoaded(true)
         } catch (error) {
           console.error('Error initializing Google Places services:', error)
+          handleGoogleMapsFailure()
         }
       } else {
         // Retry after a short delay if Places API isn't loaded yet
@@ -397,13 +590,16 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
     }
 
     initializePlacesServices()
-  }, [])
+  }, [useOsmFallback, handleGoogleMapsFailure])
 
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (autocompleteTimeoutRef.current) {
         clearTimeout(autocompleteTimeoutRef.current)
+      }
+      if (osmSearchTimeoutRef.current) {
+        clearTimeout(osmSearchTimeoutRef.current)
       }
     }
   }, [])
@@ -417,15 +613,20 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
     }
 
     try {
-      // Simplified autocomplete search with better performance
-      // No country restrictions - search everywhere
       autocompleteService.getPlacePredictions(
         { 
           input: query
         }, 
         (predictions, status) => {
-          if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
-            setAutocompleteSuggestions(predictions.slice(0, 5)) // Limit to 5 suggestions
+          const placesStatus = window.google.maps.places.PlacesServiceStatus
+
+          if (status === placesStatus.REQUEST_DENIED || status === placesStatus.OVER_QUERY_LIMIT) {
+            handleGoogleMapsFailure()
+            return
+          }
+
+          if (status === placesStatus.OK && predictions) {
+            setAutocompleteSuggestions(predictions.slice(0, 5))
             setShowSuggestions(true)
           } else {
             setAutocompleteSuggestions([])
@@ -434,11 +635,12 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
         }
       )
     } catch (error) {
-      console.error('❌ Error in autocomplete search:', error)
+      console.error('Error in autocomplete search:', error)
+      handleGoogleMapsFailure()
       setAutocompleteSuggestions([])
       setShowSuggestions(false)
     }
-  }, [autocompleteService])
+  }, [autocompleteService, handleGoogleMapsFailure])
 
   // Google Places API functions - defined first to avoid circular dependency
   const handlePlaceSelect = useCallback((place) => {
@@ -479,6 +681,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
     }
 
     const newLocationData = {
+      id: locationData.id,
       country,
       countryCode, // Store ISO country code for currency lookup
       state,
@@ -563,6 +766,76 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
     }, 200)
   }, [])
 
+  const handleOsmAutocompleteSearch = useCallback(async (query) => {
+    if (!query.trim()) {
+      setOsmSuggestions([])
+      setShowOsmSuggestions(false)
+      return
+    }
+
+    setIsOsmSearching(true)
+    try {
+      const results = await searchNominatim(query)
+      setOsmSuggestions(results)
+      setShowOsmSuggestions(results.length > 0)
+    } catch (error) {
+      console.error('Error searching OpenStreetMap:', error)
+      setOsmSuggestions([])
+      setShowOsmSuggestions(false)
+    } finally {
+      setIsOsmSearching(false)
+    }
+  }, [])
+
+  const handleOsmSuggestionSelect = useCallback((result) => {
+    const parsed = parseNominatimResult(result)
+
+    setLocationData(prev => {
+      const next = {
+        id: prev.id,
+        ...parsed,
+        additionalInformation: prev.additionalInformation
+      }
+      scheduleParentUpdate(next)
+      return next
+    })
+
+    setSearchQuery(result.display_name || '')
+    setShowOsmSuggestions(false)
+    setOsmSuggestions([])
+
+    const lat = parseFloat(parsed.coordinates.latitude)
+    const lng = parseFloat(parsed.coordinates.longitude)
+    if (!isNaN(lat) && !isNaN(lng)) {
+      setMapCenter([lat, lng])
+      setMapZoom(15)
+    }
+  }, [scheduleParentUpdate])
+
+  const handleOsmInputChange = useCallback((value) => {
+    setSearchQuery(value)
+
+    if (osmSearchTimeoutRef.current) {
+      clearTimeout(osmSearchTimeoutRef.current)
+    }
+
+    osmSearchTimeoutRef.current = setTimeout(() => {
+      handleOsmAutocompleteSearch(value)
+    }, 400)
+  }, [handleOsmAutocompleteSearch])
+
+  const handleOsmInputFocus = useCallback(() => {
+    if (osmSuggestions.length > 0) {
+      setShowOsmSuggestions(true)
+    }
+  }, [osmSuggestions.length])
+
+  const handleOsmInputBlur = useCallback(() => {
+    setTimeout(() => {
+      setShowOsmSuggestions(false)
+    }, 200)
+  }, [])
+
   const handleChange = useCallback((field, value) => {
     if (isUpdatingFromFormDataRef.current) return
     
@@ -602,12 +875,25 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
     })
   }, [updateFormData, mapCenter])
 
-  const handleMapClick = useCallback((lat, lng) => {
+  const handleMapClick = useCallback(async (lat, lng) => {
     isUpdatingFromMapRef.current = true
-    
+
+    let addressFields = {}
+    if (useOsmFallback) {
+      try {
+        const geocoded = await reverseGeocodeNominatim(lat, lng)
+        if (geocoded) {
+          addressFields = geocoded
+        }
+      } catch (error) {
+        console.error('Error reverse geocoding with OpenStreetMap:', error)
+      }
+    }
+
     setLocationData(prev => {
       const next = {
         ...prev,
+        ...addressFields,
         coordinates: {
           latitude: lat.toString(),
           longitude: lng.toString()
@@ -623,7 +909,223 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
       setMapCenter(newCenter)
       setMapZoom(15)
     }
-  }, [scheduleParentUpdate, mapCenter])
+  }, [scheduleParentUpdate, mapCenter, useOsmFallback])
+
+  const renderOsmMap = () => {
+    if (!enableMap) return null
+
+    if (!osmMapMounted) {
+      return (
+        <div className="h-full min-h-[200px] bg-gray-100 rounded-lg flex items-center justify-center">
+          <div className="text-gray-500">Loading map...</div>
+        </div>
+      )
+    }
+
+    return (
+      <MapComponent
+        center={mapCenter}
+        zoom={mapZoom}
+        onMapClick={handleMapClick}
+        coordinates={locationData.coordinates}
+      />
+    )
+  }
+
+  const renderInteractiveMap = () => {
+    if (!enableMap) return null
+
+    if (useOsmFallback) {
+      return (
+        <div className="h-full flex flex-col">
+          <div className="text-xs p-2 bg-orange-50 shrink-0">
+            Google Maps unavailable. Using OpenStreetMap.
+          </div>
+          <div className="flex-1 min-h-0">
+            {renderOsmMap()}
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <Wrapper {...mapOptions} render={(status) => {
+        if (status === 'LOADING') {
+          return <div className="h-full bg-gray-100 rounded-lg flex items-center justify-center">Loading Google Maps...</div>
+        }
+
+        if (status === 'FAILURE') {
+          return (
+            <>
+              <GoogleMapsFailureSync failed onFailure={handleGoogleMapsFailure} />
+              <div className="h-full bg-gray-100 rounded-lg flex items-center justify-center">
+                <div className="text-gray-500">Loading map...</div>
+              </div>
+            </>
+          )
+        }
+
+        return (
+          <GoogleMapViewer
+            center={mapCenter}
+            zoom={mapZoom}
+            coordinates={locationData.coordinates}
+            onMapClick={handleMapClick}
+            onGoogleMapsError={handleGoogleMapsFailure}
+          />
+        )
+      }} />
+    )
+  }
+
+  const renderLocationSearch = () => {
+    if (useOsmFallback) {
+      return (
+        <div className="relative">
+          <div className="text-xs text-orange-700 mb-2">
+            Location search powered by OpenStreetMap
+          </div>
+          <Input
+            type="text"
+            placeholder="e.g., East Legon, Accra, Ghana"
+            value={searchQuery}
+            onChange={(e) => handleOsmInputChange(e.target.value)}
+            onFocus={handleOsmInputFocus}
+            onBlur={handleOsmInputBlur}
+            className="w-full"
+          />
+
+          {showOsmSuggestions && osmSuggestions.length > 0 && (
+            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+              {osmSuggestions.map((result) => (
+                <div
+                  key={result.place_id}
+                  className="px-4 py-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                  onClick={() => handleOsmSuggestionSelect(result)}
+                >
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0 mt-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {result.display_name}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {isOsmSearching && (
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm">
+              Searching...
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    return (
+      <Wrapper {...mapOptions} render={(status) => {
+        if (status === 'LOADING') {
+          return (
+            <div className="relative">
+              <Input
+                type="text"
+                placeholder="e.g., East Legon, Accra, Ghana"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full"
+                disabled={true}
+              />
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm">
+                Loading...
+              </div>
+            </div>
+          )
+        }
+
+        if (status === 'FAILURE') {
+          return (
+            <>
+              <GoogleMapsFailureSync failed onFailure={handleGoogleMapsFailure} />
+              <div className="relative">
+                <div className="text-xs text-orange-700 mb-2">
+                  Google Maps unavailable. Using OpenStreetMap for search.
+                </div>
+                <Input
+                  type="text"
+                  placeholder="e.g., East Legon, Accra, Ghana"
+                  value={searchQuery}
+                  onChange={(e) => handleOsmInputChange(e.target.value)}
+                  onFocus={handleOsmInputFocus}
+                  onBlur={handleOsmInputBlur}
+                  className="w-full"
+                />
+              </div>
+            </>
+          )
+        }
+
+        return (
+          <div className="relative">
+            <Input
+              type="text"
+              placeholder={isGoogleMapsLoaded ? "e.g., East Legon, Accra, Ghana" : "Loading location services..."}
+              value={searchQuery}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+              className="w-full"
+              disabled={!isGoogleMapsLoaded}
+            />
+
+            {showSuggestions && autocompleteSuggestions.length > 0 && isGoogleMapsLoaded && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                {autocompleteSuggestions.map((prediction) => (
+                  <div
+                    key={prediction.place_id}
+                    className="px-4 py-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                    onClick={() => handleSuggestionSelect(prediction)}
+                  >
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 mt-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {prediction.structured_formatting?.main_text || prediction.description}
+                        </p>
+                        {prediction.structured_formatting?.secondary_text && (
+                          <p className="text-xs truncate">
+                            {prediction.structured_formatting.secondary_text}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!isGoogleMapsLoaded && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm">
+                Loading...
+              </div>
+            )}
+          </div>
+        )
+      }} />
+    )
+  }
 
   // If developer creating a unit, show dropdown of development locations
   if (isDeveloperUnit) {
@@ -736,42 +1238,13 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
           ) : null}
 
           {/* Interactive Map - Show if location is selected */}
-          {locationData.coordinates?.latitude && locationData.coordinates?.longitude && (
+          {enableMap && locationData.coordinates?.latitude && locationData.coordinates?.longitude && (
             <div className="bg-gradient-to-r from-teal-50 to-cyan-50 p-4 rounded-lg border border-teal-200">
               <label className="block text-sm font-medium text-teal-900 mb-2">
                 Location Map
               </label>
               <div className="h-96 rounded-lg overflow-hidden border border-teal-300">
-                <Wrapper {...mapOptions} render={(status) => {
-                  if (status === 'LOADING') {
-                    return <div className="h-full bg-gray-100 rounded-lg flex items-center justify-center">Loading Google Maps...</div>
-                  }
-                  
-                  if (status === 'FAILURE') {
-                    return (
-                      <div>
-                        <div className="text-xs p-2 bg-orange-50 mb-2 rounded">
-                          Google Maps unavailable. Using OpenStreetMap as fallback.
-                        </div>
-                        <MapComponent
-                          center={mapCenter}
-                          zoom={mapZoom}
-                          onMapClick={handleMapClick}
-                          coordinates={locationData.coordinates}
-                        />
-                      </div>
-                    )
-                  }
-                  
-                  return (
-                    <GoogleMapViewer
-                      center={mapCenter}
-                      zoom={mapZoom}
-                      coordinates={locationData.coordinates}
-                      onMapClick={handleMapClick}
-                    />
-                  )
-                }} />
+                {renderInteractiveMap()}
               </div>
             </div>
           )}
@@ -815,90 +1288,10 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
             Start typing an address to see suggestions and automatically fill in location details
           </p>
           
-          <Wrapper {...mapOptions} render={(status) => {
-            if (status === 'LOADING') {
-              return (
-                <div className="relative">
-                  <Input
-                    type="text"
-                    placeholder="e.g., East Legon, Accra, Ghana"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full"
-                    disabled={true}
-                  />
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2  text-sm">
-                    Loading...
-                  </div>
-                </div>
-              )
-            }
-            
-            if (status === 'FAILURE') {
-              return (
-                <div className="text-red-600 text-sm">
-                  Failed to load Google Maps. Please check your API key.
-                </div>
-              )
-            }
-            
-            return (
-              <div className="relative">
-                <Input
-                  type="text"
-                  placeholder={isGoogleMapsLoaded ? "e.g., East Legon, Accra, Ghana" : "Loading location services..."}
-                  value={searchQuery}
-                  onChange={(e) => handleInputChange(e.target.value)}
-                  onFocus={handleInputFocus}
-                  onBlur={handleInputBlur}
-                  className="w-full"
-                  disabled={!isGoogleMapsLoaded}
-                />
-                
-                {/* Autocomplete Suggestions Dropdown */}
-                {showSuggestions && autocompleteSuggestions.length > 0 && isGoogleMapsLoaded && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                    {autocompleteSuggestions.map((prediction, index) => (
-                      <div
-                        key={prediction.place_id}
-                        className="px-4 py-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
-                        onClick={() => handleSuggestionSelect(prediction)}
-                      >
-                        <div className="flex items-start space-x-3">
-                          <div className="flex-shrink-0 mt-1">
-                            <svg className="w-4 h-4 " fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium  truncate">
-                              {prediction.structured_formatting?.main_text || prediction.description}
-                            </p>
-                            {prediction.structured_formatting?.secondary_text && (
-                              <p className="text-xs  truncate">
-                                {prediction.structured_formatting.secondary_text}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
-                {/* Loading indicator */}
-                {!isGoogleMapsLoaded && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2  text-sm">
-                    Loading...
-                  </div>
-                )}
-              </div>
-            )
-          }} />
+          {renderLocationSearch()}
         </div>
 
-        {/* Interactive Map - Right after search */}
+        {enableMap && (
         <div className="bg-gradient-to-r from-teal-50 to-cyan-50 p-4 rounded-lg border border-teal-200">
           <label className="block text-sm font-medium text-teal-900 mb-2">
             Interactive Map
@@ -908,37 +1301,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
           </p>
           
           <div className="h-96 rounded-lg overflow-hidden border border-teal-300">
-            <Wrapper {...mapOptions} render={(status) => {
-              if (status === 'LOADING') {
-                return <div className="h-full bg-gray-100 rounded-lg flex items-center justify-center">Loading Google Maps...</div>
-              }
-              
-              if (status === 'FAILURE') {
-                // Fallback to OpenStreetMap if Google Maps fails
-                return (
-                  <div>
-                    <div className="text-xs  p-2 bg-orange-50 mb-2 rounded">
-                      Google Maps unavailable. Using OpenStreetMap as fallback.
-                    </div>
-                    <MapComponent
-                      center={mapCenter}
-                      zoom={mapZoom}
-                      onMapClick={handleMapClick}
-                      coordinates={locationData.coordinates}
-                    />
-                  </div>
-                )
-              }
-              
-              return (
-                <GoogleMapViewer
-                  center={mapCenter}
-                  zoom={mapZoom}
-                  coordinates={locationData.coordinates}
-                  onMapClick={handleMapClick}
-                />
-              )
-            }} />
+            {renderInteractiveMap()}
           </div>
           
           {/* Display current coordinates */}
@@ -953,6 +1316,7 @@ const PropertyLocation = ({ formData, updateFormData, isEditMode, companyLocatio
             </div>
           )}
         </div>
+        )}
 
         {/* Manual Location Fields */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">

@@ -9,12 +9,16 @@ import { toast } from 'react-toastify'
 import TeamMembersList from '@/app/components/developers/team/TeamMembersList'
 import InviteMemberModal from '@/app/components/developers/team/InviteMemberModal'
 import { FiUsers, FiShield, FiPlus } from 'react-icons/fi'
+import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits'
+import SubscriptionLimitButton from '@/app/components/shared/SubscriptionLimitButton'
 
 const TeamPage = () => {
   const { user } = useAuth()
   const pathname = usePathname()
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const { canCreateMore, usageSummary } = useSubscriptionLimits()
+  const canInviteMember = canCreateMore('total_users_limit')
 
   // Get the developer slug from the pathname
   const slug = pathname?.split('/')[2] || 'developer'
@@ -30,16 +34,21 @@ const TeamPage = () => {
         <div>
           <h1 className="text-3xl font-bold text-primary_color mb-2">Team Management</h1>
           <p className="text-gray-600">Manage your team members, roles, and permissions</p>
+          {usageSummary.teamMembersLimit != null && (
+            <p className="text-sm text-gray-500">Plan: {usageSummary.teamMembers}/{usageSummary.teamMembersLimit} team members</p>
+          )}
         </div>
         <div className="flex gap-3">
           {(user?.user_type === 'agent' || userHasPermission(user, 'team.invite')) && (
-            <button
+            <SubscriptionLimitButton
               onClick={() => setShowInviteModal(true)}
+              enabled={canInviteMember}
+              limitKey="total_users_limit"
               className="flex items-center gap-2 px-4 py-2 bg-primary_color text-white rounded-lg hover:bg-primary_color/90 transition-colors"
             >
               <FiPlus className="w-5 h-5" />
               Invite Member
-            </button>
+            </SubscriptionLimitButton>
           )}
         </div>
       </div>

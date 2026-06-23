@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { captureAuditEvent } from '@/lib/auditLogger'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
+import { resolveLeadsAssignedUserFilter } from '@/lib/permissionHelpers'
 
 // Helper to check if string is UUID
 function isUUID(str) {
@@ -93,17 +94,6 @@ export async function GET(request) {
       listerType === 'agent' &&
       listerId &&
       (listerId === userInfo.agent_id || listerId === userInfo.user_id)
-    const effectiveAssignedUser = isSuperAdmin || agentOwnsLister
-      ? assignedUserFilter || null
-      : userInfo.user_id
-    const auditActorId = userInfo.user_id || listerId || 'unknown'
-
-    if (!listerId && !effectiveAssignedUser) {
-      return NextResponse.json(
-        { error: 'Lister ID or assigned user is required' },
-        { status: 400 }
-      )
-    }
 
     // Convert slug to developer_id if needed
     let finalListerId = listerId
@@ -123,6 +113,37 @@ export async function GET(request) {
           { status: 404 }
         )
       }
+    }
+
+    if (listerType === 'agency') {
+      const agencyAccountId =
+        userInfo.agency_id || (userInfo.user_type === 'agency' ? userInfo.user_id : null)
+      if (agencyAccountId) {
+        if (!finalListerId || finalListerId === userInfo.user_id) {
+          finalListerId = agencyAccountId
+        }
+        if (
+          (userInfo.user_type === 'team_member' || userInfo.user_type === 'agency') &&
+          finalListerId !== agencyAccountId
+        ) {
+          return NextResponse.json({ error: 'Access denied to agency leads' }, { status: 403 })
+        }
+      }
+    }
+
+    const effectiveAssignedUser = resolveLeadsAssignedUserFilter(userInfo, {
+      listerType,
+      assignedUserFilter,
+      isSuperAdmin,
+      agentOwnsLister,
+    })
+    const auditActorId = userInfo.user_id || finalListerId || listerId || 'unknown'
+
+    if (!finalListerId && !effectiveAssignedUser) {
+      return NextResponse.json(
+        { error: 'Lister ID or assigned user is required' },
+        { status: 400 }
+      )
     }
 
     // Fetch ALL leads (no pagination yet - we'll group first)

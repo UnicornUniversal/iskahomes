@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'react-toastify'
 import { FiX, FiMail, FiUser, FiPhone, FiShield } from 'react-icons/fi'
+import { filterAssignableTeamRoles } from '@/lib/permissionHelpers'
 
 const InviteMemberModal = ({ isOpen, onClose, onSuccess, organizationType = 'developer' }) => {
   const { developerToken, agencyToken } = useAuth()
@@ -35,9 +36,9 @@ const InviteMemberModal = ({ isOpen, onClose, onSuccess, organizationType = 'dev
 
       if (response.ok) {
         const result = await response.json()
-        setRoles(result.data || [])
-        // Set default role if available
-        const defaultRole = result.data?.find(r => r.is_default)
+        const assignableRoles = filterAssignableTeamRoles(result.data || [])
+        setRoles(assignableRoles)
+        const defaultRole = assignableRoles.find(r => r.is_default)
         if (defaultRole) {
           setFormData(prev => ({ ...prev, role_id: defaultRole.id }))
         }
@@ -73,7 +74,7 @@ const InviteMemberModal = ({ isOpen, onClose, onSuccess, organizationType = 'dev
         const error = await response.json()
         // Check for duplicate email
         if (error.error && (error.error.toLowerCase().includes('already') || error.error.toLowerCase().includes('exists'))) {
-          toast.error('This email is already a team member. Please use a different email address.')
+          toast.error(error.error)
         } else {
           throw new Error(error.error || 'Failed to send invitation')
         }

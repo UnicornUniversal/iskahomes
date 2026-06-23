@@ -18,12 +18,13 @@ const getStatusFromProfile = (profile) => {
     profile.agent_status ||
     profile.status ||
     profile.organization_admin_status ||
+    profile.organization_profile_status ||
     ''
   )
 }
 
 export default function AccountStatusGuard({ children, entityType }) {
-  const { user, loading } = useAuth()
+  const { user, loading, hydrating } = useAuth()
   const pathname = usePathname()
   const isAllowedPendingRoute = useMemo(() => {
     const path = String(pathname || '').toLowerCase()
@@ -52,7 +53,7 @@ export default function AccountStatusGuard({ children, entityType }) {
 
   const isValidAccount = useMemo(() => VALID_STATUSES.has(normalizeStatus(adminStatus)), [adminStatus])
 
-  if (loading) {
+  if (loading || hydrating) {
     return (
       <div className="w-full min-h-[60vh] flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
