@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
+import { isStarterPlanPackage } from '@/lib/starterSubscriptionPlan'
 import { captureAuditEvent } from '@/lib/auditLogger'
 
 // GET - Fetch user's subscription requests
@@ -209,17 +210,16 @@ export async function POST(request) {
       }, { status: 400 })
     }
 
-    // Get monthly price based on currency
-    const monthlyPrice = currency === 'GHS' 
-      ? parseFloat(packageData.local_currency_price || 0)
-      : parseFloat(packageData.international_currency_price || 0)
-
-    // Check if it's a Free plan
-    const isFreePlan = packageData.name?.toLowerCase() === 'free' || monthlyPrice === 0
+    // Starter plans (Basic / Free) cannot use manual payment flow
+    const isFreePlan = isStarterPlanPackage(packageData)
 
     if (isFreePlan) {
-      return NextResponse.json({ error: 'Free plans cannot be requested via manual payment' }, { status: 400 })
+      return NextResponse.json({ error: 'Starter plans (Basic/Free) cannot be requested via manual payment' }, { status: 400 })
     }
+
+    const monthlyPrice = currency === 'GHS'
+      ? parseFloat(packageData.local_currency_price || 0)
+      : parseFloat(packageData.international_currency_price || 0)
 
     // Calculate duration in months using ideal_duration
     let durationMonths = 1

@@ -3,14 +3,14 @@
 import React, { useState } from 'react'
 import PasswordField from '@/app/components/PasswordField'
 import Link from 'next/link'
+import { toast } from 'react-toastify'
 
+const SIGNUP_SUCCESS_MESSAGE =
+  'Account created successfully! Please check your email and confirm your signup to continue.'
 
 const SignupPage = () => {
   const [activeTab, setActiveTab] = useState('seeker')
   const [isLoading, setIsLoading] = useState(false)
-  const [showToast, setShowToast] = useState(false)
-  const [toastMessage, setToastMessage] = useState('')
-  const [toastType, setToastType] = useState('error') // 'error' or 'success'
 
   const accountTypes = {
     seeker: {
@@ -79,38 +79,8 @@ const SignupPage = () => {
     }
   }
 
-  const showErrorToast = (message) => {
-    setToastType('error')
-    setToastMessage(message)
-    setShowToast(true)
-    setTimeout(() => setShowToast(false), 5000)
-  }
-
-  const showSuccessToast = (message) => {
-    setToastType('success')
-    setToastMessage(message)
-    setShowToast(true)
-    setTimeout(() => setShowToast(false), 5000) // Show for 5 seconds, no redirect
-  }
-
   return (
     <>
-      <style jsx>{`
-        @keyframes slide-in {
-          from {
-            transform: translateY(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-        .animate-slide-in {
-          animation: slide-in 0.3s ease-out;
-        }
-      `}</style>
-      
       <div className="h-screen w-screen flex overflow-hidden bg-white">
         {/* Loading Overlay */}
         {isLoading && (
@@ -120,49 +90,6 @@ const SignupPage = () => {
               <h3 className="text-xl font-semibold text-[#17637C] mb-2">Creating Your Account</h3>
               <p className="text-gray-600">Please wait while we set up your account...</p>
             </div>
-          </div>
-        )}
-
-        {/* Toast Notification */}
-        {showToast && (
-          <div className="fixed bottom-6 right-6 z-50 animate-slide-in">
-            {toastType === 'success' ? (
-              <div className="bg-white border-l-4 border-green-500 px-6 py-4 rounded-lg shadow-xl flex items-center space-x-3 max-w-md">
-                <svg className="w-6 h-6 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div className="flex-1">
-                  <p className="font-semibold text-[#17637C]">Success!</p>
-                  <p className="text-sm text-gray-600 mt-1">{toastMessage || 'Account created successfully!'}</p>
-                </div>
-                <button
-                  onClick={() => setShowToast(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            ) : (
-              <div className="bg-white border-l-4 border-[#9D2C2C] px-6 py-4 rounded-lg shadow-xl flex items-center space-x-3 max-w-md">
-                <svg className="w-6 h-6 text-[#9D2C2C] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div className="flex-1">
-                  <p className="font-semibold text-[#17637C]">Sign up failed</p>
-                  <p className="text-sm text-gray-600 mt-1">{toastMessage || 'Please try again or contact support'}</p>
-                </div>
-                <button
-                  onClick={() => setShowToast(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            )}
           </div>
         )}
 
@@ -270,24 +197,18 @@ const SignupPage = () => {
                   <PropertySeekerForm 
                     isLoading={isLoading} 
                     setIsLoading={setIsLoading} 
-                    showErrorToast={showErrorToast}
-                    showSuccessToast={showSuccessToast}
                   />
                 )}
                 {activeTab === 'developer' && (
                   <DeveloperForm 
                     isLoading={isLoading} 
                     setIsLoading={setIsLoading} 
-                    showErrorToast={showErrorToast}
-                    showSuccessToast={showSuccessToast}
                   />
                 )}
                 {activeTab === 'agency' && (
                   <AgencyForm 
                     isLoading={isLoading} 
                     setIsLoading={setIsLoading} 
-                    showErrorToast={showErrorToast}
-                    showSuccessToast={showSuccessToast}
                   />
                 )}
               </div>
@@ -340,7 +261,7 @@ const TermsAgreementField = ({ checked, onChange }) => (
 )
 
 // Property Seeker Form Component
-const PropertySeekerForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast }) => {
+const PropertySeekerForm = ({ isLoading, setIsLoading }) => {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -359,7 +280,7 @@ const PropertySeekerForm = ({ isLoading, setIsLoading, showErrorToast, showSucce
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.acceptTerms) {
-      showErrorToast('You must accept the Terms of Agreement to continue.')
+      toast.error('You must accept the Terms of Agreement to continue.')
       return
     }
     setIsLoading(true)
@@ -390,16 +311,14 @@ const PropertySeekerForm = ({ isLoading, setIsLoading, showErrorToast, showSucce
           acceptTerms: false
         })
         // Show success toast
-        const successMessage = result.message || 'Account created successfully! Please check your email for verification link.'
-        console.log('✅ Signup successful, showing toast:', successMessage)
-        showSuccessToast(successMessage)
+        toast.success(result.message || SIGNUP_SUCCESS_MESSAGE, { autoClose: 6000 })
       } else {
         console.error('❌ Signup failed:', result.error)
-        showErrorToast(result.error || 'Signup failed. Please try again.')
+        toast.error(result.error || 'Signup failed. Please try again.')
       }
     } catch (error) {
       console.error('Signup error:', error)
-      showErrorToast('An error occurred. Please try again.')
+      toast.error('An error occurred. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -475,7 +394,7 @@ const PropertySeekerForm = ({ isLoading, setIsLoading, showErrorToast, showSucce
 }
 
 // Agent Form Component
-const AgentForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast }) => {
+const AgentForm = ({ isLoading, setIsLoading }) => {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -496,7 +415,7 @@ const AgentForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast }
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.acceptTerms) {
-      showErrorToast('You must accept the Terms of Agreement to continue.')
+      toast.error('You must accept the Terms of Agreement to continue.')
       return
     }
     setIsLoading(true)
@@ -529,16 +448,14 @@ const AgentForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast }
           acceptTerms: false
         })
         // Show success toast
-        const successMessage = result.message || 'Account created successfully! Please check your email for verification link.'
-        console.log('✅ Signup successful, showing toast:', successMessage)
-        showSuccessToast(successMessage)
+        toast.success(result.message || SIGNUP_SUCCESS_MESSAGE, { autoClose: 6000 })
       } else {
         console.error('❌ Signup failed:', result.error)
-        showErrorToast(result.error || 'Signup failed. Please try again.')
+        toast.error(result.error || 'Signup failed. Please try again.')
       }
     } catch (error) {
       console.error('Signup error:', error)
-      showErrorToast('An error occurred. Please try again.')
+      toast.error('An error occurred. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -638,7 +555,7 @@ const AgentForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast }
 }
 
 // Agency Form Component
-const AgencyForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast }) => {
+const AgencyForm = ({ isLoading, setIsLoading }) => {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -659,7 +576,7 @@ const AgencyForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.acceptTerms) {
-      showErrorToast('You must accept the Terms of Agreement to continue.')
+      toast.error('You must accept the Terms of Agreement to continue.')
       return
     }
     setIsLoading(true)
@@ -692,16 +609,14 @@ const AgencyForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast 
           acceptTerms: false
         })
         // Show success toast
-        const successMessage = result.message || 'Account created successfully! Please check your email for verification link.'
-        console.log('✅ Signup successful, showing toast:', successMessage)
-        showSuccessToast(successMessage)
+        toast.success(result.message || SIGNUP_SUCCESS_MESSAGE, { autoClose: 6000 })
       } else {
         console.error('❌ Signup failed:', result.error)
-        showErrorToast(result.error || 'Signup failed. Please try again.')
+        toast.error(result.error || 'Signup failed. Please try again.')
       }
     } catch (error) {
       console.error('Signup error:', error)
-      showErrorToast('An error occurred. Please try again.')
+      toast.error('An error occurred. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -801,7 +716,7 @@ const AgencyForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast 
 }
 
 // Developer Form Component
-const DeveloperForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToast }) => {
+const DeveloperForm = ({ isLoading, setIsLoading }) => {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -822,7 +737,7 @@ const DeveloperForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToa
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.acceptTerms) {
-      showErrorToast('You must accept the Terms of Agreement to continue.')
+      toast.error('You must accept the Terms of Agreement to continue.')
       return
     }
     setIsLoading(true)
@@ -855,16 +770,14 @@ const DeveloperForm = ({ isLoading, setIsLoading, showErrorToast, showSuccessToa
           acceptTerms: false
         })
         // Show success toast
-        const successMessage = result.message || 'Account created successfully! Please check your email for verification link.'
-        console.log('✅ Signup successful, showing toast:', successMessage)
-        showSuccessToast(successMessage)
+        toast.success(result.message || SIGNUP_SUCCESS_MESSAGE, { autoClose: 6000 })
       } else {
         console.error('❌ Signup failed:', result.error)
-        showErrorToast(result.error || 'Signup failed. Please try again.')
+        toast.error(result.error || 'Signup failed. Please try again.')
       }
     } catch (error) {
       console.error('Signup error:', error)
-      showErrorToast('An error occurred. Please try again.')
+      toast.error('An error occurred. Please try again.')
     } finally {
       setIsLoading(false)
     }

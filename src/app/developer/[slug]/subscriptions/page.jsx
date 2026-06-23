@@ -27,6 +27,8 @@ import {
   FiSave
 } from 'react-icons/fi'
 import { useAuth } from '@/contexts/AuthContext'
+import { isStarterPlanPackage } from '@/lib/starterSubscriptionPlan'
+import { toast } from 'react-toastify'
 
 const EXCLUDED_FEATURE_VALUES = new Set([
   'x',
@@ -428,25 +430,21 @@ export const SubscriptionsManager = () => {
   const handleSelectPlan = async (packageId) => {
     const token = getAuthToken()
     if (!token) {
-      alert('Please log in to select a plan')
+      toast.error('Please log in to select a plan')
       return
     }
 
     // Find the selected package
     const selectedPackage = packages.find(pkg => pkg.id === packageId)
     if (!selectedPackage) {
-      alert('Package not found')
+      toast.error('Package not found')
       return
     }
 
-    // Check if it's the Free plan
-    // Free plan is identified by name === "Free" OR price === 0
-    const isFreePlan = selectedPackage.name?.toLowerCase().trim() === 'free' || 
-                      parseFloat(selectedPackage.local_currency_price || 0) === 0 ||
-                      parseFloat(selectedPackage.international_currency_price || 0) === 0
+    const isFreePlan = isStarterPlanPackage(selectedPackage)
 
     if (isFreePlan) {
-      // Directly activate Free plan (no payment needed)
+      // Directly activate starter plan (Basic/Free — no payment needed)
       await handleActivateFreePlan(packageId)
     } else {
       // Show payment method modal for paid plans
@@ -460,6 +458,8 @@ export const SubscriptionsManager = () => {
     const token = getAuthToken()
     if (!token) return
 
+    const pkg = packages.find((p) => p.id === packageId)
+
     setSubmitting(true)
     try {
       const response = await fetch('/api/subscriptions', {
@@ -470,7 +470,7 @@ export const SubscriptionsManager = () => {
         },
         body: JSON.stringify({
           package_id: packageId,
-          subscriptions_type: selectedPackage?.subscriptions_type || 'package',
+          subscriptions_type: pkg?.subscriptions_type || 'package',
           payment_method: 'free' // Special flag for free plan
         })
       })
@@ -478,7 +478,7 @@ export const SubscriptionsManager = () => {
       const result = await response.json()
 
       if (response.ok) {
-        alert('Free plan activated successfully!')
+        toast.success('Starter plan activated successfully!')
         // Refresh all data
         const subRes = await fetch('/api/subscriptions', {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -499,11 +499,11 @@ export const SubscriptionsManager = () => {
         }
         setShowChangePlanModal(false)
       } else {
-        alert(result.error || 'Failed to activate free plan')
+        toast.error(result.error || 'Failed to activate starter plan')
       }
     } catch (error) {
       console.error('Error activating free plan:', error)
-      alert('An error occurred. Please try again.')
+      toast.error('An error occurred. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -514,7 +514,7 @@ export const SubscriptionsManager = () => {
 
     const token = getAuthToken()
     if (!token) {
-      alert('Please log in to continue')
+      toast.error('Please log in to continue')
       return
     }
 
@@ -537,7 +537,7 @@ export const SubscriptionsManager = () => {
         const result = await response.json()
 
         if (response.ok) {
-          alert('Subscription request submitted successfully! Please submit your payment proof. An admin will review and activate your subscription. Your current plan remains active until approval.')
+          toast.success('Subscription request submitted successfully! Please submit your payment proof. An admin will review and activate your subscription. Your current plan remains active until approval.')
           setShowPaymentMethodModal(false)
           setSelectedPackageForPayment(null)
           setSelectedPaymentMethod(null)
@@ -564,17 +564,17 @@ export const SubscriptionsManager = () => {
             }
           }
         } else {
-          alert(result.error || 'Failed to create subscription request')
+          toast.error(result.error || 'Failed to create subscription request')
         }
       } catch (error) {
         console.error('Error creating subscription request:', error)
-        alert('An error occurred. Please try again.')
+        toast.error('An error occurred. Please try again.')
       } finally {
         setSubmitting(false)
       }
     } else if (selectedPaymentMethod === 'online') {
       // For now, show message that online payment is coming soon
-      alert('Online payment integration is coming soon! For now, please use manual payment.')
+      toast.info('Online payment integration is coming soon! For now, please use manual payment.')
       // TODO: Implement online payment flow when ready
     }
   }
@@ -588,7 +588,7 @@ export const SubscriptionsManager = () => {
 
     const token = getAuthToken()
     if (!token) {
-      alert('Please log in to continue')
+      toast.error('Please log in to continue')
       return
     }
 
@@ -604,7 +604,7 @@ export const SubscriptionsManager = () => {
       const result = await response.json()
 
       if (response.ok) {
-        alert('Request cancelled successfully')
+        toast.success('Request cancelled successfully')
         // Refresh subscription requests
         const requestsRes = await fetch('/api/subscriptions-requests', {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -614,11 +614,11 @@ export const SubscriptionsManager = () => {
           setSubscriptionRequests(data || [])
         }
       } else {
-        alert(result.error || 'Failed to cancel request')
+        toast.error(result.error || 'Failed to cancel request')
       }
     } catch (error) {
       console.error('Error cancelling request:', error)
-      alert('An error occurred. Please try again.')
+      toast.error('An error occurred. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -636,7 +636,7 @@ export const SubscriptionsManager = () => {
   const handleConfirmCancel = async () => {
     const token = getAuthToken()
     if (!token) {
-      alert('Please log in to continue')
+      toast.error('Please log in to continue')
       return
     }
 
@@ -656,7 +656,7 @@ export const SubscriptionsManager = () => {
       const result = await response.json()
 
       if (response.ok) {
-        alert('Cancellation request submitted successfully. Your subscription will be moved to the free plan after admin approval.')
+        toast.success('Cancellation request submitted successfully. Your subscription will be moved to the starter plan after admin approval.')
         setShowCancelModal(false)
         setCancellationReason('')
         
@@ -677,11 +677,11 @@ export const SubscriptionsManager = () => {
           setSubscriptionHistory(data || [])
         }
       } else {
-        alert(result.error || 'Failed to submit cancellation request')
+        toast.error(result.error || 'Failed to submit cancellation request')
       }
     } catch (error) {
       console.error('Error cancelling subscription:', error)
-      alert('An error occurred. Please try again.')
+      toast.error('An error occurred. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -708,7 +708,7 @@ export const SubscriptionsManager = () => {
   const handleSaveBillingInfo = async () => {
     const token = getAuthToken()
     if (!token) {
-      alert('Please log in to save billing information')
+      toast.error('Please log in to save billing information')
       return
     }
 
@@ -736,7 +736,7 @@ export const SubscriptionsManager = () => {
       const result = await response.json()
 
       if (response.ok) {
-        alert('Billing information saved successfully!')
+        toast.success('Billing information saved successfully!')
         setBillingInfo(result.data)
         setShowBillingForm(false)
         // Refresh billing data without full page reload
@@ -752,28 +752,28 @@ export const SubscriptionsManager = () => {
           }
         }
       } else {
-        alert(result.error || 'Failed to save billing information')
+        toast.error(result.error || 'Failed to save billing information')
       }
     } catch (error) {
       console.error('Error saving billing info:', error)
-      alert('An error occurred. Please try again.')
+      toast.error('An error occurred. Please try again.')
     } finally {
       setSubmitting(false)
     }
   }
 
   const handleDownloadAll = () => {
-    alert('Downloading all invoices...')
+    toast.info('Downloading all invoices...')
   }
 
   const handleDownloadInvoice = (invoiceId) => {
-    alert(`Downloading invoice ${invoiceId}...`)
+    toast.info(`Downloading invoice ${invoiceId}...`)
   }
 
   const handleUpdateAutoRenew = async (autoRenew) => {
     // This would update the subscription's auto_renew field
     // For now, just show a message since payments are manual
-    alert('Auto-renewal is currently disabled as payments are processed manually.')
+    toast.info('Auto-renewal is currently disabled as payments are processed manually.')
   }
 
   return (
@@ -858,8 +858,10 @@ export const SubscriptionsManager = () => {
                     {(() => {
                       // Check if it's a Free plan
                       const packageName = currentSubscription.subscriptions_package?.name || getCurrentPlan()?.name || ''
-                      const isFreePlan = packageName?.toLowerCase().trim() === 'free' || 
-                                       parseFloat(currentSubscription.amount || 0) === 0
+                      const isFreePlan = isStarterPlanPackage({
+                        name: packageName,
+                        subscriptions_type: 'package',
+                      })
                       
                       if (isFreePlan) {
                         return 'Unlimited'
@@ -1510,7 +1512,7 @@ export const SubscriptionsManager = () => {
 
         {/* Change Plan Modal */}
         {showChangePlanModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="mx-4 w-full max-w-md rounded-2xl bg-white/90 p-6 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-semibold text-primary_color">Change Subscription Plan</h3>
@@ -1581,7 +1583,7 @@ export const SubscriptionsManager = () => {
 
         {/* Billing Settings Modal */}
         {showBillingSettingsModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="mx-4 w-full max-w-md rounded-2xl bg-white/90 p-6 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-semibold text-primary_color">Billing Settings</h3>
@@ -1649,7 +1651,7 @@ export const SubscriptionsManager = () => {
 
         {/* Cancel Subscription Modal */}
         {showCancelModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="mx-4 w-full max-w-md rounded-2xl bg-white/90 p-6 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-semibold text-primary_color">Cancel Subscription</h3>
@@ -1708,7 +1710,7 @@ export const SubscriptionsManager = () => {
 
         {/* Payment Method Selection Modal */}
         {showPaymentMethodModal && selectedPackageForPayment && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="mx-4 w-full max-w-md rounded-2xl bg-white/90 p-6 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-semibold text-primary_color">Select Payment Method</h3>

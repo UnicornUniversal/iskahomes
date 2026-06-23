@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin, findAuthUserByEmail } from '@/lib/supabase'
 import { sendVerificationEmail } from '@/lib/sendgrid' // Using SendGrid for email verification
 import { getDefaultRoles } from '@/lib/rolesAndPermissions'
+import { activateDefaultFreeSubscription } from '@/lib/activateDefaultFreeSubscription'
 import crypto from 'crypto'
 
 const PROFILE_TABLE_ID_COLUMNS = {
@@ -682,6 +683,26 @@ export async function POST(request) {
         { error: 'Failed to create user profile' },
         { status: 500 }
       )
+    }
+
+    if (userType === 'developer' || userType === 'agency') {
+      try {
+        const subResult = await activateDefaultFreeSubscription({
+          userId: newUser.id,
+          userType,
+        })
+        if (!subResult.success) {
+          console.error('❌ Failed to assign default subscription on signup:', subResult.error)
+        } else {
+          console.log('✅ Default subscription assigned on signup:', {
+            subscriptionId: subResult.subscriptionId,
+            packageName: subResult.packageName,
+            skipped: subResult.skipped || false,
+          })
+        }
+      } catch (subError) {
+        console.error('❌ Error assigning default subscription on signup:', subError)
+      }
     }
 
     console.log('✅ Signup completed successfully:', {

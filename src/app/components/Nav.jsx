@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
+import { getDashboardHref, getAgencyLandingHref } from "@/lib/dashboardRoutes";
 import {
   FaHome,
   FaCogs,
@@ -115,6 +116,28 @@ const DropdownItem = ({ href, children, onClick }) => (
   </Link>
 );
 
+const DropdownAction = ({ onClick, children }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="text-primary_color w-full text-left"
+    style={{
+      padding: "10px 20px",
+      fontSize: "0.8rem",
+      fontWeight: 400,
+      cursor: "pointer",
+      transition: "background 0.2s",
+      whiteSpace: "nowrap",
+      background: "transparent",
+      border: "none",
+    }}
+    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(23,99,124,0.06)")}
+    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+  >
+    {children}
+  </button>
+);
+
 const MenuTrigger = () => (
   <span
     className="text-primary_color"
@@ -157,21 +180,25 @@ const Nav = () => {
 
   const closeMobile = () => setMobileOpen(false);
 
-  /* ── Dashboard link helper ─────────────────────────── */
-  const getDashboardLink = () => {
+  const getProfileHref = () => {
     if (!user) return "/";
-    const slug = user.profile?.slug || user.id;
-    const orgSlug = user.profile?.organization_slug || slug;
-    switch (user.user_type) {
-      case "developer": return `/developer/${slug}/dashboard`;
-      case "property_seeker": return `/propertySeeker/${slug}/dashboard`;
-      case "agent": return `/agents/${slug}/dashboard`;
-      case "agency": return `/agency/${slug}/dashboard`;
-      case "team_member":
-        return user.profile?.organization_type === "agency"
-          ? `/agency/${orgSlug}/dashboard`
-          : `/developer/${orgSlug}/dashboard`;
-      default: return "/";
+    const type = user.user_type;
+    if (
+      type === "agency" ||
+      (type === "team_member" && user.profile?.organization_type === "agency")
+    ) {
+      return getAgencyLandingHref(user) || getDashboardHref(user) || "/";
+    }
+    return getDashboardHref(user) || "/";
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      window.location.href = "/";
     }
   };
 
@@ -241,14 +268,30 @@ const Nav = () => {
 
     if (user) {
       return (
-        <Link href={getDashboardLink()}>
-          <span
-            className="text-primary_color"
-            style={{ ...linkStyle, display: "flex", alignItems: "center", gap: 6 }}
-          >
-            <ProfileIcon size={32} />
-          </span>
-        </Link>
+        <Dropdown
+          align="right"
+          trigger={
+            <span
+              className="text-primary_color"
+              style={{ display: "flex", alignItems: "center", cursor: "pointer" }}
+            >
+              <ProfileIcon size={32} />
+            </span>
+          }
+        >
+          <DropdownItem href={getProfileHref()}>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <FaUser size={13} />
+              Profile
+            </span>
+          </DropdownItem>
+          <DropdownAction onClick={handleLogout}>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <FaSignOutAlt size={13} />
+              Logout
+            </span>
+          </DropdownAction>
+        </Dropdown>
       );
     }
 
@@ -489,24 +532,51 @@ const Nav = () => {
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary_color" />
                 </div>
               ) : user ? (
-                <Link href={getDashboardLink()} onClick={closeMobile}>
-                  <div
-                    className="bg-primary_color"
+                <>
+                  <Link href={getProfileHref()} onClick={closeMobile}>
+                    <div
+                      className="bg-primary_color"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "12px 16px",
+                        borderRadius: 8,
+                        color: "#fff",
+                        fontSize: "0.9rem",
+                        fontWeight: 500,
+                      }}
+                    >
+                      <FaUser size={16} />
+                      <span>Profile</span>
+                    </div>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeMobile();
+                      handleLogout();
+                    }}
                     style={{
                       display: "flex",
                       alignItems: "center",
                       gap: 10,
+                      justifyContent: "center",
                       padding: "12px 16px",
                       borderRadius: 8,
-                      color: "#fff",
                       fontSize: "0.9rem",
                       fontWeight: 500,
+                      border: "1.5px solid var(--color-primary_color)",
+                      background: "transparent",
+                      width: "100%",
+                      cursor: "pointer",
                     }}
+                    className="text-primary_color"
                   >
-                    <FaUser size={16} />
-                    <span>Welcome, {user.profile?.name || user.email}</span>
-                  </div>
-                </Link>
+                    <FaSignOutAlt size={16} />
+                    <span>Logout</span>
+                  </button>
+                </>
               ) : (
                 <>
                   <Link href="/home/signup" onClick={closeMobile}>
