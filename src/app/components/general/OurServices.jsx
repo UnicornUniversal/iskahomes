@@ -32,7 +32,7 @@ const OurServices = () => {
           return (
             <Link
               key={service.id}
-              href="/home/allServices"
+              href={service.href}
               className="group flex h-full flex-col overflow-hidden border border-primary_color/10 bg-white transition-all duration-300 hover:border-primary_color/30 hover:shadow-lg"
             >
               <div className="relative h-44 overflow-hidden bg-primary_color/5">

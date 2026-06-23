@@ -458,8 +458,20 @@ const AgencyNav = () => {
                     })}
                 </div>
 
+                {/* Back to Home */}
+                <div className="mt-4 mb-2">
+                    <Link
+                        href="/"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="group relative text-sm flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 ease-in-out bg-primary_color/10 hover:bg-primary_color text-primary_color hover:text-white"
+                    >
+                        <FiHome className="w-5 h-5" />
+                        <span className="font-medium">Back to Home</span>
+                    </Link>
+                </div>
+
                 {/* Logout Button */}
-                <div className="mt-4 mb-4">
+                <div className="mt-2 mb-4">
                     <button
                         onClick={handleLogout}
                         disabled={isLoggingOut}

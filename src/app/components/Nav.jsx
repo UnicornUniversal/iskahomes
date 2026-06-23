@@ -28,11 +28,11 @@ const leftLinks = [
   {
     name: "All Services", href: "/home/allServices", icon: FaCogs,
     children: [
-      { name: "Virtual Tour", href: "/home/allServices?service=virtual-tour" },
-      { name: "3D Visualization", href: "/home/allServices?service=3d-visualization" },
-      { name: "Interior Design", href: "/home/allServices?service=interior-design" },
-      { name: "Smart Home Installation", href: "/home/allServices?service=smart-home-installation" },
-      { name: "Space Planning Consultation", href: "/home/allServices?service=space-planning" },
+      { name: "Virtual Tour", href: "/home/virtualTour" },
+      { name: "3D Visualization", href: "/home/3dVisualization" },
+      { name: "Interior Design", href: "/home/interiorDesign" },
+      { name: "Smart Home Installation", href: "/home/smartHome" },
+      { name: "Space Planning Consultation", href: "/home/spacePlanning" },
     ],
   },
   { name: "Explore Properties", href: "/home/exploreProperties", icon: FaSearch },

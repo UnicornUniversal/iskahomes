@@ -216,8 +216,20 @@ const HomeSeekerNav = ({ pathname }) => {
                     })}
                 </div>
 
+                {/* Back to Home */}
+                <div className="mb-3">
+                    <Link
+                        href="/"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="group relative flex items-center space-x-3 px-4 w-full py-3 rounded-xl transition-all duration-300 bg-primary_color/10 hover:bg-primary_color text-primary_color hover:text-white"
+                    >
+                        <FiHome className="w-5 h-5" />
+                        <span className="text-sm font-medium">Back to Home</span>
+                    </Link>
+                </div>
+
                 {/* Logout Button */}
-                <div className="mt-6 pt-6 border-t border-primary_color/10">
+                <div className="mt-0 pt-3 border-t border-primary_color/10">
                     <button
                         onClick={handleLogout}
                         disabled={isLoggingOut}

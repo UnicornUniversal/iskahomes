@@ -2,6 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
+import { FaInstagram, FaFacebook, FaWhatsapp } from 'react-icons/fa'
 
 const quickLinks = [
   { name: 'All Services', href: '/home/allServices' },
@@ -100,11 +101,46 @@ const Footer = () => {
         {/* Divider */}
         <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, #17637C, #F68B1F, transparent)', margin: '40px 0 0', opacity: 0.3 }} />
 
-        {/* Copyright */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '20px 0' }}>
+        {/* Copyright & Social Icons */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, padding: '20px 0' }}>
           <span style={{ fontSize: 13, color: '#17637C', opacity: 0.6 }}>
             © {new Date().getFullYear()} ISKA Homes, All Right Reserved
           </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <a
+              href="https://www.instagram.com/iskahomes/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#17637C', opacity: 0.7, transition: 'opacity 0.2s' }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7' }}
+              aria-label="Instagram"
+            >
+              <FaInstagram size={20} />
+            </a>
+            <a
+              href="https://www.facebook.com/share/18vF69eocw/?mibextid=wwXIfr"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#17637C', opacity: 0.7, transition: 'opacity 0.2s' }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7' }}
+              aria-label="Facebook"
+            >
+              <FaFacebook size={20} />
+            </a>
+            <a
+              href="https://wa.me/message/6IGQOGPRZDJZA1"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#17637C', opacity: 0.7, transition: 'opacity 0.2s' }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7' }}
+              aria-label="WhatsApp"
+            >
+              <FaWhatsapp size={20} />
+            </a>
+          </div>
         </div>
       </div>
 

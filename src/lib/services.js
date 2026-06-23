@@ -3,6 +3,7 @@ import { Box, Camera, Home, Palette, Ruler } from 'lucide-react'
 export const ISKA_SERVICES = [
   {
     id: 'virtual-tour',
+    href: '/home/virtualTour',
     name: 'Virtual Tour',
     shortDescription: 'Immersive 360° virtual tours for remote property viewing.',
     description:
@@ -20,6 +21,7 @@ export const ISKA_SERVICES = [
   },
   {
     id: '3d-visualization',
+    href: '/home/3dVisualization',
     name: '3D Visualization',
     shortDescription: 'Photorealistic 3D renders and architectural visualizations.',
     description:
@@ -37,6 +39,7 @@ export const ISKA_SERVICES = [
   },
   {
     id: 'interior-design',
+    href: '/home/interiorDesign',
     name: 'Interior Design',
     shortDescription: 'Professional interior design from concept to completion.',
     description:
@@ -54,6 +57,7 @@ export const ISKA_SERVICES = [
   },
   {
     id: 'smart-home-installation',
+    href: '/home/smartHome',
     name: 'Smart Home Installation',
     shortDescription: 'Smart lighting, security, and climate control installation.',
     description:
@@ -71,6 +75,7 @@ export const ISKA_SERVICES = [
   },
   {
     id: 'space-planning-consultation',
+    href: '/home/spacePlanning',
     name: 'Space Planning Consultation',
     shortDescription: 'Expert layout planning to maximize your property potential.',
     description:
