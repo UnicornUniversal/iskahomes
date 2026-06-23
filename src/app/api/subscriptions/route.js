@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 import { captureAuditEvent } from '@/lib/auditLogger'
 import { gracePeriodEndFromEndDate } from '@/lib/subscriptionGracePolicy'
+import { isStarterPlanPackage } from '@/lib/starterSubscriptionPlan'
 
 const ACTIVE_SUBSCRIPTION_STATUSES = ['pending', 'active', 'grace_period']
 const VALID_SUBSCRIPTION_TYPES = ['package', 'addon']
@@ -323,13 +324,12 @@ export async function POST(request) {
     const now = new Date()
     const startDate = new Date(now)
     
-    // Get monthly price based on currency first (needed to check if Free plan)
-    const monthlyPrice = currency === 'GHS' 
+    // Starter plans (Basic / Free by name) skip payment and use unlimited duration
+    const isFreePlan = isStarterPlanPackage(packageData)
+
+    const monthlyPrice = currency === 'GHS'
       ? parseFloat(packageData.local_currency_price || 0)
       : parseFloat(packageData.international_currency_price || 0)
-
-    // Check if it's a Free plan (must be defined before duration calculation)
-    const isFreePlan = packageData.name?.toLowerCase() === 'free' || monthlyPrice === 0
     
     // Calculate duration in months using ideal_duration
     // ideal_duration is the minimum payment period (e.g., 3 months)

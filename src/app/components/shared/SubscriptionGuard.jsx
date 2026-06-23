@@ -59,13 +59,13 @@ export default function SubscriptionGuard({ children, entityType }) {
         {isAgent ? (
           <p className="text-sm text-gray-600 mb-6">
             Your agency does not have an active plan. Please contact your agency administrator
-            and ask them to subscribe to the <strong>Free</strong> or <strong>Starter</strong> plan
+            and ask them to subscribe to the <strong>Basic</strong> plan
             so you can use the platform.
           </p>
         ) : isAgencySide ? (
           <>
             <p className="text-sm text-gray-600 mb-6">
-              Subscribe to the <strong>Free</strong> plan (or a paid plan) to start using your agency
+              Subscribe to the <strong>Basic</strong> plan (or a paid plan) to start using your agency
               dashboard. You can upgrade anytime as your team grows.
             </p>
             <Link
@@ -78,7 +78,7 @@ export default function SubscriptionGuard({ children, entityType }) {
         ) : (
           <>
             <p className="text-sm text-gray-600 mb-6">
-              Subscribe to the <strong>Basic</strong> free plan (or a paid plan) to use the developer
+              Subscribe to the <strong>Basic</strong> plan (or a paid plan) to use the developer
               dashboard.
             </p>
             <Link

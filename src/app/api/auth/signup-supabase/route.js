@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/supabase'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { activateDefaultFreeSubscription } from '@/lib/activateDefaultFreeSubscription'
 
 export async function POST(request) {
   try {
@@ -236,6 +237,20 @@ export async function POST(request) {
         { error: 'Failed to create user profile', details: profileCreationError.message },
         { status: 500 }
       )
+    }
+
+    if (userType === 'developer' || userType === 'agency') {
+      try {
+        const subResult = await activateDefaultFreeSubscription({
+          userId: newUser.id,
+          userType,
+        })
+        if (!subResult.success) {
+          console.error('Failed to assign default subscription on signup:', subResult.error)
+        }
+      } catch (subError) {
+        console.error('Error assigning default subscription on signup:', subError)
+      }
     }
 
     captureAuditEvent('auth_signup', {
