@@ -59,7 +59,7 @@ const APPROACH = [
 const GALLERY = [
   { src: '/aboutUsImages/c1.jpeg', label: 'Open Plan Living' },
   { src: '/aboutUsImages/land1.JPG', label: 'Garden Estate Layout' },
-  { src: '/aboutUsImages/c4.jpeg', label: 'Urban Apartment Redesign' },
+  { src: '/aboutUsImages/c2.jpeg', label: 'Urban Apartment Redesign' },
 ]
 
 const STATS = [
@@ -103,7 +103,7 @@ export default function SpacePlanningPage() {
       <section
         className="relative min-h-screen flex items-center md:-mt-[4em]"
         style={{
-          backgroundImage: "url('/aboutUsImages/c3.jpeg')",
+          backgroundImage: "url('/aboutUsImages/sitting1.jpeg')",
           backgroundSize: 'cover',
           backgroundPosition: 'center right',
         }}

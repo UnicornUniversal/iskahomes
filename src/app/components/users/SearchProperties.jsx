@@ -54,7 +54,9 @@ const SearchProperties = ({
         if (filters.specifications && Object.keys(filters.specifications).length > 0) {
           params.append('specifications', JSON.stringify(filters.specifications));
         }
-        
+
+        if (filters.q && filters.q.trim()) params.append('q', filters.q.trim());
+
     params.append('offset', offset.toString());
     params.append('limit', limit.toString());
     

@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { SlidersHorizontal, ChevronLeft } from 'lucide-react'
 import Filters from '@/app/components/users/Filters'
 import SearchProperties from '@/app/components/users/SearchProperties'
 import ExplorePropertiesToolbar from '@/app/components/users/ExplorePropertiesToolbar'
+import Footer from '@/app/components/Footer'
 import dynamic from 'next/dynamic'
 
 // Dynamically import UserMap to avoid SSR issues
@@ -26,7 +28,8 @@ const ExplorePropertiesContent = () => {
   const searchParams = useSearchParams();
   const [filters, setFilters] = useState({});
   const [showFiltersModal, setShowFiltersModal] = useState(false);
-  const [viewMode, setViewMode] = useState('map');
+  const [showDesktopFilters, setShowDesktopFilters] = useState(false);
+  const [viewMode, setViewMode] = useState('list');
 
   // Track URL updates to prevent reset loops
   const isUpdatingUrlRef = useRef(false);
@@ -81,7 +84,11 @@ const ExplorePropertiesContent = () => {
     if (state) urlFilters.state = state;
     if (city) urlFilters.city = city;
     if (town) urlFilters.town = town;
-    
+
+    // Text search
+    const q = searchParams.get('q');
+    if (q) urlFilters.q = q;
+
     // Price
     const priceMin = searchParams.get('price_min');
     const priceMax = searchParams.get('price_max');
@@ -157,6 +164,7 @@ const ExplorePropertiesContent = () => {
     if (newFilters.state) params.append('state', newFilters.state);
     if (newFilters.city) params.append('city', newFilters.city);
     if (newFilters.town) params.append('town', newFilters.town);
+    if (newFilters.q && newFilters.q.trim()) params.append('q', newFilters.q.trim());
     
     if (newFilters.priceMin !== undefined && newFilters.priceMin !== null) params.append('price_min', newFilters.priceMin.toString());
     if (newFilters.priceMax !== undefined && newFilters.priceMax !== null) params.append('price_max', newFilters.priceMax.toString());
@@ -188,11 +196,13 @@ const ExplorePropertiesContent = () => {
 
   const overlayToolbar = (
     <div
-      className={`flex absolute top-4 z-[1001] justify-center pointer-events-none pl-4 pr-14 md:px-4 ${
-        viewMode === 'map'
-          ? 'left-0 right-0 lg:left-[350px] lg:right-[500px]'
-          : 'left-0 right-0 lg:left-[350px]'
+      className={`flex absolute top-4 z-[1001] justify-center pointer-events-none pl-4 pr-14 md:px-4 right-0 ${
+        viewMode === 'map' ? 'lg:right-[500px]' : ''
       }`}
+      style={{
+        left: showDesktopFilters ? '350px' : '0px',
+        transition: 'left 0.3s ease',
+      }}
     >
       <div className="pointer-events-auto w-full flex justify-center">
         <div className="w-full max-w-2xl bg-white/95 backdrop-blur-md rounded-full shadow-lg border border-primary_color/10 px-2.5 py-1.5 md:px-3 md:py-2">
@@ -200,6 +210,8 @@ const ExplorePropertiesContent = () => {
             onOpenFilters={() => setShowFiltersModal(true)}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
+            onSearch={(q) => handleFiltersChange({ ...filters, q: q || undefined })}
+            searchValue={filters.q || ''}
             variant="overlay"
           />
         </div>
@@ -210,10 +222,45 @@ const ExplorePropertiesContent = () => {
   return (
     <div className='w-full h-full overflow-y-scroll max-md:mt-[4em]'>
       <div className='relative auto'>
-        {/* Desktop - Left side - Filters (lg and above) */}
-        <div className='hidden lg:block z-1000 absolute top-0 left-0 border border-primary_color/10 max-w-[350px] w-full h-[calc(100vh-6rem)]'>
-          <Filters onChange={handleFiltersChange} initial={filters} />
+        {/* Desktop - Collapsible Filter Sidebar */}
+        <div
+          className='hidden lg:flex flex-col z-[1002] absolute top-0 left-0 w-[350px] h-[calc(100vh-6rem)] bg-white border-r border-primary_color/10 shadow-xl'
+          style={{
+            transform: showDesktopFilters ? 'translateX(0)' : 'translateX(-100%)',
+            transition: 'transform 0.3s ease',
+          }}
+        >
+          <div className='flex items-center justify-between px-4 py-3 border-b border-primary_color/10 flex-shrink-0'>
+            <span className='text-base font-semibold text-primary_color'>Filters</span>
+            <button
+              onClick={() => setShowDesktopFilters(false)}
+              className='flex items-center gap-1 text-xs text-primary_color/60 hover:text-primary_color transition-colors px-2 py-1 rounded-lg hover:bg-primary_color/5'
+              aria-label='Close filters'
+            >
+              <ChevronLeft className='w-4 h-4' />
+              Hide
+            </button>
+          </div>
+          <div className='flex-1 overflow-y-auto'>
+            <Filters onChange={handleFiltersChange} initial={filters} />
+          </div>
         </div>
+
+        {/* Desktop - Filter toggle button (shown when sidebar is closed) */}
+        <button
+          onClick={() => setShowDesktopFilters(true)}
+          className='hidden lg:flex items-center gap-2 absolute z-[1003] top-4 bg-primary_color text-white pl-3 pr-4 py-2 rounded-r-full shadow-lg hover:bg-primary_color/90 transition-all duration-200'
+          style={{
+            left: showDesktopFilters ? '-200px' : '0px',
+            opacity: showDesktopFilters ? 0 : 1,
+            pointerEvents: showDesktopFilters ? 'none' : 'auto',
+            transition: 'left 0.3s ease, opacity 0.2s ease',
+          }}
+          aria-label='Open filters'
+        >
+          <SlidersHorizontal className='w-4 h-4' />
+          <span className='text-xs font-medium'>Filters</span>
+        </button>
 
         {viewMode === 'map' ? (
           <>
@@ -243,7 +290,13 @@ const ExplorePropertiesContent = () => {
         ) : (
           <>
             {/* List view - full-width property grid */}
-            <div className='relative w-full lg:pl-[350px] h-[calc(100vh-6rem)] lg:h-screen bg-white/95 backdrop-blur-sm border border-primary_color/10 overflow-hidden'>
+            <div
+              className='relative w-full h-[calc(100vh-6rem)] lg:h-screen bg-white/95 backdrop-blur-sm border border-primary_color/10 overflow-hidden'
+              style={{
+                paddingLeft: showDesktopFilters ? '350px' : '0px',
+                transition: 'padding-left 0.3s ease',
+              }}
+            >
               {overlayToolbar}
               <div className="h-full pt-[4.5rem]">
                 <SearchProperties
@@ -256,6 +309,8 @@ const ExplorePropertiesContent = () => {
           </>
         )}
       </div>
+
+      <Footer />
 
       {/* Mobile/Tablet Filters Modal */}
       {showFiltersModal && (

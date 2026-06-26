@@ -1,9 +1,32 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Search } from "lucide-react";
 
-const ExplorePropertiesSearch = ({ className = '' }) => {
+const ExplorePropertiesSearch = ({ className = '', onSearch, value = '' }) => {
+  const [inputValue, setInputValue] = useState(value);
+  const debounceRef = useRef(null);
+
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
+  const handleChange = (e) => {
+    const val = e.target.value;
+    setInputValue(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onSearch?.(val);
+    }, 400);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      onSearch?.(inputValue);
+    }
+  };
+
   return (
     <div className={`flex-1 min-w-0 ${className}`}>
       <div className="relative">
@@ -11,7 +34,9 @@ const ExplorePropertiesSearch = ({ className = '' }) => {
         <input
           type="text"
           placeholder="Search properties..."
-          readOnly
+          value={inputValue}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
           aria-label="Search properties"
           className="w-full pl-8 pr-2.5 py-1.5 md:pl-9 md:pr-3 md:py-2 text-xs md:text-sm text-primary_color placeholder:text-primary_color/40 bg-white border border-primary_color/15 rounded-full outline-none focus:border-primary_color/40 transition-colors"
         />

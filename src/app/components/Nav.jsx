@@ -25,6 +25,14 @@ import {
 
 /* ── Nav link data ─────────────────────────────────────── */
 const leftLinks = [
+  { name: "Explore Properties", href: "/home/exploreProperties", icon: FaSearch },
+  { name: "Developers", href: "/home/allDevelopers", icon: FaBuilding },
+  { name: "All Developments", href: "/home/allDevelopments", icon: FaCity },
+  { name: "Agencies", href: "/home/allAgencies", icon: FaSitemap },
+];
+
+const rightLinks = [
+  { name: "Agents", href: "/home/allAgents", icon: FaUsers },
   {
     name: "All Services", href: "/home/allServices", icon: FaCogs,
     children: [
@@ -35,14 +43,6 @@ const leftLinks = [
       { name: "Space Planning Consultation", href: "/home/spacePlanning" },
     ],
   },
-  { name: "Explore Properties", href: "/home/exploreProperties", icon: FaSearch },
-  { name: "Developers", href: "/home/allDevelopers", icon: FaBuilding },
-  { name: "All Developments", href: "/home/allDevelopments", icon: FaCity },
-];
-
-const rightLinks = [
-  { name: "Agencies", href: "/home/allAgencies", icon: FaSitemap },
-  { name: "Agents", href: "/home/allAgents", icon: FaUsers },
   { name: "About Us", href: "/home/aboutUs", icon: FaInfoCircle },
   { name: "Contact Us", href: "/home/contactUs", icon: FaEnvelope },
 ];

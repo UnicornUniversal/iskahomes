@@ -15,7 +15,7 @@ const SERVICES = [
   },
   {
     num: '02',
-    img: '/aboutUsImages/sitting2.jpeg',
+    img: '/aboutUsImages/hh.jpeg',
     title: 'Material & Finish Curation',
     body: 'From bespoke joinery to handpicked stone and artisan textiles — every surface, texture, and tone is selected with considered intention.',
   },
@@ -52,7 +52,7 @@ const JOURNEY = [
 
 const PORTFOLIO = [
   { src: '/aboutUsImages/sitting1.jpeg', label: 'Living Room Transformation', large: true },
-  { src: '/aboutUsImages/sitting2.jpeg', label: 'Contemporary Suite' },
+  { src: '/aboutUsImages/hh.jpeg', label: 'Contemporary Suite' },
   { src: '/aboutUsImages/Kitchen1.jpeg', label: "Chef's Kitchen" },
   { src: '/aboutUsImages/Gym1.jpeg', label: 'Home Wellness Studio' },
   { src: '/aboutUsImages/c2.jpeg', label: 'Open Plan Redesign' },
