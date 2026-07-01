@@ -239,13 +239,13 @@ const AboutUsPage = () => {
             {/* Vision images */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style={{ gap: 16, marginTop: 32 }}>
               <div style={{ borderRadius: 8, overflow: 'hidden' }}>
-                <img src="/aboutUsImages/c3.jpeg" alt="Modern real estate development" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+                <img src="/aboutUsImages/Container.png" alt="Modern real estate development" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
               </div>
               <div style={{ borderRadius: 8, overflow: 'hidden' }}>
-                <img src="/aboutUsImages/c4.jpeg" alt="Property facade detail" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+                <img src="/aboutUsImages/H.png" alt="Property facade detail" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
               </div>
               <div style={{ borderRadius: 8, overflow: 'hidden' }}>
-                <img src="/aboutUsImages/R1.jpeg" alt="Premium interior finish" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+                <img src="/aboutUsImages/Kitchen1.jpeg" alt="Premium interior finish" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
               </div>
             </div>
           </section>
@@ -280,7 +280,7 @@ const AboutUsPage = () => {
                 <img src="/aboutUsImages/sitting1.jpeg" alt="Premium sitting area" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
               </div>
               <div style={{ borderRadius: 8, overflow: 'hidden' }}>
-                <img src="/aboutUsImages/sitting2.jpeg" alt="Elegant living space" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+                <img src="/aboutUsImages/ww.jpeg" alt="Elegant living space" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
               </div>
             </div>
           </section>
@@ -312,7 +312,7 @@ const AboutUsPage = () => {
                 <img src="/aboutUsImages/land1.JPG" alt="Landscape view 1" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
               </div>
               <div style={{ borderRadius: 8, overflow: 'hidden' }}>
-                <img src="/aboutUsImages/land2.JPG" alt="Landscape view 2" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+                <img src="/aboutUsImages/land3.JPG" alt="Landscape view 2" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
               </div>
               <div style={{ borderRadius: 8, overflow: 'hidden' }}>
                 <img src="/aboutUsImages/hh.jpeg" alt="Featured property" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />

@@ -198,7 +198,7 @@ export default function EnhancedListingCard({ listing }) {
       {/* Property Image */}
       <div className="relative">
         <img 
-          src={listing.image || '/placeholder-property.jpg'} 
+          src={listing.image || '/placeholder.png'} 
           alt={listing.title}
           className="w-full h-48 object-cover"
         />

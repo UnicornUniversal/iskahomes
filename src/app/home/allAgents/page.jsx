@@ -256,7 +256,7 @@ const AllAgents = () => {
                     {agent.agency ? (
                          <div className="flex items-center gap-2 mb-4 bg-gray-50 py-1.5 px-4 rounded-full max-w-full">
                             {agent.agency.profile_image ? (
-                                <img src={getProfileImage(agent.agency.profile_image) || '/placeholder-company.png'} className="w-5 h-5 rounded-full object-cover" alt="" />
+                                <img src={getProfileImage(agent.agency.profile_image) || '/placeholder.png'} className="w-5 h-5 rounded-full object-cover" alt="" />
                             ) : (
                                 <FiBriefcase className="w-4 h-4 text-gray-400 shrink-0" />
                             )}

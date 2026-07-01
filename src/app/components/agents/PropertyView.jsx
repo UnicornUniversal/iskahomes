@@ -254,19 +254,19 @@ const PropertyView = ({ propertySlug }) => {
         <div className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-gray-100 rounded-lg p-4 text-center">
-              <img src="/placeholder-property-1.jpg" alt="Property" className="w-full h-32 object-cover rounded mb-2" />
+              <img src="/aboutUsImages/c1.jpeg" alt="Property" className="w-full h-32 object-cover rounded mb-2" />
               <p className="text-sm text-gray-500">Main Image</p>
             </div>
             <div className="bg-gray-100 rounded-lg p-4 text-center">
-              <img src="/placeholder-property-2.jpg" alt="Property" className="w-full h-32 object-cover rounded mb-2" />
+              <img src="/aboutUsImages/c2.jpeg" alt="Property" className="w-full h-32 object-cover rounded mb-2" />
               <p className="text-sm text-gray-500">Image 2</p>
             </div>
             <div className="bg-gray-100 rounded-lg p-4 text-center">
-              <img src="/placeholder-property-3.jpg" alt="Property" className="w-full h-32 object-cover rounded mb-2" />
+              <img src="/aboutUsImages/Kitchen1.jpeg" alt="Property" className="w-full h-32 object-cover rounded mb-2" />
               <p className="text-sm text-gray-500">Image 3</p>
             </div>
             <div className="bg-gray-100 rounded-lg p-4 text-center">
-              <img src="/placeholder-property-4.jpg" alt="Property" className="w-full h-32 object-cover rounded mb-2" />
+              <img src="/aboutUsImages/sitting1.jpeg" alt="Property" className="w-full h-32 object-cover rounded mb-2" />
               <p className="text-sm text-gray-500">Image 4</p>
             </div>
           </div>
