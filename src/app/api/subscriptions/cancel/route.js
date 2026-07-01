@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { findStarterPackageForUserType } from '@/lib/findStarterPackageForUserType'
 
 // POST - Cancel subscription (creates request, moves to free plan)
 export async function POST(request) {
@@ -65,18 +66,12 @@ export async function POST(request) {
       }, { status: 404 })
     }
 
-    // Find the Free plan
-    const { data: freePlan, error: freePlanError } = await supabaseAdmin
-      .from('subscriptions_package')
-      .select('id, name')
-      .or('name.ilike.%free%,local_currency_price.eq.0,international_currency_price.eq.0')
-      .eq('is_active', true)
-      .limit(1)
-      .maybeSingle()
+    // Find the starter plan (Basic or Free) for this account type
+    const { data: freePlan, error: freePlanError } = await findStarterPackageForUserType(dbUserType)
 
     if (freePlanError || !freePlan) {
-      return NextResponse.json({ 
-        error: 'Free plan not found. Please contact support.' 
+      return NextResponse.json({
+        error: 'Starter plan (Basic/Free) not found. Please contact support.'
       }, { status: 404 })
     }
 

@@ -6,6 +6,13 @@ import {
   PRE_EXPIRY_REMINDER_DAYS_BEFORE_END,
   gracePeriodEndFromEndDate
 } from '@/lib/subscriptionGracePolicy'
+import {
+  isStarterPlanPackage,
+} from '@/lib/starterSubscriptionPlan'
+import { findStarterPackageForUserType } from '@/lib/findStarterPackageForUserType'
+
+export { isStarterPlanPackage as isFreePackageRow } from '@/lib/starterSubscriptionPlan'
+export { findStarterPackageForUserType as findFreeMainPackageForUserType } from '@/lib/findStarterPackageForUserType'
 
 const DAY_MS = 86400000
 
@@ -35,52 +42,6 @@ export function calendarDaysUntilEndUtc(endDate, now = new Date()) {
   const end = utcDateOnly(endDate)
   const n = utcDateOnly(now)
   return Math.round((end.getTime() - n.getTime()) / DAY_MS)
-}
-
-export function isFreePackageRow(pkg) {
-  if (!pkg) return true
-  const name = String(pkg.name || '').toLowerCase()
-  const ghs = parseFloat(pkg.local_currency_price ?? 0)
-  const usd = parseFloat(pkg.international_currency_price ?? 0)
-  if (name.includes('free')) return true
-  if (ghs === 0 && usd === 0) return true
-  return false
-}
-
-function packageMatchesUserType(pkg, dbUserType) {
-  const ut = String(pkg.user_type || '').toLowerCase()
-  if (!ut || ut === 'all') return true
-  if (dbUserType === 'developer' && (ut === 'developers' || ut === 'developer')) return true
-  if (dbUserType === 'agency' && (ut === 'agencies' || ut === 'agency')) return true
-  if (dbUserType === 'agent' && (ut === 'agents' || ut === 'agent')) return true
-  return false
-}
-
-/**
- * Free tier package for main subscription demotion (package row only).
- */
-export async function findFreeMainPackageForUserType(dbUserType) {
-  const { data: candidates, error } = await supabaseAdmin
-    .from('subscriptions_package')
-    .select('id, name, local_currency_price, international_currency_price, subscriptions_type, user_type, ideal_duration, duration, span')
-    .eq('is_active', true)
-    .eq('subscriptions_type', 'package')
-
-  if (error || !candidates?.length) return { data: null, error }
-
-  const filtered = candidates.filter(
-    (p) => packageMatchesUserType(p, dbUserType) && isFreePackageRow(p)
-  )
-  if (!filtered.length) return { data: null, error: null }
-
-  filtered.sort((a, b) => {
-    const an = String(a.name || '').toLowerCase().includes('free') ? 0 : 1
-    const bn = String(b.name || '').toLowerCase().includes('free') ? 0 : 1
-    if (an !== bn) return an - bn
-    return String(a.name || '').localeCompare(String(b.name || ''))
-  })
-
-  return { data: filtered[0], error: null }
 }
 
 async function fetchUserEmail(userId, userType) {
@@ -347,7 +308,7 @@ async function earliestMissedGraceSlotIso(sub, now = new Date()) {
 /** After a paid renewal (new end_date in the future), reopen reminder state. */
 async function maybeResetStateAfterRenewal(sub, state) {
   if (!state || state.status !== 'completed') return state
-  if (isFreePackageRow(sub.subscriptions_package)) return state
+  if (isStarterPlanPackage(sub.subscriptions_package)) return state
   const end = new Date(sub.end_date)
   if (end.getTime() <= Date.now()) return state
   const { data, error } = await supabaseAdmin
@@ -425,7 +386,7 @@ export async function runSubscriptionRemindersCron() {
 
   for (const sub of list) {
     const pkg = sub.subscriptions_package
-    if (isFreePackageRow(pkg)) continue
+    if (isStarterPlanPackage(pkg)) continue
 
     try {
       const repaired = await repairLegacySevenDayGrace(sub)
@@ -455,7 +416,7 @@ export async function runSubscriptionRemindersCron() {
 
   for (const sub of remindSubs || []) {
     const pkg = sub.subscriptions_package
-    if (isFreePackageRow(pkg)) continue
+    if (isStarterPlanPackage(pkg)) continue
 
     try {
       let state = await ensureReminderStateRow(sub)
@@ -663,7 +624,7 @@ Your ${kind} billing period has ended. You are in a grace period until ${graceEn
 
   for (const sub of pastGrace || []) {
     const pkg = sub.subscriptions_package
-    if (isFreePackageRow(pkg)) continue
+    if (isStarterPlanPackage(pkg)) continue
 
     try {
       await finalizeExpiredSubscription(sub, summary)
@@ -728,7 +689,7 @@ async function finalizeExpiredSubscription(sub, summary) {
     return
   }
 
-  const { data: freePlan, error: fpErr } = await findFreeMainPackageForUserType(sub.user_type)
+  const { data: freePlan, error: fpErr } = await findStarterPackageForUserType(sub.user_type)
   if (fpErr || !freePlan) {
     summary.errors.push(`no free package for ${sub.user_type} (${sub.id})`)
     const { error: exErr } = await supabaseAdmin
@@ -740,11 +701,7 @@ async function finalizeExpiredSubscription(sub, summary) {
     return
   }
 
-  const isFreePlan =
-    String(freePlan.name || '').toLowerCase().includes('free') ||
-    (parseFloat(freePlan.local_currency_price || 0) === 0 &&
-      parseFloat(freePlan.international_currency_price || 0) === 0)
-  const durationMonths = isFreePlan ? 1200 : freePlan.ideal_duration || 1
+  const durationMonths = isStarterPlanPackage(freePlan) ? 1200 : freePlan.ideal_duration || 1
   const startDate = new Date()
   const endDate = new Date(startDate)
   endDate.setMonth(endDate.getMonth() + durationMonths)
