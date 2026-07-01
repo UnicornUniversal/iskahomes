@@ -147,30 +147,30 @@ const HeaderSearch = () => {
 
   return (
     <div className="w-full">
-      <div className="bg-white/17 backdrop-blur-sm rounded-lg shadow-lg p-4 flex flex-col gap-4 border border-white/40">
+      <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-5 flex flex-col gap-3 border border-white/20" style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.25)' }}>
         {/* Property Purpose Tabs */}
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setSelectedPurposeId(null)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
               selectedPurposeId === null
-                ? 'bg-primary_color text-white'
-                : 'bg-white/17 text-primary_color hover:bg-primary_color/20 border border-white/40'
+                ? 'bg-primary_color text-white shadow-md'
+                : 'bg-white/10 text-white/85 hover:bg-white/20 border border-white/20'
             }`}
           >
             All
           </button>
           {loading ? (
-            <div className="text-sm text-primary_color/60">Loading...</div>
+            <div className="text-sm text-white/50">Loading...</div>
           ) : (
             propertyPurposes.map((purpose) => (
               <button
                 key={purpose.id}
                 onClick={() => setSelectedPurposeId(purpose.id)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                   selectedPurposeId === purpose.id
-                    ? 'bg-primary_color text-white'
-                    : 'bg-white/17 text-primary_color hover:bg-primary_color/20 border border-white/40'
+                    ? 'bg-primary_color text-white shadow-md'
+                    : 'bg-white/10 text-white/85 hover:bg-white/20 border border-white/20'
                 }`}
               >
                 {purpose.name}
@@ -180,11 +180,11 @@ const HeaderSearch = () => {
         </div>
 
         {/* Search Bar */}
-        <div className="flex items-center gap-3 bg-white/17 rounded-lg border border-white/40">
+        <div className="flex items-center gap-3 bg-white/10 rounded-xl border border-white/20">
           <div className="relative flex-1">
             <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
               <svg
-                className="w-5 h-5 text-primary_color"
+                className="w-5 h-5 text-white/60"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -199,7 +199,7 @@ const HeaderSearch = () => {
               onChange={handleLocationChange}
               onBlur={handleBlur}
               placeholder="eg: house at east legon"
-              className="w-full pl-10 pr-4 py-3 rounded-lg bg-transparent text-primary_color placeholder-primary_color/60 focus:outline-none focus:ring-2 focus:ring-primary_color/20 border-0 text-sm"
+              className="w-full pl-10 pr-4 py-3 rounded-xl bg-transparent text-white placeholder-white/45 focus:outline-none focus:ring-2 focus:ring-white/25 border-0 text-sm"
               autoComplete="off"
             />
             {showLocationDropdown && locationSearchResults.length > 0 && (
@@ -240,7 +240,7 @@ const HeaderSearch = () => {
           {/* Circular Search Button */}
           <button
             onClick={handleSearch}
-            className="w-12 h-12 rounded-full bg-secondary_color hover:bg-secondary_color/90 flex items-center justify-center text-white transition-colors flex-shrink-0 shadow-lg"
+            className="w-12 h-12 rounded-full bg-primary_color hover:bg-primary_color/80 flex items-center justify-center text-white transition-colors flex-shrink-0 shadow-lg"
             aria-label="Search"
           >
             <svg

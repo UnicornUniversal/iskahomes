@@ -4,12 +4,16 @@ import React from "react";
 import { LayoutList, Map, SlidersHorizontal } from "lucide-react";
 import ExplorePropertiesSearch from "./ExplorePropertiesSearch";
 
-const ExplorePropertiesToolbar = ({ onOpenFilters, viewMode, onViewModeChange, variant = 'compact' }) => {
+const ExplorePropertiesToolbar = ({ onOpenFilters, viewMode, onViewModeChange, onSearch, searchValue = '', variant = 'compact' }) => {
   const isOverlay = variant === 'overlay';
 
   return (
     <div className={`flex items-center gap-1.5 md:gap-2 w-full ${isOverlay ? 'max-w-2xl' : ''}`}>
-      <ExplorePropertiesSearch className={isOverlay ? 'min-w-0 md:min-w-[200px]' : ''} />
+      <ExplorePropertiesSearch
+        className={isOverlay ? 'min-w-0 md:min-w-[200px]' : ''}
+        onSearch={onSearch}
+        value={searchValue}
+      />
 
       {onOpenFilters && (
         <button

@@ -48,10 +48,10 @@ const PIPELINE = [
 ]
 
 const GALLERY = [
-  { src: '/aboutUsImages/c3.jpeg', label: 'Riverside Residence', large: true },
-  { src: '/aboutUsImages/c4.jpeg', label: 'Urban Penthouse' },
-  { src: '/aboutUsImages/R1.jpeg', label: 'Hillside Estate' },
-  { src: '/aboutUsImages/land2.JPG', label: 'Coastal Development' },
+  { src: '/aboutUsImages/c2.jpeg', label: 'Riverside Residence', large: true },
+  { src: '/aboutUsImages/c1.jpeg', label: 'Urban Penthouse' },
+  { src: '/aboutUsImages/sitting1.jpeg', label: 'Hillside Estate' },
+  { src: '/aboutUsImages/land1.JPG', label: 'Coastal Development' },
   { src: '/aboutUsImages/land3.JPG', label: 'Garden Villa' },
 ]
 
@@ -97,7 +97,7 @@ export default function Visualization3DPage() {
       <section
         className="relative min-h-screen flex items-center md:-mt-[4em]"
         style={{
-          backgroundImage: "url('/aboutUsImages/land2.JPG')",
+          backgroundImage: "url('/aboutUsImages/land1.JPG')",
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}

@@ -32,6 +32,7 @@ export async function GET(request) {
     const bedrooms = searchParams.get('bedrooms')
     const bathrooms = searchParams.get('bathrooms')
     const specificationsParam = searchParams.get('specifications') // JSON string of specifications object
+    const q = searchParams.get('q')
     const page = parseInt(searchParams.get('page')) || 1
     const limit = parseInt(searchParams.get('limit')) || 15
     const offset = (page - 1) * limit
@@ -219,6 +220,11 @@ export async function GET(request) {
       })
     }
 
+    if (q && q.trim()) {
+      const term = q.trim()
+      query = query.or(`title.ilike.%${term}%,description.ilike.%${term}%,town.ilike.%${term}%,city.ilike.%${term}%,state.ilike.%${term}%`)
+    }
+
     // Apply ordering and pagination AFTER all filters
     query = query.order('created_at', { ascending: false })
     query = query.range(offset, offset + limit - 1)
@@ -287,13 +293,18 @@ export async function GET(request) {
     if (specifications && Object.keys(specifications).length > 0) {
       Object.entries(specifications).forEach(([key, value]) => {
         if (value === undefined || value === null || value === '') return
-        
+
         if (typeof value === 'number') {
           countQuery = countQuery.gte(`specifications->${key}`, value)
         } else if (typeof value === 'string') {
           countQuery = countQuery.eq(`specifications->${key}`, value)
         }
       })
+    }
+
+    if (q && q.trim()) {
+      const term = q.trim()
+      countQuery = countQuery.or(`title.ilike.%${term}%,description.ilike.%${term}%,town.ilike.%${term}%,city.ilike.%${term}%,state.ilike.%${term}%`)
     }
 
     const { data: listings, error } = await query
