@@ -27,126 +27,11 @@ import {
   FiSettings,
 } from 'react-icons/fi'
 import { FaWhatsapp, FaYoutube, FaTiktok } from 'react-icons/fa'
-import dynamic from 'next/dynamic'
-import { Wrapper } from '@googlemaps/react-wrapper'
-import countryToCurrency from 'country-to-currency'
+import CompanyLocationMapPicker from '@/app/components/shared/CompanyLocationMapPicker'
 import { CustomSelect } from '@/app/components/ui/custom-select'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'react-toastify'
 import ProfileSettings from '@/app/components/shared/ProfileSettings'
-
-// Google Map Component for Location Modal
-const GoogleMapViewer = React.memo(({ center, zoom, coordinates, onMapClick }) => {
-  const mapRef = useRef(null)
-  const mapInstanceRef = useRef(null)
-  const markerRef = useRef(null)
-  const isInitializedRef = useRef(false)
-  const listenersRef = useRef([])
-
-  // Cleanup function
-  const cleanup = useCallback(() => {
-    listenersRef.current.forEach(listener => {
-      if (listener && listener.remove) {
-        listener.remove()
-      }
-    })
-    listenersRef.current = []
-
-    if (markerRef.current) {
-      markerRef.current.setMap(null)
-      markerRef.current = null
-    }
-
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current = null
-    }
-    
-    isInitializedRef.current = false
-  }, [])
-
-  // Memoized handlers
-  const handleMapClick = useCallback((e) => {
-    onMapClick?.(e.latLng.lat(), e.latLng.lng())
-  }, [onMapClick])
-
-  const handleMarkerDrag = useCallback((e) => {
-    onMapClick?.(e.latLng.lat(), e.latLng.lng())
-  }, [onMapClick])
-
-  // Initialize map only once
-  useEffect(() => {
-    if (!mapRef.current || isInitializedRef.current || !window.google?.maps) return
-
-    const newMap = new window.google.maps.Map(mapRef.current, {
-      center: { lat: center[0], lng: center[1] },
-      zoom: zoom,
-      mapTypeControl: true,
-      streetViewControl: true,
-      fullscreenControl: true,
-    })
-
-    const clickListener = newMap.addListener('click', handleMapClick)
-    listenersRef.current.push(clickListener)
-
-    mapInstanceRef.current = newMap
-    isInitializedRef.current = true
-
-    return cleanup
-  }, [center, zoom, handleMapClick, cleanup])
-
-  // Update map center and zoom
-  useEffect(() => {
-    if (mapInstanceRef.current && isInitializedRef.current) {
-      const currentCenter = mapInstanceRef.current.getCenter()
-      const currentZoom = mapInstanceRef.current.getZoom()
-      
-      if (!currentCenter || 
-          Math.abs(currentCenter.lat() - center[0]) > 0.0001 || 
-          Math.abs(currentCenter.lng() - center[1]) > 0.0001 ||
-          currentZoom !== zoom) {
-        mapInstanceRef.current.setCenter({ lat: center[0], lng: center[1] })
-        mapInstanceRef.current.setZoom(zoom)
-      }
-    }
-  }, [center, zoom])
-
-  // Update marker when coordinates change
-  useEffect(() => {
-    if (!mapInstanceRef.current || !coordinates) return
-
-    const [lat, lng] = Array.isArray(coordinates) ? coordinates : [coordinates[0], coordinates[1]]
-    const latNum = parseFloat(lat)
-    const lngNum = parseFloat(lng)
-
-    if (isNaN(latNum) || isNaN(lngNum)) return
-
-    const shouldUpdateMarker = !markerRef.current || 
-      Math.abs(markerRef.current.getPosition().lat() - latNum) > 0.0001 ||
-      Math.abs(markerRef.current.getPosition().lng() - lngNum) > 0.0001
-
-    if (shouldUpdateMarker) {
-      if (markerRef.current) {
-        markerRef.current.setMap(null)
-      }
-
-      const newMarker = new window.google.maps.Marker({
-        position: { lat: latNum, lng: lngNum },
-        map: mapInstanceRef.current,
-        title: 'Location',
-        draggable: true,
-      })
-
-      const dragListener = newMarker.addListener('dragend', handleMarkerDrag)
-      listenersRef.current.push(dragListener)
-
-      markerRef.current = newMarker
-    }
-  }, [coordinates, handleMarkerDrag])
-
-  return <div ref={mapRef} className="w-full h-full" />
-})
-
-GoogleMapViewer.displayName = 'GoogleMapViewer'
 
 const ProfileForm = ({ accountType = 'developer' }) => {
   const { user, developerToken, agencyToken } = useAuth()
@@ -201,17 +86,11 @@ const ProfileForm = ({ accountType = 'developer' }) => {
     company_gallery: []
   })
 
-  // Google Places + multi-location and company statistics (frontend-only for now)
-  const [gmIsLoaded, setGmIsLoaded] = useState(false)
-  const autocompleteServiceRef = useRef(null)
-  const placesServiceRef = useRef(null)
-
   // Locations modal state
   const [showLocationModal, setShowLocationModal] = useState(false)
   const [locationModalMode, setLocationModalMode] = useState('add') // 'add' | 'edit'
   const [editingLocationIndex, setEditingLocationIndex] = useState(null)
   const [modalPlaceQuery, setModalPlaceQuery] = useState('')
-  const [modalPlaceSuggestions, setModalPlaceSuggestions] = useState([])
   const [modalForm, setModalForm] = useState({
     id: '',
     place_id: '',
@@ -228,7 +107,6 @@ const ProfileForm = ({ accountType = 'developer' }) => {
   })
   const [modalMapCenter, setModalMapCenter] = useState([7.9465, -1.0232]) // Ghana coordinates
   const [modalMapZoom, setModalMapZoom] = useState(6)
-  const modalAutocompleteTimerRef = useRef(null)
   const modalMapCenterRef = useRef([7.9465, -1.0232])
   const modalMapZoomRef = useRef(6)
 
@@ -381,163 +259,19 @@ const ProfileForm = ({ accountType = 'developer' }) => {
     }
   }
 
-  // Initialize Google Maps Places script once on client
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const initPlaces = () => {
-      try {
-        // eslint-disable-next-line no-undef
-        const hasPlaces = !!(window.google && window.google.maps && window.google.maps.places)
-        if (!hasPlaces) return
-        // eslint-disable-next-line no-undef
-        autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService()
-        // eslint-disable-next-line no-undef
-        placesServiceRef.current = new window.google.maps.places.PlacesService(document.createElement('div'))
-        setGmIsLoaded(true)
-      } catch (e) {
-        console.error('Failed initializing Google Places:', e)
-      }
-    }
-
-    if (window.google?.maps?.places) {
-      initPlaces()
-      return
-    }
-
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API
-    if (!apiKey) {
-      console.warn('NEXT_PUBLIC_GOOGLE_MAPS_API is not set; Places Autocomplete disabled')
-      return
-    }
-
-    const existing = document.getElementById('gmaps-script')
-    if (existing) {
-      const handle = setInterval(() => {
-        if (window.google?.maps?.places) {
-          clearInterval(handle)
-          initPlaces()
-        }
-      }, 100)
-      return () => clearInterval(handle)
-    }
-
-    const s = document.createElement('script')
-    s.id = 'gmaps-script'
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
-    s.async = true
-    s.defer = true
-    s.onload = initPlaces
-    document.head.appendChild(s)
+  const handleModalLocationChange = useCallback((location) => {
+    setModalForm((prev) => ({
+      ...prev,
+      ...location,
+    }))
   }, [])
 
-  // Modal autocomplete handler
-  const handleModalPlaceInputChange = (value) => {
-    setModalPlaceQuery(value)
-    if (!gmIsLoaded || !autocompleteServiceRef.current) return
-    if (modalAutocompleteTimerRef.current) clearTimeout(modalAutocompleteTimerRef.current)
-    modalAutocompleteTimerRef.current = setTimeout(() => {
-      try {
-        autocompleteServiceRef.current.getPlacePredictions(
-          {
-            input: value,
-          },
-          (predictions, status) => {
-            // eslint-disable-next-line no-undef
-            if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
-              setModalPlaceSuggestions(predictions.slice(0, 6))
-            } else {
-              setModalPlaceSuggestions([])
-            }
-          }
-        )
-      } catch (e) {
-        console.error('Autocomplete error:', e)
-        setModalPlaceSuggestions([])
-      }
-    }, 250)
-  }
-
-  const parseAddressComponents = (addressComponents) => {
-    const get = (type, returnShort = false) => {
-      const comp = addressComponents?.find(c => c.types?.includes(type))
-      if (!comp) return ''
-      return returnShort ? comp.short_name : comp.long_name
-    }
-    const country = get('country')
-    const countryCode = get('country', true) // ISO 3166-1 alpha-2 code (e.g., 'GH', 'US')
-    const region = get('administrative_area_level_1') || get('administrative_area_level_2')
-    const city = get('locality') || get('sublocality') || get('postal_town')
-    return { country, countryCode, region, city }
-  }
-
-  const handleModalSuggestionClick = (prediction) => {
-    if (!placesServiceRef.current) return
-    try {
-      placesServiceRef.current.getDetails(
-        { placeId: prediction.place_id, fields: ['address_components', 'formatted_address', 'geometry'] },
-        (place, status) => {
-          // eslint-disable-next-line no-undef
-          if (status !== window.google.maps.places.PlacesServiceStatus.OK || !place) return
-          const lat = place.geometry?.location?.lat?.()
-          const lng = place.geometry?.location?.lng?.()
-          const { country, countryCode, region, city } = parseAddressComponents(place.address_components)
-          const newLat = typeof lat === 'number' ? lat : 0
-          const newLng = typeof lng === 'number' ? lng : 0
-          
-          // Auto-select currency based on country code
-          let autoCurrency = 'GHS' // Default to Ghanaian Cedi
-          let autoCurrencyName = 'Ghanaian Cedi'
-          if (countryCode && countryToCurrency[countryCode]) {
-            autoCurrency = countryToCurrency[countryCode]
-            // Find currency name from our supported currencies list
-            const currencyInfo = supportedCurrencies.find(c => c.code === autoCurrency)
-            if (currencyInfo) {
-              autoCurrencyName = currencyInfo.name
-            }
-          }
-          
-          setModalForm(prev => ({
-            ...prev,
-            place_id: prediction.place_id,
-            description: prediction.description || place.formatted_address || '',
-            address: place.formatted_address || '',
-            country: country || '',
-            region: region || '',
-            city: city || '',
-            latitude: newLat,
-            longitude: newLng,
-            currency: autoCurrency,
-            currency_name: autoCurrencyName,
-          }))
-          setModalPlaceQuery(prediction.description || place.formatted_address || '')
-          setModalPlaceSuggestions([])
-          // Update map center when location is selected (only on autocomplete selection, not on input)
-          if (newLat !== 0 && newLng !== 0) {
-            const newCenter = [newLat, newLng]
-            modalMapCenterRef.current = newCenter
-            modalMapZoomRef.current = 15
-            setModalMapCenter(newCenter)
-            setModalMapZoom(15)
-          }
-        }
-      )
-    } catch (e) {
-      console.error('Places details error:', e)
-    }
-  }
-
-  const handleModalMapClick = (lat, lng) => {
-    setModalForm(prev => ({
-      ...prev,
-      latitude: lat,
-      longitude: lng
-    }))
-    const newCenter = [lat, lng]
-    modalMapCenterRef.current = newCenter
-    modalMapZoomRef.current = 15
-    setModalMapCenter(newCenter)
-    setModalMapZoom(15)
-  }
+  const handleModalMapViewChange = useCallback((center, zoom) => {
+    modalMapCenterRef.current = center
+    modalMapZoomRef.current = zoom
+    setModalMapCenter(center)
+    setModalMapZoom(zoom)
+  }, [])
 
   // Modal handlers
   const openLocationModal = (mode = 'add', index = null) => {
@@ -620,13 +354,12 @@ const ProfileForm = ({ accountType = 'developer' }) => {
       primary_location: false
     })
     setModalPlaceQuery('')
-    setModalPlaceSuggestions([])
     setEditingLocationIndex(null)
   }
 
   const saveLocation = () => {
     if (!modalForm.address || !modalForm.city) {
-      toast.error('Please select a location from Google Maps')
+      toast.error('Please select a location using the map or search above')
       return
     }
 
@@ -1684,7 +1417,7 @@ const ProfileForm = ({ accountType = 'developer' }) => {
                   <div className="text-center py-8  rounded-xl border border-gray-200">
                     <FiMapPin className="w-12 h-12 mx-auto mb-2" />
                     <p>No locations added yet</p>
-                    <p>Click "Add Location" to add your company locations using Google Maps</p>
+                    <p>Click "Add Location" to add your company locations on the map</p>
                   </div>
                 )}
 
@@ -1715,20 +1448,28 @@ const ProfileForm = ({ accountType = 'developer' }) => {
                           </p>
                         </div>
                     </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => openLocationModal('edit', index)}
-                    className="secondary_button"
-                  >
-                    <FiEdit3 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => removeLocationAt(index)}
-                    disabled={isPrimary}
-                    className="tertiary_button disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <FiTrash2 className="w-4 h-4" />
-                  </button>
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => openLocationModal('edit', index)}
+                      disabled={isPrimary}
+                      className="secondary_button disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={isPrimary ? "Primary location cannot be changed" : "Edit location"}
+                    >
+                      <FiEdit3 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => removeLocationAt(index)}
+                      disabled={isPrimary}
+                      className="tertiary_button disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={isPrimary ? "Primary location cannot be changed" : "Delete location"}
+                    >
+                      <FiTrash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {isPrimary && (
+                    <span className="text-[10px] text-gray-500 font-medium">cannot be changed</span>
+                  )}
                 </div>
                     </div>
                   )
@@ -1981,93 +1722,17 @@ const ProfileForm = ({ accountType = 'developer' }) => {
                   </div>
 
                   <div className="p-2 md:p-2 md:p-6 space-y-6">
-                    {/* Google Places Autocomplete */}
-                    <div>
-                      <label className="block font-medium mb-2">
-                        Search Location (Google Maps)
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={modalPlaceQuery}
-                          onChange={(e) => handleModalPlaceInputChange(e.target.value)}
-                          placeholder={gmIsLoaded ? 'Type an address or area' : 'Loading Google Places...'}
-                          disabled={!gmIsLoaded}
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary_color focus:border-transparent transition-all duration-200 disabled:"
-                        />
-                        {gmIsLoaded && modalPlaceQuery && modalPlaceSuggestions.length > 0 && (
-                          <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-                            {modalPlaceSuggestions.map((p) => (
-                              <button
-                                key={p.place_id}
-                                type="button"
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => handleModalSuggestionClick(p)}
-                                className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors"
-                              >
-                                <div className="font-medium text-gray-900">{p.structured_formatting?.main_text || p.description}</div>
-                                <div className="text-sm text-gray-600">{p.structured_formatting?.secondary_text || ''}</div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Interactive Map */}
-                    <div>
-                      <label className="block font-medium mb-2">
-                        Map Selector - Click on the map to set location
-                      </label>
-                      <p className="mb-3">
-                        Use the pin on the map or search above to select your location. You can also click directly on the map to set coordinates. Drag the marker to fine-tune the position.
-                      </p>
-                      <div className="h-96 rounded-lg overflow-hidden border border-gray-300">
-                        <Wrapper
-                          apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API}
-                          libraries={['places']}
-                          render={(status) => {
-                            if (status === 'LOADING') {
-                              return (
-                                <div className="h-full bg-gray-100 rounded-lg flex items-center justify-center">
-                                  <div className="text-center">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                                    <p className="text-gray-600">Loading Google Maps...</p>
-                                  </div>
-                                </div>
-                              )
-                            }
-                            
-                            if (status === 'FAILURE') {
-                              return (
-                                <div className="h-full bg-red-50 rounded-lg flex items-center justify-center">
-                                  <p className="text-red-600">Failed to load Google Maps. Please check your API key.</p>
-                                </div>
-                              )
-                            }
-                            
-                            return (
-                              <GoogleMapViewer
-                                center={modalMapCenter}
-                                zoom={modalMapZoom}
-                                coordinates={modalForm.latitude !== 0 && modalForm.longitude !== 0 ? [modalForm.latitude, modalForm.longitude] : null}
-                                onMapClick={handleModalMapClick}
-                              />
-                            )
-                          }}
-                        />
-                      </div>
-                      {modalForm.latitude !== 0 && modalForm.longitude !== 0 && (
-                        <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                          <div className="flex items-center justify-between">
-                            <span>Current Location:</span>
-                            <span className="font-mono">
-                              {modalForm.latitude.toFixed(6)}, {modalForm.longitude.toFixed(6)}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <CompanyLocationMapPicker
+                      searchQuery={modalPlaceQuery}
+                      onSearchQueryChange={setModalPlaceQuery}
+                      mapCenter={modalMapCenter}
+                      mapZoom={modalMapZoom}
+                      onMapViewChange={handleModalMapViewChange}
+                      latitude={modalForm.latitude}
+                      longitude={modalForm.longitude}
+                      onLocationChange={handleModalLocationChange}
+                      supportedCurrencies={supportedCurrencies}
+                    />
 
                     {/* Description */}
                     <div>
@@ -2188,7 +1853,10 @@ const ProfileForm = ({ accountType = 'developer' }) => {
                         disabled={Array.isArray(formData.locations) && formData.locations.some(l => l?.primary_location && (!editingLocationIndex || formData.locations.indexOf(l) !== editingLocationIndex))}
                         className="w-4 h-4 text-primary_color border-gray-300 rounded focus:ring-primary_color"
                       />
-                      <label htmlFor="primaryLocation" className="font-medium">
+                      <label 
+                        htmlFor="primaryLocation" 
+                        className={`font-medium ${(Array.isArray(formData.locations) && formData.locations.some(l => l?.primary_location && (!editingLocationIndex || formData.locations.indexOf(l) !== editingLocationIndex))) ? 'text-gray-400 cursor-not-allowed' : ''}`}
+                      >
                         Set as primary location (locked once set)
                       </label>
                     </div>

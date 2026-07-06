@@ -483,7 +483,13 @@ const DevelopmentPage = () => {
                    viewport={{ once: true }}
                    transition={{ delay: idx * 0.1 }}
                  >
-                   <UnitCard unit={unit} developerSlug={developer?.slug} />
+                   <UnitCard
+                     unit={unit}
+                     developerSlug={developer?.slug}
+                     publicView
+                     leadAttributionContext="development"
+                     onUnitClick={handleUnitClick}
+                   />
                  </motion.div>
                ))}
              </div>
