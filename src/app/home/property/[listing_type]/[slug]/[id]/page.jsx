@@ -69,7 +69,7 @@ const PropertyDetailPage = () => {
   const [saving, setSaving] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
-  const canShowLeadContactForm = !authLoading && (!user || user.user_type === 'property_seeker')
+  const canShowLeadContactForm = !user || user.user_type === 'property_seeker'
 
   useEffect(() => {
     if (!canShowLeadContactForm && showContactModal) {
@@ -1128,7 +1128,7 @@ const PropertyDetailPage = () => {
                   <div className=" rounded-2xl  p-6">
                     <LeadContactForm 
                       contextType="listing"
-                      propertyId={listing?.id}
+                      propertyId={id || listing?.id}
                       propertyTitle={title}
                       propertyType={listing_type}
                       developer={developers}

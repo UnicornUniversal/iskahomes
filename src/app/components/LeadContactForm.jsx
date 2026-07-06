@@ -10,6 +10,9 @@ import { FaWhatsapp } from 'react-icons/fa6'
 import { HiOutlineCalendar, HiOutlineClock } from 'react-icons/hi'
 import CustomDropdown from '@/app/components/propertyManagement/modules/CustomDropdown'
 import { resolveLeadAttributionFromSearchString } from '@/lib/leadAttributionResolve'
+import { verifyToken } from '@/lib/jwt'
+
+const MIN_MESSAGE_LENGTH = 10
 
 /**
  * LeadContactForm - Universal contact form for leads
@@ -73,6 +76,34 @@ const LeadContactForm = ({
     date: '', time: '', name: '', email: '', phone: '', message: ''
   })
   const [messageData, setMessageData] = useState({ message: '' })
+  const [messageFieldError, setMessageFieldError] = useState('')
+  const [formFeedback, setFormFeedback] = useState(null) // { type: 'success' | 'error' | 'info', message: string }
+
+  const notify = (type, message, autoClose = type === 'success' ? 3500 : 4500) => {
+    setFormFeedback({ type, message })
+    if (type === 'success') toast.success(message, { autoClose })
+    else if (type === 'error') toast.error(message, { autoClose })
+    else toast.info(message, { autoClose })
+  }
+
+  const getSeekerSession = () => {
+    const token =
+      propertySeekerToken ||
+      (typeof window !== 'undefined' ? localStorage.getItem('property_seeker_token') : null)
+
+    if (user?.user_type === 'property_seeker' && user?.id && token) {
+      return { seekerId: user.id, token, isSeeker: true }
+    }
+
+    if (token) {
+      const decoded = verifyToken(token)
+      if (decoded?.id) {
+        return { seekerId: decoded.id, token, isSeeker: true }
+      }
+    }
+
+    return { seekerId: null, token: null, isSeeker: false }
+  }
 
   const FIELD_REQUIRED_MSG = 'Field Required!'
   const [appointmentFieldErrors, setAppointmentFieldErrors] = useState({
@@ -276,6 +307,7 @@ const LeadContactForm = ({
   const handleAppointmentInputChange = (e) => {
     const fieldName = e.target.name
     setAppointmentData(prev => ({ ...prev, [fieldName]: e.target.value }))
+    if (formFeedback) setFormFeedback(null)
     setAppointmentFieldErrors(prev => {
       const next = { ...prev }
       if (fieldName === 'date') next.date = ''
@@ -288,7 +320,11 @@ const LeadContactForm = ({
       return next
     })
   }
-  const handleMessageInputChange = (e) => setMessageData({ message: e.target.value })
+  const handleMessageInputChange = (e) => {
+    setMessageData({ message: e.target.value })
+    if (messageFieldError) setMessageFieldError('')
+    if (formFeedback) setFormFeedback(null)
+  }
   
   const handlePhoneClick = async (e) => {
     e?.preventDefault?.()
@@ -346,17 +382,23 @@ const LeadContactForm = ({
   
   const handleAppointmentSubmit = async (e) => {
     e.preventDefault()
-    
-    // Check if user is logged in
-    if (!user) {
-      toast.error("Please sign up or log in to book an appointment")
-      router.push('/home/signup')
+    setFormFeedback(null)
+
+    const { seekerId, token, isSeeker } = getSeekerSession()
+
+    if (authLoading && !isSeeker) {
+      notify('info', 'Still verifying your session — please try again in a moment.')
       return
     }
-    
-    // Check if user is a property seeker
-    if (user.user_type !== 'property_seeker') {
-      toast.error("Only property seekers can book appointments")
+
+    if (!isSeeker || !seekerId) {
+      notify('error', 'Please log in to book an appointment')
+      router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'))
+      return
+    }
+
+    if (user && user.user_type !== 'property_seeker') {
+      notify('error', 'Only property seekers can book appointments')
       return
     }
     
@@ -387,122 +429,124 @@ const LeadContactForm = ({
       nextErrors.emailInvalid
     setAppointmentFieldErrors(nextErrors)
     if (hasErrors) {
-      toast.error('Please complete the required fields (see red hints above).', { autoClose: 3500 })
+      notify('error', 'Please complete the required fields (see red hints above).')
+      return
+    }
+
+    const listingId = contextType === 'listing' ? (propertyId || listing?.id) : null
+    const accountType = getAccountType()
+    const accountId = getAccountId()
+
+    if (!token) {
+      notify('error', 'Your session expired. Please log in again to book.')
+      router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'))
+      return
+    }
+
+    if (accountId === 'unknown') {
+      notify('error', 'We could not load the host for this page. Refresh and try again.')
+      return
+    }
+
+    if (!['developer', 'agent', 'agency'].includes(accountType)) {
+      notify('error', 'This page cannot accept online bookings yet.')
+      return
+    }
+
+    if (contextType === 'listing' && !listingId) {
+      notify('info', 'Property details are still loading. Please wait a moment and try again.')
       return
     }
 
     setLoading(true)
     
-    const listingId = contextType === 'listing' ? (propertyId || listing?.id) : null
-    const accountType = getAccountType()
-    const accountId = getAccountId()
-    const token = propertySeekerToken || (typeof window !== 'undefined' ? localStorage.getItem('property_seeker_token') : null)
-    
-    // Listing context: create actual appointment via API
-    if (listingId && accountId && accountId !== 'unknown' && token && ['developer', 'agent', 'agency'].includes(accountType)) {
-      try {
-        const appointmentType = mode === 'video' ? 'virtual' : 'in-person'
-        const res = await fetch('/api/appointments', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            account_type: accountType,
-            account_id: accountId,
-            listing_id: listingId,
-            seeker_id: user.id,
-            appointment_date: d,
-            appointment_time: t,
-            client_name: n,
-            client_email: em,
-            client_phone: (appointmentData.phone || '').trim() || null,
-            notes: appointmentData.message || null,
-            appointment_type: appointmentType,
-          }),
-        })
-        
-        const data = await res.json().catch(() => ({}))
-        
-        if (!res.ok) {
-          throw new Error(data.error || data.details || 'Failed to book appointment')
-        }
-        
-        setLoading(false)
-        toast.success('Appointment request sent!', { autoClose: 3500 })
-        setAppointmentFieldErrors({ date: '', time: '', name: '', email: '', emailInvalid: '' })
-        analytics.trackAppointmentClick(getAnalyticsContext({ appointmentType: mode === 'video' ? 'virtual' : 'viewing' })).catch(() => {})
-      } catch (error) {
-        setLoading(false)
-        toast.error(error.message || 'Failed to send appointment request', { autoClose: 4500 })
+    try {
+      const appointmentType = mode === 'video' ? 'virtual' : 'in-person'
+      const res = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          account_type: accountType,
+          account_id: accountId,
+          listing_id: listingId,
+          seeker_id: seekerId,
+          appointment_date: d,
+          appointment_time: t,
+          client_name: n,
+          client_email: em,
+          client_phone: (appointmentData.phone || '').trim() || null,
+          notes: appointmentData.message || null,
+          appointment_type: appointmentType,
+        }),
+      })
+      
+      const data = await res.json().catch(() => ({}))
+      
+      if (!res.ok) {
+        throw new Error(data.error || data.details || 'Failed to book appointment')
       }
-      return
+      
+      setLoading(false)
+      notify('success', 'Appointment request sent!')
+      setAppointmentFieldErrors({ date: '', time: '', name: '', email: '', emailInvalid: '' })
+      analytics.trackAppointmentClick(getAnalyticsContext({ appointmentType: mode === 'video' ? 'virtual' : 'viewing' })).catch(() => {})
+    } catch (error) {
+      setLoading(false)
+      notify('error', error.message || 'Failed to send appointment request')
     }
 
-    setLoading(false)
-
-    // Listing page but booking API was skipped — tell the user why (never fake success here)
-    if (contextType === 'listing' && listingId) {
-      if (!token) {
-        toast.error('Your session expired. Please log in again to book.')
-        router.push('/home/signin')
-        return
-      }
-      if (accountId === 'unknown') {
-        toast.error('We could not load the host for this listing. Refresh the page or contact support.')
-        return
-      }
-      if (!['developer', 'agent', 'agency'].includes(accountType)) {
-        toast.error('This listing cannot accept online bookings yet.')
-        return
-      }
-    }
-
-    // Profile/development context: optimistic UX only — no persisted appointment API yet
-    setAppointmentFieldErrors({ date: '', time: '', name: '', email: '', emailInvalid: '' })
-    toast.success('Appointment request sent!')
   }
   
   const handleMessageSubmit = async (e) => {
     e.preventDefault()
-    
-    // Check if user is logged in
-    if (!user) {
-      toast.error("Please sign up or log in to send a message")
-      router.push('/home/signup')
+    setFormFeedback(null)
+
+    const { seekerId, token, isSeeker } = getSeekerSession()
+
+    if (authLoading && !isSeeker) {
+      notify('info', 'Still verifying your session — please try again in a moment.')
+      return
+    }
+
+    if (!isSeeker) {
+      notify('error', 'Please log in to send a message')
+      router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'))
+      return
+    }
+
+    if (user && user.user_type !== 'property_seeker') {
+      notify('error', 'Only property seekers can send messages')
       return
     }
     
-    // Check if user is a property seeker
-    if (user.user_type !== 'property_seeker') {
-      toast.error("Only property seekers can send messages")
+    const trimmedMessage = (messageData.message || '').trim()
+
+    if (!trimmedMessage) {
+      setMessageFieldError('Please enter a message.')
+      notify('error', 'Please enter a message')
       return
     }
     
-    // Validate message is not empty
-    if (!messageData.message || messageData.message.trim().length === 0) {
-      toast.error("Please enter a message")
+    if (trimmedMessage.length < MIN_MESSAGE_LENGTH) {
+      const hint = `Message must be at least ${MIN_MESSAGE_LENGTH} characters (${trimmedMessage.length}/${MIN_MESSAGE_LENGTH}).`
+      setMessageFieldError(hint)
+      notify('error', hint)
       return
     }
-    
-    // Validate minimum message length
-    if (messageData.message.trim().length < 10) {
-      toast.error("Message must be at least 10 characters long")
-      return
-    }
-    
-    const token = propertySeekerToken || (typeof window !== 'undefined' ? localStorage.getItem('property_seeker_token') : null)
+
     if (!token) {
-      toast.error("Session expired. Please log in again.")
-      router.push('/home/signin')
+      notify('error', 'Session expired. Please log in again.')
+      router.push('/login?redirect=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/'))
       return
     }
     
     const otherUserId = getAccountId()
     const otherUserType = getAccountType()
     if (!otherUserId || otherUserId === 'unknown') {
-      toast.error("Unable to send message: recipient not found")
+      notify('error', 'Unable to send message: recipient not found')
       return
     }
     
@@ -522,7 +566,7 @@ const LeadContactForm = ({
         body: JSON.stringify({
           otherUserId,
           otherUserType,
-          firstMessage: messageData.message.trim(),
+          firstMessage: trimmedMessage,
           listingId,
           developmentId: devId,
           subject,
@@ -537,13 +581,14 @@ const LeadContactForm = ({
       }
       
       setSendingMessage(false)
-      toast.success('Message sent!', { autoClose: 3000 })
+      notify('success', 'Message sent!')
       setMessageData({ message: '' })
+      setMessageFieldError('')
       
       analytics.trackMessageClick(getAnalyticsContext({ messageType: 'direct_message' })).catch(() => {})
     } catch (error) {
       setSendingMessage(false)
-      toast.error(error.message || 'Failed to send message', { autoClose: 4500 })
+      notify('error', error.message || 'Failed to send message')
     }
   }
 
@@ -809,24 +854,56 @@ const LeadContactForm = ({
                 name="message"
                 rows={5}
                 required
-                minLength={10}
+                minLength={MIN_MESSAGE_LENGTH}
                 value={messageData.message}
                 onChange={handleMessageInputChange}
                 placeholder="Hi, I am interested..."
-                className="w-full bg-gray-50 text-sm text-primary_color font-medium rounded-lg border border-gray-200 px-3 py-2.5 focus:ring-2 focus:ring-primary_color/20 focus:border-primary_color focus:bg-white transition-all outline-none resize-none placeholder-gray-400 leading-relaxed"
+                aria-invalid={!!messageFieldError}
+                aria-describedby={`${messageFormId}-hint`}
+                className={`w-full bg-gray-50 text-sm text-primary_color font-medium rounded-lg border px-3 py-2.5 focus:ring-2 focus:ring-primary_color/20 focus:border-primary_color focus:bg-white transition-all outline-none resize-none placeholder-gray-400 leading-relaxed ${
+                  messageFieldError ? 'border-red-500 ring-1 ring-red-200' : 'border-gray-200'
+                }`}
               />
+              <p
+                id={`${messageFormId}-hint`}
+                className={`text-[10px] leading-tight ${
+                  messageFieldError
+                    ? 'text-red-600'
+                    : (messageData.message || '').trim().length >= MIN_MESSAGE_LENGTH
+                      ? 'text-green-600'
+                      : 'text-primary_color/60'
+                }`}
+              >
+                {messageFieldError ||
+                  `Minimum ${MIN_MESSAGE_LENGTH} characters required (${(messageData.message || '').trim().length}/${MIN_MESSAGE_LENGTH})`}
+              </p>
             </div>
           </form>
         )}
       </div>
 
       {/* --- STICKY FOOTER BUTTON --- */}
-      <div className="sticky bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 flex-shrink-0">
+      <div className="sticky bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 flex-shrink-0 space-y-2">
+        {formFeedback && (
+          <div
+            role="alert"
+            className={`rounded-lg border px-3 py-2 text-xs font-medium ${
+              formFeedback.type === 'success'
+                ? 'bg-green-50 border-green-200 text-green-800'
+                : formFeedback.type === 'error'
+                  ? 'bg-red-50 border-red-200 text-red-800'
+                  : 'bg-blue-50 border-blue-200 text-blue-800'
+            }`}
+          >
+            {formFeedback.message}
+          </div>
+        )}
         <button
-          type="button"
-          disabled={loading || sendingMessage || authLoading}
+          type="submit"
+          form={activeTab === 'appointment' ? appointmentFormId : messageFormId}
+          disabled={loading || sendingMessage}
           title={
-            authLoading
+            authLoading && !getSeekerSession().isSeeker
               ? 'Checking session…'
               : !user
                 ? 'Log in as a property seeker to continue'
@@ -834,16 +911,9 @@ const LeadContactForm = ({
                   ? 'Only property seekers can use this form'
                   : undefined
           }
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            if (authLoading) return
-            if (activeTab === 'appointment') void handleAppointmentSubmit(e)
-            else void handleMessageSubmit(e)
-          }}
           className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg shadow-md shadow-orange-500/20 transform active:scale-[0.98] transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
         >
-          {authLoading ? (
+          {authLoading && !getSeekerSession().isSeeker ? (
             <span className="text-sm font-medium">Checking session…</span>
           ) : loading || sendingMessage ? (
             <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
