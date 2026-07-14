@@ -57,7 +57,7 @@ export async function POST(request) {
     }
 
     // Validate required fields
-    if (!account_type || !account_id || !listing_id || !seeker_id || !appointment_date || !appointment_time || !client_name || !client_email) {
+    if (!account_type || !account_id || !seeker_id || !appointment_date || !appointment_time || !client_name || !client_email) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -149,24 +149,26 @@ export async function POST(request) {
       }
     }
 
-    // Update total_appointments in listings table - increment by 1
-    const { data: listing, error: listingError } = await supabase
-      .from('listings')
-      .select('id, user_id, account_type, total_appointments')
-      .eq('id', listing_id)
-      .single()
-
-    if (!listingError && listing) {
-      const newAppointmentsCount = (listing.total_appointments || 0) + 1
-      const { error: updateListingError } = await supabase
+    // Update total_appointments in listings table when booking is tied to a listing
+    if (listing_id) {
+      const { data: listing, error: listingError } = await supabase
         .from('listings')
-        .update({ 
-          total_appointments: newAppointmentsCount
-        })
+        .select('id, user_id, account_type, total_appointments')
         .eq('id', listing_id)
+        .single()
 
-      if (updateListingError) {
-        console.error('Error updating listing appointments count:', updateListingError)
+      if (!listingError && listing) {
+        const newAppointmentsCount = (listing.total_appointments || 0) + 1
+        const { error: updateListingError } = await supabase
+          .from('listings')
+          .update({ 
+            total_appointments: newAppointmentsCount
+          })
+          .eq('id', listing_id)
+
+        if (updateListingError) {
+          console.error('Error updating listing appointments count:', updateListingError)
+        }
       }
     }
 

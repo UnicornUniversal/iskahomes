@@ -1109,7 +1109,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
   const totalLeadsData = getTotalLeadsData()
 
   return (
-    <div className="w-full space-y-6 text-primary_color">
+    <div className="w-full min-w-0 space-y-6 text-primary_color">
       <ToastContainer position="top-right" autoClose={3000} />
       {!singleLeadMode && (
         <>
@@ -1152,72 +1152,89 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
       <Reminders listerId={listerId} listerType={listerType} listingId={listingId} refreshKey={remindersRefreshKey} />
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
+      <div className="space-y-4 min-w-0">
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold text-secondary_color-900">Leads Manager System</h2>
           <p className="text-sm text-secondary_color-600 mt-1">
             {listingId ? 'Single listing leads' : 'All leads for this lister'}
           </p>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          {!singleLeadMode && (
-            <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => switchViewMode('list')}
-                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-primary_color text-white'
-                    : 'default_bg text-secondary_color-700 hover:bg-gray-50'
-                }`}
-              >
-                <FiList className="w-4 h-4" />
-                List
-              </button>
-              <button
-                type="button"
-                onClick={() => switchViewMode('pipeline')}
-                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
-                  viewMode === 'pipeline'
-                    ? 'bg-primary_color text-white'
-                    : 'default_bg text-secondary_color-700 hover:bg-gray-50'
-                }`}
-              >
-                <FiGrid className="w-4 h-4" />
-                Pipeline
-              </button>
-            </div>
-          )}
-          {!listingId && (
-            <button
-              onClick={() => canAddLead && setShowAddLeadModal(true)}
-              disabled={!canAddLead || subscriptionLimitsLoading}
-              title={
-                canAddLead
-                  ? 'Add a new lead'
-                  : `Monthly lead limit reached (${usageSummary.leadsThisMonth}/${usageSummary.leadsLimit ?? '—'})`
-              }
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
-                canAddLead
-                  ? 'bg-primary_color text-white hover:bg-primary_color/90'
-                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              <FiPlus className="w-4 h-4" />
-              Add Lead
-            </button>
-          )}
-          <div className="text-sm text-secondary_color-500">
-            {usageSummary.leadsLimit != null && (
-              <span className="mr-3">
+          <div className="mt-3 flex w-full items-center justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50/80 px-4 py-2.5 text-sm text-secondary_color-600">
+            {usageSummary.leadsLimit != null ? (
+              <span className="min-w-0 shrink">
                 This month:{' '}
-                <span className="font-medium text-secondary_color-900">
+                <span className="font-semibold text-secondary_color-900">
                   {usageSummary.leadsThisMonth}/{usageSummary.leadsLimit}
                 </span>
-                {packageName ? ` (${packageName})` : ''}
+                {packageName ? (
+                  <span className="text-secondary_color-500"> ({packageName})</span>
+                ) : null}
               </span>
+            ) : (
+              <span className="text-secondary_color-500 shrink-0">This month: —</span>
             )}
-            Total: <span className="font-medium text-secondary_color-900">{total}</span>
+            <span className="shrink-0 text-right">
+              Total:{' '}
+              <span className="font-semibold text-secondary_color-900">{total}</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Search + actions — search full width on small screens, then controls wrap below */}
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
+          <input
+            className="w-full min-w-0 basis-full sm:basis-0 sm:flex-1 px-4 py-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+            placeholder="Search by seeker name or listing..."
+            value={search}
+            onChange={(e) => { setPage(0); setSearch(e.target.value) }}
+          />
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+            {!singleLeadMode && (
+              <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden shrink-0">
+                <button
+                  type="button"
+                  onClick={() => switchViewMode('list')}
+                  className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-primary_color text-white'
+                      : 'default_bg text-secondary_color-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <FiList className="w-4 h-4" />
+                  List
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchViewMode('pipeline')}
+                  className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors ${
+                    viewMode === 'pipeline'
+                      ? 'bg-primary_color text-white'
+                      : 'default_bg text-secondary_color-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <FiGrid className="w-4 h-4" />
+                  Pipeline
+                </button>
+              </div>
+            )}
+            {!listingId && (
+              <button
+                onClick={() => canAddLead && setShowAddLeadModal(true)}
+                disabled={!canAddLead || subscriptionLimitsLoading}
+                title={
+                  canAddLead
+                    ? 'Add a new lead'
+                    : `Monthly lead limit reached (${usageSummary.leadsThisMonth}/${usageSummary.leadsLimit ?? '—'})`
+                }
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-colors text-sm font-medium shrink-0 ${
+                  canAddLead
+                    ? 'bg-primary_color text-white hover:bg-primary_color/90'
+                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                <FiPlus className="w-4 h-4" />
+                Add Lead
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1236,16 +1253,6 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
 
       {/* Filters */}
       <div className="space-y-4">
-        {/* Search Input - Top */}
-        <div>
-          <input
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Search by seeker name or listing..."
-            value={search}
-            onChange={(e) => { setPage(0); setSearch(e.target.value) }}
-          />
-        </div>
-
         {/* Filters Grid - Hidden on small, visible on medium+ */}
         <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-7 gap-4">
           {viewMode !== 'pipeline' && (

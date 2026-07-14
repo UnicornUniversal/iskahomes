@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     'property_seeker',
     'developer',
     'agent',
+    'agency',
     'admin',
     'homeowner'
   )),
@@ -26,6 +27,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     'property_seeker',
     'developer',
     'agent',
+    'agency',
     'admin',
     'homeowner'
   )),
@@ -98,6 +100,7 @@ CREATE TABLE IF NOT EXISTS messages (
     'property_seeker',
     'developer',
     'agent',
+    'agency',
     'admin',
     'homeowner',
     'system' -- For automated messages

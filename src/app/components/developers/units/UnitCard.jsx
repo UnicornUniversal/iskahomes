@@ -3,8 +3,18 @@ import React from 'react'
 import { useRouter } from 'next/navigation'
 import { MapPin } from 'lucide-react'
 import { SUBSCRIPTION_LOCKED_CARD_CLASS } from '@/lib/subscriptionLimits'
+import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 
-const UnitCard = ({ unit, developerSlug, accountType = 'developer', locked = false, lockMessage }) => {
+const UnitCard = ({
+  unit,
+  developerSlug,
+  accountType = 'developer',
+  locked = false,
+  lockMessage,
+  publicView = false,
+  leadAttributionContext,
+  onUnitClick,
+}) => {
   const router = useRouter()
   const isAgent = accountType === 'agent'
   const isAgency = accountType === 'agency'
@@ -85,6 +95,22 @@ const UnitCard = ({ unit, developerSlug, accountType = 'developer', locked = fal
       return
     }
     
+    onUnitClick?.(unit)
+
+    if (publicView) {
+      const { listing_type, slug: unitSlug, id } = unit
+      if (!listing_type || !unitSlug || !id) {
+        console.error('Missing fields for public property URL:', { listing_type, unitSlug, id, unit })
+        return
+      }
+      const propertyPath = `/home/property/${listing_type}/${unitSlug}/${id}`
+      const href = leadAttributionContext
+        ? withWebsiteLeadAttribution(propertyPath, leadAttributionContext)
+        : propertyPath
+      router.push(href)
+      return
+    }
+
     console.log(`Navigating to ${isAgent || isAgency ? 'property' : 'unit'}:`, { slug, unitId, unit, accountType })
     if (isAgency) {
       router.push(`/agency/${slug}/properties/${unitId}`)
