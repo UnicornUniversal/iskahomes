@@ -129,19 +129,17 @@ const FeaturedDevelopments = ({ linkContext = 'featured' }) => {
   }, [])
 
   if (loading) {
+    // Pre-launch: loading text hidden; show spinner only
     return (
       <div className="w-full h-96 rounded-lg flex items-center justify-center">
-        <div className="text-gray-500">Loading featured developments...</div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary_color"></div>
       </div>
     )
   }
 
   if (featuredDevelopments.length === 0) {
-    return (
-      <div className="w-full h-96 bg-gray-100 rounded-lg flex items-center justify-center">
-        <div className="text-gray-500">No featured developments available</div>
-      </div>
-    )
+    // Pre-launch: empty-state hidden so empty inventory isn't exposed
+    return null
   }
 
   return (
@@ -235,11 +233,14 @@ const FeaturedDevelopments = ({ linkContext = 'featured' }) => {
                             <span className="opacity-75">Status: </span>
                             <span className="font-semibold">{development.status || 'N/A'}</span>
                           </div>
-                          <div>
-                            <span className="opacity-75">Total Units: </span>
-                            <span className="font-semibold">{development.total_units || 0}</span>
-                          </div>
-                          {developer?.total_developments !== undefined && developer?.total_developments !== null && (
+                          {/* Pre-launch: aggregate counters hidden so empty inventory isn't exposed */}
+                          {false && (
+                            <div>
+                              <span className="opacity-75">Total Units: </span>
+                              <span className="font-semibold">{development.total_units || 0}</span>
+                            </div>
+                          )}
+                          {false && developer?.total_developments !== undefined && developer?.total_developments !== null && (
                             <div>
                               <span className="opacity-75">Developer Projects: </span>
                               <span className="font-semibold">{developer.total_developments}</span>

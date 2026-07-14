@@ -312,15 +312,15 @@ const DeveloperPage = () => {
                   </div>
                 )}
                 
-                {/* Total Developments and Units */}
+                {/* Total Developments and Units — pre-launch: shown only when populated so zeros aren't exposed */}
                 <div className="flex items-center gap-4 text-primary_color">
-                  {developer.total_developments !== undefined && developer.total_developments !== null && (
+                  {developer.total_developments > 0 && (
                     <div className="flex items-center gap-1 ">
                       <Building2 className="w-7 h-7 bg-primary_color rounded-md !p-1 text-white" />
                       <span>{developer.total_developments} Developments</span>
                     </div>
                   )}
-                  {developer.total_units !== undefined && developer.total_units !== null && (
+                  {developer.total_units > 0 && (
                     <div className="flex items-center gap-1 ">
                       <Users className="w-7 h-7 bg-primary_color rounded-md !p-1 text-white" />
                       <span>{developer.total_units} Units</span>
@@ -346,12 +346,10 @@ const DeveloperPage = () => {
           {/* Middle Section - Slogan */}
           <div className="">
             <div className="text-xs -400 uppercase tracking-wider mb-2">--Slogan--</div>
-            {developer.slogan || developer.tagline ? (
+            {(developer.slogan || developer.tagline) && (
               <p className="text-[2em] italic -700 leading-relaxed">
                 {developer.slogan || developer.tagline}
               </p>
-            ) : (
-              <p className="text-sm -400 italic">No slogan available</p>
             )}
           </div>
 

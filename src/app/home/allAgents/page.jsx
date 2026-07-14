@@ -120,7 +120,7 @@ const AllAgents = () => {
             headingOne="Discover"
             headingTwo="Agents"
             description="Connect with top-tier real estate professionals dedicated to finding your perfect property."
-            stats={[{ label: 'Total Agents', value: agents.length }]}
+            stats={[]}
             images={headerImages}
             className="mb-12"
           />
@@ -202,7 +202,8 @@ const AllAgents = () => {
                 Try Again
                 </button>
             </div>
-          ) : filteredAgents.length === 0 ? (
+          ) : false ? (
+            /* Pre-launch: empty-state message hidden so empty inventory isn't exposed */
             <div className="text-center py-20">
                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
                  <FiSearch className="h-8 w-8 text-gray-400" />
@@ -266,17 +267,19 @@ const AllAgents = () => {
                         <div className="h-8 mb-4"></div> // Spacer
                     )}
 
-                    {/* Stats Grid */}
-                    <div className="w-full grid grid-cols-2 gap-3 mb-6">
-                        <div className="bg-gray-50 rounded-xl p-3 text-center group-hover:bg-primary_color/5 transition-colors duration-300">
-                            <div className="text-lg font-bold text-primary_color">{agent.total_listings || 0}</div>
-                            <div className="text-xs text-gray-500">Properties</div>
-                        </div>
-                        <div className="bg-gray-50 rounded-xl p-3 text-center group-hover:bg-primary_color/5 transition-colors duration-300">
-                            <div className="text-lg font-bold text-primary_color">4.9</div>
-                            <div className="text-xs text-gray-500">Rating</div>
-                        </div>
-                    </div>
+                    {/* Stats Grid — pre-launch: hidden until the agent has listings so zeros aren't exposed */}
+                    {agent.total_listings > 0 && (
+                      <div className="w-full grid grid-cols-2 gap-3 mb-6">
+                          <div className="bg-gray-50 rounded-xl p-3 text-center group-hover:bg-primary_color/5 transition-colors duration-300">
+                              <div className="text-lg font-bold text-primary_color">{agent.total_listings}</div>
+                              <div className="text-xs text-gray-500">Properties</div>
+                          </div>
+                          <div className="bg-gray-50 rounded-xl p-3 text-center group-hover:bg-primary_color/5 transition-colors duration-300">
+                              <div className="text-lg font-bold text-primary_color">4.9</div>
+                              <div className="text-xs text-gray-500">Rating</div>
+                          </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Footer Actions */}

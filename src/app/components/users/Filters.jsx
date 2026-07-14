@@ -1099,7 +1099,7 @@ const Filters = ({ onChange, initial = {} }) => {
       <div className="w-full max-h-screen overflow-y-auto rounded-2xl bg-white shadow-sm p-4 md:p-6 border border-primary_color/10">
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary_color"></div>
-          <span className="ml-2 text-primary_color">Loading filters...</span>
+          {/* Pre-launch: loading text hidden; spinner only */}
         </div>
       </div>
     );

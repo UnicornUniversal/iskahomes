@@ -235,7 +235,7 @@ const Header = () => {
 
         {/* Text content — positioned over left overlay */}
         <div
-          className="w-full md:w-[65%]"
+          className="w-full md:w-[65%] px-[5%] md:pl-[88px] md:pr-[5%]"
           style={{
             position: 'relative',
             zIndex: 3,
@@ -243,7 +243,6 @@ const Header = () => {
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
-            padding: '0 5%',
           }}
         >
           <motion.h1
@@ -260,8 +259,24 @@ const Header = () => {
               maxWidth: 600,
             }}
           >
-            Your Realty Quests Concludes Here
+            Your Real Estate Journey Starts Here
           </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.15, ease: 'easeOut' }}
+            style={{
+              color: 'rgba(255,255,255,0.9)',
+              fontSize: 'clamp(1rem, 1.8vw, 1.4rem)',
+              fontWeight: 400,
+              lineHeight: 1.4,
+              margin: '16px 0 0',
+              maxWidth: 560,
+            }}
+          >
+            Verified Premium Homes Curated For Serious Buyers
+          </motion.p>
 
           {/* Search bar */}
           <motion.div
@@ -281,7 +296,7 @@ const Header = () => {
             className="hidden md:block"
             style={{
               position: 'absolute',
-              bottom: 64,
+              bottom: 24,
               right: 80,
               background: 'rgba(0,0,0,0.55)',
               backdropFilter: 'blur(6px)',
@@ -308,6 +323,7 @@ const Header = () => {
 
         {/* ← arrow */}
         <div
+          className="hidden md:block"
           style={{
             position: 'absolute',
             left: 20,
@@ -325,6 +341,7 @@ const Header = () => {
 
         {/* → arrow */}
         <div
+          className="hidden md:block"
           style={{
             position: 'absolute',
             right: 20,

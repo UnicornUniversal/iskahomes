@@ -29,9 +29,11 @@ export default function Home() {
   <div className="w-full h-full flex flex-col gap-4">
   <HomeProperties />
   <HomeCategories />
-  <OurServices />
     <DevelopmentHeaders />
-    <FeaturedDevelopments linkContext="homepage" />
+    <div className="mt-12 md:mt-20">
+      <FeaturedDevelopments linkContext="homepage" />
+    </div>
+  <OurServices />
   <WhyIskaHomes/>
   </div>
 {/*       

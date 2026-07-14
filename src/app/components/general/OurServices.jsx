@@ -10,9 +10,6 @@ const OurServices = () => {
     <section className="w-full px-4 md:px-8 py-14">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
         <div>
-          <p className="text-sm uppercase tracking-[0.24em] text-primary_color/60 mb-2">
-            What We Offer
-          </p>
           <h2 className="heading_title font-medium text-left">Our Services</h2>
         </div>
 

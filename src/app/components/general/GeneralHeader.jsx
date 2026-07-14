@@ -1,7 +1,6 @@
 'use client'
 
 import React from 'react'
-import { FiChevronDown } from 'react-icons/fi'
 
 const GeneralHeader = ({
   headingOne,
@@ -81,18 +80,7 @@ const GeneralHeader = ({
             )}
           </div>
 
-          
-          {bottomRightIcon != null ? (
-            bottomRightIcon
-          ) : (
-            <button
-              type="button"
-              aria-label="Scroll down"
-              className="w-10 h-10 rounded-full border-2 border-primary_color flex items-center justify-center flex-shrink-0 text-primary_color hover:bg-primary_color hover:text-white transition-colors self-end lg:self-auto order-3"
-            >
-              <FiChevronDown className="w-5 h-5" />
-            </button>
-          )}
+          {bottomRightIcon != null && bottomRightIcon}
         </div>
 
         {/* Bottom teal line */}

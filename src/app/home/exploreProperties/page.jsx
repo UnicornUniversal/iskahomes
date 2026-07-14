@@ -16,7 +16,7 @@ const UserMap = dynamic(() => import('@/app/components/users/UserMap'), {
     <div className='w-full h-[100vh] rounded-xl overflow-hidden border border-primary_color/10 flex items-center justify-center'>
       <div className="text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary_color mx-auto mb-2"></div>
-        <span className="text-primary_color">Loading map...</span>
+        {/* Pre-launch: loading text hidden; spinner only */}
       </div>
     </div>
   )
@@ -291,7 +291,7 @@ const ExplorePropertiesContent = () => {
           <>
             {/* List view - full-width property grid */}
             <div
-              className='relative w-full h-[calc(100vh-6rem)] lg:h-screen bg-white/95 backdrop-blur-sm border border-primary_color/10 overflow-hidden'
+              className='relative w-full h-[calc(100vh-6rem)] lg:h-screen gradient_bg border border-primary_color/10 overflow-hidden'
               style={{
                 paddingLeft: showDesktopFilters ? '350px' : '0px',
                 transition: 'padding-left 0.3s ease',
@@ -358,7 +358,7 @@ const page = () => {
       <div className='w-full h-screen flex items-center justify-center'>
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary_color mx-auto mb-2"></div>
-          <span className="text-primary_color">Loading...</span>
+          {/* Pre-launch: loading text hidden; spinner only */}
         </div>
       </div>
     }>

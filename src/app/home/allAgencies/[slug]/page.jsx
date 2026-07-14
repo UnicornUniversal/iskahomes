@@ -27,6 +27,23 @@ import DataRenderer from '@/app/components/developers/DataRenderer'
 import AgentsSwiper from '@/app/components/agency/AgentsSwiper'
 import { toast } from 'react-toastify'
 
+// Agency images are stored as JSON objects ({ url, ... }) in a text column,
+// so resolve the actual URL whether the value is an object, a JSON string, or a plain URL.
+const resolveImageUrl = (value) => {
+  if (!value) return null
+  if (typeof value === 'object') return value.url || null
+  if (typeof value === 'string') {
+    if (value.startsWith('http')) return value
+    try {
+      const parsed = JSON.parse(value)
+      return parsed?.url || null
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
 const AgencyProfile = () => {
   const params = useParams()
   const agencySlug = params.slug
@@ -126,9 +143,9 @@ const AgencyProfile = () => {
         <div className="flex flex-col justify-between lg:grid lg:grid-cols-2 min-h-[600px] lg:h-screen">
             {/* Left Side - Cover Image */}
             <div className="relative w-full h-[300px] lg:h-full overflow-hidden">
-                {agency.cover_image ? (
+                {resolveImageUrl(agency.cover_image) ? (
                     <img
-                        src={agency.cover_image}
+                        src={resolveImageUrl(agency.cover_image)}
                         alt={`${agency.name} cover`}
                         className="w-full h-full object-cover"
                     />
@@ -144,9 +161,9 @@ const AgencyProfile = () => {
                     <div className="flex items-start gap-4">
                         {/* Profile Image */}
                         <div className="relative flex-shrink-0">
-                            {agency.profile_image ? (
+                            {resolveImageUrl(agency.profile_image) ? (
                                 <img
-                                    src={agency.profile_image}
+                                    src={resolveImageUrl(agency.profile_image)}
                                     alt={agency.name}
                                     className="w-20 h-20 rounded-md object-cover border-2 border-white shadow-md"
                                 />
@@ -387,14 +404,8 @@ const AgencyProfile = () => {
                                  })}
                              </div>
                          ) : (
-                             <div className="text-center py-12 border-2 border-dashed border-primary_color/20 rounded-lg">
-                                 <p className="text-primary_color/70 text-lg font-medium">
-                                     No listings found for this agency.
-                                 </p>
-                                 <p className="text-primary_color/50 text-sm mt-2">
-                                     Listings count: {listings?.length || 0} | Is array: {Array.isArray(listings) ? 'Yes' : 'No'}
-                                 </p>
-                             </div>
+                             /* Pre-launch: empty-state and debug text hidden so empty inventory isn't exposed */
+                             null
                          )}
                      </div>
                 </div>

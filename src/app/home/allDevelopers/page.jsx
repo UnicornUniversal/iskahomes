@@ -160,7 +160,7 @@ const AllDevelopersPage = () => {
         headingOne="Discover"
         headingTwo="Developers"
         description="Explore top developers and their amazing projects. Find your next dream home with trusted developers."
-        stats={[{ label: 'Total Developers', value: developers.length }]}
+        stats={[]}
         images={headerImages}
         className="mb-8"
       />
@@ -170,14 +170,14 @@ const AllDevelopersPage = () => {
 
       <div className="mx-auto md:px-4">
         {/* Search Bar */}
-        <div className="sticky top-0 backdrop-blur-sm z-100 bg-white/10">
-          <div className="w-full gradient_bg p-4">
+        <div className="sticky top-0 z-[100] bg-white border-b border-gray-200 shadow-sm">
+          <div className="w-full p-4">
             {/* Desktop View - Always Visible */}
             <div className="hidden md:block">
               <form onSubmit={handleSearch} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                   {/* Name Search */}
-                  <div className="relative w-full col-span-2 flex items-center rounded-lg border border-gray-300">
+                  <div className="relative w-full col-span-2 flex items-center rounded-lg border border-gray-200 bg-white focus-within:border-primary_color focus-within:ring-1 focus-within:ring-primary_color/20 transition-colors">
                     <input
                       ref={nameInputRef}
                       type="text"
@@ -202,7 +202,7 @@ const AllDevelopersPage = () => {
 
                   {/* Location Search with Autocomplete */}
                   <div className="relative w-full col-span-2">
-                    <div className="relative flex items-center rounded-lg  border-gray-300 ">
+                    <div className="relative flex items-center rounded-lg border border-gray-200 bg-white focus-within:border-primary_color focus-within:ring-1 focus-within:ring-primary_color/20 transition-colors">
                       <input
                         ref={locationInputRef}
                         type="text"
@@ -262,7 +262,7 @@ const AllDevelopersPage = () => {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="secondary_button !text-sm !rounded-md"
+                      className="bg-primary_color text-white text-sm font-medium rounded-md px-6 py-3 hover:bg-primary_color/90 transition-colors disabled:opacity-60"
                     >
                       {loading ? 'Searching...' : 'Search'}
                     </button>
@@ -271,7 +271,7 @@ const AllDevelopersPage = () => {
                         type="button"
                         onClick={handleClear}
                         disabled={loading}
-                        className="secondary_button"
+                        className="text-sm font-medium text-primary_color rounded-md px-4 py-3 border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-60"
                       >
                         Clear
                       </button>
@@ -314,12 +314,15 @@ const AllDevelopersPage = () => {
           )}
           
         
-          <div className="p-4">
-            <p>Developers Fetched</p>
-            <h1 className="text-primary_color border-b-4 border-primary_color pb-2 md:text-[3em]">
-              {developers.length}
-            </h1>
-          </div>
+          {/* Pre-launch: public "Developers Fetched" counter hidden so empty inventory isn't exposed */}
+          {false && (
+            <div className="p-4">
+              <p>Developers Fetched</p>
+              <h1 className="text-primary_color border-b-4 border-primary_color pb-2 md:text-[3em]">
+                {developers.length}
+              </h1>
+            </div>
+          )}
         </div>
 
         {/* Mobile Modal */}
@@ -459,9 +462,8 @@ const AllDevelopersPage = () => {
             
         {/* Developers Grid */}
         {developers.length > 0 && (
-          <div className="mb-8">
-         
-            <div className="flex flex-wrap gap-4 justify-center md:justify-between items-center">
+          <div className="mb-8 px-4 md:px-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {developerCards}
             </div>
           </div>
@@ -474,8 +476,8 @@ const AllDevelopersPage = () => {
           </div>
         )}
 
-        {/* No Results */}
-        {!loading && developers.length === 0 && !error && (
+        {/* No Results — hidden during pre-launch to avoid exposing empty inventory */}
+        {false && !loading && developers.length === 0 && !error && (
           <div className="text-center py-12">
             <div className="bg-gray-100 rounded-lg p-8 max-w-md mx-auto">
               <div className="text-6xl mb-4">🏗️</div>
@@ -505,8 +507,8 @@ const AllDevelopersPage = () => {
           </div>
         )}
 
-        {/* End of Results */}
-        {!hasMore && developers.length > 0 && (
+        {/* End of Results — pagination message hidden during pre-launch */}
+        {false && !hasMore && developers.length > 0 && (
           <div className="text-center py-8">
             <p className="text-gray-500">
               You've reached the end of the list. No more developers to load.

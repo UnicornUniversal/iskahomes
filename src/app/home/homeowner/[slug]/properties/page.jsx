@@ -140,7 +140,8 @@ const HomeOwnerProperties = () => {
               ))}
             </div>
 
-            {filteredProperties.length === 0 && (
+            {/* Pre-launch: empty-state message hidden so empty inventory isn't exposed */}
+            {false && filteredProperties.length === 0 && (
               <div className="text-center py-12">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <FiSearch className="w-8 h-8 text-gray-400" />
