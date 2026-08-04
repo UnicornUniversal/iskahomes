@@ -127,7 +127,7 @@ const DynamicSpecifications = ({ propertyTypeId, purposeId, onSpecificationsChan
       return (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary_color mx-auto mb-2"></div>
-          <p className="text-gray-500">Loading specifications...</p>
+          {/* Pre-launch: loading text hidden; spinner only */}
         </div>
       )
     }

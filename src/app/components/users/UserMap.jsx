@@ -293,7 +293,7 @@ const UserMap = ({ filters = {}, leadAttributionContext = 'search' }) => {
       <div className='w-full h-[100vh] rounded-xl overflow-hidden border border-primary_color/10 flex items-center justify-center'>
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary_color mx-auto mb-2"></div>
-          <span className="text-primary_color">Loading map...</span>
+          {/* Pre-launch: loading text hidden; spinner only */}
         </div>
       </div>
     );

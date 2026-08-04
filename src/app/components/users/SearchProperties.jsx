@@ -202,28 +202,11 @@ const SearchProperties = ({
   return (
     <div className="w-full h-full flex flex-col overflow-hidden max-h-full">
       {/* Header */}
-      <div className="flex-shrink-0 bg-white/80 backdrop-blur-md border-b border-primary_color/10 px-4 py-2">
+      <div className="flex-shrink-0 border-b border-primary_color/10 px-4 py-2">
         <div className="flex items-center justify-between gap-3">
+          {/* Pre-launch: result counter, loading and empty status text hidden; static label only */}
           <h6 className="text-primary_color font-medium text-sm min-w-0">
-            {loading ? (
-              'Loading...'
-            ) : error ? (
-              'Error loading properties'
-            ) : totalCount > 0 ? (
-              <>
-                <span className="text-base font-semibold">{totalCount}</span>
-                <span className="ml-1.5 text-sm font-normal">
-                  {totalCount === 1 ? 'property found' : 'properties found'}
-                </span>
-                {listings.length < totalCount && (
-                  <span className="ml-1.5 text-xs text-gray-500 font-normal">
-                    (showing {listings.length})
-                  </span>
-                )}
-              </>
-            ) : (
-              'No properties found'
-            )}
+            Properties
           </h6>
         </div>
       </div>
@@ -233,7 +216,7 @@ const SearchProperties = ({
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary_color"></div>
-            <span className="ml-2 text-primary_color">Loading properties...</span>
+            {/* Pre-launch: loading text hidden; spinner only */}
           </div>
         ) : error ? (
           <div className="text-center py-8 text-red-500">
@@ -248,10 +231,8 @@ const SearchProperties = ({
             </button>
           </div>
         ) : listings.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500 mb-2">No properties found</p>
-            <p className="text-sm text-gray-400">Try adjusting your filters</p>
-          </div>
+          /* Pre-launch: empty-state message hidden so empty inventory isn't exposed */
+          null
         ) : (
           <>
             {isFullLayout ? (
@@ -278,16 +259,15 @@ const SearchProperties = ({
               </>
             )}
             
-            {/* Loading more indicator */}
+            {/* Loading more indicator — pre-launch: text hidden, spinner only */}
             {loadingMore && (
               <div className="flex items-center justify-center py-6">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary_color"></div>
-                <span className="ml-2 text-primary_color text-sm">Loading more properties...</span>
               </div>
             )}
-            
-            {/* End of results indicator */}
-            {!hasMore && listings.length > 0 && listings.length >= totalCount && (
+
+            {/* End of results indicator — pre-launch: pagination message hidden */}
+            {false && !hasMore && listings.length > 0 && listings.length >= totalCount && (
               <div className="text-center py-6 text-gray-500 text-sm">
                 All properties loaded
               </div>

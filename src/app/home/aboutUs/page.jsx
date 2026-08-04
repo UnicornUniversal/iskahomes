@@ -24,7 +24,7 @@ const contactCards = [
   {
     icon: FaEnvelope,
     title: "We're always happy to help",
-    value: 'iskahomes@gmail.com',
+    value: 'info@iskahomes.com',
   },
   {
     icon: FaPhone,
@@ -188,14 +188,14 @@ const AboutUsPage = () => {
 
             <div style={{ width: 80, height: 3, background: 'linear-gradient(90deg, #17637C, #F68B1F)', margin: '20px 0' }} />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 24, fontSize: 13, lineHeight: 1.8, color: '#555', maxWidth: 700 }}>
+            {/* <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 24, fontSize: 13, lineHeight: 1.8, color: '#555', maxWidth: 700 }}>
               <p style={{ margin: 0 }}>
                 Our mission is to deliver exceptional real estate experiences by combining timeless design, superior craftsmanship, and innovative development practices.We are committed to setting industry standards through quality, trust, and attention to detail transforming prime locations into enduring spaces that reflect luxury, comfort, and long-term value for our clients.
               </p>
               <p style={{ margin: 0 }}>
                 We build on a legacy of excellence by delivering premium real estate developments that stand the test of time. We strive to blend tradition with innovation—creating modern, high-quality spaces that meet evolving lifestyle needs while upholding the highest standards of design, integrity, and long-term value.
               </p>
-            </div>
+            </div> */}
 
             {/* Mission images */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style={{ gap: 16, marginTop: 32 }}>
@@ -227,14 +227,14 @@ const AboutUsPage = () => {
 
             <div style={{ width: 80, height: 3, background: 'linear-gradient(90deg, #17637C, #F68B1F)', margin: '20px 0' }} />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 24, fontSize: 13, lineHeight: 1.8, color: '#555', maxWidth: 700 }}>
+            {/* <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 24, fontSize: 13, lineHeight: 1.8, color: '#555', maxWidth: 700 }}>
               <p style={{ margin: 0 }}>
                 Our Vision is to shape the future of premium real estate by blending enduring excellence with modern innovation—creating timeless developments that evolve with changing lifestyles while maintaining the highest standards of design, quality, and value.
               </p>
               <p style={{ margin: 0 }}>
                build a lasting legacy in premium real estate—one that transcends generations by adapting to modern advancements while preserving excellence at its core, and continuing to set the benchmark for innovation, design, and enduring value in every development.
               </p>
-            </div>
+            </div> */}
 
             {/* Vision images */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style={{ gap: 16, marginTop: 32 }}>

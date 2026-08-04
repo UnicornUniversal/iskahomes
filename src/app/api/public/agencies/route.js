@@ -30,6 +30,7 @@ export async function GET(request) {
         country,
         description,
         profile_image,
+        cover_image,
         social_media,
         slug,
         verified,

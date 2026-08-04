@@ -46,106 +46,71 @@ const PasswordField = ({ name, value, onChange, required = true, placeholder = "
     checkPasswordStrength(value)
   }
 
+  const strengthColor =
+    passwordStrength.score <= 2 ? 'bg-[#9D2C2C]' :
+    passwordStrength.score === 3 ? 'bg-[#F68B1F]' :
+    'bg-[#15D842]'
+
+  const strengthTextColor =
+    passwordStrength.score <= 2 ? 'text-[#9D2C2C]' :
+    passwordStrength.score === 3 ? 'text-[#F68B1F]' :
+    'text-[#15D842]'
+
   return (
     <div>
-      <label className="block text-sm font-semibold text-[#17637C] mb-2">Password</label>
+      <label className="block text-xs font-medium text-gray-600 mb-1">Password</label>
       <div className="relative">
+        <svg
+          className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0110 0v4" />
+        </svg>
         <input
           type={showPassword ? "text" : "password"}
           name={name}
           value={value}
           onChange={handleChange}
           required={required}
-          className="w-full px-4 py-3 pr-12 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#17637C] focus:border-transparent transition-all"
+          className="w-full h-11 pl-11 pr-11 border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-colors focus:border-primary_color focus:ring-2 focus:ring-primary_color/20"
           placeholder={placeholder}
         />
         <button
           type="button"
           onClick={() => setShowPassword(!showPassword)}
-          className="absolute inset-y-0 right-0 pr-4 flex items-center hover:text-[#17637C] transition-colors"
+          aria-label={showPassword ? 'Hide password' : 'Show password'}
+          className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
         >
           {showPassword ? (
-            <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
             </svg>
           ) : (
-            <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
           )}
         </button>
       </div>
-      
+
       {/* Password Strength Indicator */}
       {value && (
-        <div className="mt-2">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-gray-600">Password Strength:</span>
-            <span className={`text-xs font-semibold ${
-              passwordStrength.score <= 2 ? 'text-[#9D2C2C]' :
-              passwordStrength.score === 3 ? 'text-[#F68B1F]' :
-              'text-[#15D842]'
-            }`}>
-              {passwordStrength.feedback}
-            </span>
-          </div>
-          
-          {/* Strength Bar */}
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className={`h-2 rounded-full transition-all duration-300 ${
-                passwordStrength.score <= 2 ? 'bg-[#9D2C2C]' :
-                passwordStrength.score === 3 ? 'bg-[#F68B1F]' :
-                'bg-[#15D842]'
-              }`}
+        <div className="mt-2 flex items-center gap-2">
+          <div className="h-1 flex-1 rounded-full bg-gray-200 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${strengthColor}`}
               style={{ width: `${(passwordStrength.score / 5) * 100}%` }}
-            ></div>
+            />
           </div>
-          
-          {/* Password Requirements */}
-          <div className="mt-2 space-y-1">
-            <div className={`flex items-center text-xs ${
-              passwordStrength.checks.length ? 'text-[#15D842]' : 'text-gray-500'
-            }`}>
-              <svg className={`w-3 h-3 mr-1 ${passwordStrength.checks.length ? 'text-[#15D842]' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              At least 8 characters
-            </div>
-            <div className={`flex items-center text-xs ${
-              passwordStrength.checks.uppercase ? 'text-[#15D842]' : 'text-gray-500'
-            }`}>
-              <svg className={`w-3 h-3 mr-1 ${passwordStrength.checks.uppercase ? 'text-[#15D842]' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              One uppercase letter
-            </div>
-            <div className={`flex items-center text-xs ${
-              passwordStrength.checks.lowercase ? 'text-[#15D842]' : 'text-gray-500'
-            }`}>
-              <svg className={`w-3 h-3 mr-1 ${passwordStrength.checks.lowercase ? 'text-[#15D842]' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              One lowercase letter
-            </div>
-            <div className={`flex items-center text-xs ${
-              passwordStrength.checks.number ? 'text-[#15D842]' : 'text-gray-500'
-            }`}>
-              <svg className={`w-3 h-3 mr-1 ${passwordStrength.checks.number ? 'text-[#15D842]' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              One number
-            </div>
-            <div className={`flex items-center text-xs ${
-              passwordStrength.checks.special ? 'text-[#15D842]' : 'text-gray-500'
-            }`}>
-              <svg className={`w-3 h-3 mr-1 ${passwordStrength.checks.special ? 'text-[#15D842]' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              One special character
-            </div>
-          </div>
+          <span className={`text-[11px] font-medium whitespace-nowrap ${strengthTextColor}`}>
+            {passwordStrength.feedback}
+          </span>
         </div>
       )}
     </div>

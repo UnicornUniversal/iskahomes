@@ -6,7 +6,7 @@ import { FaClock, FaEnvelope, FaMapMarkerAlt, FaPhoneAlt } from 'react-icons/fa'
 const contactDetails = [
   {
     icon: FaEnvelope,
-    value: 'info@iskaglobal.com',
+    value: 'info@iskahomes.com',
   },
   {
     icon: FaPhoneAlt,

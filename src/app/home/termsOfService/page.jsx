@@ -80,7 +80,7 @@ const sections = [
   },
   {
     title: '18. Contact Information',
-    content: 'If you have questions or concerns about these Terms or any aspect of the ISKA Homes Platform, please contact our support team via email at support@iskahomes.com or by mail at our registered office in Accra, Ghana.',
+    content: 'If you have questions or concerns about these Terms or any aspect of the ISKA Homes Platform, please contact our support team via email at info@iskahomes.com or by mail at our registered office in Accra, Ghana.',
   },
 ]
 

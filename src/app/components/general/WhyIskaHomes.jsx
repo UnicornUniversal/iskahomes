@@ -97,7 +97,7 @@ const WhyIskaHomes = () => {
             <h2 className="heading_title">
               Who does
               <br />
-              Iska Homes serve?
+              ISKA Homes serve?
             </h2>
           </div>
           {/* <div className="max-w-sm lg:justify-self-end pt-2">

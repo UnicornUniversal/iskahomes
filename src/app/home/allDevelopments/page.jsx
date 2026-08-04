@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, Building2, Check, Filter, MapPin, X } from 'lucide-react'
+import { Building2, Check, ChevronLeft, Filter, MapPin, SlidersHorizontal, X } from 'lucide-react'
 import Nav from '@/app/components/Nav'
 import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
 import FeaturedDevelopments from '@/app/components/general/FeaturedDevelopments'
@@ -51,6 +51,7 @@ const AllDevelopmentsPage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [showDesktopFilters, setShowDesktopFilters] = useState(false)
   const [draftFilters, setDraftFilters] = useState(INITIAL_FILTERS)
   const [appliedFilters, setAppliedFilters] = useState(INITIAL_FILTERS)
   const [propertyTypeOptions, setPropertyTypeOptions] = useState([])
@@ -367,12 +368,21 @@ const AllDevelopmentsPage = () => {
       <div className={`bg-white rounded-xl shadow-lg border border-slate-200 p-6 ${isMobile ? '' : 'sticky top-24'}`}>
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-slate-900">Filters</h3>
-          {isMobile && (
+          {isMobile ? (
             <button
               onClick={() => setShowMobileFilters(false)}
               className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
             >
               <X className="w-5 h-5 text-slate-600" />
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowDesktopFilters(false)}
+              className="flex items-center gap-1 text-xs text-primary_color/60 hover:text-primary_color transition-colors px-2 py-1 rounded-lg hover:bg-primary_color/5"
+              aria-label="Hide filters"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Hide
             </button>
           )}
         </div>
@@ -576,7 +586,7 @@ const AllDevelopmentsPage = () => {
           headingOne="Discover"
           headingTwo="Developments"
           description="Explore premium residential and commercial developments across Ghana and all around the world."
-          stats={[{ label: 'Total Developments', value: pagination.total }]}
+          stats={[]}
           images={headerImages}
           className="pb-10"
         />
@@ -587,28 +597,51 @@ const AllDevelopmentsPage = () => {
           <div className="flex flex-col lg:flex-row gap-8">
             <div className="flex-1">
               <div className="flex items-center justify-between gap-4 mb-6">
+                {/* Pre-launch: result count and page counter hidden to avoid exposing empty inventory */}
                 <div>
-                  <h2 className="text-xl md:text-2xl font-semibold text-slate-900">
-                    {pagination.total} Development{pagination.total !== 1 ? 's' : ''} Found
-                  </h2>
-                  <div className="text-sm text-slate-500 mt-1">
-                    Page {pagination.page} of {pagination.pages || 1}
-                    {hasAppliedFilters && <span className="ml-2">Filtered results</span>}
-                  </div>
+                  {false && (
+                    <>
+                      <h2 className="text-xl md:text-2xl font-semibold text-slate-900">
+                        {pagination.total} Development{pagination.total !== 1 ? 's' : ''} Found
+                      </h2>
+                      <div className="text-sm text-slate-500 mt-1">
+                        Page {pagination.page} of {pagination.pages || 1}
+                        {hasAppliedFilters && <span className="ml-2">Filtered results</span>}
+                      </div>
+                    </>
+                  )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowMobileFilters(true)}
-                  className="lg:hidden px-4 py-3 bg-primary_color text-white rounded-lg hover:bg-primary_color/90 transition-colors flex items-center gap-2"
-                >
-                  <Filter className="w-5 h-5" />
-                  Filters
-                  {hasActiveDraftFilters && <span className="w-2 h-2 bg-white rounded-full"></span>}
-                </button>
+                <div className="flex items-center gap-3">
+                  {/* Desktop - Filters toggle button (shown when panel is closed) */}
+                  {!showDesktopFilters && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDesktopFilters(true)}
+                      className="hidden lg:flex items-center gap-2 bg-primary_color text-white pl-3 pr-4 py-2 rounded-full shadow-lg hover:bg-primary_color/90 transition-all duration-200"
+                      aria-label="Open filters"
+                    >
+                      <SlidersHorizontal className="w-4 h-4" />
+                      <span className="text-xs font-medium">Filters</span>
+                      {hasActiveDraftFilters && <span className="w-2 h-2 bg-white rounded-full"></span>}
+                    </button>
+                  )}
+
+                  {/* Mobile - Filters button (opens modal) */}
+                  <button
+                    type="button"
+                    onClick={() => setShowMobileFilters(true)}
+                    className="lg:hidden px-4 py-3 bg-primary_color text-white rounded-lg hover:bg-primary_color/90 transition-colors flex items-center gap-2"
+                  >
+                    <Filter className="w-5 h-5" />
+                    Filters
+                    {hasActiveDraftFilters && <span className="w-2 h-2 bg-white rounded-full"></span>}
+                  </button>
+                </div>
               </div>
 
-              {developments.length === 0 ? (
+              {/* Pre-launch: empty-state message hidden so empty inventory isn't exposed */}
+              {false ? (
                 <div className="text-center py-16 bg-white rounded-xl border border-slate-200">
                   <Building2 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-slate-900 mb-2">No Developments Found</h3>
@@ -621,99 +654,70 @@ const AllDevelopmentsPage = () => {
                     const developerImageUrl = getImageUrl(development.developers?.profile_image)
 
                     return (
-                      <Link key={development.id} href={withWebsiteLeadAttribution(`/home/allDevelopments/${development.slug}`, 'development')}>
-                        <div className="group cursor-pointer h-full">
-                          <div className="relative overflow-hidden rounded-xl border border-slate-200 hover:shadow-xl transition-all duration-300 h-full flex flex-col">
+                      <Link key={development.id} href={withWebsiteLeadAttribution(`/home/allDevelopments/${development.slug}`, 'development')} className="block">
+                        <div className="overflow-hidden transition-all duration-300 transform hover:-translate-y-1 cursor-pointer group flex flex-col w-full h-full">
+                          {/* Cover Image Section */}
+                          <div className="relative overflow-hidden w-full h-[220px] md:h-[240px] rounded-xl">
                             {bannerUrl ? (
-                              <div className="relative h-56 overflow-hidden">
-                                <Image
-                                  src={bannerUrl}
-                                  alt={development.title}
-                                  fill
-                                  className="object-cover group-hover:scale-105 transition-transform duration-300"
-                                />
-                                <div className="absolute top-4 right-4">
-                                  <span className="px-3 py-1 bg-white/90 backdrop-blur-sm text-slate-700 rounded-full text-xs font-semibold">
-                                    {development.status}
-                                  </span>
-                                </div>
-                              </div>
+                              <Image
+                                src={bannerUrl}
+                                alt={development.title}
+                                fill
+                                className="object-cover rounded-xl group-hover:scale-105 transition-transform duration-300"
+                              />
                             ) : (
-                              <div className="h-56 bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+                              <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center rounded-xl">
                                 <Building2 className="w-16 h-16 text-slate-400" />
                               </div>
                             )}
-
-                            <div className="p-5 flex-1 flex flex-col">
-                              <h3 className="text-lg font-semibold text-slate-900 mb-3 group-hover:text-primary_color transition-colors line-clamp-2">
-                                {development.title}
-                              </h3>
-
-                              <div className="flex items-center text-sm text-slate-600 mb-4">
-                                <MapPin className="w-4 h-4 mr-1.5 flex-shrink-0" />
-                                <span className="truncate">{formatDevelopmentLocation(development)}</span>
+                            {development.status && (
+                              <div className="absolute top-4 right-4">
+                                <span className="px-3 py-1 bg-white/90 backdrop-blur-sm text-slate-700 rounded-full text-xs font-semibold">
+                                  {development.status}
+                                </span>
                               </div>
+                            )}
+                          </div>
 
-                              <div className="flex items-center gap-2 mb-4">
-                                {developerImageUrl ? (
-                                  <Image
-                                    src={developerImageUrl}
-                                    alt={development.developers?.name || 'Developer'}
-                                    width={28}
-                                    height={28}
-                                    className="rounded-full object-cover flex-shrink-0"
-                                  />
-                                ) : (
-                                  <div className="w-7 h-7 bg-primary_color/10 rounded-full flex items-center justify-center flex-shrink-0">
-                                    <Building2 className="w-4 h-4 text-primary_color" />
-                                  </div>
-                                )}
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-sm font-medium text-slate-900 truncate">
-                                    {development.developers?.name || 'Developer'}
-                                  </p>
-                                  {development.developers?.verified && (
-                                    <span className="text-xs text-green-600">Verified</span>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-3 gap-2 mb-4">
-                                <div className="text-center py-1.5">
-                                  <div className="text-sm font-semibold text-slate-900">{development.total_units || 0}</div>
-                                  <div className="text-xs text-slate-500 mt-0.5">Total Units</div>
-                                </div>
-                                <div className="text-center py-1.5">
-                                  <div className="text-sm font-semibold text-slate-900">{development.units_sold || 0}</div>
-                                  <div className="text-xs text-slate-500 mt-0.5">Sold</div>
-                                </div>
-                                <div className="text-center py-1.5">
-                                  <div className="text-sm font-semibold text-slate-900">{development.total_views || development.views || 0}</div>
-                                  <div className="text-xs text-slate-500 mt-0.5">Views</div>
-                                </div>
-                              </div>
-
-                              {development.purposes && development.purposes.length > 0 && (
-                                <div className="mb-4 flex-1">
-                                  <div className="flex flex-wrap gap-2">
-                                    {development.purposes.slice(0, 3).map((purpose, index) => (
-                                      <span key={index} className="px-2.5 py-1 bg-primary_color/10 text-primary_color rounded-full text-xs font-medium">
-                                        {typeof purpose === 'string' ? purpose : purpose.name}
-                                      </span>
-                                    ))}
-                                    {development.purposes.length > 3 && (
-                                      <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-medium">
-                                        +{development.purposes.length - 3}
-                                      </span>
-                                    )}
-                                  </div>
+                          {/* Content Section */}
+                          <div className="mt-4">
+                            {/* Developer avatar, title and location */}
+                            <div className="flex items-start gap-3 mb-3">
+                              {developerImageUrl ? (
+                                <Image
+                                  src={developerImageUrl}
+                                  alt={development.developers?.name || 'Developer'}
+                                  width={48}
+                                  height={48}
+                                  className="w-12 h-12 rounded-md object-cover flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded-md bg-primary_color/10 flex items-center justify-center flex-shrink-0">
+                                  <Building2 className="w-5 h-5 text-primary_color" />
                                 </div>
                               )}
-
-                              <div className="flex items-center justify-center gap-2 text-primary_color group-hover:text-primary_color/80 transition-colors pt-2 border-t border-slate-100">
-                                <span className="text-sm font-semibold">View Details</span>
-                                <ArrowRight className="w-4 h-4" />
+                              <div className="flex-1 min-w-0">
+                                <h3 className="text-lg font-bold text-primary_color mb-1 line-clamp-1 group-hover:text-primary_color/80 transition-colors">
+                                  {development.title}
+                                </h3>
+                                <div className="flex items-center gap-2 text-sm text-primary_color">
+                                  <MapPin className="w-4 h-4 flex-shrink-0" />
+                                  <span className="truncate">{formatDevelopmentLocation(development)}</span>
+                                </div>
                               </div>
+                            </div>
+
+                            {/* Meta line: developer name + units */}
+                            <div className="flex items-center gap-4 text-sm text-primary_color">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Building2 className="w-4 h-4 flex-shrink-0" />
+                                <span className="truncate">{development.developers?.name || 'Developer'}</span>
+                              </div>
+                              {development.total_units > 0 && (
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span>{development.total_units} Units</span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -763,9 +767,12 @@ const AllDevelopmentsPage = () => {
               )}
             </div>
 
-            <div className="hidden lg:block w-80 flex-shrink-0">
-              {renderFiltersPanel()}
-            </div>
+            {/* Desktop - Collapsible filters panel (toggled like the explore properties page) */}
+            {showDesktopFilters && (
+              <div className="hidden lg:block w-80 flex-shrink-0">
+                {renderFiltersPanel()}
+              </div>
+            )}
           </div>
         </div>
 

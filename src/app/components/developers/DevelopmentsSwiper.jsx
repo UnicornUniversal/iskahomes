@@ -140,16 +140,16 @@ const DevelopmentsSwiper = ({ developerId, leadAttributionContext = 'profile' })
               <Link href={withWebsiteLeadAttribution(`/home/allDevelopments/${development.slug}`, leadAttributionContext)} className="block">
                 <div className="group cursor-pointer  overflow-hidden transition-all duration-300 ">
                   {/* Banner Image */}
-                  <div className={`relative ${imageHeight} overflow-hidden`}>
+                  <div className={`relative ${imageHeight} overflow-hidden rounded-xl`}>
                     {bannerUrl ? (
                       <Image
                         src={bannerUrl}
                         alt={development.title}
                         fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="object-cover rounded-xl group-hover:scale-105 transition-transform duration-300"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-primary_color/20 to-primary_color/10 flex items-center justify-center">
+                      <div className="w-full h-full bg-gradient-to-br from-primary_color/20 to-primary_color/10 flex items-center justify-center rounded-xl">
                         <Building2 className="w-12 h-12 opacity-50" />
                       </div>
                     )}

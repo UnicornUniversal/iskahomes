@@ -21,7 +21,7 @@ const ExplorePropertiesRedirectContent = () => {
     <div className='w-full h-screen flex items-center justify-center'>
       <div className="text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary_color mx-auto mb-2"></div>
-        <span className="text-primary_color">Redirecting...</span>
+        {/* Pre-launch: status text hidden; spinner only */}
       </div>
     </div>
   )
@@ -33,7 +33,7 @@ export default function ExplorePropertiesRedirect() {
       <div className='w-full h-screen flex items-center justify-center'>
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary_color mx-auto mb-2"></div>
-          <span className="text-primary_color">Loading...</span>
+          {/* Pre-launch: loading text hidden; spinner only */}
         </div>
       </div>
     }>

@@ -200,16 +200,19 @@ const DevelopmentHeaders = () => {
                         <p className="text-base md:text-lg opacity-90 !text-white mt-1">
                           {location}
                         </p>
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm mt-3">
-                          <div>
-                            <span className="opacity-75">Total Units: </span>
-                            <span className="font-semibold">{developer.total_units || 0}</span>
+                        {/* Pre-launch: aggregate counters hidden so empty inventory isn't exposed */}
+                        {false && (
+                          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm mt-3">
+                            <div>
+                              <span className="opacity-75">Total Units: </span>
+                              <span className="font-semibold">{developer.total_units || 0}</span>
+                            </div>
+                            <div>
+                              <span className="opacity-75">Total Developments: </span>
+                              <span className="font-semibold">{developer.total_developments || 0}</span>
+                            </div>
                           </div>
-                          <div>
-                            <span className="opacity-75">Total Developments: </span>
-                            <span className="font-semibold">{developer.total_developments || 0}</span>
-                          </div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   </div>

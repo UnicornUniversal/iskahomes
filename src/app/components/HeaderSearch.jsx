@@ -147,12 +147,12 @@ const HeaderSearch = () => {
 
   return (
     <div className="w-full">
-      <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-5 flex flex-col gap-3 border border-white/20" style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.25)' }}>
+      <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 flex flex-col gap-2.5 border border-white/20" style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.25)' }}>
         {/* Property Purpose Tabs */}
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setSelectedPurposeId(null)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
               selectedPurposeId === null
                 ? 'bg-primary_color text-white shadow-md'
                 : 'bg-white/10 text-white/85 hover:bg-white/20 border border-white/20'
@@ -161,13 +161,14 @@ const HeaderSearch = () => {
             All
           </button>
           {loading ? (
-            <div className="text-sm text-white/50">Loading...</div>
+            /* Pre-launch: loading text hidden */
+            null
           ) : (
             propertyPurposes.map((purpose) => (
               <button
                 key={purpose.id}
                 onClick={() => setSelectedPurposeId(purpose.id)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                   selectedPurposeId === purpose.id
                     ? 'bg-primary_color text-white shadow-md'
                     : 'bg-white/10 text-white/85 hover:bg-white/20 border border-white/20'
@@ -180,11 +181,11 @@ const HeaderSearch = () => {
         </div>
 
         {/* Search Bar */}
-        <div className="flex items-center gap-3 bg-white/10 rounded-xl border border-white/20">
+        <div className="flex items-center gap-2 bg-white/10 rounded-xl border border-white/20">
           <div className="relative flex-1">
             <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
               <svg
-                className="w-5 h-5 text-white/60"
+                className="w-4 h-4 text-white/60"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -199,11 +200,11 @@ const HeaderSearch = () => {
               onChange={handleLocationChange}
               onBlur={handleBlur}
               placeholder="eg: house at east legon"
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-transparent text-white placeholder-white/45 focus:outline-none focus:ring-2 focus:ring-white/25 border-0 text-sm"
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-transparent text-white placeholder-white/45 focus:outline-none focus:ring-2 focus:ring-white/25 border-0 text-sm"
               autoComplete="off"
             />
             {showLocationDropdown && locationSearchResults.length > 0 && (
-              <div 
+              <div
                 ref={dropdownRef}
                 className="absolute z-[100] w-full mt-1 bg-white border border-primary_color/20 rounded-md shadow-lg max-h-60 overflow-y-auto"
                 onMouseDown={(e) => {
@@ -236,15 +237,15 @@ const HeaderSearch = () => {
               </div>
             )}
           </div>
-          
+
           {/* Circular Search Button */}
           <button
             onClick={handleSearch}
-            className="w-12 h-12 rounded-full bg-primary_color hover:bg-primary_color/80 flex items-center justify-center text-white transition-colors flex-shrink-0 shadow-lg"
+            className="w-10 h-10 rounded-full bg-primary_color hover:bg-primary_color/80 flex items-center justify-center text-white transition-colors flex-shrink-0 shadow-lg"
             aria-label="Search"
           >
             <svg
-              className="w-5 h-5"
+              className="w-4 h-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

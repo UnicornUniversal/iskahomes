@@ -20,26 +20,21 @@ const headingElementVariants = {
 }
 
 const heroHeadingElements = [
-  { id: 'word-1', type: 'word', content: 'Explore' },
-  { id: 'word-2', type: 'word', content: 'our' },
-  { id: 'word-3', type: 'word', content: 'select' },
-  { id: 'word-4', type: 'word', content: 'properties,' },
+  { id: 'word-1', type: 'word', content: 'Discover' },
+  { id: 'word-2', type: 'word', content: 'Select' },
+  { id: 'word-3', type: 'word', content: 'Properties' },
+  { id: 'word-4', type: 'word', content: 'Offering' },
   { id: 'break-1', type: 'break' },
-  { id: 'word-5', type: 'word', content: 'offering' },
-  { id: 'word-6', type: 'word', content: 'premium' },
-  { id: 'word-7', type: 'word', content: 'standards' },
-  { id: 'word-8', type: 'word', content: 'of' },
-  { id: 'word-9', type: 'word', content: 'comfort' },
-  { id: 'word-10', type: 'word', content: '&' },
+  { id: 'word-5', type: 'word', content: 'Quality' },
+  { id: 'word-6', type: 'word', content: 'And' },
+  { id: 'word-7', type: 'word', content: 'Premium' },
+  { id: 'word-8', type: 'word', content: 'Standards' },
+  { id: 'word-9', type: 'word', content: 'From' },
   { id: 'break-2', type: 'break' },
-  { id: 'word-11', type: 'word', content: 'quality.' },
-  { id: 'word-12', type: 'word', content: 'An' },
-  { id: 'word-13', type: 'word', content: 'ideal' },
-  { id: 'word-14', type: 'word', content: 'place' },
-  { id: 'word-15', type: 'word', content: 'to' },
-  { id: 'word-16', type: 'word', content: 'call' },
-  { id: 'word-17', type: 'word', content: 'your' },
-  { id: 'word-18', type: 'word', content: 'own' },
+  { id: 'word-10', type: 'word', content: 'Licensed' },
+  { id: 'word-11', type: 'word', content: 'Developers' },
+  { id: 'word-12', type: 'word', content: 'And' },
+  { id: 'word-13', type: 'word', content: 'Agencies' },
 ]
 
 const HomeProperties = () => {
@@ -219,27 +214,45 @@ const HomeProperties = () => {
             })}
           </motion.h2>
 
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center mt-10">
-            <Link href="/home/signup">
-              <button className="px-6 py-3 rounded-[30px] border border-primary_color text-primary_color hover:bg-primary_color hover:text-white transition flex items-center gap-3">
-                Sign Up to List Properties 
-                <svg className="w-5 h-5 font-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
-                  <circle cx="12" cy="12" r="10" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l4-4-4-4" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h7" />
-                </svg>
-              </button>
-            </Link>
-            <Link href="/home/exploreProperties">
-              <button className="px-6 py-3 rounded-[30px] border border-primary_color text-primary_color hover:bg-primary_color hover:text-white transition flex items-center gap-3">
-                Explore Properties
-                <svg className="w-5 h-5 font-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
-                  <circle cx="12" cy="12" r="10" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l4-4-4-4" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h7" />
-                </svg>
-              </button>
-            </Link>
+          <div className="flex flex-col items-center gap-4 mt-10">
+            {/* Row 1 — role sign-up actions */}
+            <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-3 sm:gap-4 items-center">
+              {[
+                { label: 'Sign up as a Developer', href: '/home/signup?type=developer' },
+                { label: 'Sign up as an Agency', href: '/home/signup?type=agency' },
+                { label: 'Sign up as a Homeseeker', href: '/home/signup?type=seeker' },
+              ].map((cta) => (
+                <Link key={cta.href} href={cta.href}>
+                  <button className="px-6 py-3 rounded-[30px] border border-primary_color text-primary_color hover:bg-primary_color hover:text-white transition flex items-center gap-3">
+                    {cta.label}
+                    <svg className="w-5 h-5 font-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
+                      <circle cx="12" cy="12" r="10" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l4-4-4-4" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h7" />
+                    </svg>
+                  </button>
+                </Link>
+              ))}
+            </div>
+
+            {/* Row 2 — primary actions */}
+            <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-3 sm:gap-4 items-center">
+              {[
+                { label: 'Sign Up to List Properties', href: '/home/signup' },
+                { label: 'Explore Properties', href: '/home/exploreProperties' },
+              ].map((cta) => (
+                <Link key={cta.href} href={cta.href}>
+                  <button className="px-6 py-3 rounded-[30px] border border-primary_color text-primary_color hover:bg-primary_color hover:text-white transition flex items-center gap-3">
+                    {cta.label}
+                    <svg className="w-5 h-5 font-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
+                      <circle cx="12" cy="12" r="10" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l4-4-4-4" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h7" />
+                    </svg>
+                  </button>
+                </Link>
+              ))}
+            </div>
           </div>
         </motion.div>
       </div>
@@ -438,7 +451,8 @@ const HomeProperties = () => {
           )
         })()}
 
-        {!loading && !error && listings.length === 0 && (
+        {/* Pre-launch: empty-state message hidden so empty inventory isn't exposed */}
+        {false && !loading && !error && listings.length === 0 && (
           <div className="text-center py-16 text-gray-400">
             <p>No properties available yet.</p>
           </div>

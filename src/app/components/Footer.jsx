@@ -92,7 +92,7 @@ const Footer = () => {
                 0302318132/0303960971
               </p>
               <p style={{ fontSize: 14, color: '#17637C', opacity: 0.7, margin: 0 }}>
-                info@iskaglobal.com
+                info@iskahomes.com
               </p>
             </div>
           </div>

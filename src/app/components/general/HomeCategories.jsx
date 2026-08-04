@@ -80,9 +80,10 @@ const HomeCategories = () => {
   }
 
   if (loading) {
+    // Pre-launch: loading text hidden; show spinner only
     return (
       <div className="w-full py-12 flex items-center justify-center">
-        <div className="text-gray-500">Loading property types...</div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary_color"></div>
       </div>
     )
   }
@@ -93,18 +94,17 @@ const HomeCategories = () => {
      <h3 className="heading_title pb-4 mb-6">
             Explore our Property Types
           </h3>
-      <div className="  flex flex-col md:grid md:grid-cols-3 gap-8 md:gap-12">
-        {/* Left Side - Property Types Stack */}
-        <div className="w-full flex flex-col justify-between md:col-span-1">
-         
-          <div className="flex flex-wrap gap-3 md:flex-col md:gap-2">
+      <div className="flex flex-col gap-8">
+        {/* Top - Property Types Row */}
+        <div className="w-full">
+          <div className="flex flex-row flex-wrap items-center gap-4 md:gap-8">
             {propertyTypes.map((type) => (
               <button
                 key={type.id}
                 onClick={() => handleTypeClick(type)}
-                className={`text-left text-[0.95em] md:text-[1em] transition-all duration-300 ${
+                className={`text-left text-[0.75em] md:text-[0.85em] transition-all duration-300 ${
                   selectedType?.id === type.id
-                    ? 'text-primary_color text-[1.05em] md:text-[1.5em] font-semibold border-primary_color'
+                    ? 'text-primary_color font-semibold border-b-2 border-primary_color pb-1'
                     : 'text-primary_color/40 hover:text-primary_color'
                 }`}
               >
@@ -112,21 +112,15 @@ const HomeCategories = () => {
               </button>
             ))}
           </div>
-          <p className="text-primary_color/80 border-l-[10px] border-primary_color pl-4 max-w-lg text-[0.8em] leading-7">
-            {selectedType?.description || 'Explore this property type and discover listings that match its unique characteristics and lifestyle appeal.'}
-          </p>
-     
         </div>
 
-        {/* Right Side - Listings Swiper */}
-        <div className="w-full  md:col-span-2 md:mt-[6em]">
-     
-        <br/>
+        {/* Bottom - Listings Swiper (full width) */}
+        <div className="w-full">
           {loadingListings ? (
             <div className="w-full py-12 flex items-center justify-center">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary_color mx-auto mb-4"></div>
-                <p className="text-gray-500">Loading listings...</p>
+                {/* Pre-launch: loading text hidden; spinner only */}
               </div>
             </div>
           ) : listings.length > 0 ? (
@@ -145,6 +139,10 @@ const HomeCategories = () => {
                   slidesPerView: 3,
                   spaceBetween: 24,
                 },
+                1280: {
+                  slidesPerView: 4,
+                  spaceBetween: 24,
+                },
               }}
               className="property-types-swiper"
             >
@@ -159,16 +157,8 @@ const HomeCategories = () => {
               ))}
             </Swiper>
           ) : (
-            <div className="w-full py-12 flex items-center justify-center">
-              <div className="text-center">
-                <p className="text-gray-500 text-lg mb-2">
-                  No listings found for {selectedType?.name}
-                </p>
-                <p className="text-gray-400 text-sm">
-                  Try selecting another property type
-                </p>
-              </div>
-            </div>
+            /* Pre-launch: empty-state message hidden so empty inventory isn't exposed */
+            null
           )}
         </div>
       </div>
