@@ -116,14 +116,9 @@ Depending on how you interact with ISKA Homes, you may be a data subject as a us
 
 export default function PrivacyPolicyPage() {
   return (
-    <div style={{ background: '#fff', minHeight: '100vh' }}>
+    <div style={{ background: '#F7F6F2', minHeight: '100vh' }}>
       {/* Hero */}
       <section style={{ position: 'relative', overflow: 'hidden', padding: '60px 5% 40px' }}>
-        <div style={{
-          position: 'absolute', top: 0, left: 0, width: '56%', height: '100%',
-          background: 'linear-gradient(to right, rgba(23,99,124,0.12) 0%, rgba(23,99,124,0.06) 40%, transparent 100%)',
-          pointerEvents: 'none', zIndex: 0,
-        }} />
         <h1
           className="font-medium text-primary_color tracking-tight"
           style={{ fontSize: 'clamp(2.4rem, 5vw, 4rem)', margin: 0, lineHeight: 1.1, position: 'relative', zIndex: 1 }}

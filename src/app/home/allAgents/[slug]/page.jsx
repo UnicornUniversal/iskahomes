@@ -110,7 +110,7 @@ const AgentProfile = () => {
   if (loading) {
     return (
       <Layout1>
-         <div className="min-h-screen bg-white flex items-center justify-center">
+         <div className="min-h-screen bg-off_white flex items-center justify-center">
              <div className="relative">
                  <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary_color"></div>
              </div>
@@ -122,7 +122,7 @@ const AgentProfile = () => {
   if (error || !agent) {
     return (
       <Layout1>
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+        <div className="min-h-screen bg-off_white flex flex-col items-center justify-center p-4">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">{error || 'Agent not found'}</h2>
             <Link href="/home/allAgents" className="px-6 py-3 bg-primary_color text-white rounded-full hover:bg-opacity-90 transition-all">
                 Back to Agents

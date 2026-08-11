@@ -8,7 +8,7 @@ export default function PropertySeekerLayout({ children }) {
   const pathname = usePathname()
   
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-off_white">
       <div className="flex items-start justify-start w-full">
         {/* Navigation Sidebar */}
         <HomeSeekerNav pathname={pathname} />

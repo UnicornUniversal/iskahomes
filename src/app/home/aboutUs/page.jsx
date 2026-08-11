@@ -75,15 +75,9 @@ const AboutUsPage = () => {
   }, [])
 
   return (
-    <div style={{ background: 'linear-gradient(180deg, rgba(23,99,124,0.1) 19%, rgba(255,255,255,0.01) 100%)', color: '#1a1a1a', minHeight: '100vh' }}>
+    <div style={{ background: '#F7F6F2', color: '#1a1a1a', minHeight: '100vh' }}>
       {/* ── Hero ──────────────────────────────────── */}
       <section style={{ position: 'relative', overflow: 'hidden', padding: '60px 5% 40px' }}>
-        {/* Blue gradient overlay — left corner only */}
-        <div style={{
-          position: 'absolute', top: 0, left: 0, width: '56%', height: '100%',
-          background: 'linear-gradient(to right, rgba(23,99,124,0.12) 0%, rgba(23,99,124,0.06) 40%, transparent 100%)',
-          pointerEvents: 'none', zIndex: 0,
-        }} />
         <h1
           className="font-medium text-primary_color tracking-tight"
           style={{ fontSize: 'clamp(2.4rem, 5vw, 4rem)', margin: 0, lineHeight: 1.1, position: 'relative', zIndex: 1 }}
@@ -338,7 +332,7 @@ const AboutUsPage = () => {
         {/* Left — text content */}
         <div className="p-8 lg:p-14" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', zIndex: 1 }}>
           <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', display: 'inline-block' }} />
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F7F6F2', display: 'inline-block' }} />
             Why Choose Us
           </p>
           <h2

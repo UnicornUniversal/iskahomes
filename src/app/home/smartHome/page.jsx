@@ -203,7 +203,7 @@ export default function SmartHomePage() {
       </section>
 
       {/* ── Section 3: Process + Image ───────────────────────── */}
-      <section className="py-16 px-6 md:px-16 bg-white">
+      <section className="py-16 px-6 md:px-16 bg-off_white">
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
 

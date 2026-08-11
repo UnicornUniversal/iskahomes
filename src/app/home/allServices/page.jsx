@@ -109,7 +109,7 @@ const AllServicesPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white_bg text-primary_color">
+    <div className="min-h-screen bg-off_white text-primary_color">
       <div className="relative overflow-hidden ">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(37,99,235,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(37,99,235,0.06)_1px,transparent_1px)] bg-[size:44px_44px] opacity-40" />
         <div className="relative w-full px-4 md:px-8 py-16 md:py-24">

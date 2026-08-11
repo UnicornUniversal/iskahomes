@@ -91,7 +91,7 @@ const page = () => {
   }
   
   return (
-    <div className="min-h-screen py-8 px-4 bg-gray-50">
+    <div className="min-h-screen py-8 px-4 bg-off_white">
       <div className="max-w-7xl mx-auto">
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h1 className="text-3xl font-bold mb-6">PostHog Filter Debug Test</h1>
