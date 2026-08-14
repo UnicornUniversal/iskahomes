@@ -227,7 +227,7 @@ export default function Visualization3DPage() {
       </section>
 
       {/* ── Section 4: Pipeline — 2×2 with ghost numbers ─────── */}
-      <section className="py-16 px-6 md:px-16 bg-white">
+      <section className="py-16 px-6 md:px-16 bg-off_white">
         <div className="max-w-6xl mx-auto">
           <div className="mb-10">
             <p className="text-xs uppercase tracking-widest mb-2" style={{ color: '#F68B1F' }}>

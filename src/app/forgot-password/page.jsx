@@ -78,7 +78,7 @@ const ForgotPasswordPage = () => {
 
   if (isSubmitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-off_white">
         <div className="max-w-md w-full space-y-8 p-8">
           <div className="text-center">
             <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">

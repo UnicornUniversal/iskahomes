@@ -156,7 +156,7 @@ export default function SpacePlanningPage() {
       </section>
 
       {/* ── Section 2: Stats Strip ───────────────────────────── */}
-      <section className="py-14 px-6 md:px-16 bg-white">
+      <section className="py-14 px-6 md:px-16 bg-off_white">
         <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-center gap-0">
           {STATS.map((stat, i) => (
             <React.Fragment key={stat.label}>
@@ -330,7 +330,7 @@ export default function SpacePlanningPage() {
       </section>
 
       {/* ── Section 6: Form ──────────────────────────────────── */}
-      <section className="py-16 px-6 md:px-16 bg-white">
+      <section className="py-16 px-6 md:px-16 bg-off_white">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 items-start">
 
           {/* Left */}

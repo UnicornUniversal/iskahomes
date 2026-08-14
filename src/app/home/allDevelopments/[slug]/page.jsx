@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { MapPin, Building2, Calendar, Users, CheckCircle, Phone, Mail, Globe, ArrowRight, Play, ExternalLink, Star, Heart, Share2 } from 'lucide-react'
-import { motion, AnimatePresence, useScroll } from 'framer-motion'
+import { MapPin, CheckCircle, FileText, Heart, Share2 } from 'lucide-react'
+import { motion, useScroll } from 'framer-motion'
 
 import UnitCard from '@/app/components/developers/units/UnitCard'
 import { useAnalytics } from '@/hooks/useAnalytics'
@@ -13,6 +13,53 @@ import ShareModal from '@/app/components/ui/ShareModal'
 import { toast } from 'react-toastify'
 import Nav from '@/app/components/Nav'
 import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
+
+/* Purposes/types/categories resolve to {id,name}; unit_types.inbuilt and
+   amenities.custom may be plain strings. Normalise both to a label. */
+const labelOf = (value) => {
+  if (!value) return null
+  if (typeof value === 'string') return value
+  return value.name || null
+}
+
+const toLabels = (list) => (Array.isArray(list) ? list.map(labelOf).filter(Boolean) : [])
+
+/* Section title with the thin rule running off to the right */
+const SectionHeading = ({ children, className = '' }) => (
+  <div className={`flex items-baseline gap-6 mb-8 ${className}`}>
+    <h2 className="text-3xl md:text-4xl font-light tracking-tight text-primary_color whitespace-nowrap">
+      {children}
+    </h2>
+    <span className="h-px flex-1 bg-primary_color/20" />
+  </div>
+)
+
+/* Small uppercase label sitting above a value or a row of pills */
+const FieldLabel = ({ children }) => (
+  <p className="text-[0.65rem] uppercase tracking-[0.18em] text-primary_color/50 mb-3">{children}</p>
+)
+
+const Pill = ({ children }) => (
+  <span className="inline-flex items-center rounded-full bg-primary_color px-4 py-1.5 text-xs font-medium text-white">
+    {children}
+  </span>
+)
+
+/* A labelled row of pills — renders nothing when the list is empty */
+const PillGroup = ({ label, items }) => {
+  if (!items || items.length === 0) return null
+
+  return (
+    <div className="border-t border-primary_color/10 pt-5">
+      <FieldLabel>{label}</FieldLabel>
+      <div className="flex flex-wrap gap-2">
+        {items.map((item, i) => (
+          <Pill key={`${item}-${i}`}>{item}</Pill>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 const DevelopmentPage = () => {
   const params = useParams()
@@ -180,7 +227,7 @@ const DevelopmentPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="min-h-screen flex items-center justify-center bg-off_white">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -233,10 +280,26 @@ const DevelopmentPage = () => {
     )
   }
 
-  const allImages = [
-    development.banner,
-    ...(development.media_files || [])
-  ].filter(Boolean)
+  const galleryImages = (development.media_files || []).filter(Boolean)
+  const featureImage = galleryImages[0] || development.banner
+
+  const purposes = toLabels(development.purposes)
+  const types = toLabels(development.types)
+  const categories = toLabels(development.categories)
+  const unitTypes = toLabels([
+    ...(development.unit_types?.database || []),
+    ...(development.unit_types?.inbuilt || []),
+    ...(development.unit_types?.custom || []),
+  ])
+  const amenities = toLabels([
+    ...(development.amenities?.inbuilt || []),
+    ...(development.amenities?.custom || []),
+  ])
+
+  const locationLine = [development.town, development.city, development.state]
+    .filter(Boolean)
+    .join(', ')
+  const developerLocation = [developer?.city, developer?.country].filter(Boolean).join(', ')
 
   const handleFavoriteClick = () => {
     // TODO: Implement favorite functionality for developments
@@ -247,7 +310,7 @@ const DevelopmentPage = () => {
 
 
   return (
-    <div className="min-h-screen bg-white text-primary_color selection:bg-primary_color selection:text-white">
+    <div className="min-h-screen bg-off_white text-primary_color selection:bg-primary_color selection:text-white">
       <Nav />
       {/* Scroll Progress Bar */}
       <motion.div
@@ -255,349 +318,392 @@ const DevelopmentPage = () => {
         style={{ scaleX: scrollYProgress }}
       />
       
-      {/* Immersive Hero Section */}
-      <div className="relative h-[90vh] w-full overflow-hidden">
-        {development.banner ? (
-          <motion.div 
-            initial={{ scale: 1.1 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 1.5, ease: "easeOut" }}
-            className="absolute inset-0"
-          >
-            <Image
-              src={development.banner.url}
-              alt={development.title}
-              fill
-              className="object-cover"
-              priority
-            />
-            <div className="absolute inset-0 bg-black/20" /> {/* Subtle Overlay */}
-          </motion.div>
-        ) : (
-          <div className="absolute inset-0 bg-primary_color/10" />
-        )}
+      <div className="max-w-[1500px] mx-auto px-6 md:px-12">
+        {/* ---- Hero ---- */}
+        <motion.div
+          initial={{ y: 30, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.7 }}
+          className="pt-10 md:pt-16 mb-20 md:mb-28"
+        >
+          {/* Title spans the full width */}
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-light leading-tight tracking-tight text-primary_color mb-4">
+            {development.title}
+          </h1>
 
-        <div className="absolute inset-0 flex flex-col justify-end pb-20 px-6 md:px-12 max-w-[1920px] mx-auto">
-          <motion.div
-            initial={{ y: 50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="max-w-4xl"
-          >
-            <div className="flex items-center space-x-4 mb-6">
-              <span className="px-4 py-1 bg-white/90 backdrop-blur-md text-primary_color text-xs font-medium tracking-widest uppercase rounded-full">
+          {/* Meta row sits directly beneath the title */}
+          <div className="flex flex-wrap items-center gap-2 mb-5">
+            {locationLine && (
+              <span className="inline-flex items-center gap-1 text-xs text-primary_color/70">
+                <MapPin className="w-3 h-3 shrink-0" />
+                {locationLine}
+              </span>
+            )}
+            {development.status && (
+              <span className="inline-flex items-center rounded-full bg-primary_color px-3 py-1 text-[0.7rem] font-medium text-white">
                 {development.status}
               </span>
-              {developer && (
-                <span className="text-white/90 text-sm font-medium tracking-wide flex items-center">
-                  By {developer.name}
-                  {developer.verified && <CheckCircle className="w-4 h-4 ml-1 text-white" />}
-                </span>
-              )}
-            </div>
-            
-            <h1 className="text-6xl md:text-8xl font-light text-white leading-[0.9] tracking-tight mb-8">
-              {development.title}
-            </h1>
+            )}
 
-            <div className="flex items-center text-white/80 space-x-6 text-sm md:text-base font-light">
-              <span className="flex items-center">
-                <MapPin className="w-4 h-4 mr-2" />
-                {development.town ? `${development.town}, ` : ''}{development.city}
-              </span>
-              <span className="h-4 w-px bg-white/30" />
-              <span>{development.country}</span>
-            </div>
-          </motion.div>
-        </div>
-      </div>
+            <button
+              onClick={handleFavoriteClick}
+              aria-label="Save development"
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-primary_color/25 transition hover:bg-primary_color hover:text-white"
+            >
+              <Heart className={`w-3 h-3 ${isFavorite ? 'fill-current' : ''}`} />
+            </button>
+            <button
+              onClick={() => {
+                setShowShareModal(true)
+                handleShareClick('modal')
+              }}
+              aria-label="Share development"
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-primary_color/25 transition hover:bg-primary_color hover:text-white"
+            >
+              <Share2 className="w-3 h-3" />
+            </button>
+          </div>
 
-      {/* Floating Stats Strip */}
-      <div className="relative z-10 -mt-20 px-6 md:px-12 max-w-[1920px] mx-auto mb-24">
-        <motion.div 
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.6 }}
-          className="bg-white p-8 md:p-12 shadow-2xl max-w-4xl grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12"
-        >
-          <div>
-            <p className="text-xs uppercase tracking-widest text-gray-500 mb-2">Buildings</p>
-            <p className="text-4xl font-light text-primary_color">{development.number_of_buildings}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-widest text-gray-500 mb-2">Total Units</p>
-            <p className="text-4xl font-light text-primary_color">{development.total_units}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-widest text-gray-500 mb-2">Size</p>
-            <p className="text-4xl font-light text-primary_color">{development.size}</p>
-          </div>
-          <div className="flex items-center justify-end space-x-2">
-             <button
-                onClick={handleFavoriteClick}
-                className="p-4 hover:bg-gray-50 rounded-full transition-colors group"
+          {/* Developer card on the left, banner starting to its right and lower */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+            {developer && (
+              <div className="lg:col-span-3">
+                <Link
+                  href={withWebsiteLeadAttribution(`/home/allDevelopers/${developer.slug}`, 'development')}
+                  className="group flex items-start gap-3"
+                >
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden bg-primary_color/10">
+                    {developer.profile_image?.url ? (
+                      <Image
+                        src={developer.profile_image.url}
+                        alt={developer.name}
+                        width={48}
+                        height={48}
+                        className="h-full w-full object-contain"
+                      />
+                    ) : (
+                      <span className="font-semibold">{developer.name?.charAt(0)}</span>
+                    )}
+                  </span>
+                  <span className="flex flex-col leading-snug">
+                    <span className="flex items-center gap-1 text-xs font-medium text-primary_color group-hover:underline underline-offset-4">
+                      {developer.name}
+                      {developer.verified && <CheckCircle className="w-3 h-3 shrink-0" />}
+                    </span>
+                    <span className="text-xs text-primary_color/60">Developer</span>
+                    {developerLocation && (
+                      <span className="text-[0.7rem] italic text-primary_color/50">{developerLocation}</span>
+                    )}
+                  </span>
+                </Link>
+              </div>
+            )}
+
+            {development.banner?.url && (
+              <div
+                className={`relative aspect-[16/7] w-full overflow-hidden ${
+                  developer ? 'lg:col-span-9' : 'lg:col-span-12'
+                }`}
               >
-                <Heart className={`w-6 h-6 ${isFavorite ? 'fill-primary_color text-primary_color' : 'text-gray-400 group-hover:text-primary_color'}`} />
-              </button>
-              <button
-                onClick={() => {
-                  setShowShareModal(true)
-                  handleShareClick('modal')
-                }}
-                className="p-4 hover:bg-gray-50 rounded-full transition-colors group"
-              >
-                <Share2 className="w-6 h-6 text-gray-400 group-hover:text-primary_color" />
-              </button>
+                <Image
+                  src={development.banner.url}
+                  alt={development.title}
+                  fill
+                  priority
+                  className="object-cover"
+                />
+              </div>
+            )}
           </div>
         </motion.div>
-      </div>
 
-      <div className="max-w-[1920px] mx-auto px-6 md:px-12">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-20 mb-32">
-          {/* Sticky Intro / About */}
-          <div className="lg:col-span-4">
-            <div className="sticky top-12">
-              <h2 className="text-xs font-bold tracking-widest uppercase text-gray-400 mb-4">The Development</h2>
-              <h3 className="text-3xl font-light leading-tight mb-8 text-primary_color">
-                Stunning architecture meets modern living in the heart of {development.city}.
-              </h3>
-               {/* Categories */}
-               {(development.purposes?.length > 0 || development.types?.length > 0) && (
-                <div className="flex flex-wrap gap-2 mb-8">
-                  {development.purposes?.map((p, i) => (
-                    <span key={i} className="px-3 py-1 border border-gray-200 rounded-full text-xs uppercase tracking-wider text-gray-600">
-                      {typeof p === 'string' ? p : p.name}
-                    </span>
-                  ))}
-                   {development.types?.map((t, i) => (
-                    <span key={i} className="px-3 py-1 border border-primary_color/20 bg-primary_color/5 rounded-full text-xs uppercase tracking-wider text-primary_color">
-                      {typeof t === 'string' ? t : t.name}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Scrolling Details */}
-          <div className="lg:col-span-8">
-            <div className="prose prose-lg prose-slate max-w-none mb-12">
-              <p className="lead text-xl text-gray-600 font-light leading-relaxed">
-                {development.description}
-              </p>
-            </div>
-
-             {/* Dynamic Details Grid */}
-             <div className="grid grid-cols-2 gap-x-12 gap-y-8 border-t border-gray-100 pt-8">
-                <div>
-                   <h4 className="text-xs uppercase tracking-widest text-gray-400 mb-2">Location</h4>
-                   <p className="text-lg font-medium text-primary_color">{development.full_address || `${development.city}, ${development.country}`}</p>
-                </div>
-                {developer && (
-                   <div>
-                    <h4 className="text-xs uppercase tracking-widest text-gray-400 mb-2">Developer</h4>
-                    <Link href={withWebsiteLeadAttribution(`/home/allDevelopers/${developer.slug}`, 'development')} className="text-lg font-medium text-primary_color hover:underline decoration-1 underline-offset-4">
-                      {developer.name}
-                    </Link>
-                  </div>
-                )}
-             </div>
-             
-             {/* Downloads */}
-             {development.additional_files?.length > 0 && (
-               <div className="mt-12 pt-12 border-t border-gray-100">
-                 <h4 className="text-xs uppercase tracking-widest text-gray-400 mb-6">Documents</h4>
-                 <div className="flex flex-wrap gap-4">
-                    {development.additional_files.map((file, idx) => (
-                      <a 
-                        key={idx}
-                        href={file.url}
-                        target="_blank"
-                        className="flex items-center space-x-3 px-6 py-4 bg-gray-50 hover:bg-primary_color hover:text-white transition-all duration-300 group min-w-[200px]"
-                      >
-                         <div className="p-2 bg-white rounded-full group-hover:bg-white/20">
-                            <ExternalLink className="w-4 h-4" />
-                         </div>
-                         <div className="flex flex-col">
-                            <span className="text-sm font-medium">{file.name || 'Document'}</span>
-                            <span className="text-xs opacity-60">Download PDF</span>
-                         </div>
-                      </a>
-                    ))}
-                 </div>
-               </div>
-             )}
-          </div>
-        </div>
-
-        {/* Gallery - Masonry / Grid */}
-        {allImages.length > 0 && (
-          <div className="mb-32">
-            <h2 className="text-4xl md:text-5xl font-light text-primary_color mb-16 text-center">Gallery</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1">
-              {allImages.slice(0, 6).map((img, idx) => (
-                 <motion.div 
-                    key={idx}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.1 }}
-                    className={`relative overflow-hidden group aspect-[4/3] ${idx === 0 ? 'md:col-span-2 md:row-span-2' : ''}`}
-                 >
-                    <Image 
-                      src={img.url} 
-                      alt={`Gallery ${idx}`}
-                      fill
-                      className="object-cover transition-transform duration-700 group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-500" />
-                 </motion.div>
-              ))}
-            </div>
-             {allImages.length > 6 && (
-                <div className="text-center mt-12">
-                   <button className="px-8 py-3 border border-primary_color text-primary_color hover:bg-primary_color hover:text-white transition-colors duration-300 uppercase tracking-widest text-xs font-medium">
-                      View All Photos
-                   </button>
-                </div>
-             )}
+        {/* ---- Tagline ---- */}
+        {development.tagline && (
+          <div className="mb-16 md:mb-24">
+            <FieldLabel>Tagline</FieldLabel>
+            <h2 className="max-w-3xl text-3xl md:text-5xl font-light leading-[1.15] tracking-tight text-primary_color">
+              {development.tagline}
+            </h2>
+            <span className="mt-10 block h-px w-full bg-primary_color/20" />
           </div>
         )}
 
-        {/* Available Units */}
-        <div className="mb-32">
-           <div className="flex items-end justify-between mb-16">
-              <div>
-                <h2 className="text-4xl md:text-5xl font-light text-primary_color mb-4">Available Units</h2>
-                <p className="text-gray-500 font-light">Select from our exclusive inventory</p>
+        {/* ---- Feature image + description / details ---- */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 mb-24 md:mb-32">
+          {featureImage?.url && (
+            <div className="lg:col-span-5">
+              <div className="relative aspect-[3/4] w-full overflow-hidden lg:sticky lg:top-12">
+                <Image
+                  src={featureImage.url}
+                  alt={development.title}
+                  fill
+                  className="object-cover"
+                />
               </div>
-              <div className="hidden md:block h-px flex-1 bg-gray-200 mx-12 mb-4" />
-           </div>
+            </div>
+          )}
 
-           {units.length > 0 ? (
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-               {units.map((unit, idx) => (
-                 <motion.div
-                   key={unit.id}
-                   initial={{ opacity: 0, y: 20 }}
-                   whileInView={{ opacity: 1, y: 0 }}
-                   viewport={{ once: true }}
-                   transition={{ delay: idx * 0.1 }}
-                 >
-                   <UnitCard
-                     unit={unit}
-                     developerSlug={developer?.slug}
-                     publicView
-                     leadAttributionContext="development"
-                     onUnitClick={handleUnitClick}
-                   />
-                 </motion.div>
-               ))}
-             </div>
-           ) : (
-             <div className="py-24 text-center bg-gray-50">
-               <span className="text-gray-400 font-light text-xl">Inventory coming soon</span>
-             </div>
-           )}
+          <div className={featureImage?.url ? 'lg:col-span-7' : 'lg:col-span-12'}>
+            {development.description && (
+              <div className="mb-14">
+                <SectionHeading>Description</SectionHeading>
+                <p className="preserve-whitespace max-w-2xl leading-relaxed text-primary_color/75">
+                  {development.description}
+                </p>
+              </div>
+            )}
+
+            <SectionHeading>Details</SectionHeading>
+
+            {/* Headline figures */}
+            <div className="grid grid-cols-2 gap-8 mb-10">
+              {development.size && (
+                <div>
+                  <FieldLabel>Property Size</FieldLabel>
+                  <p className="text-2xl md:text-3xl font-light text-primary_color">{development.size}</p>
+                </div>
+              )}
+              {development.total_units != null && (
+                <div>
+                  <FieldLabel>Total Units</FieldLabel>
+                  <p className="text-2xl md:text-3xl font-light text-primary_color">{development.total_units}</p>
+                </div>
+              )}
+              {development.number_of_buildings != null && (
+                <div>
+                  <FieldLabel>Buildings</FieldLabel>
+                  <p className="text-2xl md:text-3xl font-light text-primary_color">
+                    {development.number_of_buildings}
+                  </p>
+                </div>
+              )}
+              {development.full_address && (
+                <div>
+                  <FieldLabel>Address</FieldLabel>
+                  <p className="text-primary_color">{development.full_address}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-6">
+              <PillGroup label="Property Purposes" items={purposes} />
+              <PillGroup label="Property Types" items={types} />
+              <PillGroup label="Property Categories" items={categories} />
+              <PillGroup label="Unit Types" items={unitTypes} />
+              <PillGroup label="Amenities" items={amenities} />
+            </div>
+
+            {/* ---- Property media (video) ---- */}
+            {development.video?.url && (
+              <div className="mt-16">
+                <SectionHeading>Property Media</SectionHeading>
+                <video
+                  src={development.video.url}
+                  className="w-full aspect-video object-cover"
+                  controls
+                  poster={development.banner?.url}
+                />
+              </div>
+            )}
+
+            {/* ---- Additional files ---- */}
+            {development.additional_files?.length > 0 && (
+              <div className="mt-16">
+                <SectionHeading>Additional Files</SectionHeading>
+                <ul>
+                  {development.additional_files.map((file, idx) => (
+                    <li key={idx} className="border-b border-primary_color/10">
+                      <a
+                        href={file.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex items-center gap-3 py-3 transition hover:text-primary_color"
+                      >
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-primary_color text-white">
+                          <FileText className="h-3 w-3" />
+                        </span>
+                        <span className="truncate text-primary_color/80 group-hover:underline underline-offset-4">
+                          {file.name || 'Document'}
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ---- Gallery: horizontal strip ---- */}
+        {galleryImages.length > 0 && (
+          <div className="mb-24 md:mb-32">
+            <SectionHeading>Gallery</SectionHeading>
+            <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory">
+              {galleryImages.map((img, idx) => (
+                <div
+                  key={idx}
+                  className="relative aspect-[4/3] w-[260px] md:w-[340px] shrink-0 snap-start overflow-hidden group"
+                >
+                  <Image
+                    src={img.url}
+                    alt={`${development.title} photo ${idx + 1}`}
+                    fill
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ---- All properties in this development ---- */}
+        <div className="mb-24 md:mb-32">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-end mb-10">
+            <h2 className="md:col-span-6 text-3xl md:text-4xl font-light leading-tight tracking-tight text-primary_color">
+              All Properties at {development.title}
+            </h2>
+            <div className="md:col-span-3">
+              <FieldLabel>Total listings for this development</FieldLabel>
+              <p className="text-3xl md:text-4xl font-light text-primary_color">{units.length}</p>
+            </div>
+            {development.total_units != null && (
+              <div className="md:col-span-3">
+                <FieldLabel>Total units</FieldLabel>
+                <p className="text-3xl md:text-4xl font-light text-primary_color">
+                  {development.total_units}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <span className="mb-10 block h-px w-full bg-primary_color/20" />
+
+          {units.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {units.map((unit, idx) => (
+                <motion.div
+                  key={unit.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: Math.min(idx, 5) * 0.08 }}
+                >
+                  <UnitCard
+                    unit={unit}
+                    developerSlug={developer?.slug}
+                    publicView
+                    leadAttributionContext="development"
+                    onUnitClick={handleUnitClick}
+                  />
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-20 text-center">
+              <span className="font-light text-primary_color/45">Inventory coming soon</span>
+            </div>
+          )}
         </div>
 
         {/* Location Map */}
         {development.latitude && development.longitude && (
-           <div className="mb-32">
-              <h2 className="text-4xl md:text-5xl font-light text-primary_color mb-12 text-center">Location</h2>
-              <div className="h-[600px] w-full grayscale hover:grayscale-0 transition-all duration-700 ease-in-out">
-                  <iframe
-                      src={`https://www.openstreetmap.org/export/embed.html?bbox=${development.longitude - 0.01},${development.latitude - 0.01},${development.longitude + 0.01},${development.latitude + 0.01}&layer=mapnik&marker=${development.latitude},${development.longitude}`}
-                      width="100%"
-                      height="100%"
-                      style={{ border: 0 }}
-                      allowFullScreen
-                      loading="lazy"
-                      className="w-full h-full"
-                    />
-              </div>
-           </div>
-        )}
-
-        {/* Video Section - Premium Cinema Mode */}
-        {development.video && (
-          <div className="mb-32">
-             <div className="relative aspect-video w-full overflow-hidden group cursor-pointer">
-                <video
-                  src={development.video.url}
-                  className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
-                  controls
-                  poster={development.banner?.url}
-                />
-             </div>
-             <p className="text-center mt-4 text-xs tracking-widest uppercase opacity-60">Development Video Tour</p>
+          <div className="mb-24 md:mb-32">
+            <SectionHeading>Location</SectionHeading>
+            <div className="h-[420px] md:h-[520px] w-full">
+              <iframe
+                title={`Map of ${development.title}`}
+                src={`https://www.openstreetmap.org/export/embed.html?bbox=${development.longitude - 0.01},${development.latitude - 0.01},${development.longitude + 0.01},${development.latitude + 0.01}&layer=mapnik&marker=${development.latitude},${development.longitude}`}
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                allowFullScreen
+                loading="lazy"
+                className="w-full h-full"
+              />
+            </div>
           </div>
         )}
 
-        {/* Related Developments - Dark Mode Contrast */}
+        {/* ---- Other developments by the same developer ---- */}
         {relatedDevelopments.length > 0 && (
-          <div className="mb-32">
-             <h2 className="text-4xl md:text-5xl font-light text-primary_color mb-16 text-center">More from {developer?.name}</h2>
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-               {relatedDevelopments.map((related, idx) => (
-                 <motion.div 
-                    key={related.id}
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.1 }}
-                 >
-                   <Link href={withWebsiteLeadAttribution(`/home/allDevelopments/${related.slug}`, 'development')}>
-                     <div className="group cursor-pointer">
-                       <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 mb-6">
-                         {related.banner ? (
-                            <Image
-                              src={related.banner.url}
-                              alt={related.title}
-                              fill
-                              className="object-cover transition-transform duration-700 group-hover:scale-110"
-                            />
-                         ) : (
-                            <div className="absolute inset-0 bg-primary_color/5" />
-                         )}
-                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-500" />
-                       </div>
-                       
-                       <div className="flex justify-between items-baseline">
-                          <h3 className="text-xl font-light text-primary_color group-hover:underline decoration-1 underline-offset-4 decoration-primary_color/30">
-                            {related.title}
-                          </h3>
-                          <span className="text-xs font-medium uppercase tracking-wider text-gray-400">
-                             {related.city}
-                          </span>
-                       </div>
-                     </div>
-                   </Link>
-                 </motion.div>
-               ))}
-             </div>
+          <div className="mb-24 md:mb-32">
+            <p className="text-primary_color/60 mb-1">Developments by</p>
+            <div className="flex items-baseline gap-6 mb-10">
+              <h2 className="text-3xl md:text-4xl font-light tracking-tight text-primary_color whitespace-nowrap">
+                {developer?.name}
+              </h2>
+              <span className="h-px flex-1 bg-primary_color/20" />
+            </div>
+
+            <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory">
+              {relatedDevelopments.map((related) => (
+                <Link
+                  key={related.id}
+                  href={withWebsiteLeadAttribution(`/home/allDevelopments/${related.slug}`, 'development')}
+                  onClick={() => handleRelatedDevelopmentClick(related)}
+                  className="group w-[280px] md:w-[340px] shrink-0 snap-start"
+                >
+                  <div className="relative aspect-[4/3] w-full overflow-hidden mb-4">
+                    {related.banner?.url ? (
+                      <Image
+                        src={related.banner.url}
+                        alt={related.title}
+                        fill
+                        className="object-cover transition-transform duration-700 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-primary_color/5" />
+                    )}
+                    {related.status && (
+                      <span className="absolute bottom-3 left-3 rounded-full bg-primary_color px-3 py-1 text-[0.65rem] font-medium text-white">
+                        {related.status}
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-lg font-light text-primary_color group-hover:underline underline-offset-4">
+                    {related.title}
+                  </h3>
+                  {(related.city || related.country) && (
+                    <p className="text-primary_color/55">
+                      {[related.city, related.country].filter(Boolean).join(', ')}
+                    </p>
+                  )}
+                </Link>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Developer / Contact Minimal Footer */}
-        {developer && (
-           <div className="bg-primary_color text-white p-12 md:p-24 text-center mb-12">
-              <div className="max-w-2xl mx-auto">
-                 <span className="text-xs uppercase tracking-widest opacity-60 mb-4 block">Interested?</span>
-                 <h2 className="text-4xl md:text-5xl font-light mb-12">Contact {developer.name}</h2>
-                 
-                 <div className="flex flex-col md:flex-row items-center justify-center gap-6">
-                    {developer.phone && (
-                       <button onClick={() => handlePhoneClick(developer.phone)} className="px-8 py-4 bg-white text-primary_color hover:bg-gray-100 w-full md:w-auto transition-colors font-medium">
-                          Call Now
-                       </button>
-                    )}
-                    {developer.email && (
-                       <button onClick={() => handleEmailClick(developer.email)} className="px-8 py-4 border border-white/30 hover:bg-white/10 w-full md:w-auto transition-colors font-medium">
-                          Email Developer
-                       </button>
-                    )}
-                 </div>
+        {/* Contact — keeps the developer lead-capture path on the page */}
+        {developer && (developer.phone || developer.email) && (
+          <div className="mb-20 border-t border-primary_color/15 pt-10">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+              <div>
+                <FieldLabel>Interested?</FieldLabel>
+                <h2 className="text-2xl md:text-3xl font-light tracking-tight text-primary_color">
+                  Contact {developer.name}
+                </h2>
               </div>
-           </div>
+              <div className="flex flex-wrap gap-3">
+                {developer.phone && (
+                  <button
+                    onClick={() => handlePhoneClick(developer.phone)}
+                    className="rounded-full bg-primary_color px-6 py-3 font-medium text-white transition hover:opacity-90"
+                  >
+                    Copy phone
+                  </button>
+                )}
+                {developer.email && (
+                  <button
+                    onClick={() => handleEmailClick(developer.email)}
+                    className="rounded-full border border-primary_color/25 px-6 py-3 font-medium text-primary_color transition hover:bg-primary_color hover:text-white"
+                  >
+                    Copy email
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
         )}
 
       </div>

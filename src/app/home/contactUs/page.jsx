@@ -85,7 +85,7 @@ const ContactUsPage = () => {
   }
 
   return (
-    <div className="relative" style={{ background: 'linear-gradient(180deg, rgba(23,99,124,0.1) 19%, rgba(255,255,255,0.01) 100%)', minHeight: '100vh' }}>
+    <div className="relative" style={{ background: '#F7F6F2', minHeight: '100vh' }}>
 
       <section className="relative mx-auto px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8">

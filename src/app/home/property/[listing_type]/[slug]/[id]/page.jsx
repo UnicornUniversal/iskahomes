@@ -208,7 +208,7 @@ const PropertyDetailPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="min-h-screen flex items-center justify-center bg-off_white">
         <LoadingSpinner size="large" />
       </div>
     )
@@ -216,7 +216,7 @@ const PropertyDetailPage = () => {
 
   if (error || !listing) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="min-h-screen flex items-center justify-center bg-off_white">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-semibold -900 mb-2">Listing Not Found</h2>

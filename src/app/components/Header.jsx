@@ -253,13 +253,13 @@ const Header = () => {
             style={{
               color: '#fff',
               fontSize: 'clamp(2.2rem, 5vw, 4.5rem)',
-              fontWeight: 400,
+              fontWeight: 500,
               lineHeight: 1.15,
               margin: 0,
               maxWidth: 600,
             }}
           >
-            Your Real Estate Journey Starts Here
+            Find Your Perfect Properties
           </motion.h1>
 
           <motion.p
@@ -275,7 +275,7 @@ const Header = () => {
               maxWidth: 560,
             }}
           >
-            Verified Premium Homes Curated For Serious Buyers
+            Verified Premium Properties Curated For you.
           </motion.p>
 
           {/* Search bar */}

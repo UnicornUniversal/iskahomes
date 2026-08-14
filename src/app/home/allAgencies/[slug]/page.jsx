@@ -112,7 +112,7 @@ const AgencyProfile = () => {
   if (loading) {
     return (
       <Layout1>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="min-h-screen bg-off_white flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary_color"></div>
         </div>
       </Layout1>
@@ -122,7 +122,7 @@ const AgencyProfile = () => {
   if (error || !agency) {
     return (
       <Layout1>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="min-h-screen bg-off_white flex items-center justify-center">
            <div className="text-center">
             <h1 className="font-bold text-primary_color mb-4">Agency Not Found</h1>
             <p className="text-primary_color/70">{error || "The agency you're looking for doesn't exist."}</p>
@@ -155,7 +155,7 @@ const AgencyProfile = () => {
             </div>
 
             {/* Right Side - Profile Info */}
-            <div className="w-full p-8 flex flex-col justify-between bg-white">
+            <div className="w-full p-8 flex flex-col justify-between bg-off_white">
                  {/* Top Section */}
                  <div className="space-y-6">
                     <div className="flex items-start gap-4">
@@ -258,7 +258,7 @@ const AgencyProfile = () => {
         </div>
 
         {/* Main Content */}
-        <div className="mx-auto px-6 py-16 bg-white">
+        <div className="mx-auto px-6 py-16 bg-off_white">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Side - All Information */}
                 <div className="lg:col-span-2 space-y-12">

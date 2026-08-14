@@ -10,7 +10,6 @@ import ToastProvider from "./components/ToastProvider";
 import AuthHashRedirect from "./components/AuthHashRedirect";
 
 
-
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

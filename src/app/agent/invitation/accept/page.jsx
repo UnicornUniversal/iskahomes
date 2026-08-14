@@ -184,7 +184,7 @@ const AcceptInvitationContent = () => {
   // Loading state
   if (isVerifying) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-off_white">
         <div className="max-w-md w-full space-y-8 p-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-6"></div>
@@ -199,7 +199,7 @@ const AcceptInvitationContent = () => {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-off_white">
         <div className="max-w-md w-full space-y-8 p-8">
           <div className="text-center">
             <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
@@ -222,7 +222,7 @@ const AcceptInvitationContent = () => {
   // Success state
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-off_white">
         <div className="max-w-md w-full space-y-8 p-8">
           <div className="text-center">
             <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
@@ -462,7 +462,7 @@ const AcceptInvitationContent = () => {
 const AcceptInvitationPage = () => {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-off_white">
         <div className="max-w-md w-full space-y-8 p-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-6"></div>

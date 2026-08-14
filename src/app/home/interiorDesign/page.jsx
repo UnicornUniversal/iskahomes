@@ -191,7 +191,7 @@ export default function InteriorDesignPage() {
       </section>
 
       {/* ── Section 2: Philosophy ────────────────────────────── */}
-      <section className="bg-white py-24 px-6">
+      <section className="bg-off_white py-24 px-6">
         <div className="max-w-3xl mx-auto text-center">
           <p
             className={`${playfair.className} font-medium italic leading-relaxed`}
@@ -299,7 +299,7 @@ export default function InteriorDesignPage() {
       </section>
 
       {/* ── Section 4: The Design Journey (Timeline) ─────────── */}
-      <section className="bg-white py-16 px-6 md:px-16">
+      <section className="bg-off_white py-16 px-6 md:px-16">
         <div className="max-w-6xl mx-auto">
           <div className="mb-12">
             <p className="text-xs uppercase tracking-widest mb-2" style={{ color: '#F68B1F' }}>
@@ -455,7 +455,7 @@ export default function InteriorDesignPage() {
       </section>
 
       {/* ── Section 6: Consultation Form ─────────────────────── */}
-      <section className="bg-white py-16 px-6 md:px-16">
+      <section className="bg-off_white py-16 px-6 md:px-16">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 items-start">
 
           {/* Left */}
