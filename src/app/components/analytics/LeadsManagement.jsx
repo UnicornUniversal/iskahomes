@@ -18,6 +18,7 @@ import {
   resolveLeadStatusForPipeline,
 } from '@/lib/leadsPipelineHelper'
 import { getAuthTokenForListerType, getAuthTokenForUser } from '@/lib/authTokens'
+import { formatLeadOriginLabel, formatLeadSourceLabel } from '@/lib/leadSource'
 import { shouldScopeLeadsToAssignee } from '@/lib/permissionHelpers'
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits'
 import { SUBSCRIPTION_LOCKED_ROW_CLASS } from '@/lib/subscriptionLimits'
@@ -220,22 +221,29 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
 
   function openLeadDetailsPage(leadId) {
     if (!leadId) return
-    if (isAgentLeadsView || isAgencyLeadsView) {
-      const lead = leads.find((l) => l.id === leadId)
-      if (lead) {
-        setSelectedLead(lead)
-        setReminders(lead.reminders || [])
-      }
+    const pathSlug = routeSlug || listerId
+    if (isAgencyLeadsView && pathSlug) {
+      router.push(`/agency/${pathSlug}/leads/${leadId}`)
       return
     }
-    const pathSlug = routeSlug || listerId
-    if (!pathSlug) return
-    router.push(`/developer/${pathSlug}/leads/${leadId}`)
+    if (isDeveloperLeadsView && pathSlug) {
+      router.push(`/developer/${pathSlug}/leads/${leadId}`)
+      return
+    }
+    const lead = leads.find((l) => l.id === leadId)
+    if (lead) {
+      setSelectedLead(lead)
+      setReminders(lead.reminders || [])
+    }
   }
 
   function closeLeadDetails() {
     if (singleLeadMode) {
       const pathSlug = routeSlug || listerId
+      if (pathSlug && isAgencyLeadsView) {
+        router.push(`/agency/${pathSlug}/leads`)
+        return
+      }
       if (pathSlug) {
         router.push(`/developer/${pathSlug}/leads`)
       }
@@ -499,6 +507,32 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authToken])
 
+  async function markListingSoldOnClosed(lead) {
+    if (!lead?.listing_id || lead.context_type !== 'listing') return
+    try {
+      const listingResponse = await fetch(`/api/listings/${lead.listing_id}`)
+      const listingData = await listingResponse.json()
+      if (!listingData.success || !listingData.data) return
+      const currentListing = listingData.data
+      if (currentListing.listing_status === 'sold' || currentListing.listing_status === 'rented') return
+      const updateResponse = await fetch(`/api/listings/${lead.listing_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listing_status: 'sold',
+          status: 'sold'
+        })
+      })
+      if (updateResponse.ok) {
+        toast.success('Lead closed and listing marked as sold.')
+      } else {
+        toast.warning('Lead closed, but the listing status could not be updated.')
+      }
+    } catch (err) {
+      console.error('Error updating listing status:', err)
+    }
+  }
+
   async function handlePipelineStatusChange(leadId, newStatus) {
     const lead = leads.find((l) => l.id === leadId)
     if (!lead || lead.status === newStatus) return
@@ -528,6 +562,9 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
         )
       }
       toast.success('Lead status updated')
+      if (newStatus === 'closed' && previousStatus !== 'closed') {
+        await markListingSoldOnClosed(lead)
+      }
     } catch (err) {
       setLeads((prev) =>
         prev.map((l) => (l.id === leadId ? { ...l, status: previousStatus } : l))
@@ -859,39 +896,8 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
       const result = await response.json()
       if (response.ok && result.success) {
         // If status changed to 'closed' and context_type is 'listing', update listing status to 'Sold'
-        if (statusChangedToClosed && isListingContext && selectedLead.listing_id) {
-          try {
-            // Fetch the listing to get its current status
-            const listingResponse = await fetch(`/api/listings/${selectedLead.listing_id}`)
-            const listingData = await listingResponse.json()
-            
-            if (listingData.success && listingData.data) {
-              const currentListing = listingData.data
-              // Only update if listing is not already sold/rented
-              if (currentListing.listing_status !== 'sold' && currentListing.listing_status !== 'rented') {
-                // Update listing status to 'sold' (or 'taken' if preferred)
-                const updateResponse = await fetch(`/api/listings/${selectedLead.listing_id}`, {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    listing_status: 'sold',
-                    status: 'sold'
-                  })
-                })
-                
-                if (updateResponse.ok) {
-                  toast.success('Lead closed and listing marked as sold! Revenue updated.')
-                } else {
-                  const errorData = await updateResponse.json()
-                  console.error('Failed to update listing status:', errorData)
-                  toast.warning('Lead closed, but failed to update listing status')
-                }
-              }
-            }
-          } catch (err) {
-            console.error('Error updating listing status:', err)
-            // Don't fail the lead update if listing update fails
-          }
+        if (statusChangedToClosed) {
+          await markListingSoldOnClosed(selectedLead)
         }
         // Update local state with saved data
         if (result.data) {
@@ -1488,6 +1494,8 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                     <th className="px-4 py-4 text-left text-xs font-medium text-secondary_color-500 uppercase tracking-wider">Manage</th>
                     <th className="px-4 py-4 text-left text-xs font-medium text-secondary_color-500 uppercase tracking-wider w-32">Seeker</th>
                     <th className="px-4 py-4 text-left text-xs font-medium text-secondary_color-500 uppercase tracking-wider">Listing</th>
+                    <th className="px-4 py-4 text-left text-xs font-medium text-secondary_color-500 uppercase tracking-wider">Source</th>
+                    <th className="px-4 py-4 text-left text-xs font-medium text-secondary_color-500 uppercase tracking-wider">Origin</th>
                     <th className="px-4 py-4 text-left text-xs font-medium text-secondary_color-500 uppercase tracking-wider">Classification</th>
                     <th className="px-4 py-4 text-left text-xs font-medium text-secondary_color-500 uppercase tracking-wider">Score</th>
                     <th className="px-4 py-4 text-left text-xs font-medium text-secondary_color-500 uppercase tracking-wider">Actions</th>
@@ -1496,7 +1504,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                 <tbody className="default_bg divide-y divide-gray-200">
               {loading && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center">
+                  <td colSpan={8} className="px-4 py-12 text-center">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                       <span className="ml-2 text-secondary_color-600">Loading leads...</span>
@@ -1506,7 +1514,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
               )}
               {error && !loading && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-red-600">
+                  <td colSpan={8} className="px-4 py-12 text-center text-red-600">
                     <div className="flex items-center justify-center">
                       <span className="text-red-600">{error}</span>
                     </div>
@@ -1515,7 +1523,7 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
               )}
               {!loading && !error && filteredLeads.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center">
+                  <td colSpan={8} className="px-4 py-12 text-center">
                     <div className="flex flex-col items-center">
                       <FiUser className="h-12 w-12 text-secondary_color-400 mb-4" />
                       <h3 className="text-sm font-medium text-secondary_color-900 mb-1">No leads found</h3>
@@ -1628,6 +1636,16 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                         </div>
                       </div>
                     </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-sm text-secondary_color-900">
+                      {formatLeadSourceLabel(lead.lead_source) || '—'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-sm text-secondary_color-900">
+                      {formatLeadOriginLabel(lead.lead_origin, lead.lead_source)}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium border bg-gray-100 text-secondary_color-800 border-gray-200">
@@ -1837,6 +1855,18 @@ export default function LeadsManagement({ listerId, listerType = 'developer', li
                         </div>
                       )}
 
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-secondary_color-500">Lead Source:</span>
+                        <span className="text-sm text-secondary_color-900">
+                          {formatLeadSourceLabel(selectedLead.lead_source) || '—'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-secondary_color-500">Lead Origin:</span>
+                        <span className="text-sm text-secondary_color-900">
+                          {formatLeadOriginLabel(selectedLead.lead_origin, selectedLead.lead_source)}
+                        </span>
+                      </div>
                       <div className=" w-full">
                         <span className="text-sm text-secondary_color-500">Status:</span>
                         <div className="max-w-[300px]">

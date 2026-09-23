@@ -2,17 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { FiX, FiUser, FiMail, FiPhone } from 'react-icons/fi'
-
-const LEAD_ORIGIN_OPTIONS = [
-  { value: 'platform', label: 'Platform (our website)' },
-  { value: 'their_website', label: 'Their website' },
-  { value: 'referral', label: 'Referral' },
-  { value: 'walk_in', label: 'Walk-in' },
-  { value: 'phone_call', label: 'Phone call' },
-  { value: 'event', label: 'Event' },
-  { value: 'social_media', label: 'Social media' },
-  { value: 'other', label: 'Other' }
-]
+import { LEAD_SOURCE_ISKAHOMES, MANUAL_LEAD_SOURCE_OPTIONS } from '@/lib/leadSource'
 
 const LEAD_CLASSIFICATION_OPTIONS = [
   { value: 'Premium', label: 'Premium' },
@@ -25,7 +15,7 @@ export default function AddLeadModal({ isOpen, onClose, onSubmit, listerId, list
     lead_name: '',
     lead_email: '',
     lead_phone: '',
-    lead_origin: 'platform',
+    lead_source: LEAD_SOURCE_ISKAHOMES,
     lead_classification: 'Standard',
     listing_id: '',
     development_id: '',
@@ -84,7 +74,7 @@ export default function AddLeadModal({ isOpen, onClose, onSubmit, listerId, list
         lead_name: form.lead_name.trim(),
         lead_email: form.lead_email?.trim() || null,
         lead_phone: form.lead_phone?.trim() || null,
-        lead_origin: form.lead_origin,
+        lead_source: form.lead_source,
         lead_classification: form.lead_classification || 'Standard',
         listing_id: form.listing_id || null,
         development_id: form.development_id || null,
@@ -109,7 +99,7 @@ export default function AddLeadModal({ isOpen, onClose, onSubmit, listerId, list
           lead_name: '',
           lead_email: '',
           lead_phone: '',
-          lead_origin: 'platform',
+          lead_source: LEAD_SOURCE_ISKAHOMES,
           lead_classification: 'Standard',
           listing_id: '',
           development_id: '',
@@ -185,14 +175,14 @@ export default function AddLeadModal({ isOpen, onClose, onSubmit, listerId, list
             <p className="text-xs text-gray-500 mt-1">At least one of email or phone is required</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Where did this lead come from? *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Lead source *</label>
             <select
-              name="lead_origin"
-              value={form.lead_origin}
+              name="lead_source"
+              value={form.lead_source}
               onChange={handleChange}
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary_color/20 focus:border-primary_color"
             >
-              {LEAD_ORIGIN_OPTIONS.map(opt => (
+              {MANUAL_LEAD_SOURCE_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>

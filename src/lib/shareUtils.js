@@ -8,10 +8,11 @@ export const SHARE_MEDIUMS = {
   TELEGRAM: 'telegram',
   EMAIL: 'email',
   INSTAGRAM: 'instagram',
-  WEBSITE: 'website' // Direct visit, no share param
+  WEBSITE: 'iskahomes',
+  ISKAHOMES: 'iskahomes'
 }
 
-const ALLOWED_SHARE_MEDIA = new Set(Object.values(SHARE_MEDIUMS))
+const ALLOWED_SHARE_MEDIA = new Set([...Object.values(SHARE_MEDIUMS), 'website'])
 
 /**
  * Ensures share_medium is a single safe token (e.g. "telegram").

@@ -75,7 +75,7 @@ export async function GET(request) {
       let listingsQuery = supabase
         .from('listings')
         .select('id, title, slug, listing_type, price, currency, city, state, country, media, listing_status')
-        .eq('listing_status', 'active')
+        .eq('listing_status', 'active').eq('visibility', true).or('admin_status.is.null,admin_status.not.in.(blocked,pending)')
         .or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,city.ilike.%${searchQuery}%,state.ilike.%${searchQuery}%`)
         .limit(limit)
 

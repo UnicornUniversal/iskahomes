@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react'
 import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
+import { filterPublicCatalogListings } from '@/lib/publicListingCatalog'
 
 // Helper to resolve coordinates from a listing
 const resolveCoords = (listing) => {
@@ -256,7 +257,7 @@ const UserMap = ({ filters = {}, leadAttributionContext = 'search' }) => {
         const response = await fetch(`/api/listings/search?${params.toString()}`);
         if (response.ok) {
           const result = await response.json();
-          setListings(result.data || []);
+          setListings(filterPublicCatalogListings(result.data || []));
         }
       } catch (error) {
         console.error('Error fetching listings for map:', error);

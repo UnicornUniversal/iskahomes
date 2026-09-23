@@ -273,7 +273,7 @@ export async function POST(request) {
         lead_type: 'automated',
         lead_source: finalLeadSource,
         lead_source_context: finalLeadSourceContext,
-        lead_origin: lead_origin || 'platform',
+        lead_origin: lead_origin || null,
         lead_classification,
         assigned_user: defaultAssignedUser,
         lead_actions: [actionObj],

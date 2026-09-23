@@ -6,6 +6,7 @@ import useExtendedAuthProfile from '@/hooks/useExtendedAuthProfile'
 import LeadsManagement from '@/app/components/analytics/LeadsManagement'
 import LeadsTrend from '@/app/components/analytics/LeadsTrend'
 import LeadSourceBreakdown from '@/app/components/analytics/LeadSourceBreakdown'
+import LeadStatusBySource from '@/app/components/analytics/LeadStatusBySource'
 import LeadsShare from '@/app/components/analytics/LeadsShare'
 import ChannelPerformance from '@/app/components/analytics/ChannelPerformance'
 import LeadLifecycle from '@/app/components/analytics/LeadLifecycle'
@@ -294,6 +295,8 @@ const LeadAnalytics = () => {
         <LeadsTrend listerId={listerId} listerType="developer" />
 
         <LeadSourceBreakdown listerId={listerId} listerType="developer" />
+
+        <LeadStatusBySource listerId={listerId} listerType="developer" />
 
         <LeadsShare totalLeadsData={totalLeadsData} />
 

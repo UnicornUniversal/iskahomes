@@ -8,7 +8,7 @@ const DEFAULT_SETTINGS = {
   two_factor: { sms: false },
   reminders: { sms: false, email: false },
   appointments: { sms: false, email: false },
-  service_charges: { sms: false, email: false },
+  chargeables: { sms: false, email: false },
   engagements: { sms: false, email: false }
 }
 
@@ -16,7 +16,7 @@ const SETTING_ROWS = [
   { key: 'two_factor', label: '2FA', channels: ['sms'] },
   { key: 'reminders', label: 'Reminders', channels: ['sms', 'email'] },
   { key: 'appointments', label: 'Appointments', channels: ['sms', 'email'] },
-  { key: 'service_charges', label: 'Service Charges', channels: ['sms', 'email'] },
+  { key: 'chargeables', label: 'Chargeables', channels: ['sms', 'email'] },
   { key: 'engagements', label: 'Engagements', channels: ['sms', 'email'] }
 ]
 
@@ -25,8 +25,13 @@ function normalizeSettings(input) {
   const normalized = {}
   for (const row of SETTING_ROWS) {
     normalized[row.key] = {}
+    const incoming = source?.[row.key]
+    const fallback = row.key === 'chargeables' ? source?.service_charges : null
+    const from = incoming && typeof incoming === 'object'
+      ? incoming
+      : (fallback && typeof fallback === 'object' ? fallback : {})
     for (const channel of row.channels) {
-      normalized[row.key][channel] = source?.[row.key]?.[channel] === true
+      normalized[row.key][channel] = from?.[channel] === true
     }
   }
   return normalized

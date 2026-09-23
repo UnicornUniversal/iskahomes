@@ -1790,6 +1790,9 @@ export async function PUT(request, { params }) {
       if (jsonData.published_status) {
         updateData.published_status = jsonData.published_status
       }
+      if (jsonData.visibility !== undefined) {
+        updateData.visibility = !!jsonData.visibility
+      }
     } else {
       updateData = {
       title: formData.get('title') || existingListing.title,
@@ -1983,6 +1986,9 @@ export async function PUT(request, { params }) {
       available_until: formData.get('available_until') || existingListing.available_until,
       acquisition_rules: formData.get('acquisition_rules') || existingListing.acquisition_rules,
       additional_information: formData.get('additional_information') || existingListing.additional_information,
+      chargeables: formData.get('chargeables')
+        ? JSON.parse(formData.get('chargeables'))
+        : (existingListing.chargeables || []),
       // Agent-specific fields
       commission_rate: formData.get('commission_rate') ? JSON.parse(formData.get('commission_rate')) : (existingListing.commission_rate || null),
       listing_agency_id: formData.get('listing_agency_id') || agencyId || existingListing.listing_agency_id || null,

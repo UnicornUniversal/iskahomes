@@ -65,10 +65,12 @@ export async function GET(request, { params }) {
         floor_plan,
         3d_model,
         listing_status,
+        visibility,
+        admin_status,
         listing_condition
       `)
       .eq('id', id)
-      .eq('listing_status', 'active')
+      .eq('listing_status', 'active').eq('visibility', true).or('admin_status.is.null,admin_status.not.in.(blocked,pending)')
       .eq('listing_condition', 'completed')
       .single()
 

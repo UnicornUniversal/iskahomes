@@ -775,7 +775,7 @@ const ProfilePage = () => {
       <div className="flex-1 md:p-2 md:p-2 md:p-6  relative">
         {/* Header */}
         <div className="mb-8">
-          <h1 className=" mb-2">Profile Settings</h1>
+          <h1 className="page_heading">Profile Settings</h1>
           <p>Manage your developer profile and account settings</p>
         </div>
 

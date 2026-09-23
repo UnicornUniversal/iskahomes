@@ -74,7 +74,7 @@ export function useAnalytics() {
   const getSeekerContext = useCallback((additionalContext = {}) => {
     const isPropertySeeker = user?.user_type === 'property_seeker'
     
-    let leadSource = 'website'
+    let leadSource = 'iskahomes'
     let leadSourceContext = null
     if (typeof window !== 'undefined') {
       const r = resolveLeadAttributionFromSearchString(window.location?.search || '')
@@ -91,7 +91,7 @@ export function useAnalytics() {
       leadSourceContext =
         additionalContext.lead_source_context ?? additionalContext.leadSourceContext ?? null
     }
-    if (!leadSource) leadSource = 'website'
+    if (!leadSource) leadSource = 'iskahomes'
     
     // Normalize property names - handle both camelCase and snake_case
     const listingId = additionalContext.listingId || additionalContext.listing_id
@@ -384,7 +384,7 @@ export function useAnalytics() {
             phone_number: seekerContext.phoneNumber,
             is_logged_in: seekerContext.is_logged_in,
             timestamp: nowIso(),
-            lead_source: seekerContext.lead_source || 'website',
+            lead_source: seekerContext.lead_source || 'iskahomes',
             lead_source_context: seekerContext.lead_source_context ?? null,
             lead_origin: 'platform',
             ...distinctContext
@@ -441,7 +441,7 @@ export function useAnalytics() {
             message_type: seekerContext.messageType || 'direct_message',
             is_logged_in: seekerContext.is_logged_in,
             timestamp: nowIso(),
-            lead_source: seekerContext.lead_source || 'website',
+            lead_source: seekerContext.lead_source || 'iskahomes',
             lead_source_context: seekerContext.lead_source_context ?? null,
             lead_origin: 'platform',
             ...distinctContext
@@ -498,7 +498,7 @@ export function useAnalytics() {
             appointment_type: seekerContext.appointmentType || 'viewing',
             is_logged_in: seekerContext.is_logged_in,
             timestamp: nowIso(),
-            lead_source: seekerContext.lead_source || 'website',
+            lead_source: seekerContext.lead_source || 'iskahomes',
             lead_source_context: seekerContext.lead_source_context ?? null,
             lead_origin: 'platform',
             ...distinctContext
@@ -727,7 +727,7 @@ export function useAnalytics() {
             appointment_type: leadType === 'appointment' ? (context.appointmentType || 'viewing') : undefined,
             is_logged_in: seekerContext.is_logged_in,
             timestamp: nowIso(),
-            lead_source: seekerContext.lead_source || 'website',
+            lead_source: seekerContext.lead_source || 'iskahomes',
             lead_source_context: seekerContext.lead_source_context ?? null,
             lead_origin: 'platform',
             ...distinctContext

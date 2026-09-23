@@ -1,0 +1,11 @@
+---
+description: Never start a local development server; use the user's existing one.
+alwaysApply: true
+---
+
+# No agent-started dev server
+
+- Never run `npm run dev`, `next dev`, `yarn dev`, `pnpm dev`, or any command that starts a web server.
+- Never occupy port 3000 or 3001.
+- If the app needs to be running, tell the user to use their existing terminal. Do not start a replacement server.
+- Do not use browser tools in a way that requires launching a new Next.js process.

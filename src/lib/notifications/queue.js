@@ -1,5 +1,5 @@
 import { Queue } from 'bullmq'
-import { NOTIFICATION_QUEUE_NAME } from './constants'
+import { CHARGEABLE_JOB_KIND, NOTIFICATION_QUEUE_NAME, NOTIFICATION_TYPES } from './constants'
 
 const globalForNotifications = globalThis
 
@@ -53,9 +53,21 @@ function getQueue() {
   return globalForNotifications.notificationQueue
 }
 
-export function buildNotificationJobId(notificationType, recordId) {
+export function buildNotificationJobId(notificationType, recordId, jobKind) {
   // BullMQ custom job ids cannot contain ":".
+  if (jobKind) return `${notificationType}__${jobKind}__${recordId}`
   return `${notificationType}__${recordId}`
+}
+
+export async function ensureNotificationQueueReady() {
+  const queue = getQueue()
+  await queue.waitUntilReady()
+  const client = await queue.client
+  const pong = await client.ping()
+  if (String(pong).toUpperCase() !== 'PONG') {
+    throw new Error('Redis is not available')
+  }
+  return true
 }
 
 export async function enqueueNotificationJob({
@@ -63,16 +75,18 @@ export async function enqueueNotificationJob({
   recordId,
   userId,
   userType,
-  scheduledFor
+  scheduledFor,
+  jobKind
 }) {
   const queue = getQueue()
   const delay = Math.max(0, new Date(scheduledFor).getTime() - Date.now())
-  const jobId = buildNotificationJobId(notificationType, recordId)
+  const jobId = buildNotificationJobId(notificationType, recordId, jobKind)
 
   console.log('[notifications][queue] enqueue job', {
     queueName: NOTIFICATION_QUEUE_NAME,
     jobId,
     notificationType,
+    jobKind: jobKind || null,
     recordId,
     userId,
     userType,
@@ -86,7 +100,8 @@ export async function enqueueNotificationJob({
       notificationType,
       recordId,
       userId,
-      userType
+      userType,
+      jobKind: jobKind || null
     },
     {
       jobId,
@@ -97,17 +112,15 @@ export async function enqueueNotificationJob({
   console.log('[notifications][queue] job enqueued', {
     jobId: job.id,
     notificationType,
+    jobKind: jobKind || null,
     recordId
   })
 
   return job
 }
 
-export async function cancelNotificationJob(notificationType, recordId) {
-  const queue = getQueue()
-  const jobId = buildNotificationJobId(notificationType, recordId)
+async function removeJobById(queue, jobId, notificationType, recordId) {
   const job = await queue.getJob(jobId)
-
   if (job) {
     console.log('[notifications][queue] cancelling job', {
       jobId,
@@ -117,13 +130,33 @@ export async function cancelNotificationJob(notificationType, recordId) {
     await job.remove()
     return true
   }
-
-  console.log('[notifications][queue] cancel skipped, job not found', {
-    jobId,
-    notificationType,
-    recordId
-  })
   return false
+}
+
+export async function cancelNotificationJob(notificationType, recordId) {
+  const queue = getQueue()
+  const ids = [buildNotificationJobId(notificationType, recordId)]
+  if (notificationType === NOTIFICATION_TYPES.CHARGEABLE) {
+    ids.push(
+      buildNotificationJobId(notificationType, recordId, CHARGEABLE_JOB_KIND.DUE),
+      buildNotificationJobId(notificationType, recordId, CHARGEABLE_JOB_KIND.OVERDUE)
+    )
+  }
+
+  let removed = false
+  for (const jobId of ids) {
+    const didRemove = await removeJobById(queue, jobId, notificationType, recordId)
+    if (didRemove) removed = true
+  }
+
+  if (!removed) {
+    console.log('[notifications][queue] cancel skipped, job not found', {
+      notificationType,
+      recordId
+    })
+  }
+
+  return removed
 }
 
 export async function closeNotificationQueue() {

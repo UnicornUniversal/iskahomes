@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Users,
   Building2,
+  CreditCard,
   Mail,
   Globe,
   ArrowUpRight,
@@ -206,6 +207,14 @@ const AnalyticsOverview = () => {
       href: `/developer/${params.slug}/analytics/leads`,
       color: 'green',
       metrics: { total: analyticsData?.overview?.totalLeads || 0, change: analyticsData?.overview?.leadsChange || 0 }
+    },
+    {
+      title: 'Chargeables',
+      description: 'What has been collected, what is late, and who to chase next',
+      icon: CreditCard,
+      href: `/developer/${params.slug}/analytics/chargeables`,
+      color: 'red',
+      metrics: { total: 'Live', change: null }
     },
     {
       title: 'Profile & Brand',
@@ -416,9 +425,13 @@ const AnalyticsOverview = () => {
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-gray-900">{page.metrics.total}</div>
-                      <div className={`text-sm ${page.metrics.change > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {page.metrics.change > 0 ? '+' : ''}{page.metrics.change}%
-                      </div>
+                      {page.metrics.change == null ? (
+                        <div className="text-sm text-gray-400">Entries</div>
+                      ) : (
+                        <div className={`text-sm ${page.metrics.change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {page.metrics.change > 0 ? '+' : ''}{page.metrics.change}%
+                        </div>
+                      )}
                     </div>
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">{page.title}</h3>

@@ -23,6 +23,9 @@ export async function GET(request, { params }) {
       .select('*')
       .eq('listing_type', listing_type)
       .eq('slug', slug)
+      .eq('listing_status', 'active')
+      .eq('visibility', true)
+      .or('admin_status.is.null,admin_status.not.in.(blocked,pending)')
       .single()
 
     if (error) {

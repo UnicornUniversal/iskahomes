@@ -37,9 +37,10 @@ export function getLeadsPipelineOwner(userInfo) {
   return null
 }
 
-/** System status keys — always first (New) and last (Unspecified) in the board and dropdowns */
+/** System status keys — New first, Closed last */
 export const PIPELINE_STATUS_NEW = 'new'
 export const PIPELINE_STATUS_UNSPECIFIED = 'unspecified'
+export const PIPELINE_STATUS_CLOSED = 'closed'
 
 export const SYSTEM_PIPELINE_STAGE_NEW = {
   status: PIPELINE_STATUS_NEW,
@@ -51,25 +52,35 @@ export const SYSTEM_PIPELINE_STAGE_NEW = {
 export const SYSTEM_PIPELINE_STAGE_UNSPECIFIED = {
   status: PIPELINE_STATUS_UNSPECIFIED,
   value: 'Unspecified',
+  sort_order: 99998,
+  is_system: true,
+}
+
+export const SYSTEM_PIPELINE_STAGE_CLOSED = {
+  status: PIPELINE_STATUS_CLOSED,
+  value: 'Closed',
   sort_order: 99999,
   is_system: true,
 }
 
-/** Default middle stages (seeded to DB); New and Unspecified are not stored here */
+/** Default middle stages (seeded to DB); New, Unspecified, and Closed are not stored here */
 export const DEFAULT_PIPELINE_STAGES = [
   { status: 'contacted', value: 'Contacted', sort_order: 1 },
   { status: 'scheduled', value: 'Scheduled', sort_order: 2 },
   { status: 'responded', value: 'Responded', sort_order: 3 },
-  { status: 'closed', value: 'Closed', sort_order: 4 },
-  { status: 'cold_lead', value: 'Cold Lead', sort_order: 5 },
-  { status: 'abandoned', value: 'Abandoned', sort_order: 6 },
+  { status: 'cold_lead', value: 'Cold Lead', sort_order: 4 },
+  { status: 'abandoned', value: 'Abandoned', sort_order: 5 },
 ]
 
 export function isSystemPipelineStatus(status) {
-  return status === PIPELINE_STATUS_NEW || status === PIPELINE_STATUS_UNSPECIFIED
+  return (
+    status === PIPELINE_STATUS_NEW ||
+    status === PIPELINE_STATUS_UNSPECIFIED ||
+    status === PIPELINE_STATUS_CLOSED
+  )
 }
 
-/** Middle stages only — excludes New and Unspecified from DB rows */
+/** Custom stages only — excludes New, Unspecified, and Closed */
 export function getMiddlePipelineStages(stages) {
   const list =
     stages?.length > 0
@@ -81,13 +92,14 @@ export function getMiddlePipelineStages(stages) {
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
 }
 
-/** Dropdown / filter options: New, custom stages, Unspecified */
+/** Dropdown / filter options: New, custom stages, Unspecified, Closed last */
 export function buildPipelineStatusOptions(stages) {
   const middle = getMiddlePipelineStages(stages)
   return [
     { value: PIPELINE_STATUS_NEW, label: SYSTEM_PIPELINE_STAGE_NEW.value },
     ...middle.map((s) => ({ value: s.status, label: s.value })),
     { value: PIPELINE_STATUS_UNSPECIFIED, label: SYSTEM_PIPELINE_STAGE_UNSPECIFIED.value },
+    { value: PIPELINE_STATUS_CLOSED, label: SYSTEM_PIPELINE_STAGE_CLOSED.value },
   ]
 }
 
@@ -95,6 +107,7 @@ export function buildPipelineStatusOptions(stages) {
 export function resolveLeadStatusForPipeline(status, stages) {
   const key = (status || PIPELINE_STATUS_NEW).toLowerCase()
   if (key === PIPELINE_STATUS_NEW) return PIPELINE_STATUS_NEW
+  if (key === PIPELINE_STATUS_CLOSED) return PIPELINE_STATUS_CLOSED
 
   const middleStatuses = new Set(getMiddlePipelineStages(stages).map((s) => s.status))
   if (middleStatuses.has(key)) return key
@@ -106,6 +119,7 @@ export function resolveLeadStatusForPipeline(status, stages) {
 export function getPipelineStatusLabel(statusKey, stages) {
   if (!statusKey) return SYSTEM_PIPELINE_STAGE_UNSPECIFIED.value
   if (statusKey === PIPELINE_STATUS_NEW) return SYSTEM_PIPELINE_STAGE_NEW.value
+  if (statusKey === PIPELINE_STATUS_CLOSED) return SYSTEM_PIPELINE_STAGE_CLOSED.value
   if (statusKey === PIPELINE_STATUS_UNSPECIFIED) return SYSTEM_PIPELINE_STAGE_UNSPECIFIED.value
 
   const middle = getMiddlePipelineStages(stages)
@@ -115,7 +129,7 @@ export function getPipelineStatusLabel(statusKey, stages) {
   return SYSTEM_PIPELINE_STAGE_UNSPECIFIED.value
 }
 
-/** Kanban columns: New | middle stages | Unspecified */
+/** Kanban columns: New | custom stages | Unspecified | Closed last */
 export function buildPipelineColumns(stages, leads) {
   const middle = getMiddlePipelineStages(stages)
   const middleStatuses = new Set(middle.map((s) => s.status))
@@ -128,6 +142,7 @@ export function buildPipelineColumns(stages, leads) {
       leads: [],
     })),
     { id: PIPELINE_STATUS_UNSPECIFIED, ...SYSTEM_PIPELINE_STAGE_UNSPECIFIED, leads: [] },
+    { id: PIPELINE_STATUS_CLOSED, ...SYSTEM_PIPELINE_STAGE_CLOSED, leads: [] },
   ]
 
   const grouped = {}
@@ -139,6 +154,8 @@ export function buildPipelineColumns(stages, leads) {
     const key = lead.status || PIPELINE_STATUS_NEW
     if (key === PIPELINE_STATUS_NEW) {
       grouped[PIPELINE_STATUS_NEW].push(lead)
+    } else if (key === PIPELINE_STATUS_CLOSED) {
+      grouped[PIPELINE_STATUS_CLOSED].push(lead)
     } else if (middleStatuses.has(key)) {
       grouped[key].push(lead)
     } else {
@@ -156,7 +173,7 @@ export function buildPipelineColumns(stages, leads) {
 export const PIPELINE_CLOSED_STATUS_KEYS = new Set(['closed'])
 export const PIPELINE_LOST_STATUS_KEYS = new Set(['cold_lead', 'abandoned'])
 
-/** Ordered stages for charts: New → custom middle → Unspecified */
+/** Ordered stages for charts: New → custom middle → Unspecified → Closed */
 export function buildAnalyticsStageOrder(stages) {
   const middle = getMiddlePipelineStages(stages)
   return [
@@ -166,6 +183,7 @@ export function buildAnalyticsStageOrder(stages) {
       label: s.value || s.status,
     })),
     { status: PIPELINE_STATUS_UNSPECIFIED, label: SYSTEM_PIPELINE_STAGE_UNSPECIFIED.value },
+    { status: PIPELINE_STATUS_CLOSED, label: SYSTEM_PIPELINE_STAGE_CLOSED.value },
   ]
 }
 

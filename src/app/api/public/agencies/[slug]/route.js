@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { filterPublicCatalogListings } from '@/lib/publicListingCatalog'
 
 export async function GET(request, { params }) {
   try {
@@ -122,6 +123,9 @@ export async function GET(request, { params }) {
         created_at
       `)
       .eq('listing_agency_id', agency.agency_id)
+      .eq('listing_status', 'active')
+      .eq('visibility', true)
+      .or('admin_status.is.null,admin_status.neq.blocked')
       .order('created_at', { ascending: false })
       .limit(50)
 
@@ -169,6 +173,9 @@ export async function GET(request, { params }) {
               created_at
             `)
             .in('user_id', agentIds)
+            .eq('listing_status', 'active')
+            .eq('visibility', true)
+            .or('admin_status.is.null,admin_status.neq.blocked')
             .order('created_at', { ascending: false })
             .limit(50)
 
@@ -216,7 +223,7 @@ export async function GET(request, { params }) {
         })
         
         if (uniqueListings.length > 0) {
-          listings = uniqueListings.sort((a, b) => 
+          listings = filterPublicCatalogListings(uniqueListings).sort((a, b) => 
             new Date(b.created_at) - new Date(a.created_at)
           ).slice(0, 50)
           console.log('✅ Using combined listings:', listings.length)

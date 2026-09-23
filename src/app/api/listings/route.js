@@ -7,6 +7,7 @@ import { updateAdminAnalytics } from '@/lib/adminAnalytics'
 import { captureAuditEvent } from '@/lib/auditLogger'
 import { getSubscriptionLimitsForUser } from '@/lib/subscriptionLimitsServer'
 import { checkNumericLimit } from '@/lib/subscriptionLimits'
+import { defaultChargeablesForOwner, getChargeableOwner, parseChargeablesList } from '@/lib/chargeables'
 
 // Verify import immediately
 console.log('📦 Import check - updateAdminAnalytics type:', typeof updateAdminAnalytics)
@@ -571,7 +572,7 @@ export async function GET(request) {
     let query = supabase
       .from('listings')
       .select('*')
-      .eq('listing_status', 'active')
+      .eq('listing_status', 'active').eq('visibility', true).or('admin_status.is.null,admin_status.not.in.(blocked,pending)')
       .eq('listing_condition', 'completed')
       .order('created_at', { ascending: false })
 
@@ -624,10 +625,10 @@ export async function GET(request) {
     // Get total count for pagination - only active and complete listings
     let countQuery = supabase
       .from('listings')
-      .eq('listing_status', 'active')
+      .eq('listing_status', 'active').eq('visibility', true).or('admin_status.is.null,admin_status.not.in.(blocked,pending)')
       .eq('listing_condition', 'completed')
       .select('*', { count: 'exact', head: true })
-      .eq('listing_status', 'active')
+      .eq('listing_status', 'active').eq('visibility', true).or('admin_status.is.null,admin_status.not.in.(blocked,pending)')
 
     // Apply same filters for count
     if (search) {
@@ -1115,7 +1116,23 @@ export async function POST(request) {
       floor_plan: propertyData.floor_plan || null,
       // Agent-specific fields
       listing_agency_id: accountType === 'agent' && agencyId ? agencyId : (existingListing?.listing_agency_id || null),
-      commission_rate: propertyData.commission_rate || null
+      commission_rate: propertyData.commission_rate || null,
+      chargeables: existingListing?.chargeables || []
+    }
+
+    if (!existingListing) {
+      const providedChargeables = parseChargeablesList(propertyData.chargeables)
+      if (providedChargeables.length) {
+        listingData.chargeables = providedChargeables
+      } else {
+        const owner = getChargeableOwner(userInfo) || {
+          userId,
+          userType: accountType === 'agency' || accountType === 'agent' ? 'agency' : 'developer'
+        }
+        listingData.chargeables = await defaultChargeablesForOwner(supabaseAdmin, owner.userId, owner.userType)
+      }
+    } else if (propertyData.chargeables) {
+      listingData.chargeables = parseChargeablesList(propertyData.chargeables)
     }
 
     // If resuming, start with existing listing data

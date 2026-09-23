@@ -78,7 +78,7 @@ export async function GET(request) {
       const { data: listings, error } = await supabase
         .from('listings')
         .select('country, state, city, town')
-        .eq('listing_status', 'active')
+        .eq('listing_status', 'active').eq('visibility', true).or('admin_status.is.null,admin_status.not.in.(blocked,pending)')
         .or(`country.ilike.%${searchTerm}%,state.ilike.%${searchTerm}%,city.ilike.%${searchTerm}%,town.ilike.%${searchTerm}%`)
         .limit(100)
 

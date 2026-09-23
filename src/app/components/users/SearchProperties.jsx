@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import SecondaryListingCard from '../Listing/SecondaryListingCard';
 import ExplorePropertyCard from './ExplorePropertyCard';
+import { filterPublicCatalogListings } from '@/lib/publicListingCatalog';
 
 const SearchProperties = ({
   filters = {},
@@ -122,7 +123,7 @@ const SearchProperties = ({
         
         if (response.ok) {
           const result = await response.json();
-          const transformedListings = transformListings(result.data || []);
+          const transformedListings = transformListings(filterPublicCatalogListings(result.data || []));
           
           setListings(transformedListings);
           setTotalCount(result.pagination?.total || 0);
@@ -159,7 +160,7 @@ const SearchProperties = ({
         
         if (response.ok) {
           const result = await response.json();
-          const transformedListings = transformListings(result.data || []);
+          const transformedListings = transformListings(filterPublicCatalogListings(result.data || []));
           
           setListings(prev => [...prev, ...transformedListings]);
           setHasMore(result.pagination?.hasMore || false);

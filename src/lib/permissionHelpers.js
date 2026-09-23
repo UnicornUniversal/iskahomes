@@ -192,7 +192,8 @@ export const extractRouteCategory = (pathname) => {
     'audit': 'audit_trail',
     'favorites': 'favorites',
     'agents': 'agents',
-    'reviews': 'reviews'
+    'reviews': 'reviews',
+    'api': 'api'
   }
 
   const routePart = parts.find(p => routeMap[p])

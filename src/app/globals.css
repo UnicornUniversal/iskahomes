@@ -551,6 +551,10 @@ html::-webkit-scrollbar:vertical {
     @apply [font-family:var(--font-playfair-display)] text-[2.2rem] md:text-[3.2rem] leading-[1.08] tracking-[-0.03em] text-primary_color;
   }
 
+  .page_heading {
+    @apply text-5xl leading-[1.2] text-primary_color mb-2;
+  }
+
   .primary_button{
     @apply bg-white/17 text-primary_color rounded-md min-w-24 px-4 py-3 shadow-lg text-[0.9em] hover:bg-primary_color/50 hover:text-white shadow-primary_color/20 font-medium border border-1 border-white/40 duration-500;
   }

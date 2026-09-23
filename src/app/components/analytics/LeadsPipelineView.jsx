@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react'
 import { FiUser, FiImage, FiExternalLink, FiEye } from 'react-icons/fi'
 import { buildPipelineColumns } from '@/lib/leadsPipelineHelper'
+import { formatLeadOriginLabel, formatLeadSourceLabel } from '@/lib/leadSource'
 
 function getLeadCategory(score) {
   if (score >= 60) return { label: 'High', color: 'bg-green-100 text-green-800 border-green-200' }
@@ -81,6 +82,12 @@ function LeadPipelineCard({ lead, isDragging, isUpdating, onDragStart, onDragEnd
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-1.5 mt-2">
+        <span className="inline-flex px-1.5 py-0.5 rounded text-xs border bg-slate-50 text-secondary_color-800">
+          {formatLeadSourceLabel(lead.lead_source) || '—'}
+        </span>
+        <span className="inline-flex px-1.5 py-0.5 rounded text-xs border bg-slate-50 text-secondary_color-800">
+          {formatLeadOriginLabel(lead.lead_origin, lead.lead_source)}
+        </span>
         <span className="inline-flex px-1.5 py-0.5 rounded text-xs border bg-gray-100 text-secondary_color-800">
           {lead.lead_classification || 'Standard'}
         </span>

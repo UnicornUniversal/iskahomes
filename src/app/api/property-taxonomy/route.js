@@ -55,7 +55,7 @@ export async function GET(request) {
     const { data: locations, error: locationsError } = await supabase
       .from('listings')
       .select('country, state, city, town')
-      .eq('listing_status', 'active')
+      .eq('listing_status', 'active').eq('visibility', true).or('admin_status.is.null,admin_status.not.in.(blocked,pending)')
       .not('country', 'is', null)
 
     if (locationsError) {

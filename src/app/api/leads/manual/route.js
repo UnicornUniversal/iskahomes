@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import crypto from 'crypto'
 import { verifyToken } from '@/lib/jwt'
 import { assertLeadCreationAllowed } from '@/lib/subscriptionLimitsServer'
+import { MANUAL_LEAD_SOURCE_OPTIONS, normalizeLeadSourceKey } from '@/lib/leadSource'
 
 const LEAD_CLASSIFICATIONS = ['Premium', 'High Value', 'Standard']
 
@@ -83,7 +84,7 @@ export async function GET(request) {
 
 /**
  * POST - Create a manual lead
- * Requires: lead_name, lead_email or lead_phone, lead_origin, lister_id, lister_type
+ * Requires: lead_name, lead_email or lead_phone, lead_source, lister_id, lister_type
  */
 export async function POST(request) {
   try {
@@ -104,6 +105,7 @@ export async function POST(request) {
       lead_email,
       lead_phone,
       lead_origin,
+      lead_source,
       listing_id,
       development_id,
       lister_id,
@@ -127,10 +129,16 @@ export async function POST(request) {
       )
     }
 
-    const validOrigins = ['platform', 'their_website', 'referral', 'walk_in', 'phone_call', 'event', 'social_media', 'other']
-    if (!lead_origin || !validOrigins.includes(lead_origin)) {
+    const originToSource = {
+      platform: 'iskahomes',
+      their_website: 'api'
+    }
+    const rawSource = lead_source || originToSource[lead_origin] || lead_origin
+    const finalSource = normalizeLeadSourceKey(rawSource, '')
+    const allowedManual = new Set(MANUAL_LEAD_SOURCE_OPTIONS.map((opt) => opt.value))
+    if (!finalSource || !allowedManual.has(finalSource)) {
       return NextResponse.json(
-        { error: 'Valid lead_origin is required' },
+        { error: 'Valid lead_source is required' },
         { status: 400 }
       )
     }
@@ -187,8 +195,8 @@ export async function POST(request) {
       lead_email: lead_email || null,
       lead_phone: lead_phone || null,
       lead_type: 'manual',
-      lead_source: null,
-      lead_origin,
+      lead_source: finalSource,
+      lead_origin: null,
       lead_classification,
       listing_id: listing_id || null,
       development_id: development_id || null,

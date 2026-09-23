@@ -150,10 +150,22 @@ const UnitCard = ({
             {unit.pricing?.price_type || unit.price_type || 'rent'}
           </span>
         </div>
-        <div className="absolute top-3 right-3">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(unit.status)}`}>
-            {unit.status}
-          </span>
+        <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
+          {String(unit.listing_status || '').toLowerCase() === 'active' && (
+            <span className="px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+              Active
+            </span>
+          )}
+          {String(unit.admin_status || '').toLowerCase() === 'blocked' && (
+            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              Blocked
+            </span>
+          )}
+          {unit.status && (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(unit.status)}`}>
+              {unit.status}
+            </span>
+          )}
         </div>
       </div>
 
