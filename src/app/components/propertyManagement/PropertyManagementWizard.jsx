@@ -13,6 +13,7 @@ import CategoriesStep from './steps/CategoriesStep'
 import SpecificationsStep from './steps/SpecificationsStep'
 import LocationStep from './steps/LocationStep'
 import PricingStep from './steps/PricingStep'
+import ChargeablesStep from './steps/ChargeablesStep'
 import AmenitiesStep from './steps/AmenitiesStep'
 import SocialAmenitiesStep from './steps/SocialAmenitiesStep'
 import MediaStep from './steps/MediaStep'
@@ -28,6 +29,7 @@ const getSteps = (accountType) => {
     { id: 'specifications', label: 'Specifications', component: SpecificationsStep },
     { id: 'location', label: 'Location', component: LocationStep },
     { id: 'pricing', label: 'Pricing', component: PricingStep },
+    { id: 'chargeables', label: 'Chargeables', component: ChargeablesStep },
     { id: 'amenities', label: 'Amenities', component: AmenitiesStep },
     { id: 'social-amenities', label: 'Social Amenities', component: SocialAmenitiesStep },
     { id: 'media', label: 'Media', component: MediaStep },
@@ -65,7 +67,9 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType = 'developer' 
     purposes: [],
     types: [],
     categories: [],
-    listing_types: { database: [], inbuilt: [], custom: [] }
+    listing_types: { database: [], inbuilt: [], custom: [] },
+    chargeables: [],
+    visibility: true
   })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -125,6 +129,7 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType = 'developer' 
         
         // Transform data to formData structure
         setFormData({
+          id: data.id,
           title: data.title || '',
           description: data.description || '',
           size: data.size || '',
@@ -182,10 +187,13 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType = 'developer' 
             acquisition_rules: data.acquisition_rules || ''
           },
           additional_information: data.additional_information || '',
+          chargeables: Array.isArray(data.chargeables) ? data.chargeables : [],
           floor_plan: data.floor_plan || null,
           virtual_tour_link: data.virtual_tour_link || '',
           property_status: data.listing_status || 'active',
           listing_status: data.listing_status || 'active',
+          visibility: data.visibility !== false,
+          admin_status: data.admin_status || null,
           published_at: data.published_at || null,
           published_status: data.published_status || null,
           social_amenities: data.social_amenities || {
@@ -245,6 +253,7 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType = 'developer' 
             size: formData.size,
             status: formData.status,
             listing_type: formData.listing_type,
+            visibility: formData.visibility !== false,
             development_id: formData.development_id,
             ...(formData.status && ['Sold', 'Rented Out', 'Taken'].includes(formData.status) && formData.sales_info ? { sales_info: formData.sales_info } : {})
           }
@@ -285,6 +294,12 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType = 'developer' 
             commission_rate: formData.commission_rate || null,
             // Include sales_info if status is sold/rented/taken
             sales_info: formData.sales_info || null
+          }
+          break
+
+        case 'chargeables':
+          stepData = {
+            chargeables: formData.chargeables || []
           }
           break
 
@@ -448,6 +463,11 @@ const PropertyManagementWizard = ({ slug, propertyId, accountType = 'developer' 
         // If it's add mode and we got a listing ID, save it for future saves
         if (isAddMode && result.data?.id && !draftListingId) {
           setDraftListingId(result.data.id)
+          setFormData((prev) => ({
+            ...prev,
+            id: result.data.id,
+            chargeables: Array.isArray(result.data.chargeables) ? result.data.chargeables : prev.chargeables
+          }))
           // Update the URL to edit mode without reloading
           const newUrl = accountType === 'developer'
             ? `/developer/${user.profile?.slug || user.profile.id}/units/${result.data.id}`

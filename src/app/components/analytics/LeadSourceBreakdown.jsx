@@ -14,6 +14,7 @@ import {
 } from 'chart.js'
 import { Loader2, Globe2, Share2 } from 'lucide-react'
 import { analyticsClasses, analyticsPalette, formatNumber, formatPercent } from './analyticsTheme'
+import { formatLeadSourceLabel, isIskaHomesSource } from '@/lib/leadSource'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend)
 
@@ -34,7 +35,7 @@ function normalizeEntries(raw) {
       const percentage = Number(v.percentage) || 0
       const cb = v.context_breakdown
       const contexts =
-        key === 'website' && cb && typeof cb === 'object' && !Array.isArray(cb)
+        isIskaHomesSource(key) && cb && typeof cb === 'object' && !Array.isArray(cb)
           ? Object.entries(cb)
               .map(([ck, cv]) => {
                 const c = cv && typeof cv === 'object' ? cv : {}
@@ -50,7 +51,7 @@ function normalizeEntries(raw) {
           : []
       return {
         key,
-        label: titleCaseKey(key),
+        label: formatLeadSourceLabel(key),
         amount,
         percentage,
         contexts
@@ -123,7 +124,7 @@ export default function LeadSourceBreakdown({ listerId, listerType = 'developer'
   }, [listerId, listerType])
 
   const entries = useMemo(() => normalizeEntries(breakdown), [breakdown])
-  const websiteEntry = useMemo(() => entries.find((e) => e.key === 'website'), [entries])
+  const websiteEntry = useMemo(() => entries.find((e) => isIskaHomesSource(e.key)), [entries])
   const totalDistinct = useMemo(
     () => entries.reduce((s, e) => s + e.amount, 0),
     [entries]
@@ -224,7 +225,7 @@ export default function LeadSourceBreakdown({ listerId, listerType = 'developer'
               if (!c) return ''
               return [
                 `${formatNumber(c.amount)} leads`,
-                `${formatPercent(c.percentage)} of website`
+                `${formatPercent(c.percentage)} of Iska Homes`
               ]
             }
           }
@@ -262,7 +263,7 @@ export default function LeadSourceBreakdown({ listerId, listerType = 'developer'
             <h3 className={analyticsClasses.title}>Lead source breakdown</h3>
             <p className={analyticsClasses.subtitle}>
               Where distinct leads came from: shared links (WhatsApp, Facebook, etc.), in-app traffic
-              labeled <span className="font-medium text-primary_color/80">website</span>, and nested
+              labeled <span className="font-medium text-primary_color/80">Iska Homes</span>, and nested
               surfaces when we know them (home, search, directory, …).
             </p>
           </div>
@@ -331,14 +332,14 @@ export default function LeadSourceBreakdown({ listerId, listerType = 'developer'
                     <Globe2 className="h-5 w-5" />
                   </div>
                   <div>
-                    <h4 className="text-base font-semibold text-primary_color">Website traffic surfaces</h4>
+                    <h4 className="text-base font-semibold text-primary_color">Iska Homes traffic surfaces</h4>
                     <p className="text-sm text-primary_color/70">
-                      Share of <span className="font-medium">website</span> leads by in-app context
+                      Share of <span className="font-medium">Iska Homes</span> leads by in-app context
                     </p>
                   </div>
                 </div>
                 <p className="text-sm text-primary_color/70">
-                  {formatNumber(websiteEntry.amount)} website leads total
+                  {formatNumber(websiteEntry.amount)} Iska Homes leads total
                 </p>
               </div>
               <div className="grid gap-6 lg:grid-cols-2">
@@ -367,7 +368,7 @@ export default function LeadSourceBreakdown({ listerId, listerType = 'developer'
                         />
                       </div>
                       <p className="mt-1 text-xs text-primary_color/60">
-                        {formatPercent(c.percentage)} of website leads
+                        {formatPercent(c.percentage)} of Iska Homes leads
                       </p>
                     </div>
                   ))}

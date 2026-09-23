@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import SecondaryListingCard from '../Listing/SecondaryListingCard'
+import { filterPublicCatalogListings } from '@/lib/publicListingCatalog'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Navigation, Pagination } from 'swiper/modules'
 import 'swiper/css'
@@ -55,11 +56,12 @@ const HomeCategories = () => {
         const result = await response.json()
         
         if (result.success && result.data) {
-          setListings(result.data)
+          const publicListings = filterPublicCatalogListings(result.data)
+          setListings(publicListings)
           // Cache the results
           setCache(prev => ({
             ...prev,
-            [selectedType.id]: result.data
+            [selectedType.id]: publicListings
           }))
         } else {
           setListings([])

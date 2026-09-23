@@ -107,6 +107,12 @@ const developerPermissions = {
   audit_trail: {
     view: 'audit_trail.view',    // View audit trail
     manage: 'audit_trail.manage'  // Manage audit logs
+  },
+  api: {
+    view: 'api.view',            // View API keys
+    create: 'api.create',        // Create API keys
+    edit: 'api.edit',            // Edit API key permissions
+    delete: 'api.delete'         // Delete API keys
   }
 }
 
@@ -203,6 +209,12 @@ const agencyPermissions = {
   audit_trail: {
     view: 'audit_trail.view',
     manage: 'audit_trail.manage'
+  },
+  api: {
+    view: 'api.view',
+    create: 'api.create',
+    edit: 'api.edit',
+    delete: 'api.delete'
   }
 }
 
@@ -227,7 +239,8 @@ const developerDefaultRoles = {
       subscriptions: { view: true, upgrade: true, downgrade: true, cancel: true, manage: true },
       media: { upload: true, delete: true, manage: true },
       favorites: { view: true, add: true, remove: true },
-      audit_trail: { view: true, manage: true }
+      audit_trail: { view: true, manage: true },
+      api: { view: true, create: true, edit: true, delete: true }
     }
   },
   admin: {
@@ -249,7 +262,8 @@ const developerDefaultRoles = {
       subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: true, delete: true, manage: true },
       favorites: { view: true, add: true, remove: true },
-      audit_trail: { view: true, manage: true }
+      audit_trail: { view: true, manage: true },
+      api: { view: true, create: true, edit: true, delete: true }
     }
   },
   manager: {
@@ -271,7 +285,8 @@ const developerDefaultRoles = {
       subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: true, delete: true, manage: true },
       favorites: { view: true, add: true, remove: true },
-      audit_trail: { view: true, manage: true }
+      audit_trail: { view: true, manage: true },
+      api: { view: true, create: false, edit: false, delete: false }
     }
   },
   editor: {
@@ -293,7 +308,8 @@ const developerDefaultRoles = {
       subscriptions: { view: false, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: true, delete: true, manage: false },
       favorites: { view: true, add: true, remove: true },
-      audit_trail: { view: true, manage: false }
+      audit_trail: { view: true, manage: false },
+      api: { view: false, create: false, edit: false, delete: false }
     }
   },
   viewer: {
@@ -315,7 +331,8 @@ const developerDefaultRoles = {
       subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: false, delete: false, manage: false },
       favorites: { view: true, add: false, remove: false },
-      audit_trail: { view: true, manage: false }
+      audit_trail: { view: true, manage: false },
+      api: { view: false, create: false, edit: false, delete: false }
     }
   }
 }
@@ -341,7 +358,8 @@ const agencyDefaultRoles = {
       subscriptions: { view: true, upgrade: true, downgrade: true, cancel: true, manage: true },
       media: { upload: true, delete: true, manage: true },
       reviews: { view: true, respond: true, delete: true },
-      audit_trail: { view: true, manage: true }
+      audit_trail: { view: true, manage: true },
+      api: { view: true, create: true, edit: true, delete: true }
     }
   },
   admin: {
@@ -363,7 +381,8 @@ const agencyDefaultRoles = {
       subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: true, delete: true, manage: true },
       reviews: { view: true, respond: true, delete: true },
-      audit_trail: { view: true, manage: true }
+      audit_trail: { view: true, manage: true },
+      api: { view: true, create: true, edit: true, delete: true }
     }
   },
   agentManager: {
@@ -385,7 +404,8 @@ const agencyDefaultRoles = {
       subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: true, delete: true, manage: true },
       reviews: { view: true, respond: true, delete: false },
-      audit_trail: { view: true, manage: true }
+      audit_trail: { view: true, manage: true },
+      api: { view: true, create: false, edit: false, delete: false }
     }
   },
   editor: {
@@ -407,7 +427,8 @@ const agencyDefaultRoles = {
       subscriptions: { view: false, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: true, delete: true, manage: false },
       reviews: { view: true, respond: false, delete: false },
-      audit_trail: { view: true, manage: false }
+      audit_trail: { view: true, manage: false },
+      api: { view: false, create: false, edit: false, delete: false }
     }
   },
   viewer: {
@@ -429,7 +450,8 @@ const agencyDefaultRoles = {
       subscriptions: { view: true, upgrade: false, downgrade: false, cancel: false, manage: false },
       media: { upload: false, delete: false, manage: false },
       reviews: { view: true, respond: false, delete: false },
-      audit_trail: { view: true, manage: false }
+      audit_trail: { view: true, manage: false },
+      api: { view: false, create: false, edit: false, delete: false }
     }
   }
 }

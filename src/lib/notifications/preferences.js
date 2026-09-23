@@ -69,9 +69,12 @@ export async function getNotificationChannelsForType({
     .maybeSingle()
 
   const settings = data?.settings || {}
+  const current = settings?.[settingKey]
+  const legacy = settingKey === 'chargeables' ? settings?.service_charges : null
+  const prefs = current && typeof current === 'object' ? current : legacy
   return {
-    sms: settings?.[settingKey]?.sms === true,
-    email: settings?.[settingKey]?.email === true
+    sms: prefs?.sms === true,
+    email: prefs?.email === true
   }
 }
 

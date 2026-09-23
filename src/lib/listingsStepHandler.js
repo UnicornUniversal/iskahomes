@@ -5,6 +5,7 @@ import { processCurrencyConversions } from '@/lib/currencyConversion'
 import { updateAdminAnalytics } from '@/lib/adminAnalytics'
 import { updateAdminListingsAnalytics, updateAdminSalesAnalytics } from '@/lib/adminAnalyticsHelpers'
 import { captureAuditEvent } from '@/lib/auditLogger'
+import { defaultChargeablesForOwner, parseChargeablesList } from '@/lib/chargeables'
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -1402,13 +1403,19 @@ export async function handleStepUpdate(request, params, isNewListing) {
           draftSlug = `${baseDraftSlug}-${Date.now()}`
         }
         
+        const ownerType = accountType === 'developer' ? 'developer' : 'agency'
+        const defaultChargeables = await defaultChargeablesForOwner(supabaseAdmin, userId, ownerType)
+
         const draftData = {
           account_type: accountType,
           user_id: userId,
+          chargeables: defaultChargeables,
           created_by: userId, // Required field - set to the user creating the listing
           last_modified_by: userId, // Set to the user creating the listing
           listing_type: accountType === 'developer' ? 'unit' : 'property',
           listing_status: 'draft', // Default is 'draft', but set explicitly for clarity
+          visibility: true,
+          admin_status: null,
           listing_condition: 'adding', // Default is 'adding', but set explicitly for clarity
           upload_status: 'incomplete', // Default is 'incomplete', but set explicitly for clarity
           title: draftTitle,
@@ -1526,6 +1533,9 @@ export async function handleStepUpdate(request, params, isNewListing) {
           status: stepData.status || existingListing.status,
           listing_type: stepData.listing_type || existingListing.listing_type,
           listing_status: newListingStatus,
+          visibility: stepData.visibility !== undefined
+            ? !!stepData.visibility
+            : (existingListing.visibility !== false),
           development_id: stepData.development_id !== undefined 
             ? (stepData.development_id || null) 
             : existingListing.development_id,
@@ -1756,6 +1766,12 @@ export async function handleStepUpdate(request, params, isNewListing) {
           additional_information: stepData.additional_information || existingListing.additional_information,
           floor_plan: floorPlanData || stepData.floor_plan || existingListing.floor_plan,
           additional_files: [...existingAdditionalFiles, ...additionalFiles]
+        }
+        break
+
+      case 'chargeables':
+        updateData = {
+          chargeables: parseChargeablesList(stepData.chargeables)
         }
         break
 

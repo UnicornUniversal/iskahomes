@@ -3,11 +3,14 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { getNotificationChannelsForType, getUserContact } from './preferences'
 import {
   getNotificationRecord,
+  markChargeableDue,
+  markChargeableOverdue,
   markNotificationAttempt,
   markNotificationFailed,
-  markNotificationSent
+  markNotificationSent,
+  saveChargeableChannelResults
 } from './records'
-import { NOTIFICATION_STATUS, NOTIFICATION_TYPES } from './constants'
+import { CHARGEABLE_JOB_KIND, NOTIFICATION_STATUS, NOTIFICATION_TYPES } from './constants'
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -412,7 +415,7 @@ async function buildNotificationMessage(notificationType, record, { userId } = {
     }
   }
 
-  if (notificationType === NOTIFICATION_TYPES.SERVICE_CHARGE) {
+  if (notificationType === NOTIFICATION_TYPES.SERVICE_CHARGE || notificationType === NOTIFICATION_TYPES.CHARGEABLE) {
     const listing = await fetchListingContext(record.unit_id)
     const client = await fetchClientContext(record.client_id)
     const propertyTitle = listing?.title || 'the property'
@@ -429,10 +432,12 @@ async function buildNotificationMessage(notificationType, record, { userId } = {
     const amountValue = Number(record.amount || 0)
     const amountDisplay = Number.isFinite(amountValue) ? amountValue.toLocaleString('en-US') : `${record.amount || 0}`
 
+    const reminderLabel = notificationType === NOTIFICATION_TYPES.CHARGEABLE ? 'Chargeable' : 'Service Charge'
+
     return {
-      subject: 'Service Charge Reminder',
+      subject: `${reminderLabel} Reminder`,
       text: [
-        `Service charge payment reminder`,
+        `${reminderLabel} payment reminder`,
         `Client: ${clientName}`,
         clientPrimaryEmail ? `Client Email: ${clientPrimaryEmail}` : null,
         clientPrimaryPhone ? `Client Phone: ${clientPrimaryPhone}` : null,
@@ -447,9 +452,9 @@ async function buildNotificationMessage(notificationType, record, { userId } = {
           <div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
             ${listingImageUrl ? `<img src="${escapeHtml(listingImageUrl)}" alt="Property image" style="display:block;width:100%;height:220px;object-fit:cover;background:#e2e8f0;" />` : ''}
             <div style="padding:22px;">
-              <p style="margin:0 0 10px 0;font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#64748b;">Service Charge</p>
+              <p style="margin:0 0 10px 0;font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#64748b;">${escapeHtml(reminderLabel)}</p>
               <h2 style="margin:0 0 14px 0;font-size:24px;line-height:1.3;color:#0f172a;">Payment Reminder</h2>
-              <p style="margin:0 0 16px 0;font-size:15px;color:#334155;">A service charge payment is due on <strong>${escapeHtml(dueAt)}</strong>.</p>
+              <p style="margin:0 0 16px 0;font-size:15px;color:#334155;">A ${escapeHtml(reminderLabel.toLowerCase())} payment is due on <strong>${escapeHtml(dueAt)}</strong>.</p>
 
               <div style="margin:0 0 16px 0;padding:14px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;">
                 <p style="margin:0 0 6px 0;font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#9a3412;">Amount Due</p>
@@ -544,6 +549,83 @@ async function sendSms(to, text) {
   }
 }
 
+async function dispatchChargeableJob(payload, record) {
+  const { recordId, userId, userType, jobKind } = payload
+  const dueStatus = String(record.next_due_status || '').toLowerCase()
+  if (dueStatus === 'paid') {
+    return { skipped: true, reason: 'cycle_paid' }
+  }
+
+  if (jobKind === CHARGEABLE_JOB_KIND.OVERDUE) {
+    await markChargeableOverdue(record)
+    return { marked: 'overdue' }
+  }
+
+  await markNotificationAttempt(NOTIFICATION_TYPES.CHARGEABLE, recordId)
+
+  const channels = await getNotificationChannelsForType({
+    userId,
+    userType,
+    notificationType: NOTIFICATION_TYPES.CHARGEABLE
+  })
+
+  const contact = await getUserContact({ userId, userType })
+  const message = await buildNotificationMessage(NOTIFICATION_TYPES.CHARGEABLE, record, { userId, userType })
+
+  const sms = { status: NOTIFICATION_STATUS.SKIPPED, error: null }
+  const email = { status: NOTIFICATION_STATUS.SKIPPED, error: null }
+
+  if (channels.sms) {
+    try {
+      if (!contact.phone) throw new Error('SMS enabled but phone is missing')
+      await sendSms(contact.phone, message.smsText || message.text)
+      sms.status = NOTIFICATION_STATUS.SENT
+    } catch (error) {
+      sms.status = NOTIFICATION_STATUS.FAILED
+      sms.error = error?.message || 'SMS delivery failed'
+    }
+  }
+
+  if (channels.email) {
+    try {
+      if (!contact.email) throw new Error('Email enabled but email address is missing')
+      await sendEmail(contact.email, message.subject, message.text, message.html)
+      email.status = NOTIFICATION_STATUS.SENT
+    } catch (error) {
+      email.status = NOTIFICATION_STATUS.FAILED
+      email.error = error?.message || 'Email delivery failed'
+    }
+  }
+
+  const enabled = [channels.sms ? sms : null, channels.email ? email : null].filter(Boolean)
+  const sentCount = enabled.filter((item) => item.status === NOTIFICATION_STATUS.SENT).length
+  const failedCount = enabled.filter((item) => item.status === NOTIFICATION_STATUS.FAILED).length
+
+  let rollup = NOTIFICATION_STATUS.SENT
+  let rollupError = null
+  if (!channels.sms && !channels.email) {
+    rollup = NOTIFICATION_STATUS.SENT
+  } else if (failedCount && sentCount) {
+    rollup = NOTIFICATION_STATUS.PARTIAL
+    rollupError = [sms.error, email.error].filter(Boolean).join('; ')
+  } else if (failedCount && !sentCount) {
+    rollup = NOTIFICATION_STATUS.FAILED
+    rollupError = [sms.error, email.error].filter(Boolean).join('; ')
+  }
+
+  const afterSend = await saveChargeableChannelResults(record, { sms, email, rollup, rollupError })
+  await markChargeableDue(afterSend)
+
+  console.log('[notifications][dispatcher] chargeable due processed', {
+    recordId,
+    rollup,
+    sms: sms.status,
+    email: email.status
+  })
+
+  return { sent: sentCount > 0, rollup }
+}
+
 export async function dispatchNotificationJob(payload) {
   const {
     notificationType,
@@ -556,6 +638,10 @@ export async function dispatchNotificationJob(payload) {
   if (!record) {
     console.warn('[notifications][dispatcher] record not found', { notificationType, recordId })
     return { skipped: true, reason: 'record_not_found' }
+  }
+
+  if (notificationType === NOTIFICATION_TYPES.CHARGEABLE) {
+    return dispatchChargeableJob(payload, record)
   }
 
   if (record.notification_status && record.notification_status !== NOTIFICATION_STATUS.PENDING) {

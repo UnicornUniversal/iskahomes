@@ -132,7 +132,7 @@ export async function GET(request) {
         categories,
         listing_types
       `, { count: 'exact' })
-      .eq('listing_status', 'active')
+      .eq('listing_status', 'active').eq('visibility', true).or('admin_status.is.null,admin_status.not.in.(blocked,pending)')
       .eq('listing_condition', 'completed')
 
     // Apply filters - purposes, types, categories are JSONB arrays of UUID strings
@@ -234,7 +234,7 @@ export async function GET(request) {
     let countQuery = supabase
       .from('listings')
       .select('*', { count: 'exact', head: true })
-      .eq('listing_status', 'active')
+      .eq('listing_status', 'active').eq('visibility', true).or('admin_status.is.null,admin_status.not.in.(blocked,pending)')
       .eq('listing_condition', 'completed')
     
     // Apply all the same filters to count query

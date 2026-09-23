@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { mergeWebsiteBreakdownKey } from '@/lib/leadSource'
 
 function isUUID(str) {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -57,8 +58,9 @@ export async function GET(request) {
     }
 
     const raw = row?.lead_source_breakdown
-    const breakdown =
+    const breakdown = mergeWebsiteBreakdownKey(
       raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
+    )
 
     return NextResponse.json({
       success: true,

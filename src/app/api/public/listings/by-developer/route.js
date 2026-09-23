@@ -46,7 +46,7 @@ export async function GET(request) {
         created_at
       `)
       .eq('user_id', developerId)
-      .eq('listing_status', 'active')
+      .eq('listing_status', 'active').eq('visibility', true).or('admin_status.is.null,admin_status.not.in.(blocked,pending)')
       .eq('listing_condition', 'completed')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
@@ -64,7 +64,7 @@ export async function GET(request) {
       .from('listings')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', developerId)
-      .eq('listing_status', 'active')
+      .eq('listing_status', 'active').eq('visibility', true).or('admin_status.is.null,admin_status.not.in.(blocked,pending)')
       .eq('listing_condition', 'completed')
 
     return NextResponse.json({

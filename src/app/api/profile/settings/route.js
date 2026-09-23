@@ -6,7 +6,7 @@ const SETTINGS_TEMPLATE = {
   two_factor: { sms: false },
   reminders: { sms: false, email: false },
   appointments: { sms: false, email: false },
-  service_charges: { sms: false, email: false },
+  chargeables: { sms: false, email: false },
   engagements: { sms: false, email: false }
 }
 
@@ -16,8 +16,13 @@ function normalizeSettings(input) {
 
   for (const feature of Object.keys(SETTINGS_TEMPLATE)) {
     normalized[feature] = {}
+    const incomingFeature = source?.[feature]
+    const fallbackFeature = feature === 'chargeables' ? source?.service_charges : null
+    const from = incomingFeature && typeof incomingFeature === 'object'
+      ? incomingFeature
+      : (fallbackFeature && typeof fallbackFeature === 'object' ? fallbackFeature : {})
     for (const channel of Object.keys(SETTINGS_TEMPLATE[feature])) {
-      normalized[feature][channel] = source?.[feature]?.[channel] === true
+      normalized[feature][channel] = from?.[channel] === true
     }
   }
 

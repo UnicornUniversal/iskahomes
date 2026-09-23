@@ -499,6 +499,16 @@ const ViewProperty = ({ formData, accountType }) => {
 
             {/* Badges */}
             <div className="flex flex-wrap gap-3 mb-6">
+              {String(formData?.listing_status || '').toLowerCase() === 'active' && (
+                <span className="bg-emerald-100 text-emerald-800 px-4 py-2 rounded-full text-sm font-medium">
+                  Active
+                </span>
+              )}
+              {String(formData?.admin_status || '').toLowerCase() === 'blocked' && (
+                <span className="bg-red-100 text-red-800 px-4 py-2 rounded-full text-sm font-medium">
+                  Blocked
+                </span>
+              )}
               {formData?.is_featured && (
                 <span className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full text-sm font-medium flex items-center">
                   <Star className="w-4 h-4 mr-2" />

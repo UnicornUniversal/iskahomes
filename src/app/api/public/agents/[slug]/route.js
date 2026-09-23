@@ -122,7 +122,7 @@ export async function GET(request, { params }) {
         created_at
       `)
       .eq('user_id', agent.agent_id)
-      .eq('listing_status', 'active')
+      .eq('listing_status', 'active').eq('visibility', true).or('admin_status.is.null,admin_status.not.in.(blocked,pending)')
       .eq('listing_condition', 'completed')
       .order('created_at', { ascending: false })
       .limit(20)

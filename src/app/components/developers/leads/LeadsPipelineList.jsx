@@ -10,6 +10,7 @@ import {
   getMiddlePipelineStages,
   SYSTEM_PIPELINE_STAGE_NEW,
   SYSTEM_PIPELINE_STAGE_UNSPECIFIED,
+  SYSTEM_PIPELINE_STAGE_CLOSED,
 } from '@/lib/leadsPipelineHelper'
 
 function SystemPipelineRow({ stage, position }) {
@@ -300,13 +301,17 @@ const LeadsPipelineList = ({ onRefresh }) => {
               stage={SYSTEM_PIPELINE_STAGE_UNSPECIFIED}
               position={stages.length + 2}
             />
+            <SystemPipelineRow
+              stage={SYSTEM_PIPELINE_STAGE_CLOSED}
+              position={stages.length + 3}
+            />
           </tbody>
         </table>
       </div>
 
       {canManage && stages.length > 0 && (
         <p className="mt-3 text-sm text-gray-500">
-          Drag custom stages to reorder. New and Unspecified stay fixed at the top and bottom.
+          Drag custom stages to reorder. New stays first. Closed stays last. Unspecified stays just before Closed.
         </p>
       )}
 

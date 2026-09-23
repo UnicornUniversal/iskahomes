@@ -32,7 +32,7 @@ export async function GET(request) {
         available_from,
         created_at
       `)
-      .eq('listing_status', 'active')
+      .eq('listing_status', 'active').eq('visibility', true).or('admin_status.is.null,admin_status.not.in.(blocked,pending)')
       .eq('listing_condition', 'completed')
       .order('created_at', { ascending: false })
 

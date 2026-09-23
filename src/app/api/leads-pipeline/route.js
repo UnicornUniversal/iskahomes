@@ -99,7 +99,7 @@ export async function POST(request) {
       (statusKey && String(statusKey).trim()) || toPipelineStatusKey(value)
     if (isSystemPipelineStatus(stageStatus)) {
       return NextResponse.json(
-        { error: 'New and Unspecified are reserved system stages and cannot be created' },
+        { error: 'New, Closed, and Unspecified are reserved system stages and cannot be created' },
         { status: 400 }
       )
     }

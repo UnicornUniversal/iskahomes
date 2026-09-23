@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authenticateRequest, requirePermission } from '@/lib/apiPermissionMiddleware'
-import { getLeadsPipelineOwner, toPipelineStatusKey } from '@/lib/leadsPipelineHelper'
+import { getLeadsPipelineOwner, isSystemPipelineStatus, toPipelineStatusKey } from '@/lib/leadsPipelineHelper'
 
 async function getOwnedStage(id, owner) {
   const { data, error } = await supabaseAdmin
@@ -88,6 +88,12 @@ export async function PUT(request, { params }) {
         toPipelineStatusKey(updateData.value || existing.value)
       if (!nextStatus) {
         return NextResponse.json({ error: 'Invalid status key' }, { status: 400 })
+      }
+      if (isSystemPipelineStatus(nextStatus) && nextStatus !== existing.status) {
+        return NextResponse.json(
+          { error: 'New, Closed, and Unspecified are reserved and cannot replace a custom stage' },
+          { status: 400 }
+        )
       }
       if (nextStatus !== existing.status) {
         const { data: conflict } = await supabaseAdmin
@@ -181,6 +187,13 @@ export async function DELETE(request, { params }) {
     const existing = await getOwnedStage(id, owner)
     if (!existing) {
       return NextResponse.json({ error: 'Pipeline stage not found' }, { status: 404 })
+    }
+
+    if (isSystemPipelineStatus(existing.status)) {
+      return NextResponse.json(
+        { error: 'Closed and other system stages cannot be deleted' },
+        { status: 400 }
+      )
     }
 
     const { count: leadsCount } = await supabaseAdmin

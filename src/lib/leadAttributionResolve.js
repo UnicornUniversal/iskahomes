@@ -1,7 +1,10 @@
 /**
  * Resolve lead_source / lead_source_context from URL query parts or pre-filled body fields.
- * Rules: share_medium (shared link) wins over source=website + context; context only when lead_source is website.
+ * share_medium (shared link) wins over source=iskahomes + context.
+ * context only applies when lead_source is iskahomes (legacy source=website is mapped).
  */
+
+import { LEAD_SOURCE_ISKAHOMES, isIskaHomesSource, normalizeLeadSourceKey } from '@/lib/leadSource'
 
 export const VALID_LEAD_ATTRIBUTION_CONTEXTS = new Set([
   'home',
@@ -29,7 +32,7 @@ export function resolveLeadAttributionFromSearchString(search) {
   try {
     params = new URLSearchParams(q)
   } catch {
-    return { lead_source: 'website', lead_source_context: null }
+    return { lead_source: LEAD_SOURCE_ISKAHOMES, lead_source_context: null }
   }
 
   const share = norm(params.get('share_medium'))
@@ -37,13 +40,15 @@ export function resolveLeadAttributionFromSearchString(search) {
   const utm = norm(params.get('utm_source'))
   const contextParam = norm(params.get('context'))
 
-  let lead_source = 'website'
+  let lead_source = LEAD_SOURCE_ISKAHOMES
   if (share) lead_source = share
   else if (sourceParam) lead_source = sourceParam
   else if (utm) lead_source = utm
 
+  lead_source = normalizeLeadSourceKey(lead_source, LEAD_SOURCE_ISKAHOMES)
+
   let lead_source_context = null
-  if (lead_source === 'website' && contextParam && VALID_LEAD_ATTRIBUTION_CONTEXTS.has(contextParam)) {
+  if (isIskaHomesSource(lead_source) && contextParam && VALID_LEAD_ATTRIBUTION_CONTEXTS.has(contextParam)) {
     lead_source_context = contextParam
   }
 
@@ -62,14 +67,16 @@ export function resolveLeadAttributionFromParts(parts = {}) {
   const bodyCtx = norm(parts.lead_source_context)
   const bodySource = norm(parts.lead_source)
 
-  let lead_source = 'website'
+  let lead_source = LEAD_SOURCE_ISKAHOMES
   if (share) lead_source = share
   else if (sourceParam) lead_source = sourceParam
   else if (utm) lead_source = utm
   else if (bodySource) lead_source = bodySource
 
+  lead_source = normalizeLeadSourceKey(lead_source, LEAD_SOURCE_ISKAHOMES)
+
   let lead_source_context = null
-  if (lead_source === 'website') {
+  if (isIskaHomesSource(lead_source)) {
     const c = attrCtx || bodyCtx
     if (c && VALID_LEAD_ATTRIBUTION_CONTEXTS.has(c)) lead_source_context = c
   }

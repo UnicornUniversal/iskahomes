@@ -317,6 +317,11 @@ const PreviewStep = ({ formData, accountType, onFinalize, developments = [] }) =
           </div>
         )}
 
+        <div>
+          <p className="font-medium mb-1">Visibility</p>
+          <p>{formData?.visibility === false ? 'Non-Visible' : 'Visible'}</p>
+        </div>
+
         {formData?.status && (
           <div>
             <p className="font-medium mb-1">Status</p>

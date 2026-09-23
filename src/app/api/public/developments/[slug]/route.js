@@ -134,7 +134,7 @@ export async function GET(request, { params }) {
       .eq('development_id', development.id)
       .eq('account_type', 'developer')
       .eq('user_id', development.developer_id)
-      .eq('listing_status', 'active')
+      .eq('listing_status', 'active').eq('visibility', true).or('admin_status.is.null,admin_status.not.in.(blocked,pending)')
       .eq('listing_condition', 'completed')
       .order('created_at', { ascending: false })
 

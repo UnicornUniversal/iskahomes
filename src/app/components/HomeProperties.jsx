@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { Playfair_Display } from 'next/font/google'
 import { MapPin, Bed, Bath, Square } from 'lucide-react'
+import { filterPublicCatalogListings } from '@/lib/publicListingCatalog'
 
 const playfairDisplay = Playfair_Display({
   subsets: ['latin'],
@@ -69,7 +70,7 @@ const HomeProperties = () => {
             return parsed
           })
           
-          setListings(parsedListings)
+          setListings(filterPublicCatalogListings(parsedListings))
           console.log('Listings set:', parsedListings.length)
         } else {
           setError(result.error || 'Failed to fetch listings')

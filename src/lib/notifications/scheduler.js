@@ -1,5 +1,12 @@
 import { enqueueNotificationJob, cancelNotificationJob } from './queue'
-import { getNotificationRecord, getScheduledAtForRecord, markNotificationCancelled, markNotificationPending } from './records'
+import {
+  getNotificationRecord,
+  getOverdueScheduledAtForRecord,
+  getScheduledAtForRecord,
+  markNotificationCancelled,
+  markNotificationPending
+} from './records'
+import { CHARGEABLE_JOB_KIND, NOTIFICATION_TYPES } from './constants'
 
 export async function scheduleNotificationFromRecord({
   notificationType,
@@ -25,6 +32,43 @@ export async function scheduleNotificationFromRecord({
   }
 
   await markNotificationPending(notificationType, recordId)
+
+  if (notificationType === NOTIFICATION_TYPES.CHARGEABLE) {
+    const overdueAt = getOverdueScheduledAtForRecord(record)
+    if (!overdueAt) {
+      throw new Error('Could not resolve overdue time for chargeable')
+    }
+
+    await enqueueNotificationJob({
+      notificationType,
+      recordId,
+      userId,
+      userType,
+      scheduledFor: scheduledAt,
+      jobKind: CHARGEABLE_JOB_KIND.DUE
+    })
+
+    try {
+      await enqueueNotificationJob({
+        notificationType,
+        recordId,
+        userId,
+        userType,
+        scheduledFor: overdueAt,
+        jobKind: CHARGEABLE_JOB_KIND.OVERDUE
+      })
+    } catch (overdueError) {
+      await cancelNotificationJob(notificationType, recordId)
+      throw overdueError
+    }
+
+    console.log('[notifications][scheduler] chargeable jobs scheduled', {
+      recordId,
+      dueAt: scheduledAt,
+      overdueAt
+    })
+    return scheduledAt
+  }
 
   await enqueueNotificationJob({
     notificationType,

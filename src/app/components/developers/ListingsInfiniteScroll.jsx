@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import ListingList2 from '@/app/components/Listing/ListingList2'
+import { filterPublicCatalogListings } from '@/lib/publicListingCatalog'
 
 const ListingsInfiniteScroll = ({ developerId, leadAttributionContext = 'profile' }) => {
   const [listings, setListings] = useState([])
@@ -25,7 +26,7 @@ const ListingsInfiniteScroll = ({ developerId, leadAttributionContext = 'profile
       const result = await response.json()
 
       if (result.success) {
-        const newListings = result.data || []
+        const newListings = filterPublicCatalogListings(result.data || [])
         
         if (append) {
           setListings(prev => [...prev, ...newListings])

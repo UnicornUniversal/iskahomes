@@ -28,7 +28,9 @@ import {
     FiChevronUp,
     FiShield,
     FiActivity,
-    FiGitBranch
+    FiGitBranch,
+    FiCode,
+    FiFileText
 } from 'react-icons/fi'
 import Link from 'next/link'
 
@@ -36,7 +38,7 @@ const DeveloperNav = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const [isCollapsed, setIsCollapsed] = useState(true)
     const [isMobile, setIsMobile] = useState(false)
-    const [openSubmenus, setOpenSubmenus] = useState({ Analytics: false, Leads: false })
+    const [openSubmenus, setOpenSubmenus] = useState({ Analytics: false, Leads: false, Chargeables: false })
     const [isLoggingOut, setIsLoggingOut] = useState(false)
     const [isClient, setIsClient] = useState(false)
     const pathname = usePathname()
@@ -120,10 +122,23 @@ const DeveloperNav = () => {
             permission: 'clients'
         },
         {
-            label: 'Service Charges',
-            href: `/developer/${developerSlug}/serviceCharge`,
-            icon: FiDollarSign,
-            permission: 'clients'
+            label: 'Chargeables',
+            href: `/developer/${developerSlug}/chargeables/types`,
+            icon: FiCreditCard,
+            hasSubmenu: true,
+            permission: 'units',
+            submenu: [
+                {
+                    label: 'Chargeable types',
+                    href: `/developer/${developerSlug}/chargeables/types`,
+                    icon: FiCreditCard,
+                },
+                {
+                    label: 'Charges',
+                    href: `/developer/${developerSlug}/chargeables/charges`,
+                    icon: FiDollarSign,
+                },
+            ],
         },
         {
             label: 'Developments',
@@ -181,10 +196,22 @@ const DeveloperNav = () => {
                     permission: 'analytics.view_leads'
                 },
                 {
+                    label: 'Chargeables',
+                    href: `/developer/${developerSlug}/analytics/chargeables`,
+                    icon: FiDollarSign,
+                    permission: 'analytics.view'
+                },
+                {
                     label: 'Profile & Brand',
                     href: `/developer/${developerSlug}/analytics/profile`,
                     icon: FiUser,
                     permission: 'analytics.view_profile_brand'
+                },
+                {
+                    label: 'Report',
+                    href: `/developer/${developerSlug}/report`,
+                    icon: FiFileText,
+                    permission: 'analytics.view'
                 },
             ]
         },
@@ -199,6 +226,12 @@ const DeveloperNav = () => {
             href: `/developer/${developerSlug}/subscriptions`,
             icon: FiCreditCard,
             permission: 'subscriptions'
+        },
+        {
+            label: 'API Integration',
+            href: `/developer/${developerSlug}/api`,
+            icon: FiCode,
+            permission: 'api'
         },
         {
             label: 'Back to Home',
@@ -274,6 +307,7 @@ const DeveloperNav = () => {
     const getSubmenuPathPrefix = (label) => {
         if (label === 'Analytics') return `/developer/${developerSlug}/analytics`
         if (label === 'Leads') return `/developer/${developerSlug}/leads`
+        if (label === 'Chargeables') return `/developer/${developerSlug}/chargeables`
         return ''
     }
 
@@ -356,6 +390,9 @@ const DeveloperNav = () => {
         }
         if (isSubmenuSectionActive('Leads')) {
             setOpenSubmenus((prev) => ({ ...prev, Leads: true }))
+        }
+        if (isSubmenuSectionActive('Chargeables')) {
+            setOpenSubmenus((prev) => ({ ...prev, Chargeables: true }))
         }
     }, [pathname, developerSlug])
 
@@ -454,7 +491,9 @@ const DeveloperNav = () => {
                     {navItems.map((item, index) => {
                         const IconComponent = item.icon
                         // Check if current pathname matches this nav item
-                        const isActive = pathname === item.href
+                        const isActive = !item.isHomeLink && !item.isLogout && (
+                            pathname === item.href || pathname?.startsWith(`${item.href}/`)
+                        )
                         const hasSubmenu = item.hasSubmenu && item.submenu?.length > 0
                         const isSubmenuOpen = openSubmenus[item.label]
                         const isSubmenuActive = hasSubmenu && isSubmenuSectionActive(item.label)

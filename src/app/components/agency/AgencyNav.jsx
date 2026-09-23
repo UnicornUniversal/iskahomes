@@ -19,7 +19,10 @@ import {
     FiChevronDown,
     FiChevronRight,
     FiGitBranch,
-    FiPercent
+    FiPercent,
+    FiCode,
+    FiDollarSign,
+    FiFileText
 } from 'react-icons/fi'
 import { userCanAccessRoute, userHasPermission } from '@/lib/permissionHelpers'
 import Link from 'next/link'
@@ -30,7 +33,7 @@ import { toast } from 'react-toastify'
 const AgencyNav = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const [isLoggingOut, setIsLoggingOut] = useState(false)
-    const [openSubmenus, setOpenSubmenus] = useState({ Leads: false, Sales: false })
+    const [openSubmenus, setOpenSubmenus] = useState({ Leads: false, Sales: false, Chargeables: false, Analytics: false })
     const [isClient, setIsClient] = useState(false)
     const pathname = usePathname()
     const { user, logout } = useAuth()
@@ -40,11 +43,18 @@ const AgencyNav = () => {
     }, [])
 
     useEffect(() => {
-        if (pathname?.includes('/leads')) {
+        const section = pathname?.split('/')[3]
+        if (section === 'leads') {
             setOpenSubmenus((prev) => ({ ...prev, Leads: true }))
         }
-        if (pathname?.includes('/sales')) {
+        if (section === 'sales') {
             setOpenSubmenus((prev) => ({ ...prev, Sales: true }))
+        }
+        if (section === 'chargeables') {
+            setOpenSubmenus((prev) => ({ ...prev, Chargeables: true }))
+        }
+        if (section === 'analytics') {
+            setOpenSubmenus((prev) => ({ ...prev, Analytics: true }))
         }
     }, [pathname])
 
@@ -89,6 +99,25 @@ const AgencyNav = () => {
             permission: 'listings'
         },
         {
+            label: 'Chargeables',
+            href: `/agency/${slug}/chargeables/types`,
+            icon: FiCreditCard,
+            hasSubmenu: true,
+            permission: 'listings',
+            submenu: [
+                {
+                    label: 'Chargeable types',
+                    href: `/agency/${slug}/chargeables/types`,
+                    icon: FiCreditCard,
+                },
+                {
+                    label: 'Charges',
+                    href: `/agency/${slug}/chargeables/charges`,
+                    icon: FiDollarSign,
+                },
+            ],
+        },
+        {
             label: 'Appointments',
             href: `/agency/${slug}/appointments`,
             icon: FiCalendar,
@@ -125,6 +154,25 @@ const AgencyNav = () => {
             label: 'Analytics',
             href: `/agency/${slug}/analytics/overview`,
             icon: FiBarChart2,
+            hasSubmenu: true,
+            permission: 'analytics',
+            submenu: [
+                {
+                    label: 'Overview',
+                    href: `/agency/${slug}/analytics/overview`,
+                    icon: FiBarChart2,
+                },
+                {
+                    label: 'Chargeables',
+                    href: `/agency/${slug}/analytics/chargeables`,
+                    icon: FiDollarSign,
+                },
+            ]
+        },
+        {
+            label: 'Report',
+            href: `/agency/${slug}/report`,
+            icon: FiFileText,
             permission: 'analytics'
         },
         {
@@ -153,6 +201,12 @@ const AgencyNav = () => {
             href: `/agency/${slug}/subscriptions`,
             icon: FiCreditCard,
             permission: 'subscriptions'
+        },
+        {
+            label: 'API Integration',
+            href: `/agency/${slug}/api`,
+            icon: FiCode,
+            permission: 'api'
         },
         {
             label: 'Team',
@@ -213,8 +267,11 @@ const AgencyNav = () => {
     }
 
     const isSubmenuSectionActive = (label) => {
-        if (label === 'Leads') return pathname?.includes(`/agency/${slug}/leads`)
-        if (label === 'Sales') return pathname?.includes(`/agency/${slug}/sales`)
+        const section = pathname?.split('/')[3]
+        if (label === 'Leads') return section === 'leads'
+        if (label === 'Sales') return section === 'sales'
+        if (label === 'Chargeables') return section === 'chargeables'
+        if (label === 'Analytics') return section === 'analytics'
         return false
     }
 
@@ -243,6 +300,10 @@ const AgencyNav = () => {
             if (subItem.href === commissionHref) {
                 return pathname === commissionHref || pathname?.startsWith(`${commissionHref}/`)
             }
+        }
+
+        if (parentLabel === 'Analytics' || parentLabel === 'Chargeables') {
+            return pathname === subItem.href || pathname?.startsWith(`${subItem.href}/`)
         }
 
         return pathname === subItem.href

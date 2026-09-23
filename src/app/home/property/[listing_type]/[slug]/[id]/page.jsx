@@ -50,6 +50,7 @@ import { getAmenityIcon, getAmenityName, getAmenityById } from '@/lib/StaticData
 import { getSpecificationDataByTypeName, getSpecificationDataByTypeId, getFieldDataByKey } from '@/app/components/Data/StaticData'
 import { toast } from 'react-toastify'
 import { withWebsiteLeadAttribution } from '@/lib/leadAttributionUrl'
+import { isPublicCatalogListing } from '@/lib/publicListingCatalog'
 
 const PropertyDetailPage = () => {
   const params = useParams()
@@ -142,6 +143,12 @@ const PropertyDetailPage = () => {
             }
           }
           
+          if (!isPublicCatalogListing(listingData)) {
+            setError('Listing not found')
+            setListing(null)
+            return
+          }
+
           setListing(listingData)
           
           // Track property view and detailed impression

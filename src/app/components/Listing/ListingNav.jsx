@@ -3,7 +3,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { FiSettings, FiBarChart2, FiUsers } from 'react-icons/fi'
+import { FiSettings, FiBarChart2, FiUsers, FiCreditCard } from 'react-icons/fi'
 
 const ListingNav = () => {
   const pathname = usePathname()
@@ -22,9 +22,10 @@ const ListingNav = () => {
   const basePath = pathname?.substring(0, pathname.indexOf('/units/') + `/units/${unitSlug}`.length) || ''
   
   // Determine active tab
-  const isManage = pathname === basePath || pathname?.startsWith(basePath) && !pathname.includes('/analytics') && !pathname.includes('/leads')
+  const isManage = pathname === basePath || (pathname?.startsWith(basePath) && !pathname.includes('/analytics') && !pathname.includes('/leads') && !pathname.includes('/chargeables'))
   const isAnalytics = pathname?.includes('/analytics')
   const isLeads = pathname?.includes('/leads')
+  const isChargeables = pathname?.includes('/chargeables')
   
   const navItems = [
     {
@@ -44,6 +45,12 @@ const ListingNav = () => {
       icon: FiUsers,
       href: `${basePath}/leads`,
       active: isLeads
+    },
+    {
+      label: 'Chargeables',
+      icon: FiCreditCard,
+      href: `${basePath}/chargeables`,
+      active: isChargeables
     }
   ]
 

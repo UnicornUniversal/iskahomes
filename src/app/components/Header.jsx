@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Playfair_Display } from 'next/font/google'
 import HeaderSearch from './HeaderSearch'
+import { filterPublicCatalogListings } from '@/lib/publicListingCatalog'
 
 const dummyImage = "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?q=80&w=735&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 
@@ -96,7 +97,7 @@ const Header = () => {
         const result = await response.json()
 
         if (response.ok && result.data && Array.isArray(result.data)) {
-          const transformed = result.data.slice(0, 5).map(listing => {
+          const transformed = filterPublicCatalogListings(result.data).slice(0, 5).map(listing => {
             let firstImage = dummyImage
             if (listing.media) {
               try {

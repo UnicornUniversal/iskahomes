@@ -3,6 +3,7 @@ import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { captureAuditEvent } from '@/lib/auditLogger'
 import { authenticateRequest } from '@/lib/apiPermissionMiddleware'
 import { resolveLeadsAssignedUserFilter } from '@/lib/permissionHelpers'
+import { normalizeLeadSourceKey } from '@/lib/leadSource'
 
 // Helper to check if string is UUID
 function isUUID(str) {
@@ -625,7 +626,7 @@ export async function GET(request) {
         seeker_email: displayEmail,
         seeker_phone: displayPhone,
         lead_type: lead.lead_type || 'automated',
-        lead_source: lead.lead_source,
+        lead_source: normalizeLeadSourceKey(lead.lead_source, lead.lead_source || null),
         lead_origin: lead.lead_origin,
         lead_classification: lead.lead_classification || 'Standard',
         assigned_user: lead.assigned_user || null,
