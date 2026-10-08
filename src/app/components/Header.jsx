@@ -1,6 +1,7 @@
 "use client"
 import React, { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Playfair_Display } from 'next/font/google'
 import HeaderSearch from './HeaderSearch'
@@ -133,6 +134,7 @@ const Header = () => {
               propertyPrice: formattedPrice,
               propertyLocation,
               property_images: [firstImage],
+              propertyHref: `/home/property/${listing.listing_type || 'property'}/${listing.slug || 'listing'}/${listing.id}`,
             }
           })
           setHeaderProperties(transformed)
@@ -292,8 +294,10 @@ const Header = () => {
 
         {/* Listing info overlay — bottom right */}
         {currentProperty && (
-          <div
-            className="hidden md:block"
+          <Link
+            href={currentProperty.propertyHref}
+            aria-label={`View ${currentProperty.propertyName}`}
+            className="hidden md:block hover:bg-black/70 transition-colors"
             style={{
               position: 'absolute',
               bottom: 24,
@@ -318,7 +322,7 @@ const Header = () => {
             <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.85rem', margin: '2px 0 0' }}>
               {currentProperty.propertyLocation}
             </p>
-          </div>
+          </Link>
         )}
 
         {/* ← arrow */}

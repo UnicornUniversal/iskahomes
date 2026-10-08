@@ -58,6 +58,7 @@ export async function GET(request) {
       .select(`
         id,
         title,
+        slug,
         media,
         price,
         currency,
@@ -158,6 +159,7 @@ export async function GET(request) {
       return {
         id: listing.id,
         name: listing.title,
+        slug: listing.slug,
         media: listing.media,
         price: listing.price,
         currency: listing.currency,

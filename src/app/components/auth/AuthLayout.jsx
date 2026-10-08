@@ -44,7 +44,7 @@ const AuthLayout = ({ children }) => {
           <div className="w-full max-w-6xl flex flex-col lg:flex-row items-center justify-center gap-10 lg:gap-16">
             {/* Branding - desktop only */}
             <div className="hidden lg:flex flex-1 items-center justify-center">
-              <div className="auth-logo-in relative flex items-center justify-center">
+              <div className="relative flex items-center justify-center">
                 <span
                   aria-hidden="true"
                   className="auth-logo-glow pointer-events-none absolute h-[320px] w-[320px] rounded-full blur-2xl"
@@ -55,7 +55,7 @@ const AuthLayout = ({ children }) => {
                   width={400}
                   height={400}
                   priority
-                  className="auth-logo-img relative w-full max-w-[200px] xl:max-w-[230px] h-auto object-contain drop-shadow-2xl"
+                  className="relative w-full max-w-[200px] xl:max-w-[230px] h-auto object-contain drop-shadow-2xl"
                 />
               </div>
             </div>
