@@ -685,71 +685,10 @@ html::-webkit-scrollbar:vertical {
 }
 
 
-/* Auth pages - logo entrance, idle float and hover response */
-@keyframes authFadeInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-56px) scale(0.94);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-}
-
-@keyframes authLogoFloat {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-12px);
-  }
-}
-
-@keyframes authGlowPulse {
-  0%, 100% {
-    opacity: 0.25;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.45;
-    transform: scale(1.12);
-  }
-}
-
-/* Outer: fades in from the left, then floats forever */
-.auth-logo-in {
-  animation:
-    authFadeInLeft 1000ms cubic-bezier(0.22, 1, 0.36, 1) both,
-    authLogoFloat 6s ease-in-out 1000ms infinite;
-}
-
-/* Inner: free to react to hover without fighting the float */
-.auth-logo-img {
-  transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1), filter 600ms ease;
-  will-change: transform;
-}
-
-.auth-logo-in:hover .auth-logo-img {
-  transform: scale(1.07) rotate(-1.5deg);
-  filter: drop-shadow(0 18px 40px rgba(246, 139, 31, 0.45));
-}
-
-/* Soft brand glow behind the mark */
+/* Auth pages - soft brand glow behind the mark (static, no animation) */
 .auth-logo-glow {
   background: radial-gradient(circle, rgba(246, 139, 31, 0.55) 0%, rgba(246, 139, 31, 0) 65%);
-  animation: authGlowPulse 5s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .auth-logo-in,
-  .auth-logo-glow {
-    animation: none;
-  }
-
-  .auth-logo-in:hover .auth-logo-img {
-    transform: none;
-  }
+  opacity: 0.35;
 }
 
 
